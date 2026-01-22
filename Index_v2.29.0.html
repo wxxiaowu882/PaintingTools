@@ -955,7 +955,9 @@
     // === 微信浏览器检测与引导 ===
     // 检测是否为微信浏览器
     function isWeChatBrowser() {
-        return /micromessenger/i.test(navigator.userAgent);
+        const ua = navigator.userAgent.toLowerCase();
+        // 检测微信浏览器，只要包含micromessenger即可
+        return ua.includes('micromessenger');
     }
     
     // 检测是否为移动设备
@@ -965,15 +967,18 @@
     
     // 检测是否需要显示微信引导
     function shouldShowWeChatGuide() {
-        // 只检测微信浏览器，不检测是否为移动设备
+        // 只检测微信浏览器
         return isWeChatBrowser();
     }
     
     // 微信引导控制器
     const WeChatGuide = {
         init: function() {
+            // 根据检测结果决定是否显示引导
             if (shouldShowWeChatGuide()) {
                 this.showGuide();
+            } else {
+                this.hideGuide();
             }
         },
         

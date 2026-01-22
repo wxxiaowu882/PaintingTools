@@ -951,7 +951,119 @@
             }
         }, 10);
     }
+
+    // === 微信浏览器检测与引导 ===
+    // 检测是否为微信浏览器
+    function isWeChatBrowser() {
+        return /micromessenger/i.test(navigator.userAgent);
+    }
+    
+    // 检测是否为移动设备
+    function isMobileDevice() {
+        return /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+    }
+    
+    // 检测是否需要显示微信引导
+    function shouldShowWeChatGuide() {
+        // 只检测微信浏览器，不检测是否为移动设备
+        return isWeChatBrowser();
+    }
+    
+    // 微信引导控制器
+    const WeChatGuide = {
+        init: function() {
+            if (shouldShowWeChatGuide()) {
+                this.showGuide();
+            }
+        },
+        
+        showGuide: function() {
+            const overlay = document.getElementById('wechatGuide');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            }
+        },
+        
+        hideGuide: function() {
+            const overlay = document.getElementById('wechatGuide');
+            if (overlay) {
+                overlay.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+        },
+        
+        copyUrl: function() {
+            const url = window.location.href;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('链接已复制到剪贴板！');
+            }).catch(err => {
+                // 降级方案
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('链接已复制到剪贴板！');
+            });
+        }
+    };
+    
+    // 页面加载后初始化微信引导
+    document.addEventListener('DOMContentLoaded', function() {
+        WeChatGuide.init();
+    });
 </script>
+
+<!-- 微信引导层 - 默认隐藏 -->
+<div id="wechatGuide" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; display:flex; justify-content:center; align-items:center;">
+    <div style="background:white; border-radius:12px; padding:25px; max-width:90%; width:350px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+        <div style="font-size:32px; margin-bottom:15px; color:#4a90e2;">🌐</div>
+        <h3 style="margin:0 0 10px 0; color:#333; font-size:18px;">请在浏览器中打开</h3>
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px;">
+            微信浏览器可能无法正常保存图片。<br>
+            建议点击右上角"..."，选择"在浏览器中打开"。
+        </p>
+        
+        <div style="background:#f8f9fa; border-radius:8px; padding:15px; margin-bottom:20px; border:1px solid #e9ecef;">
+            <div style="display:flex; align-items:center; margin-bottom:10px;">
+                <div style="width:24px; height:24px; background:#4a90e2; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-right:10px; font-size:12px; font-weight:bold;">1</div>
+                <div style="flex:1; text-align:left; font-size:13px;">点击右上角"..."</div>
+            </div>
+            <div style="display:flex; align-items:center; margin-bottom:10px;">
+                <div style="width:24px; height:24px; background:#4a90e2; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-right:10px; font-size:12px; font-weight:bold;">2</div>
+                <div style="flex:1; text-align:left; font-size:13px;">选择"在浏览器中打开"</div>
+            </div>
+            <div style="display:flex; align-items:center;">
+                <div style="width:24px; height:24px; background:#4a90e2; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-right:10px; font-size:12px; font-weight:bold;">3</div>
+                <div style="flex:1; text-align:left; font-size:13px;">享受完整绘画功能</div>
+            </div>
+        </div>
+        
+        <div style="display:flex; gap:10px;">
+            <button onclick="WeChatGuide.copyUrl()" style="flex:1; padding:12px; background:#f0f0f0; border:none; border-radius:6px; color:#666; cursor:pointer; font-size:14px; font-weight:500;">
+                📋 复制链接
+            </button>
+            <button onclick="WeChatGuide.hideGuide()" style="flex:1; padding:12px; background:#4a90e2; border:none; border-radius:6px; color:white; cursor:pointer; font-size:14px; font-weight:500;">
+                🎨 仍要尝试
+            </button>
+        </div>
+        
+        <div style="margin-top:15px; color:#999; font-size:12px; line-height:1.4;">
+            提示：在浏览器中打开后，所有图片保存功能将正常工作
+        </div>
+    </div>
+</div>
+
+<!-- PC端隐藏微信引导 -->
+<style>
+    @media (min-width: 768px) {
+        #wechatGuide {
+            display: none !important;
+        }
+    }
+</style>
 
 </body>
 </html>
