@@ -282,7 +282,7 @@
     }
 
     // 限制Canvas尺寸，避免超出浏览器限制（特别是iOS设备）
-    function limitCanvasSize(canvas, maxWidth = 2560, maxHeight = 2560) {
+    function limitCanvasSize(canvas, maxWidth = 2048, maxHeight = 2048) {
         const width = canvas.width;
         const height = canvas.height;
         
@@ -913,7 +913,7 @@
         
         // 限制4联图尺寸，避免iOS设备上的内存问题
         // 使用更严格的限制，因为4联图是4张图片拼接，尺寸较大
-        return limitCanvasSize(fourPanelCanvas, 2560, 2560);
+        return limitCanvasSize(fourPanelCanvas, 2048, 2048);
     }
 
     // 保存4联对比图

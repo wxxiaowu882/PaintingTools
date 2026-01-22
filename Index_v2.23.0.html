@@ -263,51 +263,8 @@
         }
     }
 
-    // 生成带时间戳的文件名
-    function generateTimestampFilename(baseName) {
-        // 移除可能存在的.jpg扩展名
-        if (baseName.endsWith('.jpg')) {
-            baseName = baseName.slice(0, -4);
-        }
-        
-        const now = new Date();
-        const month = String(now.getMonth() + 1).padStart(2, '0');      // 月份 (01-12)
-        const day = String(now.getDate()).padStart(2, '0');            // 日期 (01-31)
-        const hours = String(now.getHours()).padStart(2, '0');         // 小时 (00-23)
-        const minutes = String(now.getMinutes()).padStart(2, '0');     // 分钟 (00-59)
-        const seconds = String(now.getSeconds()).padStart(2, '0');     // 秒 (00-59)
-        
-        // 格式：基础名称_月日_时_分_秒.jpg
-        return `${baseName}_${month}${day}_${hours}_${minutes}_${seconds}.jpg`;
-    }
-
-    // 限制Canvas尺寸，避免超出浏览器限制（特别是iOS设备）
-    function limitCanvasSize(canvas, maxWidth = 2560, maxHeight = 2560) {
-        const width = canvas.width;
-        const height = canvas.height;
-        
-        // 如果尺寸已经在限制内，直接返回
-        if (width <= maxWidth && height <= maxHeight) {
-            return canvas;
-        }
-        
-        // 计算等比例缩放尺寸
-        const ratio = Math.min(maxWidth / width, maxHeight / height);
-        const newWidth = Math.floor(width * ratio);
-        const newHeight = Math.floor(height * ratio);
-        
-        // 创建新Canvas并绘制缩放后的图像
-        const newCanvas = document.createElement('canvas');
-        newCanvas.width = newWidth;
-        newCanvas.height = newHeight;
-        const ctx = newCanvas.getContext('2d');
-        ctx.drawImage(canvas, 0, 0, width, height, 0, 0, newWidth, newHeight);
-        
-        return newCanvas;
-    }
-
     // === 核心修复：下载功能 (所见即所得) ===
-    function downloadCanvas(canvasId, baseName) {
+    function downloadCanvas(canvasId, filename) {
         const type = canvasId === 'gridCanvas' ? 'grid' : 'poster';
         // 关键修复：从全局变量获取源图片，而不是state
         const sourceImg = type === 'grid' ? gridOriginalImg : posterOriginalImg;
@@ -364,9 +321,6 @@
             // 直接绘制源画布内容（不应用变换）
             ctx.drawImage(sourceCanvas, 0, 0);
         }
-        
-        // 生成带时间戳的文件名
-        const filename = generateTimestampFilename(baseName);
         
         const link = document.createElement('a');
         link.download = filename;
@@ -856,8 +810,7 @@
             ctx.drawImage(sourceCanvas, 0, 0);
         }
         
-        // 限制Canvas尺寸，避免iOS设备上的内存问题
-        return limitCanvasSize(exportCanvas);
+        return exportCanvas;
     }
 
     // 生成4联对比图
@@ -911,9 +864,7 @@
         // 图2-2 (singleWidth, singleHeight)
         fourPanelCtx.drawImage(processedCanvases[3], singleWidth, singleHeight);
         
-        // 限制4联图尺寸，避免iOS设备上的内存问题
-        // 使用更严格的限制，因为4联图是4张图片拼接，尺寸较大
-        return limitCanvasSize(fourPanelCanvas, 2560, 2560);
+        return fourPanelCanvas;
     }
 
     // 保存4联对比图
@@ -935,9 +886,9 @@
                     return;
                 }
                 
-                // 保存图片，使用带时间戳的文件名
+                // 保存图片
                 const link = document.createElement('a');
-                link.download = generateTimestampFilename('4联对比图');
+                link.download = '4联对比图.jpg';
                 link.href = fourPanelCanvas.toDataURL('image/jpeg', 0.95);
                 document.body.appendChild(link);
                 link.click();

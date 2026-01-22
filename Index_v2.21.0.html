@@ -127,7 +127,10 @@
             <!-- 2. 网格调整 (Max 15, Default 3) -->
             <div class="control-row">
                  <div class="control-group full-width" style="flex-direction: row; align-items: center;">
-                     <!-- 取色按钮已经移到下面一行，这里移除 -->
+                     <!-- 正方形取色按钮 -->
+                     <div class="color-picker-wrapper" title="网格颜色" style="border-radius: 8px;">
+                         <input type="color" id="gridColor" value="#ff0000" oninput="drawGrid()">
+                     </div>
                      <div class="slider-container">
                         <button class="btn-micro" onclick="adjustGridSize(-0.1)">-</button>
                         <input type="range" id="gridSize" min="2" max="15" value="3" step="0.05" oninput="drawGrid()">
@@ -139,11 +142,8 @@
             
             <!-- 取色按钮和方格复选框 -->
             <div class="control-row">
-                <div class="control-group full-width" style="flex-direction: row; align-items: center; justify-content: center; gap: 15px;">
-                    <!-- 正方形取色按钮 -->
-                    <div class="color-picker-wrapper" title="网格颜色" style="border-radius: 8px;">
-                        <input type="color" id="gridColor" value="#ff0000" oninput="drawGrid()">
-                    </div>
+                <div class="control-group full-width" style="flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px;">
+                    <!-- 取色按钮已经移到上一行，这里不需要重复 -->
                     <!-- 方格复选框 -->
                     <label style="display: flex; align-items: center; justify-content:center; padding:0 10px; background:#fff; border-radius:20px; height: 36px; border:1px solid #eee; flex-shrink: 0;">
                         <input type="checkbox" id="squareGridCheck" onchange="toggleSquareGrid()" style="width: 20px; height:20px; margin-right: 5px;"> 
@@ -229,9 +229,8 @@
             </div>
         </div>
 
-        <div style="padding: 10px; display: flex; gap: 10px; justify-content: center;">
-            <button class="btn btn-outline" style="color:var(--secondary-color)!important; border-color:var(--secondary-color); background:#fff; flex: 1;" onclick="saveFourPanelComparison()">📊 保存4联对比图</button>
-            <button class="btn btn-outline" style="color:var(--secondary-color)!important; border-color:var(--secondary-color); background:#fff; flex: 1;" onclick="downloadCanvas('posterCanvas', '色块概括图.jpg')">⬇️ 保存结果图</button>
+        <div style="padding: 10px;">
+            <button class="btn btn-outline" style="color:var(--secondary-color)!important; border-color:var(--secondary-color); background:#fff;" onclick="downloadCanvas('posterCanvas', '色块概括图.jpg')">⬇️ 保存结果图</button>
         </div>
     </div>
 
@@ -263,51 +262,8 @@
         }
     }
 
-    // 生成带时间戳的文件名
-    function generateTimestampFilename(baseName) {
-        // 移除可能存在的.jpg扩展名
-        if (baseName.endsWith('.jpg')) {
-            baseName = baseName.slice(0, -4);
-        }
-        
-        const now = new Date();
-        const month = String(now.getMonth() + 1).padStart(2, '0');      // 月份 (01-12)
-        const day = String(now.getDate()).padStart(2, '0');            // 日期 (01-31)
-        const hours = String(now.getHours()).padStart(2, '0');         // 小时 (00-23)
-        const minutes = String(now.getMinutes()).padStart(2, '0');     // 分钟 (00-59)
-        const seconds = String(now.getSeconds()).padStart(2, '0');     // 秒 (00-59)
-        
-        // 格式：基础名称_月日_时_分_秒.jpg
-        return `${baseName}_${month}${day}_${hours}_${minutes}_${seconds}.jpg`;
-    }
-
-    // 限制Canvas尺寸，避免超出浏览器限制（特别是iOS设备）
-    function limitCanvasSize(canvas, maxWidth = 2560, maxHeight = 2560) {
-        const width = canvas.width;
-        const height = canvas.height;
-        
-        // 如果尺寸已经在限制内，直接返回
-        if (width <= maxWidth && height <= maxHeight) {
-            return canvas;
-        }
-        
-        // 计算等比例缩放尺寸
-        const ratio = Math.min(maxWidth / width, maxHeight / height);
-        const newWidth = Math.floor(width * ratio);
-        const newHeight = Math.floor(height * ratio);
-        
-        // 创建新Canvas并绘制缩放后的图像
-        const newCanvas = document.createElement('canvas');
-        newCanvas.width = newWidth;
-        newCanvas.height = newHeight;
-        const ctx = newCanvas.getContext('2d');
-        ctx.drawImage(canvas, 0, 0, width, height, 0, 0, newWidth, newHeight);
-        
-        return newCanvas;
-    }
-
     // === 核心修复：下载功能 (所见即所得) ===
-    function downloadCanvas(canvasId, baseName) {
+    function downloadCanvas(canvasId, filename) {
         const type = canvasId === 'gridCanvas' ? 'grid' : 'poster';
         // 关键修复：从全局变量获取源图片，而不是state
         const sourceImg = type === 'grid' ? gridOriginalImg : posterOriginalImg;
@@ -364,9 +320,6 @@
             // 直接绘制源画布内容（不应用变换）
             ctx.drawImage(sourceCanvas, 0, 0);
         }
-        
-        // 生成带时间戳的文件名
-        const filename = generateTimestampFilename(baseName);
         
         const link = document.createElement('a');
         link.download = filename;
@@ -705,251 +658,6 @@
             data[i] = r; data[i+1] = g; data[i+2] = b;
         }
         posterCtx.putImageData(imageData, 0, 0);
-    }
-
-    // === 4联对比图功能 ===
-    // 加载提示样式
-    const style = document.createElement('style');
-    style.textContent = `
-        .loading-overlay {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(255,255,255,0.85);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            font-size: 16px;
-            color: #333;
-        }
-        .loading-spinner {
-            width: 40px; height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--secondary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 15px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    `;
-    document.head.appendChild(style);
-
-    // 显示/隐藏加载提示
-    function showLoading(message = '正在生成4联对比图...') {
-        let overlay = document.getElementById('loadingOverlay');
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.id = 'loadingOverlay';
-            overlay.className = 'loading-overlay';
-            overlay.innerHTML = `
-                <div class="loading-spinner"></div>
-                <div>${message}</div>
-            `;
-            document.body.appendChild(overlay);
-        }
-        overlay.style.display = 'flex';
-    }
-
-    function hideLoading() {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) overlay.style.display = 'none';
-    }
-
-    // 可指定色阶值的处理函数
-    function processWithLevel(sourceCanvas, level, isGray) {
-        const canvas = document.createElement('canvas');
-        canvas.width = sourceCanvas.width;
-        canvas.height = sourceCanvas.height;
-        const ctx = canvas.getContext('2d');
-        
-        // 绘制原始图片
-        ctx.drawImage(sourceCanvas, 0, 0);
-        
-        // 如果level为0，表示不进行色阶处理（但应用黑白模式）
-        if (level === 0) {
-            if (isGray) {
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imageData.data;
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i], g = data[i+1], b = data[i+2];
-                    const avg = 0.299*r + 0.587*g + 0.114*b;
-                    data[i] = data[i+1] = data[i+2] = avg;
-                }
-                ctx.putImageData(imageData, 0, 0);
-            }
-            return canvas;
-        }
-        
-        // 色阶处理
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        const step = 255 / (level - 1);
-        
-        for (let i = 0; i < data.length; i += 4) {
-            let r = data[i], g = data[i+1], b = data[i+2];
-            if (isGray) {
-                const avg = 0.299*r + 0.587*g + 0.114*b;
-                r = g = b = avg;
-            }
-            r = Math.floor(r / step) * step;
-            g = Math.floor(g / step) * step;
-            b = Math.floor(b / step) * step;
-            data[i] = r; data[i+1] = g; data[i+2] = b;
-        }
-        ctx.putImageData(imageData, 0, 0);
-        return canvas;
-    }
-
-    // 获取导出Canvas（复用downloadCanvas的逻辑）
-    function getExportCanvas(sourceCanvas, type) {
-        const stage = document.getElementById(type + 'Window');
-        const s = state[type];
-        
-        // 判断图片是否完全覆盖可视范围
-        const scaledWidth = sourceCanvas.width * s.scale;
-        const scaledHeight = sourceCanvas.height * s.scale;
-        const imgLeft = (stage.clientWidth / 2) - (scaledWidth / 2) + s.panX;
-        const imgTop = (stage.clientHeight / 2) - (scaledHeight / 2) + s.panY;
-        
-        const isFullyCovered = imgLeft <= 0 && imgTop <= 0 && 
-                               imgLeft + scaledWidth >= stage.clientWidth && 
-                               imgTop + scaledHeight >= stage.clientHeight;
-        
-        const exportCanvas = document.createElement('canvas');
-        
-        if (isFullyCovered) {
-            // 图片完全覆盖可视范围：保存所见即所得（当前视窗内容）
-            exportCanvas.width = stage.clientWidth;
-            exportCanvas.height = stage.clientHeight;
-            const ctx = exportCanvas.getContext('2d');
-            
-            // 填充白色背景
-            ctx.fillStyle = '#ffffff'; 
-            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-            
-            ctx.save();
-            
-            // 1. 移动到中心
-            ctx.translate(exportCanvas.width / 2, exportCanvas.height / 2);
-            
-            // 2. 应用变换
-            ctx.translate(s.panX, s.panY);
-            ctx.scale(s.scale, s.scale);
-            
-            // 3. 绘制源内容 (回到左上角)
-            ctx.translate(-sourceCanvas.width / 2, -sourceCanvas.height / 2);
-            ctx.drawImage(sourceCanvas, 0, 0);
-            
-            ctx.restore();
-        } else {
-            // 图片未完全覆盖可视范围：保存实际图片（不裁剪）
-            exportCanvas.width = sourceCanvas.width;
-            exportCanvas.height = sourceCanvas.height;
-            const ctx = exportCanvas.getContext('2d');
-            
-            // 直接绘制源画布内容（不应用变换）
-            ctx.drawImage(sourceCanvas, 0, 0);
-        }
-        
-        // 限制Canvas尺寸，避免iOS设备上的内存问题
-        return limitCanvasSize(exportCanvas);
-    }
-
-    // 生成4联对比图
-    function generateFourPanelComparison() {
-        if (!posterOriginalImg) {
-            alert('请先上传图片！');
-            return null;
-        }
-        
-        // 获取当前黑白模式状态
-        const isGray = document.getElementById('grayscaleCheck').checked;
-        
-        // 创建原始Canvas
-        const originalCanvas = document.createElement('canvas');
-        originalCanvas.width = posterOriginalImg.width;
-        originalCanvas.height = posterOriginalImg.height;
-        const originalCtx = originalCanvas.getContext('2d');
-        originalCtx.drawImage(posterOriginalImg, 0, 0);
-        
-        // 处理4种色阶
-        const levels = [0, 12, 9, 15]; // 0表示原始图片（但应用黑白模式）
-        const processedCanvases = [];
-        
-        for (let i = 0; i < 4; i++) {
-            const processedCanvas = processWithLevel(originalCanvas, levels[i], isGray);
-            const exportCanvas = getExportCanvas(processedCanvas, 'poster');
-            processedCanvases.push(exportCanvas);
-        }
-        
-        // 确定单张图片尺寸（所有图片使用相同的尺寸判断逻辑，所以尺寸应该相同）
-        const singleWidth = processedCanvases[0].width;
-        const singleHeight = processedCanvases[0].height;
-        
-        // 创建4联图Canvas
-        const fourPanelCanvas = document.createElement('canvas');
-        fourPanelCanvas.width = singleWidth * 2;
-        fourPanelCanvas.height = singleHeight * 2;
-        const fourPanelCtx = fourPanelCanvas.getContext('2d');
-        
-        // 填充白色背景
-        fourPanelCtx.fillStyle = '#ffffff';
-        fourPanelCtx.fillRect(0, 0, fourPanelCanvas.width, fourPanelCanvas.height);
-        
-        // 绘制4张图片（田字形布局）
-        // 图1-1 (0, 0)
-        fourPanelCtx.drawImage(processedCanvases[0], 0, 0);
-        // 图1-2 (singleWidth, 0)
-        fourPanelCtx.drawImage(processedCanvases[1], singleWidth, 0);
-        // 图2-1 (0, singleHeight)
-        fourPanelCtx.drawImage(processedCanvases[2], 0, singleHeight);
-        // 图2-2 (singleWidth, singleHeight)
-        fourPanelCtx.drawImage(processedCanvases[3], singleWidth, singleHeight);
-        
-        // 限制4联图尺寸，避免iOS设备上的内存问题
-        // 使用更严格的限制，因为4联图是4张图片拼接，尺寸较大
-        return limitCanvasSize(fourPanelCanvas, 2560, 2560);
-    }
-
-    // 保存4联对比图
-    function saveFourPanelComparison() {
-        if (!posterOriginalImg) {
-            alert('请先上传图片！');
-            return;
-        }
-        
-        // 显示等待提示
-        showLoading();
-        
-        // 异步处理，避免阻塞UI
-        setTimeout(() => {
-            try {
-                const fourPanelCanvas = generateFourPanelComparison();
-                if (!fourPanelCanvas) {
-                    hideLoading();
-                    return;
-                }
-                
-                // 保存图片，使用带时间戳的文件名
-                const link = document.createElement('a');
-                link.download = generateTimestampFilename('4联对比图');
-                link.href = fourPanelCanvas.toDataURL('image/jpeg', 0.95);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (error) {
-                alert('生成失败：' + error.message);
-                console.error(error);
-            } finally {
-                // 隐藏等待提示
-                hideLoading();
-            }
-        }, 10);
     }
 </script>
 
