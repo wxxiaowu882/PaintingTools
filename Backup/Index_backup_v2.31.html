@@ -955,9 +955,7 @@
     // === 微信浏览器检测与引导 ===
     // 检测是否为微信浏览器
     function isWeChatBrowser() {
-        const ua = navigator.userAgent.toLowerCase();
-        // 检测微信浏览器，只要包含micromessenger即可
-        return ua.includes('micromessenger');
+        return /micromessenger/i.test(navigator.userAgent);
     }
     
     // 检测是否为移动设备
@@ -967,18 +965,15 @@
     
     // 检测是否需要显示微信引导
     function shouldShowWeChatGuide() {
-        // 只检测微信浏览器
+        // 只检测微信浏览器，不检测是否为移动设备
         return isWeChatBrowser();
     }
     
     // 微信引导控制器
     const WeChatGuide = {
         init: function() {
-            // 根据检测结果决定是否显示引导
             if (shouldShowWeChatGuide()) {
                 this.showGuide();
-            } else {
-                this.hideGuide();
             }
         },
         
@@ -1024,10 +1019,10 @@
 <!-- 微信引导层 - 默认隐藏 -->
 <div id="wechatGuide" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; display:flex; justify-content:center; align-items:center;">
     <div style="background:white; border-radius:12px; padding:25px; max-width:90%; width:350px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
-        <div style="font-size:32px; margin-bottom:15px; color:#4a90e2;">👧</div>
+        <div style="font-size:32px; margin-bottom:15px; color:#4a90e2;">🌐</div>
         <h3 style="margin:0 0 10px 0; color:#333; font-size:18px;">请在浏览器中打开</h3>
-        <p style="color:#666; line-height:1.5; margin-bottom:15px; font-size:14px;">
-            微信不支持此网页中的技术。<br>
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px;">
+            微信浏览器可能无法正常保存图片。<br>
             建议点击右上角"..."，选择"在浏览器中打开"。
         </p>
         
@@ -1036,49 +1031,28 @@
                 <div style="width:24px; height:24px; background:#4a90e2; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-right:10px; font-size:12px; font-weight:bold;">1</div>
                 <div style="flex:1; text-align:left; font-size:13px;">点击右上角"..."</div>
             </div>
-            <div style="display:flex; align-items:center;">
+            <div style="display:flex; align-items:center; margin-bottom:10px;">
                 <div style="width:24px; height:24px; background:#4a90e2; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-right:10px; font-size:12px; font-weight:bold;">2</div>
                 <div style="flex:1; text-align:left; font-size:13px;">选择"在浏览器中打开"</div>
             </div>
+            <div style="display:flex; align-items:center;">
+                <div style="width:24px; height:24px; background:#4a90e2; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-right:10px; font-size:12px; font-weight:bold;">3</div>
+                <div style="flex:1; text-align:left; font-size:13px;">享受完整绘画功能</div>
+            </div>
         </div>
         
-        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px;">
-            或者，在这里
-            <button onclick="WeChatGuide.copyUrl()" style="padding:6px 12px; background:#e8f4ff; border:2px solid #4a90e2; border-radius:6px; color:#4a90e2; cursor:pointer; font-size:13px; font-weight:500; margin:0 4px; transition:all 0.1s;">
+        <div style="display:flex; gap:10px;">
+            <button onclick="WeChatGuide.copyUrl()" style="flex:1; padding:12px; background:#f0f0f0; border:none; border-radius:6px; color:#666; cursor:pointer; font-size:14px; font-weight:500;">
                 📋 复制链接
             </button>
-            ，然后切换到浏览器，粘贴到浏览器地址栏打开。
-        </p>
-        
-        <div style="display:flex; gap:10px; margin-bottom:15px;">
-            <button onclick="WeChatGuide.copyUrl()" style="flex:1; padding:12px; background:#4a90e2; border:none; border-radius:6px; color:white; cursor:pointer; font-size:14px; font-weight:500; transition:all 0.1s;">
-                📋 复制链接
-            </button>
-            <button onclick="WeChatGuide.hideGuide()" style="flex:1; padding:12px; background:#f0f0f0; border:none; border-radius:6px; color:#666; cursor:pointer; font-size:14px; font-weight:500; transition:all 0.1s;">
+            <button onclick="WeChatGuide.hideGuide()" style="flex:1; padding:12px; background:#4a90e2; border:none; border-radius:6px; color:white; cursor:pointer; font-size:14px; font-weight:500;">
                 🎨 仍要尝试
             </button>
         </div>
         
-        <div style="color:#999; font-size:12px; line-height:1.4; padding-top:15px; border-top:1px solid #eee;">
-            提示：在浏览器中打开后，绘画辅助工具才正常工作。在微信中打开则不支持。
+        <div style="margin-top:15px; color:#999; font-size:12px; line-height:1.4;">
+            提示：在浏览器中打开后，所有图片保存功能将正常工作
         </div>
-        
-        <style>
-            /* 按钮按下效果 */
-            #wechatGuide button:active {
-                transform: translateY(1px);
-                box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-            }
-            #wechatGuide button:nth-of-type(1):active {
-                background-color: #d0e4ff !important;
-            }
-            #wechatGuide button:nth-of-type(2):active {
-                background-color: #3a80d2 !important;
-            }
-            #wechatGuide button:nth-of-type(3):active {
-                background-color: #e0e0e0 !important;
-            }
-        </style>
     </div>
 </div>
 

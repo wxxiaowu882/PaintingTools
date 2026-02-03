@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>有机孟塞尔色立体 | Organic Munsell Solid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+                "@tweenjs/tween.js": "https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@23.1.1/dist/tween.esm.js"
+            }
+        }
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+        }
+        .color-input-wrapper { position: relative; overflow: hidden; display: inline-block; cursor: pointer; }
+        .color-input-wrapper input[type="color"] { position: absolute; left: -100%; top: -100%; width: 300%; height: 300%; cursor: pointer; opacity: 0; }
+        
+        .toggle-checkbox:checked { right: 0; border-color: #F6E05E; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #F6E05E; }
+        
+        input[type=range].peel-slider::-webkit-slider-thumb { background: #63B3ED; }
+        input[type=range].shape-slider::-webkit-slider-thumb { background: #F6E05E; }
+    </style>
+</head>
+<body class="text-white">
+
+    <!-- Header -->
+    <div class="absolute top-0 left-0 w-full p-6 z-10 flex justify-between items-start pointer-events-none">
+        <div class="pointer-events-auto">
+            <h1 class="text-2xl font-light tracking-wider text-gray-200">MUNSELL <span class="font-bold text-white">PRO</span></h1>
+            <p class="text-xs text-gray-500 mt-1 uppercase tracking-widest">高级粒子渲染 (High-Fidelity)</p>
+        </div>
+        <!-- 文字说明部分已移除 -->
+    </div>
+
+    <!-- Controls -->
+    <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 w-auto max-w-[98%] pointer-events-auto">
+        <div class="glass-panel rounded-full px-4 py-3 flex items-center gap-3 sm:gap-4 transition-all hover:border-gray-500">
+            
+            <!-- Picker -->
+            <div class="color-input-wrapper group relative flex-shrink-0" title="Color Picker">
+                <div id="colorPreview" class="w-9 h-9 rounded-full border-2 border-white/20 shadow-lg group-hover:scale-110 transition-transform bg-white"></div>
+                <input type="color" id="colorPicker" value="#ffffff">
+            </div>
+
+            <!-- Shape Slider -->
+            <div class="flex flex-col justify-center w-16 sm:w-20">
+                <div class="flex justify-between text-[8px] text-gray-400 uppercase tracking-wider mb-1">
+                    <span>Morph</span>
+                    <span id="shapeValue" class="text-yellow-400">55%</span>
+                </div>
+                <input type="range" id="shapeSlider" min="0" max="1" step="0.01" value="0.55" class="shape-slider w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <!-- Peel Slider -->
+            <div class="flex flex-col justify-center w-16 sm:w-20">
+                <div class="flex justify-between text-[8px] text-gray-400 uppercase tracking-wider mb-1">
+                    <span>Peel</span>
+                    <span id="peelValue" class="text-blue-400">100%</span>
+                </div>
+                <input type="range" id="peelSlider" min="0.01" max="1" step="0.01" value="1" class="peel-slider w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <div class="w-px h-8 bg-white/10 hidden sm:block"></div>
+
+            <!-- Grayscale -->
+            <div class="flex flex-col items-center">
+                <span class="text-[8px] text-gray-400 uppercase tracking-wider mb-1">Gray</span>
+                <label for="grayToggle" class="flex items-center cursor-pointer relative">
+                    <input type="checkbox" id="grayToggle" class="sr-only">
+                    <div class="w-8 h-4 bg-gray-600 rounded-full shadow-inner transition-colors duration-300 toggle-bg-gray"></div>
+                    <div class="dot-gray absolute left-1 top-0.5 bg-white w-3 h-3 rounded-full shadow transition-transform duration-300 transform"></div>
+                </label>
+            </div>
+
+            <!-- Top View Toggle -->
+            <button id="topViewBtn" class="flex flex-col items-center justify-center group focus:outline-none" title="Toggle Top/Side View">
+                <span class="text-[8px] text-gray-400 uppercase tracking-wider mb-1 group-hover:text-white transition-colors">Top</span>
+                <!-- Button Circle: Will toggle classes for active state -->
+                <div id="topViewIconCircle" class="w-8 h-8 rounded-full bg-gray-700 border border-gray-600 flex items-center justify-center group-hover:bg-gray-600 group-hover:border-gray-500 transition-all shadow-lg">
+                    <svg class="w-4 h-4 text-gray-300 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                </div>
+            </button>
+
+        </div>
+    </div>
+
+    <div id="canvas-container" class="w-full h-screen"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import * as TWEEN from '@tweenjs/tween.js';
+
+        // Configuration
+        const CONFIG = {
+            particleCount: 75000, 
+            height: 40,
+            radius: 26, 
+            currentBaseSize: 0.85 
+        };
+
+        let scene, camera, renderer, controls;
+        let particleSystem;
+        let selectionMarker;
+        let selectedColor = new THREE.Color('#ffffff');
+        let particleTexture;
+        let isAnimatingCamera = false; 
+        
+        // State
+        let shapeMode = 0.55; 
+        let lastShapeMode = 0.55; 
+        let isGrayscale = false; 
+        let isTopView = false;
+        
+        // Idle Timer State
+        let lastInteractionTime = Date.now();
+        const IDLE_TIMEOUT = 5000; // 5 seconds
+        
+        // Materials References for dynamic updating
+        let skeletonMatSubtle;
+        let skeletonGroup; 
+
+        // Data Stores
+        const particlesData = {
+            baseX: [], baseY: [], baseZ: [],
+            munsellX: [], munsellY: [], munsellZ: [],
+            colorRGB: [],
+            colorGray: []
+        };
+        const skeletonLines = [];
+
+        function createSoftParticleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            grad.addColorStop(0, 'rgba(255,255,255,1.0)');
+            grad.addColorStop(0.2, 'rgba(255,255,255,0.8)'); 
+            grad.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+            grad.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 64, 64);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // --- MATH ---
+        function cosineInterpolate(y1, y2, mu) {
+            const mu2 = (1 - Math.cos(mu * Math.PI)) / 2;
+            return (y1 * (1 - mu2) + y2 * mu2);
+        }
+
+        function getMunsellCharacteristics(h) {
+            if (h >= 0.9999) h = 0;
+
+            const hueDeg = h * 360;
+            const keys = [
+                { h: 0,   v: 0.45, c: 1.0 },  
+                { h: 60,  v: 0.85, c: 0.8 },  
+                { h: 120, v: 0.55, c: 0.5 },  
+                { h: 180, v: 0.65, c: 0.4 },  
+                { h: 240, v: 0.35, c: 0.7 },  
+                { h: 300, v: 0.30, c: 0.65 }, 
+                { h: 360, v: 0.45, c: 1.0 }   
+            ];
+            for (let i = 0; i < keys.length - 1; i++) {
+                if (hueDeg >= keys[i].h && hueDeg < keys[i+1].h) {
+                    const t = (hueDeg - keys[i].h) / (keys[i+1].h - keys[i].h);
+                    return {
+                        peakL: cosineInterpolate(keys[i].v, keys[i+1].v, t),
+                        maxChroma: cosineInterpolate(keys[i].c, keys[i+1].c, t)
+                    };
+                }
+            }
+            return { peakL: 0.45, maxChroma: 1.0 };
+        }
+
+        function calculateData(h, s, l) {
+            const standardDist = Math.abs(2 * l - 1);
+            const standardBulge = Math.cos(standardDist * Math.PI / 2); 
+            const standardR = s * CONFIG.radius * 0.7 * standardBulge;
+            const standardY = (l - 0.5) * CONFIG.height;
+
+            const { peakL, maxChroma } = getMunsellCharacteristics(h);
+            const tempColor = new THREE.Color().setHSL(h, s, l);
+            const luma = 0.2126 * tempColor.r + 0.7152 * tempColor.g + 0.0722 * tempColor.b;
+            const perceptualL = Math.pow(luma, 1/2.2); 
+            const munsellY = (perceptualL - 0.5) * CONFIG.height;
+
+            let dist = 0;
+            if (l > peakL) dist = (l - peakL) / (1 - peakL);
+            else dist = (peakL - l) / peakL;                 
+            let bulge = Math.pow(Math.cos(dist * Math.PI / 2), 0.8);
+            const munsellR = s * CONFIG.radius * maxChroma * bulge;
+
+            const theta = h * Math.PI * 2;
+            const cos = Math.cos(theta);
+            const sin = Math.sin(theta);
+
+            return { 
+                base: { x: standardR * cos, y: standardY, z: standardR * sin },
+                munsell: { x: munsellR * cos, y: munsellY, z: munsellR * sin },
+                luma: luma,
+                rgb: tempColor
+            };
+        }
+
+        function init() {
+            particleTexture = createSoftParticleTexture();
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050505);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 15, 90);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.autoRotate = true; 
+            controls.autoRotateSpeed = 2.0; 
+            
+            // Interaction Listener for Skeleton Visibility Logic and Idle Timer
+            controls.addEventListener('start', () => {
+                // User started interacting
+                lastInteractionTime = Date.now();
+                controls.autoRotate = false;
+            });
+
+            controls.addEventListener('change', () => {
+                // Keep updating timestamp while dragging
+                // Note: 'change' fires on autoRotate too, so we check user intent via 'start' mostly
+                // But for idle reset, we can just use the DOM events below for robust detection
+                
+                // Skeleton visibility logic
+                if (isTopView) {
+                    const polarAngle = controls.getPolarAngle();
+                    if (polarAngle > 0.1) { 
+                        resetNormalVisuals();
+                    }
+                }
+            });
+
+            // Global Interaction Listeners for Idle Timer
+            const resetIdleTimer = () => {
+                lastInteractionTime = Date.now();
+                controls.autoRotate = false;
+            };
+            renderer.domElement.addEventListener('pointerdown', resetIdleTimer);
+            renderer.domElement.addEventListener('pointermove', () => {
+                // Only reset if we are NOT auto-rotating (user is actually moving it)
+                if (!controls.autoRotate) {
+                    lastInteractionTime = Date.now();
+                }
+            });
+            renderer.domElement.addEventListener('dblclick', () => {
+                // Toggle rotation manually on double click
+                controls.autoRotate = !controls.autoRotate;
+                if (!controls.autoRotate) lastInteractionTime = Date.now();
+            });
+
+            generateColorSolid();
+            createSkeleton();
+            createSelectionMarker();
+
+            scene.add(new THREE.AmbientLight(0x444444));
+            
+            window.addEventListener('resize', onWindowResize);
+            setupUI();
+            animate();
+        }
+
+        function generateColorSolid() {
+            const geometry = new THREE.BufferGeometry();
+            const positions = [];
+            const colorRGB = [];
+            const colorGray = [];
+            
+            const tempParticles = [];
+
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                const h = Math.random();
+                const s = Math.sqrt(Math.random()); 
+                const l = Math.random(); 
+                tempParticles.push({ h, s, l });
+            }
+
+            // Sort for peeling
+            tempParticles.sort((a, b) => a.s - b.s);
+
+            particlesData.baseX = []; particlesData.baseY = []; particlesData.baseZ = [];
+            particlesData.munsellX = []; particlesData.munsellY = []; particlesData.munsellZ = [];
+
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                const { h, s, l } = tempParticles[i];
+                const data = calculateData(h, s, l);
+                
+                positions.push(
+                    data.base.x + (data.munsell.x - data.base.x) * shapeMode,
+                    data.base.y + (data.munsell.y - data.base.y) * shapeMode,
+                    data.base.z + (data.munsell.z - data.base.z) * shapeMode
+                );
+                
+                colorRGB.push(data.rgb.r, data.rgb.g, data.rgb.b);
+                colorGray.push(data.luma, data.luma, data.luma);
+
+                particlesData.baseX.push(data.base.x);
+                particlesData.baseY.push(data.base.y);
+                particlesData.baseZ.push(data.base.z);
+                
+                particlesData.munsellX.push(data.munsell.x);
+                particlesData.munsellY.push(data.munsell.y);
+                particlesData.munsellZ.push(data.munsell.z);
+            }
+
+            particlesData.colorRGB = new Float32Array(colorRGB);
+            particlesData.colorGray = new Float32Array(colorGray);
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(particlesData.colorRGB, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: CONFIG.currentBaseSize,
+                map: particleTexture,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9, 
+                sizeAttenuation: true,
+                alphaTest: 0.001,
+                blending: THREE.NormalBlending,
+                depthWrite: false
+            });
+
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+        }
+
+        function createSkeleton() {
+            skeletonGroup = new THREE.Group();
+            skeletonGroup.visible = false; 
+            scene.add(skeletonGroup);
+
+            const addLine = (pointsData, material) => {
+                const positions = [];
+                const lineData = { 
+                    baseX: [], baseY: [], baseZ: [],
+                    munsellX: [], munsellY: [], munsellZ: []
+                };
+                
+                pointsData.forEach(p => {
+                    positions.push(
+                        p.base.x + (p.munsell.x - p.base.x) * shapeMode,
+                        p.base.y + (p.munsell.y - p.base.y) * shapeMode,
+                        p.base.z + (p.munsell.z - p.base.z) * shapeMode
+                    );
+                    
+                    lineData.baseX.push(p.base.x); lineData.baseY.push(p.base.y); lineData.baseZ.push(p.base.z);
+                    lineData.munsellX.push(p.munsell.x); lineData.munsellY.push(p.munsell.y); lineData.munsellZ.push(p.munsell.z);
+                });
+
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                const line = new THREE.Line(geo, material);
+                skeletonGroup.add(line); 
+                skeletonLines.push({ mesh: line, data: lineData });
+            };
+
+            skeletonMatSubtle = new THREE.LineBasicMaterial({ 
+                color: 0xffffff, 
+                transparent: true, 
+                opacity: 0.15,
+                blending: THREE.AdditiveBlending 
+            });
+            
+            const axisGeo = new THREE.CylinderGeometry(0.03, 0.03, CONFIG.height + 6, 8);
+            const axisMat = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff, 
+                transparent: true, 
+                opacity: 0.4, 
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const axisMesh = new THREE.Mesh(axisGeo, axisMat);
+            scene.add(axisMesh);
+
+            const arrowGeo = new THREE.ConeGeometry(0.5, 1.5, 16);
+            const arrowMesh = new THREE.Mesh(arrowGeo, axisMat);
+            arrowMesh.position.y = (CONFIG.height + 6) / 2; 
+            scene.add(arrowMesh);
+
+            // 12 Radial Ribs
+            const ribs = 12;
+            for (let i = 0; i < ribs; i++) {
+                const h = i / ribs;
+                const points = [];
+                const steps = 60;
+                for(let j = 0; j <= steps; j++) {
+                    const l = j / steps;
+                    points.push(calculateData(h, 1.0, l));
+                }
+                addLine(points, skeletonMatSubtle);
+            }
+        }
+
+        // --- VISUAL STATE MANAGERS ---
+        function enterTopView() {
+            isTopView = true;
+            if (skeletonGroup) {
+                skeletonGroup.visible = true;
+                skeletonMatSubtle.color.setHex(0x000000);
+                skeletonMatSubtle.blending = THREE.NormalBlending;
+                skeletonMatSubtle.opacity = 0.5;
+            }
+            const btnDiv = document.querySelector('#topViewBtn div');
+            if(btnDiv) {
+                btnDiv.classList.remove('bg-gray-700', 'border-gray-600');
+                btnDiv.classList.add('bg-blue-600', 'border-white');
+            }
+        }
+
+        function resetNormalVisuals() {
+            isTopView = false;
+            if (skeletonGroup) {
+                skeletonGroup.visible = false;
+                skeletonMatSubtle.color.setHex(0xffffff);
+                skeletonMatSubtle.blending = THREE.AdditiveBlending;
+                skeletonMatSubtle.opacity = 0.15;
+            }
+            const btnDiv = document.querySelector('#topViewBtn div');
+            if(btnDiv) {
+                btnDiv.classList.remove('bg-blue-600', 'border-white');
+                btnDiv.classList.add('bg-gray-700', 'border-gray-600');
+            }
+        }
+
+        function createSelectionMarker() {
+            const group = new THREE.Group();
+            group.add(new THREE.Mesh(
+                new THREE.SphereGeometry(0.8, 16, 16),
+                new THREE.MeshBasicMaterial({ color: 0xffffff })
+            ));
+            
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+            group.add(new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.05, 16, 64), ringMat));
+            
+            const ring2 = new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.02, 16, 64), ringMat);
+            ring2.rotation.x = Math.PI / 2;
+            group.add(ring2);
+
+            selectionMarker = group;
+            selectionMarker.visible = false;
+            scene.add(selectionMarker);
+        }
+
+        // MAIN UPDATE LOOP
+        function updateRealtime() {
+             const positions = particleSystem.geometry.attributes.position.array;
+             const bx = particlesData.baseX;
+             const by = particlesData.baseY;
+             const bz = particlesData.baseZ;
+             const mx = particlesData.munsellX;
+             const my = particlesData.munsellY;
+             const mz = particlesData.munsellZ;
+             const count = CONFIG.particleCount;
+             const t = shapeMode; 
+
+             for(let i = 0; i < count; i++) {
+                 positions[i*3]     = bx[i] + (mx[i] - bx[i]) * t;
+                 positions[i*3 + 1] = by[i] + (my[i] - by[i]) * t;
+                 positions[i*3 + 2] = bz[i] + (mz[i] - bz[i]) * t;
+             }
+             particleSystem.geometry.attributes.position.needsUpdate = true;
+             
+             // Update Skeleton Lines
+             skeletonLines.forEach(line => {
+                 const pos = line.mesh.geometry.attributes.position.array;
+                 const d = line.data;
+                 const len = d.baseX.length;
+                 for(let i = 0; i < len; i++) {
+                     pos[i*3]     = d.baseX[i] + (d.munsellX[i] - d.baseX[i]) * t;
+                     pos[i*3 + 1] = d.baseY[i] + (d.munsellY[i] - d.baseY[i]) * t;
+                     pos[i*3 + 2] = d.baseZ[i] + (d.munsellZ[i] - d.baseZ[i]) * t;
+                 }
+                 line.mesh.geometry.attributes.position.needsUpdate = true;
+             });
+             
+             if (selectionMarker.visible) {
+                 const hsl = {}; selectedColor.getHSL(hsl);
+                 update3DSelection(hsl);
+             }
+        }
+
+        function setShapeMode(targetVal) {
+            new TWEEN.Tween({ val: shapeMode })
+                .to({ val: targetVal }, 1500)
+                .easing(TWEEN.Easing.Cubic.InOut)
+                .onUpdate((obj) => {
+                    shapeMode = obj.val;
+                    const slider = document.getElementById('shapeSlider');
+                    if(slider && document.activeElement !== slider) {
+                        slider.value = shapeMode;
+                        document.getElementById('shapeValue').innerText = Math.round(shapeMode * 100) + '%';
+                    }
+                })
+                .start();
+        }
+
+        function setupUI() {
+            const picker = document.getElementById('colorPicker');
+            const preview = document.getElementById('colorPreview');
+            
+            picker.addEventListener('input', (e) => {
+                selectedColor.set(e.target.value);
+                preview.style.backgroundColor = e.target.value;
+                const hsl = {}; selectedColor.getHSL(hsl);
+                update3DSelection(hsl);
+            });
+
+            const shapeSlider = document.getElementById('shapeSlider');
+            const shapeValue = document.getElementById('shapeValue');
+            shapeSlider.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                shapeMode = val;
+                shapeValue.innerText = Math.round(val * 100) + '%';
+            });
+
+            const peelSlider = document.getElementById('peelSlider');
+            const peelValue = document.getElementById('peelValue');
+            peelSlider.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                peelValue.innerText = Math.round(val * 100) + '%';
+                if (particleSystem) {
+                    const count = Math.floor(CONFIG.particleCount * val);
+                    particleSystem.geometry.setDrawRange(0, count);
+                }
+            });
+
+            const setupToggle = (id, dotClass, bgClass, activeColor, callback) => {
+                const toggle = document.getElementById(id);
+                // Safety check
+                if (!toggle) return;
+                
+                const dot = toggle.parentElement.querySelector(dotClass);
+                const bg = toggle.parentElement.querySelector(bgClass);
+                const updateVis = (checked) => {
+                    dot.style.transform = checked ? 'translateX(100%)' : 'translateX(0)';
+                    bg.style.backgroundColor = checked ? activeColor : '#4B5563';
+                };
+                toggle.addEventListener('change', (e) => {
+                    updateVis(e.target.checked);
+                    callback(e.target.checked);
+                });
+                updateVis(toggle.checked); 
+            };
+            
+            setupToggle('grayToggle', '.dot-gray', '.toggle-bg-gray', '#CBD5E0', toggleGrayscale);
+            
+            // TOGGLE BUTTON LOGIC
+            const topViewBtn = document.getElementById('topViewBtn');
+            topViewBtn.addEventListener('click', () => {
+                controls.autoRotate = false;
+                isAnimatingCamera = true;
+                controls.enabled = false; 
+
+                const startPos = new THREE.Vector3().copy(camera.position);
+                const startSph = new THREE.Spherical().setFromVector3(startPos);
+                
+                let endSph;
+                
+                if (!isTopView) {
+                    // Go to Top View
+                    enterTopView();
+                    endSph = { radius: 120, phi: 0.0001, theta: startSph.theta };
+                } else {
+                    // Go back to Perspective
+                    resetNormalVisuals();
+                    endSph = { radius: 90, phi: 1.4, theta: startSph.theta };
+                }
+
+                const dummy = { t: 0 };
+                
+                new TWEEN.Tween(dummy)
+                    .to({ t: 1 }, 1500)
+                    .easing(TWEEN.Easing.Cubic.InOut)
+                    .onUpdate(() => {
+                        const currentRadius = startSph.radius + (endSph.radius - startSph.radius) * dummy.t;
+                        const currentPhi = startSph.phi + (endSph.phi - startSph.phi) * dummy.t;
+                        const currentTheta = startSph.theta + (endSph.theta - startSph.theta) * dummy.t;
+                        camera.position.setFromSphericalCoords(currentRadius, currentPhi, currentTheta);
+                        camera.lookAt(0, 0, 0);
+                    })
+                    .onComplete(() => {
+                        isAnimatingCamera = false;
+                        controls.enabled = true;
+                        controls.target.set(0, 0, 0); 
+                        controls.update();
+                    })
+                    .start();
+            });
+        }
+
+        function toggleGrayscale(enabled) {
+            isGrayscale = enabled;
+            if (particleSystem) {
+                particleSystem.geometry.setAttribute('color', 
+                    new THREE.BufferAttribute(enabled ? particlesData.colorGray : particlesData.colorRGB, 3)
+                );
+                particleSystem.geometry.attributes.color.needsUpdate = true;
+            }
+            if (selectionMarker.visible) { const hsl = {}; selectedColor.getHSL(hsl); update3DSelection(hsl); }
+        }
+
+        function update3DSelection(hsl) {
+            controls.autoRotate = false; 
+            selectionMarker.visible = true;
+            
+            // Hide skeleton if interacting
+            resetNormalVisuals();
+
+            const data = calculateData(hsl.h, hsl.s, hsl.l);
+            const x = data.base.x + (data.munsell.x - data.base.x) * shapeMode;
+            const y = data.base.y + (data.munsell.y - data.base.y) * shapeMode;
+            const z = data.base.z + (data.munsell.z - data.base.z) * shapeMode;
+
+            new TWEEN.Tween(selectionMarker.position)
+                .to({ x: x, y: y, z: z }, 800)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .onUpdate(() => selectionMarker.lookAt(camera.position))
+                .start();
+            
+            if (isGrayscale) {
+                const l = data.luma;
+                selectionMarker.children[0].material.color.setRGB(l, l, l);
+            } else {
+                selectionMarker.children[0].material.color.setHSL(hsl.h, hsl.s, hsl.l);
+            }
+            
+            const theta = hsl.h * Math.PI * 2;
+            const offsetAngle = Math.PI / 4; 
+            const finalAngle = theta + offsetAngle;
+            const camDist = 90;
+            const camHeight = Math.max(30, y + 20); 
+
+            new TWEEN.Tween(camera.position)
+                .to({ 
+                    x: camDist * Math.cos(finalAngle), 
+                    y: camHeight, 
+                    z: camDist * Math.sin(finalAngle) 
+                }, 1500)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .onComplete(() => {
+                    isAnimatingCamera = false;
+                    controls.enabled = true;
+                    controls.target.set(0, 0, 0);
+                    controls.update();
+                })
+                .start();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+            TWEEN.update(time);
+            
+            if (!isAnimatingCamera) {
+                controls.update();
+            }
+            
+            // Auto Rotate Idle Logic
+            if (!controls.autoRotate && !isAnimatingCamera && !isTopView) {
+                if (Date.now() - lastInteractionTime > IDLE_TIMEOUT) {
+                    controls.autoRotate = true;
+                }
+            }
+            
+            if (Math.abs(shapeMode - lastShapeMode) > 0.0001) {
+                updateRealtime();
+                lastShapeMode = shapeMode;
+            }
+
+            if (selectionMarker && selectionMarker.visible) {
+                selectionMarker.children[1].rotation.x = Math.sin(time * 0.002) * 0.5;
+                selectionMarker.children[2].rotation.x = (Math.PI / 2) + Math.cos(time * 0.002) * 0.5;
+            }
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>

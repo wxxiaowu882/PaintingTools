@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>我爱你们 - 绘画辅助</title>
+    <style>
+        /* === 0. 核心重置 & 基础变量 === */
+        :root {
+            --primary-blue: #007AFF;
+            --primary-blue-soft: #E0F0FF; 
+            --primary-orange: #FF9500;
+            --primary-orange-soft: #FFF5E5;
+            --bg-body: #F0F2F5;
+            --bg-shell: #FFFFFF;
+            --bg-control: #F7F8FA;
+            --text-main: #1D1D1F;
+            --text-sub: #86868B;
+            --border-color: #E5E5EA;
+            --paper-ratio: 0.716;
+            
+            --shadow-app: 0 12px 40px rgba(0,0,0,0.08); 
+            --shadow-card: 0 2px 8px rgba(0,0,0,0.04);
+            --shadow-btn-blue: 0 4px 12px rgba(0,122,255,0.3);
+            --shadow-btn-orange: 0 4px 12px rgba(255,149,0,0.3);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        img { -webkit-touch-callout: none; }
+
+        html, body {
+            margin: 0; padding: 0; width: 100%;
+            /* 移除 height: 100% 限制，改用 min-height，允许内容自然撑开，防白屏 */
+            min-height: 100vh; 
+            background-color: var(--bg-body);
+            padding-bottom: env(safe-area-inset-bottom);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-main);
+            -webkit-user-select: none; user-select: none;
+            
+            /* 关键：PC端上下留白，移动端后面会覆盖 */
+            display: block; /* 确保流式布局 */
+            padding-top: 20px; padding-bottom: 20px;
+        }
+
+        /* === 1. App 容器壳 === */
+        .app-shell {
+            width: 100%; max-width: 1400px; 
+            /* 关键：使用 margin: auto 居中，而非 Flex */
+            margin: 0 auto; 
+            background-color: var(--bg-shell);
+            position: relative;
+            border-radius: 16px;
+            box-shadow: var(--shadow-app);
+            overflow: hidden; 
+            /* 确保最小高度撑满视口 */
+            min-height: calc(100vh - 40px);
+            display: flex; flex-direction: column;
+        }
+
+        /* === 2. 头部 (左对齐品牌 + 下方 Tab) === */
+        header {
+            background: #FFFFFF;
+            padding: 12px 24px 0;
+            border-bottom: 1px solid var(--border-color);
+            position: relative; z-index: 10;
+            display: flex; flex-direction: column; /* 垂直排列 */
+            align-items: flex-start; /* 左对齐 */
+        }
+
+        /* 品牌卡片 (左对齐) */
+        .brand-card {
+            display: flex; align-items: center; gap: 10px;
+            padding: 6px 0; /* 减少内边距，使其贴左 */
+            cursor: pointer;
+            margin-bottom: 8px;
+            width: 100%; /* 占满宽度以便点击 */
+        }
+        .brand-card:active { opacity: 0.7; }
+
+        .brand-avatar {
+            width: 40px; height: 40px; border-radius: 50%; 
+            background: linear-gradient(135deg, #FF9500, #FF5E3A);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; color: white;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05); flex-shrink: 0;
+        }
+
+        .brand-info { display: flex; flex-direction: column; justify-content: center; text-align: left; }
+        .brand-name { font-size: 17px; font-weight: 700; color: var(--text-main); line-height: 1.2; display: flex; align-items: center; gap: 4px; }
+        .brand-arrow { font-size: 12px; color: #ccc; margin-top: 1px; }
+        .brand-desc { font-size: 11px; color: var(--text-sub); line-height: 1.2; margin-top: 2px; font-weight: 500; }
+
+        /* Tab 导航 (居中) */
+        .tabs { display: flex; gap: 30px; justify-content: center; width: 100%; }
+        .tab-btn {
+            flex: 1; max-width: 200px; padding: 10px 0 14px;
+            font-size: 16px; font-weight: 500; color: var(--text-sub);
+            background: transparent; border: none; cursor: pointer; position: relative; transition: color 0.2s;
+        }
+        .tab-btn.active { color: var(--text-main); font-weight: 600; }
+        .tab-btn[data-theme="blue"].active { color: var(--primary-blue); }
+        .tab-btn[data-theme="orange"].active { color: var(--primary-orange); }
+        .tab-btn::after {
+            content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) scaleX(0);
+            width: 30px; height: 3px; background-color: var(--text-main); border-radius: 3px 3px 0 0; transition: transform 0.2s ease-out;
+        }
+        .tab-btn.active::after { transform: translateX(-50%) scaleX(1); }
+        .tab-btn[data-theme="blue"].active::after { background-color: var(--primary-blue); }
+        .tab-btn[data-theme="orange"].active::after { background-color: var(--primary-orange); }
+
+        /* === 3. 内容区域 === */
+        .tab-content { display: none; width: 100%; }
+        .tab-content.active { display: block; animation: fadeEffect 0.3s ease; }
+        @keyframes fadeEffect { from { opacity: 0; } to { opacity: 1; } }
+
+        /* === 4. 控制面板 === */
+        .controls-panel {
+            background: #FFFFFF; padding: 16px 24px;
+            display: flex; flex-direction: column; gap: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .control-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+        /* 大按钮 */
+        .btn-upload {
+            width: 100%; height: 44px; background-color: var(--primary-blue); color: white; border-radius: 10px; font-size: 15px; font-weight: 600;
+            display: flex; align-items: center; justify-content: center; gap: 8px; border: none; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,122,255,0.2); transition: transform 0.1s, opacity 0.2s;
+        }
+        .btn-upload:active { transform: scale(0.99); opacity: 0.9; }
+        .btn-upload.orange { background-color: var(--primary-orange); box-shadow: 0 4px 10px rgba(255,149,0,0.2); }
+
+        /* 合并胶囊 */
+        .merged-capsule {
+            display: flex; align-items: center; width: 100%; background: var(--bg-control); border-radius: 12px; height: 44px; padding: 0;
+        }
+        .capsule-item {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; height: 100%; cursor: pointer; transition: background 0.2s; position: relative;
+        }
+        .capsule-item:first-child { border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+        .capsule-item:last-child { border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+        .capsule-item:only-child { border-radius: 12px; }
+        .capsule-item:active { background: rgba(0,0,0,0.05); }
+        .capsule-divider { width: 1px; height: 24px; background: rgba(0,0,0,0.08); flex-shrink: 0; }
+
+        /* 颜色选择器 */
+        .color-wrapper {
+            width: 24px; height: 24px; border-radius: 6px; border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15); overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0;
+        }
+        input[type="color"] { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; padding: 0; border: none; cursor: pointer; }
+
+        input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--primary-blue); margin: 0; cursor: pointer; }
+        .orange-accent input[type=checkbox] { accent-color: var(--primary-orange); }
+        .label-text { font-size: 14px; font-weight: 500; color: var(--text-main); }
+
+        /* 独立滑块行 */
+        .slider-row {
+            display: flex; align-items: center; gap: 12px; width: 100%;
+            background: var(--bg-control); padding: 4px; border-radius: 12px;
+        }
+        .slider-container-transparent {
+            flex: 1; height: 40px; display: flex; align-items: center; padding: 0 4px; gap: 8px;
+        }
+        .btn-micro {
+            width: 32px; height: 32px; border-radius: 50%; background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08);
+            color: var(--text-main); display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: background 0.1s; flex-shrink: 0;
+        }
+        .btn-micro:active { background: #E5E5EA; }
+
+        /* Range Input */
+        input[type=range] { 
+            -webkit-appearance: none; width: 100%; height: 5px; background: #E5E5EA; border-radius: 3px;
+            background-image: linear-gradient(var(--track-color, #007AFF), var(--track-color, #007AFF));
+            background-size: var(--percent, 0%) 100%; background-repeat: no-repeat; cursor: pointer; border: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: #fff;
+            border: 0.5px solid rgba(0,0,0,0.1); box-shadow: 0 2px 5px rgba(0,0,0,0.15); transition: transform 0.1s;
+        }
+        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.1); }
+        /* Firefox */
+        input[type=range]::-moz-range-track { width: 100%; height: 5px; background: #E5E5EA; border-radius: 3px; }
+        input[type=range]::-moz-range-progress { background-color: var(--track-color, #007AFF); height: 5px; border-radius: 3px; }
+        input[type=range]::-moz-range-thumb { height: 24px; width: 24px; border: none; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.15); cursor: pointer; }
+
+        /* Mode Switch */
+        .mode-switch { display: flex; background: var(--bg-control); padding: 4px; border-radius: 12px; width: 100%; }
+        .mode-btn {
+            flex: 1; padding: 0 8px; font-size: 14px; font-weight: 500; color: var(--text-sub);
+            border: none; background: transparent; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; cursor: pointer; white-space: nowrap; height: 40px;
+        }
+        .mode-btn.active { background: #fff; color: var(--text-main); font-weight: 600; box-shadow: 0 2px 5px rgba(0,0,0,0.06); }
+        .mode-btn.active.blue-text { color: var(--primary-blue); }
+
+        /* === 7. 画板区域 (交互核心) === */
+        .canvas-area {
+            width: 100%;
+            height: calc(100vw / var(--paper-ratio));
+            max-height: 75vh; 
+            min-height: 400px;
+            background: #EBEBF0; 
+            display: flex; justify-content: center; align-items: center;
+            overflow: hidden;
+            border-top: 1px solid rgba(0,0,0,0.05);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            position: relative;
+            
+            /* 关键点：允许垂直滚动(单指)，但阻止双指默认行为(缩放) */
+            touch-action: pan-y;
+        }
+        
+        .empty-placeholder {
+            width: 80%; height: 80%;
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+            color: #C7C7CC;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: transform 0.2s; cursor: pointer;
+        }
+        .empty-placeholder:active { transform: scale(0.98); }
+        .plus-icon { font-size: 64px; margin-bottom: 20px; line-height: 1; font-weight: 200; }
+
+        /* === 8. 底部工具 === */
+        .bottom-toolbar {
+            background: #FFFFFF; padding: 12px 24px; border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between; gap: 16px;
+        }
+        .btn-flat {
+            height: 36px; padding: 0 14px; background: var(--bg-control);
+            border: none; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-main); cursor: pointer; transition: background 0.1s;
+        }
+        .btn-flat:active { background: #EFEFF4; }
+        .zoom-display { font-size: 13px; font-weight: 600; color: var(--text-sub); width: 40px; text-align: center; }
+
+        /* === 9. 底部操作区 === */
+        .bottom-actions { background: #FFFFFF; padding: 16px 24px 24px; display: flex; gap: 16px; }
+        
+        .btn-cta {
+            flex: 1; height: 50px; background: var(--primary-blue);
+            color: white; border-radius: 12px; font-size: 16px; font-weight: 600; 
+            border: none; cursor: pointer; box-shadow: var(--shadow-btn-blue);
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .btn-cta:active { transform: scale(0.98); opacity: 0.9; }
+        .btn-cta.orange { background: var(--primary-orange); box-shadow: var(--shadow-btn-orange); }
+
+        .btn-secondary {
+            flex: 1; height: 50px; background: var(--bg-control);
+            color: var(--text-main); border-radius: 12px; font-size: 15px; font-weight: 600;
+            border: 1px solid transparent; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn-secondary:active { background: #EFEFF4; transform: scale(0.98); }
+        .btn-secondary.soft-orange { background: var(--primary-orange-soft); color: #D67E00; }
+        .btn-secondary.soft-orange:active { background: #FFECC9; }
+
+        /* === 10. 关于模态框 === */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+            z-index: 100; display: none; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+
+        .about-card {
+            width: 90%; max-width: 320px; background: white; border-radius: 20px; padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2); transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            text-align: center;
+        }
+        .modal-overlay.active .about-card { transform: scale(1); }
+
+        .about-avatar-large {
+            width: 64px; height: 64px; background: linear-gradient(135deg, #FF9500, #FF5E3A); border-radius: 50%; 
+            margin: 0 auto 12px; display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: white;
+        }
+        .about-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; color: var(--text-main); }
+        .about-subtitle { font-size: 13px; color: var(--text-sub); margin-bottom: 20px; font-weight: 500; }
+        
+        .share-btn {
+            flex: 1; height: 44px; background: var(--text-main); color: white;
+            border-radius: 12px; font-weight: 600; border: none; cursor: pointer; 
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        
+        .fav-btn {
+            flex: 1; height: 44px; background: var(--bg-control); color: var(--text-main);
+            border-radius: 12px; font-weight: 600; border: 1px solid transparent; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .fav-btn:active { background: #EFEFF4; }
+
+        .action-row {
+            display: flex; gap: 12px; margin-bottom: 16px;
+        }
+        
+        .social-link {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            font-size: 13px; color: var(--text-main); padding: 8px;
+            background: var(--bg-control); border-radius: 8px; margin-bottom: 8px;
+            text-decoration: none; cursor: pointer;
+        }
+        .copy-right {
+            margin-top: 20px; font-size: 11px; color: #999; line-height: 1.5; border-top: 1px solid #eee; padding-top: 12px;
+        }
+
+        /* 微信引导层 */
+        .wechat-guide {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9); z-index: 99999;
+            display: none; flex-direction: column; align-items: flex-end; padding: 20px 30px;
+            color: white; text-align: right;
+        }
+        .wechat-guide .arrow { font-size: 40px; margin-bottom: 10px; animation: bounce 1.5s infinite; color: #fff; }
+        .wechat-guide .text { font-size: 16px; line-height: 1.6; font-weight: 500; color: #fff; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+        /* 图片预览模态框 */
+        .preview-img {
+            max-width: 100%; max-height: 60vh; border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 16px;
+            -webkit-touch-callout: default; pointer-events: auto;
+        }
+
+        /* === 11. 移动端适配 (覆盖) === */
+        @media (max-width: 768px) {
+            body { 
+                padding: 0; /* 移动端贴边 */
+            }
+            .app-shell { 
+                max-width: 100%; 
+                margin: 0; 
+                border-radius: 0; 
+                box-shadow: none; 
+                min-height: 100vh;
+            }
+            /* 修正移动端 canvas 高度，防止被 PC 逻辑误伤 */
+            .canvas-area {
+                height: calc(100vw / var(--paper-ratio));
+                max-height: 75vh;
+            }
+        }
+    </style>
+    <!-- 立即执行微信检测脚本 -->
+    <script>
+        (function() {
+            var ua = navigator.userAgent.toLowerCase();
+            if (ua.match(/MicroMessenger/i) == "micromessenger") {
+                document.write('<style>.wechat-guide{display:flex !important;}</style>');
+            }
+        })();
+    </script>
+</head>
+<body>
+
+<!-- 微信引导层 -->
+<div class="wechat-guide" id="wechatGuide" onclick="this.style.display='none'">
+    <div class="arrow">↗</div>
+    <div class="text">
+        为了更好的画画体验<br>
+        请点击右上角菜单<br>
+        选择 <strong>在浏览器中打开</strong> 🌍
+    </div>
+</div>
+
+<div class="app-shell">
+    
+    <header>
+        <!-- 左对齐品牌名片 -->
+        <div class="brand-card" onclick="toggleModal('aboutModal', true)">
+            <div class="brand-avatar">🎨</div> 
+            <div class="brand-info">
+                <div class="brand-name">
+                    我爱你们 
+                    <span class="brand-arrow">›</span>
+                </div>
+                <div class="brand-desc">By 童画师吴晓</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-theme="blue" onclick="switchTab('grid', this)">📏 网格起型</button>
+            <button class="tab-btn" data-theme="orange" onclick="switchTab('poster', this)">🎨 色阶概括</button>
+        </div>
+    </header>
+
+    <!-- TAB 1: 网格起型 -->
+    <div id="grid-content" class="tab-content active">
+        
+        <div class="controls-panel">
+            <!-- Row 1: 文件上传 (蓝色实心) -->
+            <div class="control-row">
+                <button class="btn-upload">📂 打开相册图片</button>
+            </div>
+
+            <!-- Row 2: 颜色+方格 (合并胶囊) -->
+            <div class="control-row">
+                 <div class="merged-capsule">
+                     <!-- 左侧: 颜色 -->
+                     <div class="capsule-item" onclick="document.querySelector('#gridColor').click()">
+                        <div class="color-wrapper" title="网格颜色">
+                            <input type="color" id="gridColor" value="#FF3B30">
+                        </div>
+                        <span class="label-text">网格颜色</span>
+                     </div>
+                     
+                     <div class="capsule-divider"></div>
+                     
+                     <!-- 右侧: 方格 -->
+                     <label class="capsule-item">
+                        <input type="checkbox">
+                        <span class="label-text">正方格</span>
+                    </label>
+                 </div>
+            </div>
+
+            <!-- Row 3: 独立滑块行 -->
+            <div class="slider-row">
+                <div class="slider-container-transparent">
+                    <button class="btn-micro" onclick="adjustSlider('gridSize', -1)">-</button>
+                    <input type="range" id="gridSize" value="30" min="0" max="100" 
+                           oninput="onSliderInput(this)" style="--track-color: var(--primary-blue)">
+                    <button class="btn-micro" onclick="adjustSlider('gridSize', 1)">+</button>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; color: var(--text-sub); width: 24px; text-align: right; padding-right: 8px;">3.0</div>
+            </div>
+
+            <!-- Row 4: 模式切换 -->
+            <div class="control-row">
+                <div class="mode-switch">
+                    <button class="mode-btn active blue-text" onclick="toggleMode(this)">✋ 双指移动视图</button>
+                    <button class="mode-btn" onclick="toggleMode(this)">📐 双指移动网格</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 画板区域 -->
+        <div class="canvas-area" id="gridWindow">
+            <div class="empty-placeholder">
+                <div class="plus-icon" style="color: #007AFF;">+</div>
+                <div style="font-weight: 600; color: #1C1C1E; margin-bottom: 4px;">请选择图片</div>
+                <div style="font-size: 13px; color: #8E8E93;">双指操作</div>
+            </div>
+        </div>
+
+        <div class="bottom-toolbar">
+            <button class="btn-flat">重置网格</button>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="btn-micro">-</button>
+                <span class="zoom-display">100%</span>
+                <button class="btn-micro">+</button>
+            </div>
+            <button class="btn-flat">适应</button>
+        </div>
+
+        <div class="bottom-actions">
+            <!-- 网格保存 -->
+            <button class="btn-cta">⬇️ 保存网格图</button>
+        </div>
+    </div>
+
+
+    <!-- TAB 2: 色阶概括 -->
+    <div id="poster-content" class="tab-content">
+        
+        <div class="controls-panel">
+            <!-- Row 1: 文件上传 (橙色实心) -->
+            <div class="control-row">
+                <button class="btn-upload orange">📂 打开相册图片</button>
+            </div>
+
+            <!-- Row 2: 黑白开关 (也是合并胶囊风格，单项) -->
+            <div class="control-row">
+                 <div class="merged-capsule">
+                     <label class="capsule-item orange-accent">
+                        <input type="checkbox" checked>
+                        <span class="label-text">开启黑白模式</span>
+                    </label>
+                 </div>
+            </div>
+
+            <!-- Row 3: 独立滑块行 -->
+            <div class="slider-row">
+                <div class="slider-container-transparent">
+                    <button class="btn-micro" onclick="adjustSlider('posterLevel', -1)">-</button>
+                    <input type="range" id="posterLevel" value="60" min="0" max="100" 
+                           oninput="onSliderInput(this)" style="--track-color: var(--primary-orange)">
+                    <button class="btn-micro" onclick="adjustSlider('posterLevel', 1)">+</button>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; color: var(--text-sub); width: 24px; text-align: right; padding-right: 8px;">12</div>
+            </div>
+        </div>
+
+        <div class="canvas-area" id="posterWindow">
+            <div class="empty-placeholder">
+                <div class="plus-icon" style="color: #FF9500;">+</div>
+                <div style="font-weight: 600; color: #1C1C1E;">请选择图片</div>
+            </div>
+        </div>
+
+        <div class="bottom-toolbar">
+            <div style="width: 40px;"></div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="btn-micro">-</button>
+                <span class="zoom-display">100%</span>
+                <button class="btn-micro">+</button>
+            </div>
+            <button class="btn-flat">适应</button>
+        </div>
+
+        <div class="bottom-actions">
+            <!-- 色阶保存 -->
+            <button class="btn-secondary soft-orange">📊 保存4联对比图</button>
+            <button class="btn-cta orange">⬇️ 保存色阶图</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- 关于模态框 (Popup) -->
+<div class="modal-overlay" id="aboutModal" onclick="if(event.target === this) toggleModal('aboutModal', false)">
+    <div class="about-card">
+        <div class="about-avatar-large">🎨</div>
+        <div class="about-title">童画师吴晓</div>
+        <div class="about-subtitle">肖像画师·水彩·油画<br>擅长儿童肖像画</div>
+        
+        <div style="font-size: 13px; color: var(--text-sub); margin-bottom: 20px; line-height: 1.5; padding: 0 8px;">
+            这是吴晓老师为喜欢画画的朋友们准备的绘画学习辅助工具，持续更新，永久免费。
+        </div>
+        
+        <div class="action-row">
+            <button class="share-btn" onclick="shareApp()">
+                <span>✨</span> 推荐给画友
+            </button>
+            <button class="fav-btn" onclick="addToFavorites()">
+                <span>⭐</span> 收藏工具
+            </button>
+        </div>
+        
+        <div style="text-align:left; margin-top:16px;">
+            <div class="social-link" onclick="copyText('童画师吴晓')">
+                🔴 小红书：童画师吴晓 (点击复制)
+            </div>
+            <div class="social-link" onclick="copyText('wx_id_sample')">
+                🟢 微信：wx_id_sample (点击复制)
+            </div>
+        </div>
+        
+        <div class="copy-right">
+            © 2026 童画师吴晓. All Rights Reserved.<br>
+            欢迎分享，未经许可禁止商业使用。
+        </div>
+    </div>
+</div>
+
+<!-- 图片预览模态框 -->
+<div class="modal-overlay" id="previewModal" onclick="if(event.target === this) toggleModal('previewModal', false)">
+    <div class="about-card" style="width:95%; padding:20px 16px;">
+        <h3 style="margin-top:0; font-size:16px;">预览结果</h3>
+        <div style="background:#eee; height:200px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-bottom:12px; color:#999;" class="preview-img">
+            [生成的图片将显示在这里]
+        </div>
+        <div style="font-size:14px; color:#007AFF; font-weight:600; margin-bottom:16px;">
+            👆 请长按上方图片保存到相册
+        </div>
+        <button class="share-btn" style="background:#f2f2f7; color:#333; margin:0;" onclick="toggleModal('previewModal', false)">关闭</button>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('input[type=range]').forEach(updateSliderVisual);
+        
+        // 防御性 JS：拦截画板区域的双指浏览器默认行为 (配合 CSS touch-action: pan-y)
+        const canvasAreas = document.querySelectorAll('.canvas-area');
+        canvasAreas.forEach(area => {
+            area.addEventListener('touchmove', (e) => {
+                // 如果是双指或更多，阻止浏览器默认行为(如缩放)，将事件留给JS处理
+                if (e.touches.length > 1) {
+                    e.preventDefault();
+                }
+                // 单指时，如果不preventDefault，CSS的 pan-y 会生效，允许页面垂直滚动
+            }, { passive: false }); // 必须 passive: false 才能调用 preventDefault
+        });
+    });
+
+    let ticking = false;
+    function onSliderInput(input) {
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                updateSliderVisual(input);
+                ticking = false;
+            });
+            ticking = true;
+        }
+    }
+
+    function updateSliderVisual(input) {
+        const min = input.min || 0;
+        const max = input.max || 100;
+        const val = input.value;
+        const percent = (val - min) / (max - min) * 100;
+        input.style.setProperty('--percent', percent + '%');
+    }
+    
+    function adjustSlider(id, delta) {
+        const el = document.getElementById(id);
+        el.value = parseInt(el.value) + (delta * 10);
+        updateSliderVisual(el);
+    }
+
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        document.querySelectorAll('.tab-content').forEach(c => {
+            c.style.display = 'none';
+            c.classList.remove('active');
+        });
+        
+        const target = document.getElementById(tabId + '-content');
+        target.style.display = 'block';
+        target.classList.add('active');
+    }
+
+    function toggleMode(btn) {
+        btn.parentElement.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        b.classList.remove('blue-text');
+        
+        btn.classList.add('active');
+        if(btn.closest('#grid-content')) {
+            btn.classList.add('blue-text');
+        }
+    }
+
+    // Modal & Share
+    function toggleModal(id, show) {
+        const modal = document.getElementById(id);
+        if(show) {
+            modal.style.display = 'flex';
+            void modal.offsetWidth;
+            modal.classList.add('active');
+        } else {
+            modal.classList.remove('active');
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+        }
+    }
+
+    function shareApp() {
+        if (navigator.share) {
+            navigator.share({
+                title: '童画师吴晓的绘画工作台',
+                text: '这是吴晓老师为画友们准备的绘画辅助工具，持续更新，永久免费。',
+                url: window.location.href
+            });
+        } else {
+            alert('链接已复制，请分享给好友！');
+        }
+    }
+
+    function addToFavorites() {
+        alert('请使用浏览器的“添加书签”或“添加到主屏幕”功能来收藏本工具 🎨');
+    }
+
+    function copyText(text) {
+        alert('已复制：' + text);
+    }
+    function simulateSave(type) { toggleModal('previewModal', true); }
+</script>
+</body>
+</html>

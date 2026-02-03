@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>我爱你们 - 绘画辅助</title>
+    <style>
+        /* === 0. 核心重置 & 基础变量 === */
+        :root {
+            --primary-blue: #007AFF;
+            --primary-blue-soft: #E0F0FF; 
+            --primary-orange: #FF9500;
+            --primary-orange-soft: #FFF5E5;
+            --bg-body: #F0F2F5;
+            --bg-shell: #FFFFFF;
+            --bg-control: #F7F8FA;
+            --text-main: #1D1D1F;
+            --text-sub: #86868B;
+            --border-color: #E5E5EA;
+            --paper-ratio: 0.716;
+            
+            --shadow-app: 0 12px 40px rgba(0,0,0,0.08); 
+            --shadow-card: 0 2px 8px rgba(0,0,0,0.04);
+            --shadow-btn-blue: 0 4px 12px rgba(0,122,255,0.3);
+            --shadow-btn-orange: 0 4px 12px rgba(255,149,0,0.3);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        img { -webkit-touch-callout: none; }
+
+        html, body {
+            margin: 0; padding: 0; width: 100%;
+            /* 移除 height: 100% 限制，改用 min-height，允许内容自然撑开，防白屏 */
+            min-height: 100vh; 
+            background-color: var(--bg-body);
+            padding-bottom: env(safe-area-inset-bottom);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-main);
+            -webkit-user-select: none; user-select: none;
+            
+            /* 关键：PC端上下留白，移动端后面会覆盖 */
+            display: block; /* 确保流式布局 */
+            padding-top: 20px; padding-bottom: 20px;
+        }
+
+        /* === 1. App 容器壳 === */
+        .app-shell {
+            width: 100%; max-width: 1400px; 
+            /* 关键：使用 margin: auto 居中，而非 Flex */
+            margin: 0 auto; 
+            background-color: var(--bg-shell);
+            position: relative;
+            border-radius: 16px;
+            box-shadow: var(--shadow-app);
+            overflow: hidden; 
+            /* 确保最小高度撑满视口 */
+            min-height: calc(100vh - 40px);
+            display: flex; flex-direction: column;
+        }
+
+        /* === 2. 头部 (左对齐品牌 + 下方 Tab) === */
+        header {
+            background: #FFFFFF;
+            padding: 12px 24px 0;
+            border-bottom: 1px solid var(--border-color);
+            position: relative; z-index: 10;
+            display: flex; flex-direction: column; /* 垂直排列 */
+            align-items: flex-start; /* 左对齐 */
+        }
+
+        /* 品牌卡片 (左对齐) */
+        .brand-card {
+            display: flex; align-items: center; gap: 10px;
+            padding: 6px 0; /* 减少内边距，使其贴左 */
+            cursor: pointer;
+            margin-bottom: 8px;
+            width: 100%; /* 占满宽度以便点击 */
+        }
+        .brand-card:active { opacity: 0.7; }
+
+        .brand-avatar {
+            width: 40px; height: 40px; border-radius: 50%; 
+            background: linear-gradient(135deg, #FF9500, #FF5E3A);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; color: white;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05); flex-shrink: 0;
+        }
+
+        .brand-info { display: flex; flex-direction: column; justify-content: center; text-align: left; }
+        .brand-name { font-size: 17px; font-weight: 700; color: var(--text-main); line-height: 1.2; display: flex; align-items: center; gap: 4px; }
+        .brand-arrow { font-size: 12px; color: #ccc; margin-top: 1px; }
+        .brand-desc { font-size: 11px; color: var(--text-sub); line-height: 1.2; margin-top: 2px; font-weight: 500; }
+
+        /* Tab 导航 (居中) */
+        .tabs { display: flex; gap: 30px; justify-content: center; width: 100%; }
+        .tab-btn {
+            flex: 1; max-width: 200px; padding: 10px 0 14px;
+            font-size: 16px; font-weight: 500; color: var(--text-sub);
+            background: transparent; border: none; cursor: pointer; position: relative; transition: color 0.2s;
+        }
+        .tab-btn.active { color: var(--text-main); font-weight: 600; }
+        .tab-btn[data-theme="blue"].active { color: var(--primary-blue); }
+        .tab-btn[data-theme="orange"].active { color: var(--primary-orange); }
+        .tab-btn::after {
+            content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) scaleX(0);
+            width: 30px; height: 3px; background-color: var(--text-main); border-radius: 3px 3px 0 0; transition: transform 0.2s ease-out;
+        }
+        .tab-btn.active::after { transform: translateX(-50%) scaleX(1); }
+        .tab-btn[data-theme="blue"].active::after { background-color: var(--primary-blue); }
+        .tab-btn[data-theme="orange"].active::after { background-color: var(--primary-orange); }
+
+        /* === 3. 内容区域 === */
+        .tab-content { display: none; width: 100%; }
+        .tab-content.active { display: block; animation: fadeEffect 0.3s ease; }
+        @keyframes fadeEffect { from { opacity: 0; } to { opacity: 1; } }
+
+        /* === 4. 控制面板 === */
+        .controls-panel {
+            background: #FFFFFF; padding: 16px 24px;
+            display: flex; flex-direction: column; gap: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .control-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+        /* 大按钮 */
+        .btn-upload {
+            width: 100%; height: 44px; background-color: var(--primary-blue); color: white; border-radius: 10px; font-size: 15px; font-weight: 600;
+            display: flex; align-items: center; justify-content: center; gap: 8px; border: none; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,122,255,0.2); transition: transform 0.1s, opacity 0.2s;
+        }
+        .btn-upload:active { transform: scale(0.99); opacity: 0.9; }
+        .btn-upload.orange { background-color: var(--primary-orange); box-shadow: 0 4px 10px rgba(255,149,0,0.2); }
+
+        /* 合并胶囊 */
+        .merged-capsule {
+            display: flex; align-items: center; width: 100%; background: var(--bg-control); border-radius: 12px; height: 44px; padding: 0;
+        }
+        .capsule-item {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; height: 100%; cursor: pointer; transition: background 0.2s; position: relative;
+        }
+        .capsule-item:first-child { border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+        .capsule-item:last-child { border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+        .capsule-item:only-child { border-radius: 12px; }
+        .capsule-item:active { background: rgba(0,0,0,0.05); }
+        .capsule-divider { width: 1px; height: 24px; background: rgba(0,0,0,0.08); flex-shrink: 0; }
+
+        /* 颜色选择器 */
+        .color-wrapper {
+            width: 24px; height: 24px; border-radius: 6px; border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15); overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0;
+        }
+        input[type="color"] { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; padding: 0; border: none; cursor: pointer; }
+
+        input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--primary-blue); margin: 0; cursor: pointer; }
+        .orange-accent input[type=checkbox] { accent-color: var(--primary-orange); }
+        .label-text { font-size: 14px; font-weight: 500; color: var(--text-main); }
+
+        /* 独立滑块行 */
+        .slider-row {
+            display: flex; align-items: center; gap: 12px; width: 100%;
+            background: var(--bg-control); padding: 4px; border-radius: 12px;
+        }
+        .slider-container-transparent {
+            flex: 1; height: 40px; display: flex; align-items: center; padding: 0 4px; gap: 8px;
+        }
+        .btn-micro {
+            width: 32px; height: 32px; border-radius: 50%; background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08);
+            color: var(--text-main); display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: background 0.1s; flex-shrink: 0;
+        }
+        .btn-micro:active { background: #E5E5EA; }
+
+        /* Range Input */
+        input[type=range] { 
+            -webkit-appearance: none; width: 100%; height: 5px; background: #E5E5EA; border-radius: 3px;
+            background-image: linear-gradient(var(--track-color, #007AFF), var(--track-color, #007AFF));
+            background-size: var(--percent, 0%) 100%; background-repeat: no-repeat; cursor: pointer; border: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: #fff;
+            border: 0.5px solid rgba(0,0,0,0.1); box-shadow: 0 2px 5px rgba(0,0,0,0.15); transition: transform 0.1s;
+        }
+        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.1); }
+        /* Firefox */
+        input[type=range]::-moz-range-track { width: 100%; height: 5px; background: #E5E5EA; border-radius: 3px; }
+        input[type=range]::-moz-range-progress { background-color: var(--track-color, #007AFF); height: 5px; border-radius: 3px; }
+        input[type=range]::-moz-range-thumb { height: 24px; width: 24px; border: none; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.15); cursor: pointer; }
+
+        /* Mode Switch */
+        .mode-switch { display: flex; background: var(--bg-control); padding: 4px; border-radius: 12px; width: 100%; }
+        .mode-btn {
+            flex: 1; padding: 0 8px; font-size: 14px; font-weight: 500; color: var(--text-sub);
+            border: none; background: transparent; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; cursor: pointer; white-space: nowrap; height: 40px;
+        }
+        .mode-btn.active { background: #fff; color: var(--text-main); font-weight: 600; box-shadow: 0 2px 5px rgba(0,0,0,0.06); }
+        .mode-btn.active.blue-text { color: var(--primary-blue); }
+
+        /* === 7. 画板区域 (交互核心) === */
+        .canvas-area {
+            width: 100%;
+            height: calc(100vw / var(--paper-ratio));
+            max-height: 75vh; 
+            min-height: 400px;
+            background: #EBEBF0; 
+            display: flex; justify-content: center; align-items: center;
+            overflow: hidden;
+            border-top: 1px solid rgba(0,0,0,0.05);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            position: relative;
+            
+            /* 关键点：允许垂直滚动(单指)，但阻止双指默认行为(缩放) */
+            touch-action: pan-y;
+        }
+        
+        .empty-placeholder {
+            width: 80%; height: 80%;
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+            color: #C7C7CC;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: transform 0.2s; cursor: pointer;
+        }
+        .empty-placeholder:active { transform: scale(0.98); }
+        .plus-icon { font-size: 64px; margin-bottom: 20px; line-height: 1; font-weight: 200; }
+
+        /* === 8. 底部工具 === */
+        .bottom-toolbar {
+            background: #FFFFFF; padding: 12px 24px; border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between; gap: 16px;
+        }
+        .btn-flat {
+            height: 36px; padding: 0 14px; background: var(--bg-control);
+            border: none; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-main); cursor: pointer; transition: background 0.1s;
+        }
+        .btn-flat:active { background: #EFEFF4; }
+        .zoom-display { font-size: 13px; font-weight: 600; color: var(--text-sub); width: 40px; text-align: center; }
+
+        /* === 9. 底部操作区 === */
+        .bottom-actions { background: #FFFFFF; padding: 16px 24px 24px; display: flex; gap: 16px; }
+        
+        .btn-cta {
+            flex: 1; height: 50px; background: var(--primary-blue);
+            color: white; border-radius: 12px; font-size: 16px; font-weight: 600; 
+            border: none; cursor: pointer; box-shadow: var(--shadow-btn-blue);
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .btn-cta:active { transform: scale(0.98); opacity: 0.9; }
+        .btn-cta.orange { background: var(--primary-orange); box-shadow: var(--shadow-btn-orange); }
+
+        .btn-secondary {
+            flex: 1; height: 50px; background: var(--bg-control);
+            color: var(--text-main); border-radius: 12px; font-size: 15px; font-weight: 600;
+            border: 1px solid transparent; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn-secondary:active { background: #EFEFF4; transform: scale(0.98); }
+        .btn-secondary.soft-orange { background: var(--primary-orange-soft); color: #D67E00; }
+        .btn-secondary.soft-orange:active { background: #FFECC9; }
+
+        /* === 10. 关于模态框 === */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+            z-index: 100; display: none; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+
+        .about-card {
+            width: 90%; max-width: 320px; background: white; border-radius: 20px; padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2); transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            text-align: center;
+        }
+        .modal-overlay.active .about-card { transform: scale(1); }
+
+        .about-avatar-large {
+            width: 64px; height: 64px; background: linear-gradient(135deg, #FF9500, #FF5E3A); border-radius: 50%; 
+            margin: 0 auto 12px; display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: white;
+        }
+        .about-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; color: var(--text-main); }
+        .about-subtitle { font-size: 13px; color: var(--text-sub); margin-bottom: 20px; font-weight:500; }
+        
+        .share-btn {
+            flex: 1; height: 44px; background: var(--text-main); color: white;
+            border-radius: 12px; font-weight: 600; border: none; cursor: pointer; 
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        
+        .fav-btn {
+            flex: 1; height: 44px; background: var(--bg-control); color: var(--text-main);
+            border-radius: 12px; font-weight: 600; border: 1px solid transparent; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .fav-btn:active { background: #EFEFF4; }
+
+        .action-row {
+            display: flex; gap: 12px; margin-bottom: 16px;
+        }
+        
+        .social-link {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            font-size: 13px; color: var(--text-main); padding: 8px;
+            background: var(--bg-control); border-radius: 8px; margin-bottom: 8px;
+            text-decoration: none; cursor: pointer;
+        }
+        .copy-right {
+            margin-top: 20px; font-size: 11px; color: #999; line-height: 1.5; border-top: 1px solid #eee; padding-top: 12px;
+        }
+
+        /* 微信引导层 */
+        .wechat-guide {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9); z-index: 99999;
+            display: none; flex-direction: column; align-items: flex-end; padding: 20px 30px;
+            color: white; text-align: right;
+        }
+        .wechat-guide .arrow { font-size: 40px; margin-bottom: 10px; animation: bounce 1.5s infinite; color: #fff; }
+        .wechat-guide .text { font-size: 16px; line-height: 1.6; font-weight: 500; color: #fff; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+        /* 图片预览模态框 */
+        .preview-img {
+            max-width: 100%; max-height: 60vh; border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 16px;
+            -webkit-touch-callout: default; pointer-events: auto;
+        }
+
+        /* === 11. 移动端适配 (覆盖) === */
+        @media (max-width: 768px) {
+            body { 
+                padding: 0; /* 移动端贴边 */
+            }
+            .app-shell { 
+                max-width: 100%; 
+                margin: 0; 
+                border-radius: 0; 
+                box-shadow: none; 
+                min-height: 100vh;
+            }
+            /* 修正移动端 canvas 高度，防止被 PC 逻辑误伤 */
+            .canvas-area {
+                height: calc(100vw / var(--paper-ratio));
+                max-height: 75vh;
+            }
+        }
+    </style>
+    <!-- 立即执行微信检测脚本 -->
+    <script>
+        (function() {
+            var ua = navigator.userAgent.toLowerCase();
+            if (ua.match(/MicroMessenger/i) == "micromessenger") {
+                document.write('<style>.wechat-guide{display:flex !important;}</style>');
+            }
+        })();
+    </script>
+</head>
+<body>
+
+<!-- 微信引导层 -->
+<div class="wechat-guide" id="wechatGuide" onclick="this.style.display='none'">
+    <div class="arrow">↗</div>
+    <div class="text">
+        为了更好的画画体验<br>
+        请点击右上角菜单<br>
+        选择 <strong>在浏览器中打开</strong> 🌍
+    </div>
+</div>
+
+<div class="app-shell">
+    
+    <header>
+        <!-- 左对齐品牌名片 -->
+        <div class="brand-card" onclick="toggleModal('aboutModal', true)">
+            <div class="brand-avatar">🎨</div> 
+            <div class="brand-info">
+                <div class="brand-name">
+                    我爱你们 
+                    <span class="brand-arrow">›</span>
+                </div>
+                <div class="brand-desc">By 童画师吴晓</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-theme="blue" onclick="switchTab('grid', this)">📏 网格起型</button>
+            <button class="tab-btn" data-theme="orange" onclick="switchTab('poster', this)">🎨 色阶概括</button>
+        </div>
+    </header>
+
+    <!-- TAB 1: 网格起型 -->
+    <div id="grid-content" class="tab-content active">
+        
+        <div class="controls-panel">
+            <!-- Row 1: 文件上传 (蓝色实心) -->
+            <div class="control-row">
+                <button class="btn-upload">📂 打开相册图片</button>
+            </div>
+
+            <!-- Row 2: 颜色+方格 (合并胶囊) -->
+            <div class="control-row">
+                 <div class="merged-capsule">
+                     <!-- 左侧: 颜色 -->
+                     <div class="capsule-item" onclick="document.querySelector('#gridColor').click()">
+                        <div class="color-wrapper" title="网格颜色">
+                        <input type="color" id="gridColor" value="#FF3B30" oninput="drawGrid()">
+                        </div>
+                        <span class="label-text">网格颜色</span>
+                     </div>
+                     
+                     <div class="capsule-divider"></div>
+                     
+                     <!-- 右侧: 方格 -->
+                     <label class="capsule-item">
+                        <input type="checkbox" id="squareGridCheck">
+                        <span class="label-text">正方格</span>
+                    </label>
+                 </div>
+            </div>
+
+            <!-- Row 3: 独立滑块行 -->
+            <div class="slider-row">
+                <div class="slider-container-transparent">
+                    <button class="btn-micro" onclick="adjustGridSize(-0.1)">-</button>
+                    <input type="range" id="gridSize" min="2" max="15" value="3" step="0.05" oninput="drawGrid()">
+                    <button class="btn-micro" onclick="adjustGridSize(0.1)">+</button>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; color: var(--text-sub); width: 24px; text-align: right; padding-right: 8px;" id="gridSizeVal">3.0</div>
+            </div>
+
+            <!-- Row 4: 模式切换 -->
+            <div class="control-row">
+                <div class="mode-switch">
+                    <button class="mode-btn active blue-text" id="modeMove" onclick="setGridMode('move')">✋ 双指移动视图</button>
+                    <button class="mode-btn" id="modeGrid" onclick="setGridMode('grid')">📐 双指移动网格</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 画板区域 -->
+        <div class="canvas-area" id="gridWindow">
+            <div class="empty-placeholder" id="gridPlaceholder" onclick="document.getElementById('gridImageInput').click()">
+                <div class="plus-icon" style="color: #007AFF;">+</div>
+                <div style="font-weight: 600; color: #1C1C1E; margin-bottom: 4px;">请选择图片</div>
+                <div style="font-size: 13px; color: #8E8E93;">双指操作</div>
+            </div>
+            <canvas id="gridCanvas" style="display:none;"></canvas>
+        </div>
+
+        <div class="bottom-toolbar">
+            <button class="btn-flat" onclick="resetGridOffset()">重置网格</button>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="btn-micro" onclick="updateZoom('grid', -0.1)">-</button>
+                <span class="zoom-display" id="gridZoomVal">100%</span>
+                <button class="btn-micro" onclick="updateZoom('grid', 0.1)">+</button>
+            </div>
+            <button class="btn-flat" onclick="fitView('grid')">适应</button>
+        </div>
+
+        <div class="bottom-actions">
+            <!-- 网格保存 -->
+            <button class="btn-cta" onclick="previewCanvas('gridCanvas', '网格参考图.jpg')">⬇️ 保存网格图</button>
+        </div>
+    </div>
+
+
+    <!-- TAB 2: 色阶概括 -->
+    <div id="poster-content" class="tab-content">
+        
+        <div class="controls-panel">
+            <!-- Row 1: 文件上传 (橙色实心) -->
+            <div class="control-row">
+                <button class="btn-upload orange">📂 打开相册图片</button>
+            </div>
+
+            <!-- Row 2: 黑白开关 (也是合并胶囊风格，单项) -->
+            <div class="control-row">
+                 <div class="merged-capsule">
+                     <label class="capsule-item orange-accent">
+                        <input type="checkbox" id="grayscaleCheck" onchange="processPoster()">
+                        <span class="label-text">开启黑白模式</span>
+                    </label>
+                 </div>
+            </div>
+
+            <!-- Row 3: 独立滑块行 -->
+            <div class="slider-row">
+                <div class="slider-container-transparent">
+                    <button class="btn-micro" onclick="adjustPosterLevel(-1)">-</button>
+                    <input type="range" id="posterLevel" min="2" max="20" value="12" step="1" oninput="handlePosterSliderInput(this)" style="--track-color: var(--primary-orange);">
+                    <button class="btn-micro" onclick="adjustPosterLevel(1)">+</button>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; color: var(--text-sub); width: 24px; text-align: right; padding-right: 8px;" id="posterLevelVal">12</div>
+            </div>
+        </div>
+
+        <div class="canvas-area" id="posterWindow">
+            <div class="empty-placeholder" id="posterPlaceholder" onclick="document.getElementById('posterImageInput').click()">
+                <div class="plus-icon" style="color: #FF9500;">+</div>
+                <div style="font-weight: 600; color: #1C1C1E;">请选择图片</div>
+            </div>
+            <canvas id="posterCanvas" style="display:none;"></canvas>
+        </div>
+
+        <div class="bottom-toolbar">
+            <div style="width: 40px;"></div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="btn-micro" onclick="updateZoom('poster', -0.1)">-</button>
+                <span class="zoom-display" id="posterZoomVal">100%</span>
+                <button class="btn-micro" onclick="updateZoom('poster', 0.1)">+</button>
+            </div>
+            <button class="btn-flat" onclick="fitView('poster')">适应</button>
+        </div>
+
+        <div class="bottom-actions">
+            <!-- 色阶保存 -->
+            <button class="btn-secondary soft-orange" onclick="saveFourPanelComparison()">📊 保存4联对比图</button>
+            <button class="btn-cta orange" onclick="previewCanvas('posterCanvas', '色块概括图.jpg')">⬇️ 保存色阶图</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- 关于模态框 (Popup) -->
+<div class="modal-overlay" id="aboutModal" onclick="if(event.target === this) toggleModal('aboutModal', false)">
+    <div class="about-card">
+        <div class="about-avatar-large">🎨</div>
+        <div class="about-title">童画师吴晓</div>
+        <div class="about-subtitle">肖像画师·水彩·油画<br>擅长儿童肖像画</div>
+        
+        <div style="font-size: 13px; color: var(--text-sub); margin-bottom: 20px; line-height: 1.5; padding: 0 8px;">
+            这是吴晓老师为喜欢画画的朋友们准备的绘画学习辅助工具，持续更新，永久免费。
+        </div>
+        
+        <div class="action-row">
+            <button class="share-btn" onclick="shareApp()">
+                <span>✨</span> 推荐给画友
+            </button>
+            <button class="fav-btn" onclick="addToFavorites()">
+                <span>⭐</span> 收藏工具
+            </button>
+        </div>
+        
+        <div style="text-align:left; margin-top:16px;">
+            <div class="social-link" onclick="copyText('童画师吴晓')">
+                🔴 小红书：童画师吴晓 (点击复制)
+            </div>
+            <div class="social-link" onclick="copyText('wx_id_sample')">
+                🟢 微信：wx_id_sample (点击复制)
+            </div>
+        </div>
+        
+        <div class="copy-right">
+            © 2026 童画师吴晓. All Rights Reserved.<br>
+            欢迎分享，未经许可禁止商业使用。
+        </div>
+    </div>
+</div>
+
+<!-- 图片预览模态框 -->
+<div class="modal-overlay" id="previewModal" onclick="if(event.target === this) toggleModal('previewModal', false)">
+    <div class="about-card" style="width:95%; padding:20px 16px;">
+        <h3 style="margin-top:0; font-size:16px;">预览结果</h3>
+        <img id="previewImage" class="preview-img" src="" alt="预览图片" style="max-width:100%; max-height:60vh; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.1); margin-bottom:16px; display:none;">
+        <div style="background:#eee; height:200px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-bottom:12px; color:#999; display:none;" class="preview-placeholder">
+            [生成的图片将显示在这里]
+        </div>
+        <div id="mobileSaveHint" style="font-size:14px; color:#007AFF; font-weight:600; margin-bottom:16px; display:none;">
+            👆 请长按上方图片保存到相册
+        </div>
+        <div id="pcSaveHint" style="font-size:14px; color:#007AFF; font-weight:600; margin-bottom:16px; display:none;">
+            👇 请点击下方按钮下载图片
+        </div>
+        <div style="display:flex; gap:12px;">
+            <button id="downloadBtn" class="share-btn" style="background:#007AFF; color:white; flex:1; display:none;" onclick="downloadPreviewImage()">⬇️ 下载图片</button>
+            <button class="share-btn" style="background:#f2f2f7; color:#333; flex:1;" onclick="toggleModal('previewModal', false)">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // === 状态管理 ===
+    const state = {
+        currentGridMode: 'move', // 'move' (default) or 'grid'
+        grid: { scale: 1, panX: 0, panY: 0, isDraggingImg: false, isDraggingGrid: false, startX: 0, startY: 0, minScale: 1, lastDist: 0, lastCenter: {x:0, y:0}, density: 3.0, isSquareGrid: false },
+        poster: { scale: 1, panX: 0, panY: 0, isDraggingImg: false, startX: 0, startY: 0, minScale: 1, lastDist: 0, lastCenter: {x:0, y:0} }
+    };
+
+    function setGridMode(mode) {
+        state.currentGridMode = mode;
+        document.getElementById('modeMove').className = mode === 'move' ? 'mode-btn active blue-text' : 'mode-btn';
+        document.getElementById('modeGrid').className = mode === 'grid' ? 'mode-btn active blue-text' : 'mode-btn';
+    }
+
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        document.querySelectorAll('.tab-content').forEach(c => {
+            c.style.display = 'none';
+            c.classList.remove('active');
+        });
+        
+        const target = document.getElementById(tabId + '-content');
+        target.style.display = 'block';
+        target.classList.add('active');
+    }
+
+    // 生成带时间戳的文件名
+    function generateTimestampFilename(baseName) {
+        // 移除可能存在的.jpg扩展名
+        if (baseName.endsWith('.jpg')) {
+            baseName = baseName.slice(0, -4);
+        }
+        
+        const now = new Date();
+        const month = String(now.getMonth() + 1).padStart(2, '0');      // 月份 (01-12)
+        const day = String(now.getDate()).padStart(2, '0');            // 日期 (01-31)
+        const hours = String(now.getHours()).padStart(2, '0');         // 小时 (00-23)
+        const minutes = String(now.getMinutes()).padStart(2, '0');     // 分钟 (00-59)
+        const seconds = String(now.getSeconds()).padStart(2, '0');     // 秒 (00-59)
+        
+        // 格式：基础名称_月日_时_分_秒.jpg
+        return `${baseName}_${month}${day}_${hours}_${minutes}_${seconds}.jpg`;
+    }
+
+    // 限制Canvas尺寸，避免超出浏览器限制（特别是iOS设备）
+    function limitCanvasSize(canvas, maxWidth = 2560, maxHeight = 2560) {
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // 如果尺寸已经在限制内，直接返回
+        if (width <= maxWidth && height <= maxHeight) {
+            return canvas;
+        }
+        
+        // 计算等比例缩放尺寸
+        const ratio = Math.min(maxWidth / width, maxHeight / height);
+        const newWidth = Math.floor(width * ratio);
+        const newHeight = Math.floor(height * ratio);
+        
+        // 创建新Canvas并绘制缩放后的图像
+        const newCanvas = document.createElement('canvas');
+        newCanvas.width = newWidth;
+        newCanvas.height = newHeight;
+        const ctx = newCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, 0, width, height, 0, 0, newWidth, newHeight);
+        
+        return newCanvas;
+    }
+
+    // === 新逻辑：预览功能替代直接下载 ===
+    function previewCanvas(canvasId, baseName) {
+        const type = canvasId === 'gridCanvas' ? 'grid' : 'poster';
+        // 关键修复：从全局变量获取源图片，而不是state
+        const sourceImg = type === 'grid' ? gridOriginalImg : posterOriginalImg;
+        
+        if (!sourceImg) { alert('请先上传图片！'); return; }
+        
+        const stage = document.getElementById(type + 'Window');
+        const sourceCanvas = document.getElementById(canvasId);
+        const s = state[type];
+        
+        // 判断图片是否完全覆盖可视范围
+        const scaledWidth = sourceCanvas.width * s.scale;
+        const scaledHeight = sourceCanvas.height * s.scale;
+        const imgLeft = (stage.clientWidth / 2) - (scaledWidth / 2) + s.panX;
+        const imgTop = (stage.clientHeight / 2) - (scaledHeight / 2) + s.panY;
+        
+        const isFullyCovered = imgLeft <= 0 && imgTop <= 0 && 
+                               imgLeft + scaledWidth >= stage.clientWidth && 
+                               imgTop + scaledHeight >= stage.clientHeight;
+        
+        // 创建导出 Canvas
+        const exportCanvas = document.createElement('canvas');
+        
+        if (isFullyCovered) {
+            // 图片完全覆盖可视范围：保存所见即所得（当前视窗内容）
+            exportCanvas.width = stage.clientWidth;
+            exportCanvas.height = stage.clientHeight;
+            const ctx = exportCanvas.getContext('2d');
+            
+            // 填充白色背景
+            ctx.fillStyle = '#ffffff'; 
+            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+            
+            ctx.save();
+            
+            // 1. 移动到中心
+            ctx.translate(exportCanvas.width / 2, exportCanvas.height / 2);
+            
+            // 2. 应用变换
+            ctx.translate(s.panX, s.panY);
+            ctx.scale(s.scale, s.scale);
+            
+            // 3. 绘制源内容 (回到左上角)
+            ctx.translate(-sourceCanvas.width / 2, -sourceCanvas.height / 2);
+            ctx.drawImage(sourceCanvas, 0, 0);
+            
+            ctx.restore();
+        } else {
+            // 图片未完全覆盖可视范围：保存实际图片（不裁剪）
+            exportCanvas.width = sourceCanvas.width;
+            exportCanvas.height = sourceCanvas.height;
+            const ctx = exportCanvas.getContext('2d');
+            
+            // 直接绘制源画布内容（不应用变换）
+            ctx.drawImage(sourceCanvas, 0, 0);
+        }
+        
+        // 生成带时间戳的文件名（仅用于显示）
+        const filename = generateTimestampFilename(baseName);
+        
+        // 显示预览弹窗
+        const previewImage = document.getElementById('previewImage');
+        const previewPlaceholder = document.querySelector('.preview-placeholder');
+        
+        // 设置图片源
+        previewImage.src = exportCanvas.toDataURL('image/jpeg', 0.95);
+        previewImage.alt = filename;
+        
+        // 显示图片，隐藏占位符
+        previewImage.style.display = 'block';
+        if (previewPlaceholder) previewPlaceholder.style.display = 'none';
+        
+        // 打开预览模态框
+        toggleModal('previewModal', true);
+    }
+
+    // === 保留原有的下载功能（备用） ===
+    function downloadCanvas(canvasId, baseName) {
+        const type = canvasId === 'gridCanvas' ? 'grid' : 'poster';
+        // 关键修复：从全局变量获取源图片，而不是state
+        const sourceImg = type === 'grid' ? gridOriginalImg : posterOriginalImg;
+        
+        if (!sourceImg) { alert('请先上传图片！'); return; }
+        
+        const stage = document.getElementById(type + 'Window');
+        const sourceCanvas = document.getElementById(canvasId);
+        const s = state[type];
+        
+        // 判断图片是否完全覆盖可视范围
+        const scaledWidth = sourceCanvas.width * s.scale;
+        const scaledHeight = sourceCanvas.height * s.scale;
+        const imgLeft = (stage.clientWidth / 2) - (scaledWidth / 2) + s.panX;
+        const imgTop = (stage.clientHeight / 2) - (scaledHeight / 2) + s.panY;
+        
+        const isFullyCovered = imgLeft <= 0 && imgTop <= 0 && 
+                               imgLeft + scaledWidth >= stage.clientWidth && 
+                               imgTop + scaledHeight >= stage.clientHeight;
+        
+        // 创建导出 Canvas
+        const exportCanvas = document.createElement('canvas');
+        
+        if (isFullyCovered) {
+            // 图片完全覆盖可视范围：保存所见即所得（当前视窗内容）
+            exportCanvas.width = stage.clientWidth;
+            exportCanvas.height = stage.clientHeight;
+            const ctx = exportCanvas.getContext('2d');
+            
+            // 填充白色背景
+            ctx.fillStyle = '#ffffff'; 
+            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+            
+            ctx.save();
+            
+            // 1. 移动到中心
+            ctx.translate(exportCanvas.width / 2, exportCanvas.height / 2);
+            
+            // 2. 应用变换
+            ctx.translate(s.panX, s.panY);
+            ctx.scale(s.scale, s.scale);
+            
+            // 3. 绘制源内容 (回到左上角)
+            ctx.translate(-sourceCanvas.width / 2, -sourceCanvas.height / 2);
+            ctx.drawImage(sourceCanvas, 0, 0);
+            
+            ctx.restore();
+        } else {
+            // 图片未完全覆盖可视范围：保存实际图片（不裁剪）
+            exportCanvas.width = sourceCanvas.width;
+            exportCanvas.height = sourceCanvas.height;
+            const ctx = exportCanvas.getContext('2d');
+            
+            // 直接绘制源画布内容（不应用变换）
+            ctx.drawImage(sourceCanvas, 0, 0);
+        }
+        
+        // 生成带时间戳的文件名
+        const filename = generateTimestampFilename(baseName);
+        
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = exportCanvas.toDataURL('image/jpeg', 0.95);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // === 缩放与视图控制系统 ===
+    function calculateMinScale(type) {
+        const win = document.getElementById(type + 'Window');
+        const canvas = document.getElementById(type + 'Canvas');
+        if(canvas.width === 0) return 1;
+        return Math.min(win.clientWidth / canvas.width, win.clientHeight / canvas.height);
+    }
+
+    function updateCanvasTransform(type) {
+        const s = state[type];
+        const canvas = document.getElementById(type + 'Canvas');
+        const zoomVal = document.getElementById(type + 'ZoomVal');
+        canvas.style.transform = `translate3d(${s.panX}px, ${s.panY}px, 0) scale(${s.scale})`;
+        zoomVal.innerText = Math.round(s.scale / s.minScale * 100) + '%';
+    }
+
+    function updateZoom(type, delta, isAbsolute = false) {
+        const s = state[type];
+        if (!s.minScale || s.minScale === 1) s.minScale = calculateMinScale(type);
+        
+        let newScale;
+        if (isAbsolute) newScale = delta;
+        else newScale = s.scale + (delta * s.minScale);
+
+        if(newScale < s.minScale) newScale = s.minScale; 
+        if(newScale > s.minScale * 10) newScale = s.minScale * 10;
+        
+        s.scale = newScale;
+        if (Math.abs(s.scale - s.minScale) < 0.001) { s.panX = 0; s.panY = 0; }
+        updateCanvasTransform(type);
+    }
+
+    function fitView(type) {
+        const s = state[type];
+        s.minScale = calculateMinScale(type);
+        s.scale = s.minScale;
+        s.panX = 0; s.panY = 0;
+        updateCanvasTransform(type);
+    }
+    
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    function handleFsChange() {
+        setTimeout(() => {
+            if(state.grid.minScale) fitView('grid');
+            if(state.poster.minScale) fitView('poster');
+        }, 200);
+    }
+
+    // === 核心逻辑 ===
+    // 动态创建file input元素
+    const gridImageInput = document.createElement('input');
+    gridImageInput.type = 'file';
+    gridImageInput.id = 'gridImageInput';
+    gridImageInput.accept = 'image/*';
+    gridImageInput.style.display = 'none';
+    document.body.appendChild(gridImageInput);
+
+    const posterImageInput = document.createElement('input');
+    posterImageInput.type = 'file';
+    posterImageInput.id = 'posterImageInput';
+    posterImageInput.accept = 'image/*';
+    posterImageInput.style.display = 'none';
+    document.body.appendChild(posterImageInput);
+
+    // 为上传按钮绑定点击事件
+    document.querySelector('.btn-upload:not(.orange)').addEventListener('click', () => gridImageInput.click());
+    document.querySelector('.btn-upload.orange').addEventListener('click', () => posterImageInput.click());
+
+    const gridCanvas = document.getElementById('gridCanvas');
+    const gridCtx = gridCanvas.getContext('2d');
+    let gridOriginalImg = null; let gridOffsetX = 0; let gridOffsetY = 0;
+
+    gridImageInput.addEventListener('change', (e) => handleImageUpload(e, 'grid'));
+
+    function handleImageUpload(e, type) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                if(type === 'grid') {
+                    gridOriginalImg = img;
+                    document.getElementById('gridPlaceholder').style.display = 'none';
+                    gridCanvas.style.display = 'block';
+                    // 新版没有has-image类，跳过
+                    gridOffsetX = 0; gridOffsetY = 0;
+                    drawGrid(); setTimeout(() => fitView('grid'), 50); 
+                } else {
+                    posterOriginalImg = img;
+                    document.getElementById('posterPlaceholder').style.display = 'none';
+                    posterCanvas.style.display = 'block';
+                    // 新版没有has-image类，跳过
+                    processPoster(); setTimeout(() => fitView('poster'), 50);
+                }
+            }
+            img.src = event.target.result;
+        }
+        reader.readAsDataURL(file);
+    }
+
+    function adjustGridSize(delta) {
+        const slider = document.getElementById('gridSize');
+        let newVal = parseFloat(slider.value) + delta;
+        if(newVal < 2) newVal = 2; if(newVal > 15) newVal = 15;
+        slider.value = newVal; drawGrid();
+    }
+
+    function resetGridOffset() { 
+        gridOffsetX = 0; gridOffsetY = 0; 
+        document.getElementById('gridSize').value = 3;
+        drawGrid(); 
+    }
+
+    function drawGrid() {
+        if (!gridOriginalImg) return;
+        const size = parseFloat(document.getElementById('gridSize').value);
+        const color = document.getElementById('gridColor').value;
+        document.getElementById('gridSizeVal').textContent = size.toFixed(1);
+        gridCanvas.width = gridOriginalImg.width;
+        gridCanvas.height = gridOriginalImg.height;
+        gridCtx.drawImage(gridOriginalImg, 0, 0);
+        gridCtx.strokeStyle = color;
+        gridCtx.lineWidth = Math.max(1.5, gridOriginalImg.width / 800);
+        gridCtx.beginPath();
+        
+        if (state.grid.isSquareGrid) {
+            // 正方形网格模式
+            const shortSide = Math.min(gridCanvas.width, gridCanvas.height);
+            const squareSize = shortSide / size; // 正方形边长
+            // 确定短边是宽度还是高度
+            const isWidthShort = gridCanvas.width <= gridCanvas.height;
+            
+            if (isWidthShort) {
+                // 宽度是短边，保持横向线条数量不变，调整纵向线条
+                const stepX = gridCanvas.width / size;
+                const stepY = squareSize; // 纵向步长为正方形边长
+                // 横向线条（短边方向）
+                let startX = gridOffsetX % stepX; if (startX > 0) startX -= stepX;
+                for (let x = startX; x < gridCanvas.width; x += stepX) {
+                    gridCtx.moveTo(x, 0);
+                    gridCtx.lineTo(x, gridCanvas.height);
+                }
+                // 纵向线条（长边方向）
+                let startY = gridOffsetY % stepY; if (startY > 0) startY -= stepY;
+                for (let y = startY; y < gridCanvas.height; y += stepY) {
+                    gridCtx.moveTo(0, y);
+                    gridCtx.lineTo(gridCanvas.width, y);
+                }
+            } else {
+                // 高度是短边，保持纵向线条数量不变，调整横向线条
+                const stepX = squareSize; // 横向步长为正方形边长
+                const stepY = gridCanvas.height / size;
+                // 横向线条（长边方向）
+                let startX = gridOffsetX % stepX; if (startX > 0) startX -= stepX;
+                for (let x = startX; x < gridCanvas.width; x += stepX) {
+                    gridCtx.moveTo(x, 0);
+                    gridCtx.lineTo(x, gridCanvas.height);
+                }
+                // 纵向线条（短边方向）
+                let startY = gridOffsetY % stepY; if (startY > 0) startY -= stepY;
+                for (let y = startY; y < gridCanvas.height; y += stepY) {
+                    gridCtx.moveTo(0, y);
+                    gridCtx.lineTo(gridCanvas.width, y);
+                }
+            }
+        } else {
+            // 长方形网格模式（原有逻辑）
+            const stepX = gridCanvas.width / size;
+            const stepY = gridCanvas.height / size;
+            let startX = gridOffsetX % stepX; if (startX > 0) startX -= stepX;
+            for (let x = startX; x < gridCanvas.width; x += stepX) { gridCtx.moveTo(x, 0); gridCtx.lineTo(x, gridCanvas.height); }
+            let startY = gridOffsetY % stepY; if (startY > 0) startY -= stepY;
+            for (let y = startY; y < gridCanvas.height; y += stepY) { gridCtx.moveTo(0, y); gridCtx.lineTo(gridCanvas.width, y); }
+        }
+        gridCtx.stroke();
+    }
+
+    function toggleSquareGrid() {
+        // 切换正方形网格状态
+        const checkbox = document.getElementById('squareGridCheck');
+        state.grid.isSquareGrid = checkbox.checked;
+        // 重新绘制网格
+        drawGrid();
+    }
+
+    // 为方格复选框绑定事件
+    document.getElementById('squareGridCheck').addEventListener('change', toggleSquareGrid);
+
+    // === 手势控制核心 ===
+    
+    function getCenter(touches) {
+        return {
+            x: (touches[0].clientX + touches[1].clientX) / 2,
+            y: (touches[0].clientY + touches[1].clientY) / 2
+        };
+    }
+    
+    function getDistance(touches) {
+        return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    }
+
+    function handleStart(e, type) {
+        if (!e.touches) {
+            if (type === 'grid' && !gridOriginalImg) return;
+            if (type === 'poster' && !posterOriginalImg) return;
+            state[type].startX = e.clientX;
+            state[type].startY = e.clientY;
+            state[type].isDraggingImg = (type === 'poster' || state.currentGridMode === 'move');
+            state[type].isDraggingGrid = (type === 'grid' && state.currentGridMode === 'grid');
+            return;
+        }
+
+        if (e.touches.length === 2) {
+            if (type === 'grid' && !gridOriginalImg) return;
+            if (type === 'poster' && !posterOriginalImg) return;
+            
+            const s = state[type];
+            s.lastDist = getDistance(e.touches);
+            s.lastCenter = getCenter(e.touches);
+            
+            s.isDraggingImg = (type === 'poster' || state.currentGridMode === 'move');
+            s.isDraggingGrid = (type === 'grid' && state.currentGridMode === 'grid');
+        }
+    }
+
+    function handleMove(e, type) {
+        if (!e.touches) {
+            const s = state[type];
+            if (s.isDraggingGrid) {
+                updateGridOffset(e.clientX - s.startX, e.clientY - s.startY);
+                s.startX = e.clientX; s.startY = e.clientY;
+            } else if (s.isDraggingImg) {
+                updateImgPan(type, e.clientX - s.startX, e.clientY - s.startY);
+                s.startX = e.clientX; s.startY = e.clientY;
+            }
+            return;
+        }
+
+        if (e.touches.length === 2) {
+            // 关键：根据指南，只在双指时阻止默认行为
+            e.preventDefault(); 
+            const s = state[type];
+            
+            // 1. 如果是网格模式，只移动网格 (修正: 禁止缩放)
+            if (s.isDraggingGrid) {
+                const currentCenter = getCenter(e.touches);
+                const deltaX = currentCenter.x - s.lastCenter.x;
+                const deltaY = currentCenter.y - s.lastCenter.y;
+                updateGridOffset(deltaX, deltaY);
+                s.lastCenter = currentCenter;
+                return; // 关键：直接返回，不执行缩放
+            }
+
+            // 2. 正常移动视图模式 (缩放+移动)
+            const currentDist = getDistance(e.touches);
+            const scaleRatio = currentDist / s.lastDist;
+            const newScale = s.scale * scaleRatio;
+            updateZoom(type, newScale, true);
+            s.lastDist = currentDist;
+
+            const currentCenter = getCenter(e.touches);
+            const deltaX = currentCenter.x - s.lastCenter.x;
+            const deltaY = currentCenter.y - s.lastCenter.y;
+            
+            if (s.isDraggingImg) {
+                updateImgPan(type, deltaX, deltaY);
+            }
+            s.lastCenter = currentCenter;
+        }
+    }
+
+    function updateGridOffset(dx, dy) {
+        const rect = gridCanvas.getBoundingClientRect();
+        const scaleX = gridCanvas.width / rect.width;
+        const scaleY = gridCanvas.height / rect.height;
+        gridOffsetX += dx * scaleX;
+        gridOffsetY += dy * scaleY;
+        drawGrid();
+    }
+
+    function updateImgPan(type, dx, dy) {
+        const s = state[type];
+        s.panX += dx;
+        s.panY += dy;
+        updateCanvasTransform(type);
+    }
+
+    function handleEnd(e) {
+        state.grid.isDraggingImg = false;
+        state.grid.isDraggingGrid = false;
+        state.poster.isDraggingImg = false;
+    }
+
+    // 绑定事件 - 适配新版canvas-area
+    const gridWin = document.getElementById('gridWindow');
+    const posterWin = document.getElementById('posterWindow');
+
+    // 移除新版已有的touchmove事件监听器，避免冲突
+    // 我们将在DOMContentLoaded后重新绑定
+
+    // === 色阶工具逻辑 ===
+    const posterCanvas = document.getElementById('posterCanvas');
+    const posterCtx = posterCanvas.getContext('2d');
+    let posterOriginalImg = null;
+
+    posterImageInput.addEventListener('change', (e) => handleImageUpload(e, 'poster'));
+
+    function adjustPosterLevel(delta) {
+        const slider = document.getElementById('posterLevel');
+        let val = parseInt(slider.value) + delta;
+        if(val < 2) val = 2; if(val > 20) val = 20;
+        slider.value = val; processPoster();
+    }
+
+    // 色阶滑块防抖处理函数（移除视觉更新以优化性能）
+    let posterSliderTimeout = null;
+    function handlePosterSliderInput(slider) {
+        // 清除之前的定时器
+        if (posterSliderTimeout) {
+            clearTimeout(posterSliderTimeout);
+        }
+        
+        // 设置新的定时器，100ms后执行processPoster
+        posterSliderTimeout = setTimeout(() => {
+            processPoster();
+        }, 100);
+    }
+
+    function processPoster() {
+        if (!posterOriginalImg) return;
+        const levels = parseInt(document.getElementById('posterLevel').value);
+        const isGray = document.getElementById('grayscaleCheck').checked;
+        document.getElementById('posterLevelVal').textContent = levels;
+        posterCanvas.width = posterOriginalImg.width;
+        posterCanvas.height = posterOriginalImg.height;
+        posterCtx.drawImage(posterOriginalImg, 0, 0);
+        const imageData = posterCtx.getImageData(0, 0, posterCanvas.width, posterCanvas.height);
+        const data = imageData.data;
+        const step = 255 / (levels - 1);
+        for (let i = 0; i < data.length; i += 4) {
+            let r = data[i], g = data[i+1], b = data[i+2];
+            if (isGray) {
+                const avg = 0.299*r + 0.587*g + 0.114*b;
+                r=g=b=avg;
+            }
+            r = Math.floor(r / step) * step;
+            g = Math.floor(g / step) * step;
+            b = Math.floor(b / step) * step;
+            data[i] = r; data[i+1] = g; data[i+2] = b;
+        }
+        posterCtx.putImageData(imageData, 0, 0);
+    }
+
+    // === 4联对比图功能 ===
+    // 加载提示样式
+    const style = document.createElement('style');
+    style.textContent = `
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(255,255,255,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            font-size: 16px;
+            color: #333;
+        }
+        .loading-spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-orange);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(style);
+
+    // 显示/隐藏加载提示
+    function showLoading(message = '正在生成4联对比图...') {
+        let overlay = document.getElementById('loadingOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'loadingOverlay';
+            overlay.className = 'loading-overlay';
+            overlay.innerHTML = `
+                <div class="loading-spinner"></div>
+                <div>${message}</div>
+            `;
+            document.body.appendChild(overlay);
+        }
+        overlay.style.display = 'flex';
+    }
+
+    function hideLoading() {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    // 可指定色阶值的处理函数
+    function processWithLevel(sourceCanvas, level, isGray) {
+        const canvas = document.createElement('canvas');
+        canvas.width = sourceCanvas.width;
+        canvas.height = sourceCanvas.height;
+        const ctx = canvas.getContext('2d');
+        
+        // 绘制原始图片
+        ctx.drawImage(sourceCanvas, 0, 0);
+        
+        // 如果level为0，表示不进行色阶处理（但应用黑白模式）
+        if (level === 0) {
+            if (isGray) {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i], g = data[i+1], b = data[i+2];
+                    const avg = 0.299*r + 0.587*g + 0.114*b;
+                    data[i] = data[i+1] = data[i+2] = avg;
+                }
+                ctx.putImageData(imageData, 0, 0);
+            }
+            return canvas;
+        }
+        
+        // 色阶处理
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        const step = 255 / (level - 1);
+        
+        for (let i = 0; i < data.length; i += 4) {
+            let r = data[i], g = data[i+1], b = data[i+2];
+            if (isGray) {
+                const avg = 0.299*r + 0.587*g + 0.114*b;
+                r = g = b = avg;
+            }
+            r = Math.floor(r / step) * step;
+            g = Math.floor(g / step) * step;
+            b = Math.floor(b / step) * step;
+            data[i] = r; data[i+1] = g; data[i+2] = b;
+        }
+        ctx.putImageData(imageData, 0, 0);
+        return canvas;
+    }
+
+    // 获取导出Canvas（复用downloadCanvas的逻辑）
+    function getExportCanvas(sourceCanvas, type) {
+        const stage = document.getElementById(type + 'Window');
+        const s = state[type];
+        
+        // 判断图片是否完全覆盖可视范围
+        const scaledWidth = sourceCanvas.width * s.scale;
+        const scaledHeight = sourceCanvas.height * s.scale;
+        const imgLeft = (stage.clientWidth / 2) - (scaledWidth / 2) + s.panX;
+        const imgTop = (stage.clientHeight / 2) - (scaledHeight / 2) + s.panY;
+        
+        const isFullyCovered = imgLeft <= 0 && imgTop <= 0 && 
+                               imgLeft + scaledWidth >= stage.clientWidth && 
+                               imgTop + scaledHeight >= stage.clientHeight;
+        
+        const exportCanvas = document.createElement('canvas');
+        
+        if (isFullyCovered) {
+            // 图片完全覆盖可视范围：保存所见即所得（当前视窗内容）
+            exportCanvas.width = stage.clientWidth;
+            exportCanvas.height = stage.clientHeight;
+            const ctx = exportCanvas.getContext('2d');
+            
+            // 填充白色背景
+            ctx.fillStyle = '#ffffff'; 
+            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+            
+            ctx.save();
+            
+            // 1. 移动到中心
+            ctx.translate(exportCanvas.width / 2, exportCanvas.height / 2);
+            
+            // 2. 应用变换
+            ctx.translate(s.panX, s.panY);
+            ctx.scale(s.scale, s.scale);
+            
+            // 3. 绘制源内容 (回到左上角)
+            ctx.translate(-sourceCanvas.width / 2, -sourceCanvas.height / 2);
+            ctx.drawImage(sourceCanvas, 0, 0);
+            
+            ctx.restore();
+        } else {
+            // 图片未完全覆盖可视范围：保存实际图片（不裁剪）
+            exportCanvas.width = sourceCanvas.width;
+            exportCanvas.height = sourceCanvas.height;
+            const ctx = exportCanvas.getContext('2d');
+            
+            // 直接绘制源画布内容（不应用变换）
+            ctx.drawImage(sourceCanvas, 0, 0);
+        }
+        
+        // 限制Canvas尺寸，避免iOS设备上的内存问题
+        return limitCanvasSize(exportCanvas);
+    }
+
+    // 生成4联对比图
+    function generateFourPanelComparison() {
+        if (!posterOriginalImg) {
+            alert('请先上传图片！');
+            return null;
+        }
+        
+        // 获取当前黑白模式状态
+        const isGray = document.getElementById('grayscaleCheck').checked;
+        
+        // 创建原始Canvas
+        const originalCanvas = document.createElement('canvas');
+        originalCanvas.width = posterOriginalImg.width;
+        originalCanvas.height = posterOriginalImg.height;
+        const originalCtx = originalCanvas.getContext('2d');
+        originalCtx.drawImage(posterOriginalImg, 0, 0);
+        
+        // 处理4种色阶
+        const levels = [0, 12, 9, 15]; // 0表示原始图片（但应用黑白模式）
+        const processedCanvases = [];
+        
+        for (let i = 0; i < 4; i++) {
+            const processedCanvas = processWithLevel(originalCanvas, levels[i], isGray);
+            const exportCanvas = getExportCanvas(processedCanvas, 'poster');
+            processedCanvases.push(exportCanvas);
+        }
+        
+        // 确定单张图片尺寸（所有图片使用相同的尺寸判断逻辑，所以尺寸应该相同）
+        const singleWidth = processedCanvases[0].width;
+        const singleHeight = processedCanvases[0].height;
+        
+        // 创建4联图Canvas
+        const fourPanelCanvas = document.createElement('canvas');
+        fourPanelCanvas.width = singleWidth * 2;
+        fourPanelCanvas.height = singleHeight * 2;
+        const fourPanelCtx = fourPanelCanvas.getContext('2d');
+        
+        // 填充白色背景
+        fourPanelCtx.fillStyle = '#ffffff';
+        fourPanelCtx.fillRect(0, 0, fourPanelCanvas.width, fourPanelCanvas.height);
+        
+        // 绘制4张图片（田字形布局）
+        // 图1-1 (0, 0)
+        fourPanelCtx.drawImage(processedCanvases[0], 0, 0);
+        // 图1-2 (singleWidth, 0)
+        fourPanelCtx.drawImage(processedCanvases[1], singleWidth, 0);
+        // 图2-1 (0, singleHeight)
+        fourPanelCtx.drawImage(processedCanvases[2], 0, singleHeight);
+        // 图2-2 (singleWidth, singleHeight)
+        fourPanelCtx.drawImage(processedCanvases[3], singleWidth, singleHeight);
+        
+        // 限制4联图尺寸，避免iOS设备上的内存问题
+        // 使用更严格的限制，因为4联图是4张图片拼接，尺寸较大
+        return limitCanvasSize(fourPanelCanvas, 2560, 2560);
+    }
+
+    // 保存4联对比图（改为预览模式）
+    function saveFourPanelComparison() {
+        if (!posterOriginalImg) {
+            alert('请先上传图片！');
+            return;
+        }
+        
+        // 显示等待提示
+        showLoading();
+        
+        // 异步处理，避免阻塞UI
+        setTimeout(() => {
+            try {
+                const fourPanelCanvas = generateFourPanelComparison();
+                if (!fourPanelCanvas) {
+                    hideLoading();
+                    return;
+                }
+                
+                // 生成带时间戳的文件名（仅用于显示）
+                const filename = generateTimestampFilename('4联对比图');
+                
+                // 获取预览图片元素和占位符
+                const previewImage = document.getElementById('previewImage');
+                const previewPlaceholder = document.querySelector('.preview-placeholder');
+                
+                // 设置图片源
+                previewImage.src = fourPanelCanvas.toDataURL('image/jpeg', 0.95);
+                previewImage.alt = filename;
+                
+                // 显示图片，隐藏占位符
+                previewImage.style.display = 'block';
+                if (previewPlaceholder) previewPlaceholder.style.display = 'none';
+                
+                // 打开预览模态框
+                toggleModal('previewModal', true);
+            } catch (error) {
+                alert('生成失败：' + error.message);
+                console.error(error);
+            } finally {
+                // 隐藏等待提示
+                hideLoading();
+            }
+        }, 10);
+    }
+
+    // === 微信浏览器检测与引导 ===
+    // 检测是否为微信浏览器
+    function isWeChatBrowser() {
+        const ua = navigator.userAgent.toLowerCase();
+        // 检测微信浏览器，只要包含micromessenger即可
+        return ua.includes('micromessenger');
+    }
+    
+    // 检测是否需要显示微信引导
+    function shouldShowWeChatGuide() {
+        // 只检测微信浏览器
+        return isWeChatBrowser();
+    }
+    
+    // 微信引导控制器
+    const WeChatGuide = {
+        init: function() {
+            // 根据检测结果决定是否显示引导
+            if (shouldShowWeChatGuide()) {
+                this.showGuide();
+            } else {
+                this.hideGuide();
+            }
+        },
+        
+        showGuide: function() {
+            const overlay = document.getElementById('wechatGuide');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            }
+        },
+        
+        hideGuide: function() {
+            const overlay = document.getElementById('wechatGuide');
+            if (overlay) {
+                overlay.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+        },
+        
+        copyUrl: function() {
+            const url = window.location.href;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('链接已复制到剪贴板！');
+            }).catch(err => {
+                // 降级方案
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('链接已复制到剪贴板！');
+            });
+        }
+    };
+    
+    // 页面加载后初始化微信引导
+    document.addEventListener('DOMContentLoaded', function() {
+        WeChatGuide.init();
+        
+        // 重新绑定手势事件，覆盖新版的默认事件
+        const gridWin = document.getElementById('gridWindow');
+        const posterWin = document.getElementById('posterWindow');
+        
+        // 移除新版默认的touchmove事件监听器
+        const oldGridHandler = gridWin._touchmoveHandler;
+        const oldPosterHandler = posterWin._touchmoveHandler;
+        
+        // 重新绑定事件
+        gridWin.addEventListener('mousedown', (e) => handleStart(e, 'grid'));
+        gridWin.addEventListener('mousemove', (e) => handleMove(e, 'grid'));
+        gridWin.addEventListener('touchstart', (e) => handleStart(e, 'grid'), {passive: false});
+        gridWin.addEventListener('touchmove', (e) => handleMove(e, 'grid'), {passive: false});
+
+        posterWin.addEventListener('mousedown', (e) => handleStart(e, 'poster'));
+        posterWin.addEventListener('mousemove', (e) => handleMove(e, 'poster'));
+        posterWin.addEventListener('touchstart', (e) => handleStart(e, 'poster'), {passive: false});
+        posterWin.addEventListener('touchmove', (e) => handleMove(e, 'poster'), {passive: false});
+
+        window.addEventListener('mouseup', handleEnd);
+        window.addEventListener('touchend', handleEnd);
+    });
+
+    // 滑块视觉更新函数（适配新版UI）
+    let ticking = false;
+    function onSliderInput(input) {
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                updateSliderVisual(input);
+                ticking = false;
+            });
+            ticking = true;
+        }
+    }
+
+    function updateSliderVisual(input) {
+        const min = input.min || 0;
+        const max = input.max || 100;
+        const val = input.value;
+        const percent = (val - min) / (max - min) * 100;
+        input.style.setProperty('--percent', percent + '%');
+    }
+    
+    // 适配新版的adjustSlider函数
+    function adjustSlider(id, delta) {
+        const el = document.getElementById(id);
+        el.value = parseInt(el.value) + (delta * 10);
+        updateSliderVisual(el);
+        // 触发相应的处理函数
+        if (id === 'gridSize') {
+            drawGrid();
+        } else if (id === 'posterLevel') {
+            processPoster();
+        }
+    }
+
+    // 更新网格颜色选择器的视觉更新（移除非必要的滑块视觉更新以优化性能）
+    document.getElementById('gridColor').addEventListener('input', function() {
+        drawGrid();
+    });
+
+    // Modal & Share (保留新版功能)
+    function toggleModal(id, show) {
+        const modal = document.getElementById(id);
+        if(show) {
+            modal.style.display = 'flex';
+            void modal.offsetWidth;
+            modal.classList.add('active');
+        } else {
+            modal.classList.remove('active');
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+        }
+    }
+
+    function shareApp() {
+        if (navigator.share) {
+            navigator.share({
+                title: '童画师吴晓的绘画工作台',
+                text: '这是吴晓老师为画友们准备的绘画辅助工具，持续更新，永久免费。',
+                url: window.location.href
+            });
+        } else {
+            alert('链接已复制，请分享给好友！');
+        }
+    }
+
+    function addToFavorites() {
+        alert('请使用浏览器的"添加书签"或"添加到主屏幕"功能来收藏本工具 🎨');
+    }
+
+    // 设备检测函数
+    function isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    // 预览框显示时调整界面
+    function adjustPreviewInterface() {
+        const isMobile = isMobileDevice();
+        const mobileHint = document.getElementById('mobileSaveHint');
+        const pcHint = document.getElementById('pcSaveHint');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        if (isMobile) {
+            // 移动端：显示长按提示，隐藏下载按钮
+            if (mobileHint) mobileHint.style.display = 'block';
+            if (pcHint) pcHint.style.display = 'none';
+            if (downloadBtn) downloadBtn.style.display = 'none';
+        } else {
+            // PC端：显示下载按钮和PC提示
+            if (mobileHint) mobileHint.style.display = 'none';
+            if (pcHint) pcHint.style.display = 'block';
+            if (downloadBtn) downloadBtn.style.display = 'flex';
+        }
+    }
+
+    // 下载预览图片
+    function downloadPreviewImage() {
+        const previewImage = document.getElementById('previewImage');
+        if (!previewImage.src) {
+            alert('没有可下载的图片');
+            return;
+        }
+        
+        // 从图片URL创建下载
+        const link = document.createElement('a');
+        const filename = previewImage.alt || '绘画工作台图片.jpg';
+        link.download = filename;
+        link.href = previewImage.src;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // 修改toggleModal函数以支持预览框界面调整
+    const originalToggleModal = toggleModal;
+    toggleModal = function(id, show) {
+        originalToggleModal(id, show);
+        if (id === 'previewModal' && show) {
+            // 预览框显示时调整界面
+            setTimeout(adjustPreviewInterface, 50);
+        }
+    };
+
+    function copyText(text) {
+        alert('已复制：' + text);
+    }
+</script>
+</body>
+</html>

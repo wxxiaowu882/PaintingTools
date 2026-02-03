@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<title>调色助手 - Studio版</title>
+<script src="https://cdn.jsdelivr.net/npm/culori@3.2.0/bundled/culori.min.js"></script>
+<style>
+:root {
+  --accent-color: #5E5CE6; --bg-body: #F2F2F7; --surface-glass: rgba(255, 255, 255, 0.85);
+  --surface-panel: #F7F8FA; --surface-opaque: #FFFFFF; --text-primary: #1C1C1E;
+  --text-secondary: #8E8E93; --success: #34C759; --warning: #FF9500; --danger: #FF3B30;
+  --border-light: rgba(0,0,0,0.06); --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08); --shadow-lg: 0 12px 32px rgba(0,0,0,0.12);
+  --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+body {
+  margin: 0; padding: 0; width: 100%; min-height: 100vh; background-color: var(--bg-body);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  color: var(--text-primary); overflow-x: hidden; overflow-y: auto; -webkit-user-select: none; user-select: none;
+}
+body.modal-open { overflow: hidden; }
+.app-container { width: 100%; display: flex; flex-direction: column; position: relative; }
+.app-header {
+  width: 100%; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;
+  background-color: var(--bg-body); z-index: 60;
+}
+.header-right { display: flex; align-items: center; gap: 10px; }
+.top-open-btn {
+  padding: 8px 16px; background: #FFFFFF; border-radius: 20px; font-size: 13px; font-weight: 600;
+  color: var(--text-primary); border: 1px solid var(--border-light); box-shadow: var(--shadow-sm); cursor: pointer;
+}
+.top-open-btn:active { transform: scale(0.95); background: #f0f0f0; }
+.mode-toggle {
+  background: rgba(255,255,255,0.9); padding: 3px; border-radius: 12px; display: flex; gap: 2px;
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border-light);
+}
+.mode-opt {
+  padding: 6px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--text-secondary);
+  cursor: pointer; transition: all 0.2s var(--ease-out);
+}
+.mode-opt.active { background: var(--surface-opaque); color: var(--text-primary); box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+.palette-stage {
+  height: 50vh; min-height: 350px; background: #E5E5EA; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; z-index: 1; box-shadow: inset 0 0 20px rgba(0,0,0,0.02);
+  background-image: radial-gradient(#C7C7CC 1px, transparent 1px); background-size: 20px 20px; touch-action: pan-y;
+}
+.image-container-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; }
+.upload-trigger-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 200px; height: 160px; z-index: 20; }
+.empty-placeholder {
+  width: 100%; height: 100%; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
+  border-radius: 20px; box-shadow: var(--shadow-md); color: var(--text-secondary);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer;
+}
+.plus-icon { font-size: 32px; color: var(--accent-color); margin-bottom: 8px; }
+.placeholder-text { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+#paletteImg { display: none; position: absolute; top: 0; left: 0; transform-origin: 0 0; user-select: none; pointer-events: none; border-radius: 8px; }
+.crosshair { position: absolute; top: 50%; left: 50%; width: 120px; height: 120px; z-index: 50; display: none; pointer-events: auto; touch-action: none; }
+.crosshair-visual { position: absolute; top: 50%; left: 50%; width: 0; height: 0; pointer-events: none; }
+.crosshair-circle { position: absolute; width: 12px; height: 12px; transform: translate(-50%, -50%); border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.3); border-radius: 50%; background: transparent; }
+.crosshair-line { position: absolute; background: #fff; box-shadow: 0 0 2px rgba(0,0,0,0.5); }
+.ch-top { width: 1px; height: 14px; top: -20px; left: 0; transform: translateX(-50%); }
+.ch-bottom { width: 1px; height: 14px; top: 6px; left: 0; transform: translateX(-50%); }
+.ch-left { width: 14px; height: 1px; top: 0; left: -20px; transform: translateY(-50%); }
+.ch-right { width: 14px; height: 1px; top: 0; left: 6px; transform: translateY(-50%); }
+.stage-hint { position: absolute; top: 16px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; z-index: 40; opacity: 0; transition: opacity 0.5s; }
+.stage-hint.visible { opacity: 1; }
+.stage-hint-pill { background: rgba(255,255,255,0.6); backdrop-filter: blur(6px); padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; color: var(--text-secondary); box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid rgba(255,255,255,0.2); }
+.palette-tray {
+  flex: 1; background: var(--surface-panel); position: relative; display: flex; flex-direction: column; align-items: center;
+  margin-top: -24px; border-top-left-radius: 32px; border-top-right-radius: 32px; z-index: 10; padding-bottom: 60px; box-shadow: 0 -4px 20px rgba(0,0,0,0.02);
+}
+.tray-handle { width: 40px; height: 4px; background: #D1D1D6; border-radius: 2px; margin: 12px auto; opacity: 0.6; }
+.tray-header-bar { width: 100%; height: 60px; position: absolute; top: 0; left: 0; z-index: 20; pointer-events: none; }
+.info-btn {
+  width: 36px; height: 36px; border-radius: 50%; background: #FFFFFF;
+  box-shadow: var(--shadow-sm); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid var(--border-light);
+}
+.info-btn:active { transform: scale(0.92); }
+.action-group { position: absolute; top: 20px; right: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: auto; z-index: 50; }
+.pick-btn {
+  height: 36px; padding: 0 16px; border-radius: 18px; background: #FFFFFF; color: #555; display: flex; align-items: center;
+  justify-content: center; font-size: 13px; font-weight: 600; box-shadow: var(--shadow-sm); cursor: pointer; border: 1px solid rgba(0,0,0,0.05); white-space: nowrap;
+}
+.pick-btn.primary { background: var(--text-primary); color: #fff; box-shadow: var(--shadow-md); border: none; }
+.pick-btn:active { transform: scale(0.95); }
+#focusContainer { width: 100%; min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; margin-top: 20px; }
+#trayHint { color: var(--text-secondary); font-size: 13px; font-weight: 500; margin-top: 16px; opacity: 0.8; text-align: center; line-height: 1.5; max-width: 280px; }
+.focus-blob-wrapper { position: relative; width: 100%; max-width: 360px; height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.focus-blob {
+  width: 144px; height: 144px; border-radius: 50%; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.15), inset 0 -4px 8px rgba(0,0,0,0.05);
+  border: 4px solid #fff; position: relative; z-index: 20; display: flex; align-items: center; justify-content: center; background-color: var(--sim-color); flex-shrink: 0; cursor: pointer;
+}
+.focus-blob::after { content: ''; position: absolute; width: 62px; height: 62px; border-radius: 50%; background: var(--target-color); border: 1px solid rgba(255,255,255,0.4); z-index: 21; transition: border-color 0.1s; }
+.focus-blob:active::after { border-color: transparent; }
+.focus-blob.preview-mode { background-color: transparent; box-shadow: none; border: 4px solid #E5E5EA; }
+.status-badge-container { position: absolute; top: 20px; left: 24px; z-index: 50; pointer-events: auto; }
+.status-badge {
+  background: rgba(255,255,255,0.98); color: var(--text-primary); padding: 8px 14px;
+  border-radius: 18px; font-family: -apple-system, sans-serif; cursor: pointer; box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: row; align-items: center; gap: 8px; border: 1px solid rgba(0,0,0,0.05); white-space: nowrap;
+}
+.status-badge:active { transform: scale(0.98); background: #f9f9f9; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.status-text { font-size: 12px; font-weight: 600; line-height: 1.2; text-align: left; }
+.status-text b { font-size: 13px; color: var(--text-primary); }
+.status-text small { font-size: 10px; color: var(--text-secondary); font-weight: 400; }
+.delta-e-badge {
+  position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+  background: rgba(255,255,255,0.9); padding: 4px 12px; border-radius: 12px;
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  box-shadow: var(--shadow-sm); border: 1px solid rgba(0,0,0,0.05); cursor: pointer; z-index: 55; transition: all 0.2s;
+}
+.delta-e-badge:active { transform: translateX(-50%) scale(0.95); }
+.focus-ingredient {
+  position: absolute; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 2px solid #fff; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; color: #1D1D1F; font-weight: 700; z-index: 15; transition: all 0.6s var(--ease-out); top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+}
+.focus-blob-wrapper.active .focus-ingredient { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1); }
+.focus-ingredient span { pointer-events: none; line-height: 1; position: absolute; bottom: -16px; font-size: 10px; color: var(--text-secondary); white-space: nowrap; text-shadow: 0 1px 2px rgba(255,255,255,0.8); }
+.section-header { width: 100%; max-width: 360px; padding: 0 20px; margin-top: 20px; margin-bottom: 16px; font-size: 14px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; justify-content: space-between; }
+.settings-icon-btn { width: 32px; height: 32px; border-radius: 8px; background: rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-secondary); transition: background 0.2s; flex-shrink: 0; }
+.settings-icon-btn:active { background: rgba(0,0,0,0.08); }
+.manual-adjust-bar { width: 100%; max-width: 360px; padding: 0 16px; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; row-gap: 12px; }
+.adjust-chip { width: 44px; height: 36px; background-color: #fff; border-radius: 6px; position: relative; cursor: pointer; box-shadow: inset 0 1px 3px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.02); transition: transform 0.1s; }
+.adjust-chip:active { transform: scale(0.95); }
+.adjust-chip-color { position: absolute; top: 3px; left: 3px; right: 3px; bottom: 3px; border-radius: 3px; background-image: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(0,0,0,0.05) 100%); box-shadow: inset 0 0 2px rgba(0,0,0,0.1); overflow: hidden; }
+.adjust-chip.is-water .adjust-chip-color { background: #fff; border: 1px solid #eee; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.adjust-chip-label { font-size: 10px; color: var(--text-secondary); margin-top: 6px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 56px; margin-left: -6px; }
+.flying-drop { position: fixed; width: 24px; height: 24px; border-radius: 50%; pointer-events: none; z-index: 999; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: none; }
+.pigment-modal {
+  position: fixed; bottom: 0; left: 0; right: 0; top: 100px; background: var(--bg-body); border-top-left-radius: 24px; border-top-right-radius: 24px;
+  z-index: 100; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column;
+}
+.pigment-modal.active { transform: translateY(0); }
+.modal-header { background: var(--surface-opaque); padding: 20px 24px; border-radius: 24px 24px 0 0; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); }
+.modal-title { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.close-modal { font-size: 28px; color: var(--text-secondary); cursor: pointer; padding: 4px; line-height: 1; }
+.tabs-container { background: var(--surface-opaque); padding: 12px 20px; overflow-x: auto; white-space: nowrap; display: flex; gap: 12px; flex-shrink: 0; border-bottom: 1px solid var(--border-light); -ms-overflow-style: none; scrollbar-width: none; }
+.tabs-container::-webkit-scrollbar { display: none; }
+.tab-chip { display: inline-block; padding: 8px 16px; border-radius: 18px; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: #F2F2F7; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; }
+.tab-chip.active { background: var(--text-primary); color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+.modal-body { flex: 1; overflow-y: auto; padding: 24px; }
+.section-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5; padding: 12px; background: #fff; border-radius: 12px; }
+.section-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; margin-top: 24px; }
+.section-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.5px; text-transform: uppercase; margin: 0; }
+.reset-custom-btn { font-size: 12px; color: #666; cursor: pointer; background: rgba(0,0,0,0.05); padding: 4px 10px; border-radius: 12px; font-weight: 600; display: none; }
+.pigment-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 8px; row-gap: 20px; }
+.pigment-pan-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; position: relative; }
+.pigment-pan { width: 48px; height: 40px; border-radius: 8px; background-color: #fff; position: relative; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1), 0 2px 5px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.05); overflow: hidden; transition: transform 0.1s; }
+.pigment-pan-color { position: absolute; top: 4px; left: 4px; right: 4px; bottom: 4px; border-radius: 4px; background-image: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0.1) 100%); box-shadow: inset 0 0 2px rgba(0,0,0,0.15); }
+.pigment-pan-label { font-size: 10px; color: var(--text-primary); text-align: center; line-height: 1.2; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pan-delete-user-icon { position: absolute; top: -6px; left: -6px; width: 18px; height: 18px; border-radius: 50%; background: #FF3B30; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid #fff; z-index: 6; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.pan-action-icon { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: #E5E5EA; color: #1C1C1E; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 2px solid #fff; z-index: 5; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.add-new-pigment-pan { width: 48px; height: 40px; border-radius: 8px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; color: var(--accent-color); font-size: 20px; cursor: pointer; background: #fff; }
+.pigment-select-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; position: relative; }
+.select-check { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--success); color: #fff; display: none; align-items: center; justify-content: center; font-size: 10px; border: 2px solid #fff; z-index: 5; }
+.pigment-select-item.selected .select-check { display: flex; }
+.modal-footer { padding: 16px 24px; background: var(--surface-opaque); border-top: 1px solid var(--border-light); display: flex; gap: 12px; flex-shrink: 0; }
+.btn-footer { flex: 1; padding: 14px; border-radius: 16px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; text-align: center; }
+.btn-primary { background: var(--text-primary); color: #fff; }
+.btn-outline { background: transparent; border: 1px solid #E5E5EA; color: var(--text-primary); }
+.backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 90; opacity: 0; pointer-events: none; transition: opacity 0.3s; backdrop-filter: blur(2px); }
+.backdrop.active { opacity: 1; pointer-events: auto; }
+.toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 24px; border-radius: 12px; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 2000; box-shadow: var(--shadow-lg); backdrop-filter: blur(4px); }
+.toast.show { opacity: 1; }
+.gamut-popover { position: fixed; bottom: 20%; left: 50%; transform: translateX(-50%) translateY(20px); width: 280px; background: #FFF; border-radius: 20px; padding: 20px; box-shadow: var(--shadow-lg); z-index: 2100; opacity: 0; pointer-events: none; transition: all 0.3s var(--ease-out); border: 1px solid rgba(0,0,0,0.05); }
+.gamut-popover.active { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+.gamut-popover h4 { margin: 0 0 10px 0; font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.gamut-popover p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+.gamut-popover b { color: var(--text-primary); }
+@media (min-width: 768px) { .pick-btn { display: none !important; } .palette-stage { cursor: crosshair; } }
+</style>
+</head>
+<body>
+<div class="app-container">
+  <div class="app-header">
+    <button class="top-open-btn" onclick="document.getElementById('fileInput').click()">打开图片</button>
+    <div class="header-right">
+      <div class="mode-toggle" ontouchstart="event.stopPropagation()">
+        <div class="mode-opt active" id="modeWatercolor" onclick="setMode('watercolor')">水彩</div>
+        <div class="mode-opt" id="modeOil" onclick="setMode('oil')">油画</div>
+      </div>
+      <button class="info-btn" onclick="showInfo()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></button>
+    </div>
+  </div>
+  <div class="palette-stage" id="stage">
+    <div class="image-container-wrapper" id="imgWrapper">
+      <div class="upload-trigger-container" id="uploadContainer">
+        <div class="empty-placeholder" id="placeholder" onclick="document.getElementById('fileInput').click()">
+          <div class="plus-icon">+</div>
+          <div class="placeholder-text">打开图片</div>
+        </div>
+      </div>
+      <img id="paletteImg" src="">
+      <div class="crosshair" id="crosshair"><div class="crosshair-visual"><div class="crosshair-line ch-top"></div><div class="crosshair-line ch-bottom"></div><div class="crosshair-line ch-left"></div><div class="crosshair-line ch-right"></div><div class="crosshair-circle"></div></div></div>
+    </div>
+    <div id="stageHint" class="stage-hint"><div class="stage-hint-pill">双指移动图片，单指拖动十字准心</div></div>
+  </div>
+  <div class="palette-tray" id="tray">
+    <div class="tray-handle"></div>
+    <div class="tray-header-bar">
+      <div id="statusBadgeContainer" class="status-badge-container"></div>
+      <div class="action-group" id="mainActionGroup" style="display: none;"><button class="pick-btn primary" id="pickBtn" onclick="triggerAutoMix()" ontouchstart="event.stopPropagation()">自动调色</button></div>
+    </div>
+    <div id="focusContainer"><div id="trayHint">点击上方打开图片</div></div>
+    <div class="section-header" id="manualBarHeader" style="display:none; align-items: center; justify-content: space-between;">
+      <div style="display:flex; align-items:center; gap:10px;"><span>我的颜料盒</span><div class="settings-icon-btn" onclick="openPigmentModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;overflow:visible;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></div></div>
+      <button class="pick-btn" id="practiceBtn" style="height: 28px; font-size: 12px; padding: 0 12px;" onclick="triggerPractice()">调色练习</button>
+    </div>
+    <div class="manual-adjust-bar" id="manualBar" style="display:none;"></div>
+  </div>
+</div>
+<input type="file" id="fileInput" accept="image/*" style="display:none">
+<input type="color" id="userPigmentPicker" style="visibility:hidden; width:0; height:0; position:absolute; z-index:-1;" onchange="handleUserPigmentPick(this.value)">
+<div class="backdrop" id="modalBackdrop" onclick="closePigmentModal()"></div>
+<div class="backdrop" id="gamutBackdrop" style="z-index: 2050;" onclick="closeGamutPopover()"></div>
+<div class="gamut-popover" id="gamutPopover"><h4 id="gamutTitle">色域说明</h4><div id="gamutDesc" style="font-size: 13px; line-height: 1.6; color: var(--text-secondary);"></div></div>
+<div class="pigment-modal" id="pigmentModal">
+  <div class="modal-header"><div class="modal-title">配置颜料盒</div><div class="close-modal" onclick="closePigmentModal()">×</div></div>
+  <div class="tabs-container" id="modalTabs"></div>
+  <div class="modal-body">
+    <div id="setDescription" class="section-desc"></div>
+    <div class="section-header-row"><div class="section-title" id="currentGroupTitle">当前组颜料</div><div class="reset-custom-btn" id="resetCustomBtn" onclick="resetCustomSet()">重置</div></div>
+    <div class="pigment-grid" id="currentSetGrid"></div>
+    <div id="librarySection" style="display:none;"><div class="section-title" style="margin-top:40px; border-top:1px dashed #eee; padding-top:20px;">添加更多颜料</div><div class="pigment-grid" id="fullLibraryGrid"></div></div>
+  </div>
+  <div class="modal-footer"><button class="btn-footer btn-outline" onclick="closePigmentModal()">取消</button><button class="btn-footer btn-primary" onclick="confirmPigmentSet()">使用此方案</button></div>
+</div>
+<div id="toast" class="toast"></div>
+<script>
+const culoriLib = window.culori;
+const differenceCiede2000 = culoriLib ? culoriLib.differenceCiede2000() : null;
+const ALL_PIGMENTS = [
+  { id: 'lemon-yellow', name: '柠檬黄', rgb: [255, 247, 0], hex: '#FFF700' }, { id: 'medium-yellow', name: '中黄', rgb: [255, 230, 0], hex: '#FFD200' },
+  { id: 'cadmium-yellow', name: '镉黄', rgb: [255, 246, 0], hex: '#FFF600' }, { id: 'indian-yellow', name: '印度黄', rgb: [227, 168, 87], hex: '#E3A857' },
+  { id: 'naples-yellow', name: '那不勒斯黄', rgb: [250, 218, 94], hex: '#FADA5E' }, { id: 'yellow-ochre', name: '土黄', rgb: [204, 150, 30], hex: '#CC961E' },
+  { id: 'vermilion', name: '朱红', rgb: [255, 60, 10], hex: '#FF3C0A' }, { id: 'cadmium-red', name: '镉红', rgb: [227, 0, 34], hex: '#E30022' },
+  { id: 'scarlet', name: '猩红', rgb: [255, 36, 0], hex: '#FF2400' }, { id: 'crimson', name: '大红', rgb: [220, 0, 40], hex: '#DC0028' },
+  { id: 'cherry-red', name: '樱桃红', rgb: [210, 4, 45], hex: '#D2042D' }, { id: 'alizarin-crimson', name: '深红', rgb: [140, 20, 30], hex: '#8C141E' },
+  { id: 'permanent-alizarin', name: '永固茜红', rgb: [220, 20, 60], hex: '#DC143C' }, { id: 'carmine', name: '胭脂红', rgb: [150, 0, 24], hex: '#960018' },
+  { id: 'rose-madder', name: '玫瑰红', rgb: [220, 50, 70], hex: '#DC3246' }, { id: 'quinacridone-rose', name: '玫瑰茜红', rgb: [164, 0, 60], hex: '#A4003C' },
+  { id: 'dioxazine-purple', name: '紫红', rgb: [72, 40, 109], hex: '#48286D' }, { id: 'lavender', name: '薰衣草紫', rgb: [181, 126, 220], hex: '#B57EDC' },
+  { id: 'violet', name: '紫罗兰', rgb: [138, 43, 226], hex: '#8A2BE2' }, { id: 'ultramarine', name: '群青', rgb: [25, 25, 140], hex: '#19198C' },
+  { id: 'cobalt-blue', name: '钴蓝', rgb: [0, 71, 171], hex: '#0047AB' }, { id: 'cerulean-blue', name: '湖蓝', rgb: [42, 82, 190], hex: '#2A52BE' },
+  { id: 'phthalo-blue', name: '酞青蓝', rgb: [0, 15, 137], hex: '#000F89' }, { id: 'prussian-blue', name: '普蓝', rgb: [0, 49, 83], hex: '#003153' },
+  { id: 'indigo', name: '靛蓝', rgb: [79, 105, 198], hex: '#4F69C6' }, { id: 'turquoise', name: '绿松石', rgb: [64, 224, 208], hex: '#40E0D0' },
+  { id: 'viridian', name: '翠绿', rgb: [64, 130, 109], hex: '#40826D' }, { id: 'emerald-green', name: '永固绿', rgb: [80, 200, 120], hex: '#50C878' },
+  { id: 'permanent-light-green', name: '永固浅绿', rgb: [139, 195, 74], hex: '#8BC34A' }, { id: 'sap-green', name: '树汁绿', rgb: [80, 125, 42], hex: '#507D2A' },
+  { id: 'olive-green', name: '橄榄绿', rgb: [128, 128, 0], hex: '#808000' }, { id: 'hookers-green', name: '虎克绿', rgb: [73, 121, 107], hex: '#49796B' },
+  { id: 'raw-sienna', name: '生褐', rgb: [214, 138, 89], hex: '#D68A59' }, { id: 'burnt-sienna', name: '熟褐', rgb: [136, 45, 23], hex: '#882D17' },
+  { id: 'raw-umber', name: '生褐(深)', rgb: [115, 74, 18], hex: '#734A12' }, { id: 'burnt-umber', name: '熟赭', rgb: [138, 51, 36], hex: '#8A3324' },
+  { id: 'sepia', name: '乌贼墨', rgb: [112, 66, 20], hex: '#704214' }, { id: 'paynes-grey', name: '佩恩灰', rgb: [83, 104, 120], hex: '#536878' },
+  { id: 'davys-grey', name: '戴维斯灰', rgb: [85, 85, 85], hex: '#555555' }, { id: 'ivory-black', name: '象牙黑', rgb: [30, 30, 30], hex: '#1E1E1E' },
+  { id: 'mars-black', name: '马斯黑', rgb: [35, 30, 30], hex: '#231E1E' }, { id: 'titanium-white', name: '钛白', rgb: [255, 255, 255], hex: '#FFFFFF' },
+  { id: 'fluorescent-pink', name: '荧光粉', rgb: [255, 20, 147], hex: '#FF1493' }, { id: 'fluorescent-green', name: '荧光绿', rgb: [0, 255, 0], hex: '#00FF00' }
+];
+const PRESET_TABS = [
+  { id: 'custom', name: '自定义色', desc: '基于标准24色，可自由增删颜料。配置会保存。' },
+  { id: 'basic', name: '基础三色', desc: '红黄蓝 (RYB) 经典组合。', ids: ['medium-yellow', 'crimson', 'ultramarine', 'titanium-white'] },
+  { id: 'modern', name: '现代三原色', desc: 'CMY 体系，色域最广。', ids: ['lemon-yellow', 'quinacridone-rose', 'phthalo-blue', 'titanium-white'] },
+  { id: 'split', name: '冷暖双原色', desc: '6色系统，包含冷暖倾向。', ids: ['lemon-yellow', 'medium-yellow', 'crimson', 'vermilion', 'ultramarine', 'phthalo-blue', 'titanium-white'] },
+  { id: 'std12', name: '标准12色', desc: '写生常用12色组合。', ids: ['lemon-yellow', 'medium-yellow', 'yellow-ochre', 'vermilion', 'alizarin-crimson', 'ultramarine', 'cobalt-blue', 'sap-green', 'viridian', 'burnt-sienna', 'burnt-umber', 'titanium-white'] },
+  { id: 'std24', name: '标准24色', desc: '全能24色专业配置。', ids: ['lemon-yellow', 'medium-yellow', 'naples-yellow', 'yellow-ochre', 'raw-sienna', 'vermilion', 'scarlet', 'crimson', 'alizarin-crimson', 'rose-madder', 'carmine', 'violet', 'ultramarine', 'cobalt-blue', 'cerulean-blue', 'prussian-blue', 'viridian', 'emerald-green', 'sap-green', 'permanent-light-green', 'burnt-sienna', 'burnt-umber', 'raw-umber', 'paynes-grey', 'titanium-white'] },
+  { id: 'landscape', name: '风景写生', desc: '强化土色系和绿色系。', ids: ['yellow-ochre', 'sap-green', 'burnt-sienna', 'ultramarine', 'alizarin-crimson', 'titanium-white', 'viridian', 'raw-umber', 'paynes-grey'] },
+  { id: 'portrait', name: '人物肤色', desc: '精选肤色调配专用色。', ids: ['yellow-ochre', 'vermilion', 'rose-madder', 'burnt-sienna', 'titanium-white', 'ultramarine', 'viridian', 'lavender', 'scarlet', 'cherry-red', 'lemon-yellow', 'fluorescent-pink'] }
+];
+const GAMUT_INFO = {
+  level1: { title: "超出颜料盒色域", desc: "意味着当前<b>[颜料盒]</b>中的颜料品种调配不出这种颜色。<br><br>在<b>[自动调色]</b>中可看到颜料盒子调出的颜色和目标色间的强烈反差。" },
+  level2: { title: "接近颜料盒色域", desc: "虽然用<b>[颜料盒]</b>中的颜料品种能调出和目标色类似的颜色，但是感觉显著断层，人眼可察觉明显不一致。<br><br>在<b>[自动调色]</b>中可看到颜料盒子调出的颜色和目标色间的明显不一致。" },
+  level3: { title: "大致匹配颜料盒色域", desc: "可通过<b>[颜料盒]</b>中的颜料品种调出和目标色近似的颜色，稍有色差，但人眼可以接收。<br><br>在<b>[自动调色]</b>中可观察到调合色和目标色的微小色差。" },
+  level4: { title: "完美匹配颜料盒色域", desc: "可通过<b>[颜料盒]</b>中的颜料品种调出和目标色几乎相同的颜色，准确度极高，肉眼几乎无法分辨色差。<br><br>在<b>[自动调色]</b>中可观察到几乎一致的调合色和目标色。" }
+};
+let appState = { currentTabId: 'custom', customIds: [], activePigments: [], userAddedPigments: [] };
+let modalState = { viewingTabId: 'custom', tempCustomIds: [] };
+let currentMode = 'watercolor';
+let globalSession = { targetRGB: null, targetHex: null, currentRecipe: [], activePool: [], minError: null };
+
+function showGamutPopover(level) {
+  const info = GAMUT_INFO[level]; if(!info) return;
+  document.getElementById('gamutTitle').innerText = info.title;
+  document.getElementById('gamutDesc').innerHTML = info.desc;
+  document.getElementById('gamutBackdrop').classList.add('active');
+  document.getElementById('gamutPopover').classList.add('active');
+}
+function showDeltaPopover() {
+  document.getElementById('gamutTitle').innerText = "色差值 ΔE 说明";
+  document.getElementById('gamutDesc').innerHTML = `
+    <div style="margin-bottom:6px;"><b>同心圆的内圆：</b>十字准心在图片中取得的颜色——<b style="color:var(--text-primary)">目标色</b>；</div>
+    <div style="margin-bottom:6px;"><b>外环：</b>用当前颜料盒中的颜品种调合的颜色——<b style="color:var(--text-primary)">调合色</b>。</div>
+    <div style="margin-bottom:12px;"><b>ΔE：</b>是以上两种颜色间的色差值。这个值越小，颜色越接近。</div>
+    <div style="font-size:12px; border-top:1px solid var(--border-light); padding-top:8px;">我们调色的目标是尽量减小ΔE，但在调色的过程中，ΔE会受制于颜料盒中的颜料品种而不能继续变小。</div>
+  `;
+  document.getElementById('gamutBackdrop').classList.add('active');
+  document.getElementById('gamutPopover').classList.add('active');
+}
+function closeGamutPopover() {
+  document.getElementById('gamutBackdrop').classList.remove('active');
+  document.getElementById('gamutPopover').classList.remove('active');
+}
+function getGamutLevel(dE) {
+  if (dE <= 1.0) return 'level4'; if (dE <= 2.0) return 'level3'; if (dE <= 5.0) return 'level2'; return 'level1';
+}
+function getCapsuleHTML(level) {
+  const map = {
+    level4: { k: '完美匹配', dot: 'var(--success)' }, level3: { k: '大致匹配', dot: 'var(--success)' },
+    level2: { k: '接近', dot: 'var(--warning)' }, level1: { k: '超出', dot: 'var(--danger)' }
+  };
+  const item = map[level];
+  return `<div class="status-dot" style="background:${item.dot}"></div><span class="status-text"><b>${item.k}</b><br><small>颜料盒色域</small></span>`;
+}
+function showToast(msg, duration = 2500) {
+  const toast = document.getElementById('toast'); if (!toast) return;
+  toast.textContent = msg; toast.classList.add('show');
+  if (toast.timeoutId) clearTimeout(toast.timeoutId);
+  toast.timeoutId = setTimeout(() => toast.classList.remove('show'), duration);
+}
+function getDeltaE(rgb1, rgb2) {
+  if (!culoriLib) {
+    const r = (rgb1[0]-rgb2[0])*0.3, g = (rgb1[1]-rgb2[1])*0.59, b = (rgb1[2]-rgb2[2])*0.11;
+    return Math.sqrt(r*r + g*g + b*b)*0.5;
+  }
+  return differenceCiede2000({mode:'rgb', r:rgb1[0]/255, g:rgb1[1]/255, b:rgb1[2]/255}, {mode:'rgb', r:rgb2[0]/255, g:rgb2[1]/255, b:rgb2[2]/255});
+}
+
+function initApp() {
+  const st = localStorage.getItem('currentTabId'), sc = localStorage.getItem('customIds'), su = localStorage.getItem('userAddedPigments');
+  appState.currentTabId = st || 'custom';
+  appState.customIds = sc ? JSON.parse(sc) : [...PRESET_TABS.find(t=>t.id==='std24').ids];
+  appState.userAddedPigments = su ? JSON.parse(su) : [];
+  updateActivePigments(); updateGlobalSessionPool(); renderManualBar();
+  document.getElementById('trayHint').innerHTML = "点击上方打开图片";
+}
+function updateGlobalSessionPool() {
+  let p = [...appState.activePigments], w = null;
+  if (currentMode === 'watercolor') { p = p.filter(x=>x.id!=='titanium-white'); w = { id:'water', name:'水', rgb:[255,255,255], hex:'#FFFFFF', isWater:true }; }
+  else { let ew = p.find(x=>x.id==='titanium-white'); if(ew) { w = ew; p = p.filter(x=>x.id!==ew.id); } else w = { id:'titanium-white', name:'钛白', rgb:[255,255,255], hex:'#FFFFFF' }; }
+  globalSession.activePool = [...p]; if(w) globalSession.activePool.push(w);
+}
+function getAllAvailablePigments() { return [...ALL_PIGMENTS, ...appState.userAddedPigments]; }
+function updateActivePigments() {
+  let ids = appState.currentTabId === 'custom' ? appState.customIds : PRESET_TABS.find(t=>t.id===appState.currentTabId).ids;
+  const all = getAllAvailablePigments(); appState.activePigments = [];
+  ids.forEach(id => { let p = all.find(x=>x.id===id); if(p) { let n = JSON.parse(JSON.stringify(p)); n.cmyk = rgbToCmyk(...n.rgb); appState.activePigments.push(n); } });
+  localStorage.setItem('currentTabId', appState.currentTabId); if(appState.currentTabId==='custom') localStorage.setItem('customIds', JSON.stringify(appState.customIds));
+}
+function openPigmentModal() {
+  modalState.viewingTabId = appState.currentTabId; modalState.tempCustomIds = [...appState.customIds];
+  renderModalContent(); document.getElementById('modalBackdrop').classList.add('active');
+  document.getElementById('pigmentModal').classList.add('active'); document.body.classList.add('modal-open');
+  setTimeout(() => { const a = document.querySelector('.tab-chip.active'); if(a) a.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center'}); }, 100);
+}
+function closePigmentModal() { document.getElementById('modalBackdrop').classList.remove('active'); document.getElementById('pigmentModal').classList.remove('active'); document.body.classList.remove('modal-open'); }
+function confirmPigmentSet() {
+  try { appState.currentTabId = modalState.viewingTabId; if(appState.currentTabId==='custom') appState.customIds=[...modalState.tempCustomIds]; updateActivePigments(); updateGlobalSessionPool(); renderManualBar(); showToast("颜料箱配置已更新"); }
+  catch(e){console.error(e)} finally{closePigmentModal()}
+}
+function switchModalTab(id) { modalState.viewingTabId = id; renderModalContent(); }
+function toggleCustomPigment(id) { if(id==='titanium-white')return; const i = modalState.tempCustomIds.indexOf(id); if(i>-1) modalState.tempCustomIds.splice(i,1); else modalState.tempCustomIds.push(id); renderModalContent(); }
+function resetCustomSet() { if(confirm("确定要重置吗？")) { modalState.tempCustomIds = [...PRESET_TABS.find(t=>t.id==='std24').ids]; renderModalContent(); } }
+function triggerAddUserPigment() { const n = prompt("请输入名称(5字内):"); if(!n || n.length>5) return; if(getAllAvailablePigments().some(x=>x.name===n)) return; window.tempNewPigmentName=n; document.getElementById('userPigmentPicker').click(); }
+function handleUserPigmentPick(hex) {
+  const n = window.tempNewPigmentName; if(!n)return; const r=parseInt(hex.substr(1,2),16), g=parseInt(hex.substr(3,2),16), b=parseInt(hex.substr(5,2),16);
+  const np = { id:'u_'+Date.now(), name:n, hex:hex, rgb:[r,g,b], isUserCreated:true }; appState.userAddedPigments.push(np); localStorage.setItem('userAddedPigments', JSON.stringify(appState.userAddedPigments));
+  if(modalState.viewingTabId==='custom') modalState.tempCustomIds.push(np.id); renderModalContent(); showToast("已添加");
+}
+function deleteUserPigment(id) { if(confirm("确定删除？")) { appState.userAddedPigments=appState.userAddedPigments.filter(x=>x.id!==id); localStorage.setItem('userAddedPigments', JSON.stringify(appState.userAddedPigments)); modalState.tempCustomIds=modalState.tempCustomIds.filter(x=>x!==id); appState.customIds=appState.customIds.filter(x=>x!==id); renderModalContent(); } }
+function renderModalContent() {
+  const tabs = document.getElementById('modalTabs'); tabs.innerHTML=''; PRESET_TABS.forEach(t=>{ const c=document.createElement('div'); c.className=`tab-chip ${t.id===modalState.viewingTabId?'active':''}`; c.innerText=t.name; c.onclick=()=>switchModalTab(t.id); tabs.appendChild(c); });
+  const isC = modalState.viewingTabId==='custom', curT = PRESET_TABS.find(t=>t.id===modalState.viewingTabId); let ids = isC?modalState.tempCustomIds:curT.ids;
+  document.getElementById('setDescription').innerText=curT.desc; document.getElementById('currentGroupTitle').innerText=isC?"自定义":"包含颜料"; document.getElementById('resetCustomBtn').style.display=isC?'block':'none';
+  const grid = document.getElementById('currentSetGrid'); grid.innerHTML=''; const all = getAllAvailablePigments();
+  all.forEach(p=>{ if(ids.includes(p.id)) grid.appendChild(createPanElement(p, isC?()=>toggleCustomPigment(p.id):()=>{}, isC?'action-remove':'', !isC)); });
+  const libS = document.getElementById('librarySection'), libG = document.getElementById('fullLibraryGrid');
+  if(isC){ libS.style.display='block'; libG.innerHTML=''; all.forEach(p=>{ if(p.id==='titanium-white')return; libG.appendChild(createSelectablePan(p, ids.includes(p.id), ()=>toggleCustomPigment(p.id), p.isUserCreated?()=>deleteUserPigment(p.id):null)); }); const add = document.createElement('div'); add.className='add-new-pigment-pan'; add.innerText='+'; add.onclick=triggerAddUserPigment; libG.appendChild(add); }
+  else libS.style.display='none';
+}
+function createPanElement(p, click, icon, read) {
+  const i = document.createElement('div'); i.className='pigment-pan-item'; if(read) i.style.cursor='default';
+  const pan = document.createElement('div'); pan.className='pigment-pan'; const c = document.createElement('div'); c.className='pigment-pan-color'; c.style.backgroundColor=p.hex; pan.appendChild(c);
+  const l = document.createElement('span'); l.className='pigment-pan-label'; l.innerText=p.name; i.appendChild(pan); i.appendChild(l);
+  if(!read && icon) { const ic = document.createElement('div'); ic.className=`pan-action-icon ${icon}`; ic.innerText=icon==='action-remove'?'-':'+'; i.appendChild(ic); }
+  i.onclick=click; return i;
+}
+function createSelectablePan(p, sel, click, del) {
+  const i = document.createElement('div'); i.className=`pigment-select-item ${sel?'selected':''}`;
+  if(del){ const d = document.createElement('div'); d.className='pan-delete-user-icon'; d.innerText='×'; d.onclick=(e)=>{e.stopPropagation();del()}; i.appendChild(d); }
+  const pan = document.createElement('div'); pan.className='pigment-pan'; const c = document.createElement('div'); c.className='pigment-pan-color'; c.style.backgroundColor=p.hex; pan.appendChild(c);
+  const ch = document.createElement('div'); ch.className='select-check'; ch.innerText='✓'; i.appendChild(ch);
+  const l = document.createElement('span'); l.className='pigment-pan-label'; l.innerText=p.name; i.appendChild(pan); i.appendChild(l); i.onclick=click; return i;
+}
+function rgbToHsl(r,g,b){r/=255;g/=255;b/=255;const max=Math.max(r,g,b),min=Math.min(r,g,b);let h,s,l=(max+min)/2;if(max===min)h=s=0;else{const d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;}h*=360}return {h,s,l}}
+function rgbToCmyk(r,g,b){let c=1-(r/255),m=1-(g/255),y=1-(b/255),k=Math.min(c,m,y);return k===1?[0,0,0,1]:[(c-k)/(1-k),(m-k)/(1-k),(y-k)/(1-k),k]}
+function cmykToRgb(c,m,y,k){return [Math.round(255*(1-c)*(1-k)),Math.round(255*(1-m)*(1-k)),Math.round(255*(1-y)*(1-k))]}
+function mixPigments(ing){let C=0,M=0,Y=0,K=0,W=0;ing.forEach(x=>{if(!x.pigment._cmyk)x.pigment._cmyk=rgbToCmyk(...x.pigment.rgb);C+=x.pigment._cmyk[0]*x.amount;M+=x.pigment._cmyk[1]*x.amount;Y+=x.pigment._cmyk[2]*x.amount;K+=x.pigment._cmyk[3]*x.amount;W+=x.amount});return W===0?[255,255,255]:cmykToRgb(C/W,M/W,Y/W,K/W)}
+function solveRecipe(tr, tg, tb, dry = false) {
+    const tRGB = [tr, tg, tb], tHex = `rgb(${tr},${tg},${tb})`;
+    if (!globalSession.activePool.length) updateGlobalSessionPool();
+    
+    // Prepare pool (exclude white/water from main permutation logic if handled separately, 
+    // though the new logic handles them specifically in loops)
+    let pool = [...globalSession.activePool];
+    let white = pool.find(x => x.isWater || x.id === 'titanium-white');
+    if (white) pool = pool.filter(x => x.id !== white.id);
+
+    // --- 1. Coarse Search (Top-K) ---
+    let candidates = [];
+    const keep = 5;
+    const addCand = (r, score) => {
+        // Optimization: skip if worse than worst candidate
+        if (candidates.length >= keep && score >= candidates[candidates.length - 1].score) return;
+        // Deep copy
+        const rec = r.map(x => ({ ...x }));
+        candidates.push({ recipe: rec, score: score });
+        candidates.sort((a, b) => a.score - b.score);
+        if (candidates.length > keep) candidates.pop();
+    };
+
+    const ev = (r) => {
+        let m = mixPigments(r);
+        let e = getDeltaE(tRGB, m);
+        // Penalty: >5.0 (0.02), >2.0 (0.05), else (0.1) per extra pigment
+        // Reduced penalty to encourage complex mixes if they are accurate
+        let p = e > 5.0 ? 0.02 : (e > 2.0 ? 0.05 : 0.1);
+        let t = e + (r.length - 1) * p;
+        addCand(r, t);
+    };
+
+    // Strategy A: Single + White/Water
+    pool.forEach(p => {
+        ev([{ pigment: p, amount: 100 }]);
+        if (white) {
+            // Step 5%
+            for (let w = 5; w <= 95; w += 5) {
+                ev([{ pigment: p, amount: 100 - w }, { pigment: white, amount: w, isWater: (white.id === 'water' || white.isWater) }]);
+            }
+        }
+    });
+
+    // Strategy B: Two Pigments + White/Water
+    for (let i = 0; i < pool.length; i++) {
+        for (let j = i + 1; j < pool.length; j++) {
+            // 2-color mix
+            for (let r = 10; r <= 90; r += 10) {
+                ev([{ pigment: pool[i], amount: r }, { pigment: pool[j], amount: 100 - r }]);
+                
+                // 3-color mix with white
+                if (white) {
+                    // Coarse iteration for 3rd component to save time
+                    for (let w = 10; w <= 60; w += 10) {
+                        const rem = 100 - w;
+                        let a1 = Math.round(rem * (r / 100));
+                        let a2 = rem - a1;
+                        if (a1 > 1 && a2 > 1) {
+                            ev([
+                                { pigment: pool[i], amount: a1 },
+                                { pigment: pool[j], amount: a2 },
+                                { pigment: white, amount: w, isWater: (white.id === 'water' || white.isWater) }
+                            ]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // --- 2. Refinement (Evolution & Deep Hill Climbing) ---
+    let fullPool = [...pool];
+    if (white) fullPool.push(white);
+
+    let globalBest = [];
+    let globalMinE = Infinity;
+
+    candidates.forEach(cand => {
+        let currentRecipe = cand.recipe.map(x => ({ ...x }));
+        let currentScore = cand.score;
+
+        // Phase 1: Evolution (Try adding traces of other pigments)
+        let improved = true;
+        let rounds = 0;
+        while(improved && rounds < 2) { // Limit rounds
+            improved = false;
+            rounds++;
+            for(let p of fullPool) {
+                // If not in recipe, try adding
+                if(!currentRecipe.find(r => r.pigment.id === p.id)) {
+                    if(currentRecipe.length >= 5) continue; // Cap at 5 ingredients
+                    
+                    // Try adding small amounts
+                    [2, 5, 8].forEach(addAmt => {
+                        // Scale existing
+                        let factor = (100 - addAmt) / 100;
+                        let newRec = currentRecipe.map(x => ({...x, amount: x.amount * factor}));
+                        newRec.push({ pigment: p, amount: addAmt, isWater: (p.id==='water'||p.isWater) });
+                        
+                        let m = mixPigments(newRec);
+                        let e = getDeltaE(tRGB, m);
+                        let pen = (newRec.length - 1) * (e > 2 ? 0.05 : 0.1);
+                        let score = e + pen;
+                        
+                        if(score < currentScore) {
+                            currentScore = score;
+                            currentRecipe = newRec;
+                            improved = true;
+                        }
+                    });
+                }
+            }
+        }
+
+        // Phase 2: Deep Hill Climbing (Fine tune ratios)
+        let changed = true;
+        let iter = 0;
+        while(changed && iter < 100) {
+            changed = false;
+            iter++;
+            
+            // Sort by amount descending to prioritize adjusting main ingredients? 
+            // No, just iterate all pairs.
+            
+            // Normalize to 100
+            let sum = currentRecipe.reduce((a,b)=>a+b.amount,0);
+            if(Math.abs(sum-100) > 0.01) currentRecipe.forEach(x => x.amount = x.amount/sum*100);
+
+            for(let i=0; i<currentRecipe.length; i++) {
+                for(let j=0; j<currentRecipe.length; j++) {
+                    if(i===j) continue;
+                    if(currentRecipe[i].amount > 1) {
+                        // Move 1 unit from i to j
+                        currentRecipe[i].amount -= 1;
+                        currentRecipe[j].amount += 1;
+                        
+                        let m = mixPigments(currentRecipe);
+                        let e = getDeltaE(tRGB, m);
+                        let pen = (currentRecipe.length - 1) * (e > 2 ? 0.05 : 0.1);
+                        let score = e + pen;
+                        
+                        if(score < currentScore - 0.0001) { // Epsilon improvement
+                            currentScore = score;
+                            changed = true;
+                        } else {
+                            // Revert
+                            currentRecipe[i].amount += 1;
+                            currentRecipe[j].amount -= 1;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Clean up tiny amounts
+        currentRecipe = currentRecipe.filter(x => x.amount > 0.5);
+
+        if(currentScore < globalMinE) {
+            globalMinE = currentScore;
+            globalBest = currentRecipe;
+        }
+    });
+
+    if (dry) return { minError: globalMinE };
+
+    globalSession.targetRGB = tRGB;
+    globalSession.targetHex = tHex;
+    globalSession.currentRecipe = globalBest.map(x => ({ ...x }));
+
+    // UI Animations
+    globalSession.currentRecipe.forEach(x => {
+        document.querySelectorAll('.adjust-chip').forEach(c => {
+            if (c.parentElement.querySelector('.adjust-chip-label').innerText === x.pigment.name) {
+                const r = c.getBoundingClientRect();
+                flyPigmentToMix(r.left + r.width / 2, r.top + r.height / 2, x.pigment.hex === '#ffffff' ? '#e0e0e0' : x.pigment.hex);
+            }
+        });
+    });
+
+    setTimeout(() => {
+        recalculateAndShow();
+        document.getElementById('manualBar').style.display = 'flex';
+        document.getElementById('manualBarHeader').style.display = 'flex';
+    }, 500);
+}
+function triggerAutoMix(){
+  isDC = false; isD = false; // Reset dragging states to prevent jump
+  if(!globalSession.targetRGB)showToast('请先取色');else solveRecipe(...globalSession.targetRGB)
+}
+function triggerPractice(){if(!globalSession.targetRGB)showToast('请先取色');else{globalSession.currentRecipe=[]; const con=document.getElementById('focusContainer');con.innerHTML='';const w=document.createElement('div');w.className='focus-blob-wrapper active';const b=document.createElement('div');b.className='focus-blob preview-mode';b.style.setProperty('--target-color',globalSession.targetHex);w.appendChild(b);con.appendChild(w);document.getElementById('manualBar').style.display='flex';document.getElementById('manualBarHeader').style.display='flex';showToast("开始调色吧",1250)}}
+function renderManualBar(){
+  const b=document.getElementById('manualBar');b.innerHTML=''; if(!globalSession.activePool.length)return;
+  globalSession.activePool.forEach(p=>{
+    const w=document.createElement('div');w.style.display='flex';w.style.flexDirection='column';w.style.alignItems='center';
+    const c=document.createElement('div');c.className='adjust-chip'; if(p.isWater||p.id==='water'){c.classList.add('is-water');const i=document.createElement('div');i.className='adjust-chip-color';i.innerText='💧';c.appendChild(i)}
+    else{const i=document.createElement('div');i.className='adjust-chip-color';i.style.backgroundColor=p.hex;c.appendChild(i)}
+    c.onclick=()=>{const r=c.getBoundingClientRect();flyPigmentToMix(r.left+r.width/2,r.top+r.height/2,p.hex==='#ffffff'?'#e0e0e0':p.hex);manualAddPigment(p)};
+    const l=document.createElement('span');l.className='adjust-chip-label';l.innerText=p.name;w.appendChild(c);w.appendChild(l);b.appendChild(w);
+  });
+}
+function flyPigmentToMix(sx,sy,c){
+  const t=document.querySelector('.focus-blob'); if(!t)return; const r=t.getBoundingClientRect(), tx=r.left+r.width/2, ty=r.top+r.height/2, a=Math.random()*2*Math.PI, rad=35+Math.random()*30, lx=tx+rad*Math.cos(a), ly=ty+rad*Math.sin(a);
+  const d=document.createElement('div');d.className='flying-drop';d.style.background=c;d.style.left=sx+'px';d.style.top=sy+'px';d.style.transform='translate(-50%,-50%)';document.body.appendChild(d);
+  d.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:`translate(${lx-sx}px,${ly-sy}px) scale(0)`,opacity:0}],{duration:500+Math.random()*200,easing:'cubic-bezier(0.2,0.8,0.2,1)'}).onfinish=()=>d.remove();
+}
+function manualAddPigment(p){if(!globalSession.targetRGB)return;let t=globalSession.currentRecipe.reduce((s,i)=>s+i.amount,0), a=t===0?50:Math.max(1,Math.round(t*0.02)), e=globalSession.currentRecipe.find(x=>x.pigment.id===p.id); if(e)e.amount+=a;else globalSession.currentRecipe.push({pigment:p,amount:a,isWater:p.id==='water'||p.isWater});recalculateAndShow()}
+function recalculateAndShow(){
+  let d=globalSession.currentRecipe.map(x=>({...x})), t=d.reduce((s,i)=>s+i.amount,0); d.forEach(x=>x.amount=(x.amount/t)*100); d.sort((a,b)=>b.amount-a.amount);
+  let m=mixPigments(d), del=globalSession.targetRGB?getDeltaE(globalSession.targetRGB,m):0;
+  showFocusBlob(globalSession.targetHex,{ingredients:d.map(x=>({hex:x.pigment.hex,amount:x.amount,isWater:x.isWater})),simHex:`rgb(${m[0]},${m[1]},${m[2]})`,deviation:del,targetRGB:globalSession.targetRGB,mixRGB:m});
+}
+function updateStatusBadge(minE) {
+  const container = document.getElementById('statusBadgeContainer');
+  if(!container) return;
+  container.innerHTML = '';
+  const bad = document.createElement('div');
+  bad.className = 'status-badge';
+  const lv = getGamutLevel(minE);
+  bad.innerHTML = getCapsuleHTML(lv);
+  bad.onclick = (e) => { e.stopPropagation(); showGamutPopover(lv); };
+  container.appendChild(bad);
+}
+function showFocusBlob(tCol, res) {
+  const con=document.getElementById('focusContainer');con.innerHTML=''; const w=document.createElement('div');w.className='focus-blob-wrapper active';
+  
+  // Use global stored theoretical min error for the badge, not current mix error
+  if(globalSession.minError !== null) updateStatusBadge(globalSession.minError);
+
+  const deltaBadge = document.createElement('div');
+  deltaBadge.className = 'delta-e-badge';
+  deltaBadge.innerText = 'ΔE: ' + res.deviation.toFixed(2);
+  deltaBadge.onclick = (e) => { e.stopPropagation(); showDeltaPopover(); };
+  w.appendChild(deltaBadge);
+
+  const blo=document.createElement('div');blo.className='focus-blob';blo.style.backgroundColor=res.simHex;blo.style.setProperty('--target-color',tCol);w.appendChild(blo);
+  res.ingredients.forEach((x,i)=>{
+    const s=document.createElement('div');s.className='focus-ingredient';s.style.backgroundColor=x.hex; const fS=Math.max(14,Math.sqrt(x.amount)*5.0+8);s.style.width=fS+'px';s.style.height=fS+'px';
+    if(x.isWater){s.style.border='1px solid #ddd';s.style.background='#F0F8FF';const wi=document.createElement('div');wi.innerText='💧';wi.style.fontSize=(fS*0.55)+'px';s.appendChild(wi)}
+    const txt=document.createElement('span');txt.innerText=Math.round(x.amount)+'%';if(fS>=14)s.appendChild(txt);
+    let a=res.ingredients.length===1?Math.PI/2:(Math.PI/6+i*((5*Math.PI/6-Math.PI/6)/(res.ingredients.length-1))); const dist=72+12+fS/2;
+    s.style.setProperty('--tx',`${Math.cos(a)*dist}px`);s.style.setProperty('--ty',`${Math.sin(a)*dist}px`);w.appendChild(s);
+  });
+  const h=document.createElement('div');h.id='trayHint';h.style.cssText="color:var(--text-secondary);font-size:13px;font-weight:500;margin-top:16px;opacity:0.8;text-align:center;line-height:1.5;max-width:280px;";
+  h.innerText="配方计算完成。点击颜料可手动微调。"; con.appendChild(w);con.appendChild(h);
+}
+const fileInput=document.getElementById('fileInput'), imgElement=document.getElementById('paletteImg'), imgWrapper=document.getElementById('imgWrapper'), crosshair=document.getElementById('crosshair'), offC=document.createElement('canvas'), offCtx=offC.getContext('2d');
+let state={x:0,y:0,scale:1}, crossPos={x:0,y:0}, isM=/Android|iPhone|iPad/i.test(navigator.userAgent);
+
+function setMode(m){currentMode=m;document.getElementById('modeWatercolor').className=m==='watercolor'?'mode-opt active':'mode-opt';document.getElementById('modeOil').className=m==='oil'?'mode-opt active':'mode-opt';showToast(`切至${m==='watercolor'?'水彩':'油画'}`);updateActivePigments();updateGlobalSessionPool();renderManualBar()}
+fileInput.onchange=(e)=>{
+  const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=(ev)=>{
+    imgElement.onload=()=>{
+      document.getElementById('uploadContainer').style.display='none';imgElement.style.display='block';document.getElementById('trayHint').innerHTML="拖动准心或双指移动取色";document.getElementById('mainActionGroup').style.display='flex';document.getElementById('stageHint').classList.add('visible');
+      offC.width=imgElement.naturalWidth;offC.height=imgElement.naturalHeight;offCtx.drawImage(imgElement,0,0);setTimeout(()=>resetV(),50);if(isM){crosshair.style.display='block';document.getElementById('pickBtn').style.display='flex'}
+    }; imgElement.src=ev.target.result;
+  }; r.readAsDataURL(f);
+};
+function resetV(){const r=imgWrapper.getBoundingClientRect();if(r.width===0)return;const ir=imgElement.naturalWidth/imgElement.naturalHeight,sr=r.width/r.height;state.scale=ir>sr?(r.width*0.9)/imgElement.naturalWidth:(r.height*0.9)/imgElement.naturalHeight;state.x=(r.width-imgElement.naturalWidth*state.scale)/2;state.y=(r.height-imgElement.naturalHeight*state.scale)/2;crossPos={x:0,y:0};upC();upT()}
+function upT(){imgElement.style.transform=`translate3d(${state.x}px,${state.y}px,0) scale(${state.scale})`}
+function upC(){crosshair.style.transform=`translate(calc(-50% + ${crossPos.x}px),calc(-50% + ${crossPos.y}px))`}
+let isD=false,sX=0,sY=0,iX=0,iY=0,iDist=0,iScale=1,pX=0,pY=0,isDC=false;
+crosshair.ontouchstart=(e)=>{if(e.touches.length===1){isDC=true;isD=false;sX=e.touches[0].clientX;sY=e.touches[0].clientY;iX=crossPos.x;iY=crossPos.y;e.stopPropagation()}};
+crosshair.onmousedown=(e)=>{isDC=true;isD=false;sX=e.clientX;sY=e.clientY;iX=crossPos.x;iY=crossPos.y;e.stopPropagation()};
+function hGM(cx,cy){if(isDC){const r=imgWrapper.getBoundingClientRect(),w=r.width/2-20,h=r.height/2-20;let nx=iX+(cx-sX),ny=iY+(cy-sY);crossPos.x=Math.max(-w,Math.min(w,nx));crossPos.y=Math.max(-h,Math.min(h,ny));upC();return true}return false}
+imgWrapper.ontouchstart=(e)=>{if(e.touches.length===2){isDC=false;e.preventDefault();iDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);iScale=state.scale;const r=imgWrapper.getBoundingClientRect(),cx=(e.touches[0].clientX+e.touches[1].clientX)/2-r.left,cy=(e.touches[0].clientY+e.touches[1].clientY)/2-r.top;pX=(cx-state.x)/state.scale;pY=(cy-state.y)/state.scale;iX=state.x;iY=state.y}};
+imgWrapper.ontouchmove=(e)=>{if(isDC){hGM(e.touches[0].clientX,e.touches[0].clientY);upRP();return}if(e.touches.length===2){e.preventDefault();const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(iDist>0){state.scale=iScale*(d/iDist);const r=imgWrapper.getBoundingClientRect(),cx=(e.touches[0].clientX+e.touches[1].clientX)/2-r.left,cy=(e.touches[0].clientY+e.touches[1].clientY)/2-r.top;state.x=cx-pX*state.scale;state.y=cy-pY*state.scale;upT();upRP()}}};
+imgWrapper.onmousedown=(e)=>{if(imgElement.style.display==='none')return;isD=true;sX=e.clientX;sY=e.clientY;iX=state.x;iY=state.y};
+window.onmousemove=(e)=>{if(isDC){hGM(e.clientX,e.clientY);upRP()}else if(isD){state.x=iX+(e.clientX-sX);state.y=iY+(e.clientY-sY);upT();upRP()}};
+window.onmouseup=()=>{isDC=isD=false};
+window.ontouchend=()=>{isDC=isD=false};
+window.ontouchcancel=()=>{isDC=isD=false};
+imgWrapper.onwheel=(e)=>{e.preventDefault();const d=e.deltaY>0?0.9:1.1;state.scale*=d;const r=imgWrapper.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;state.x=mx-(mx-state.x)*d;state.y=my-(my-state.y)*d;upT();upRP()};
+function upRP(){if(!imgElement.src||imgElement.style.display==='none')return;const r=imgWrapper.getBoundingClientRect(),cx=r.left+r.width/2+crossPos.x,cy=r.top+r.height/2+crossPos.y;const c=getGAC(cx,cy);if(c){const col=getAvgC(c);if(col){globalSession.targetRGB=[col.r,col.g,col.b];globalSession.targetHex=`rgb(${col.r},${col.g},${col.b})`;globalSession.currentRecipe=[];const lim=solveRecipe(col.r,col.g,col.b,true);
+globalSession.minError = lim.minError;
+renderPM(globalSession.targetHex,lim.minError)}}}
+function getGAC(sx,sy){const r=imgElement.getBoundingClientRect();if(sx<r.left||sx>r.right||sy<r.top||sy>r.bottom)return null;return {x:Math.floor((sx-r.left)*(imgElement.naturalWidth/r.width)),y:Math.floor((sy-r.top)*(imgElement.naturalHeight/r.height))}}
+function getAvgC(c){
+  const r=imgElement.getBoundingClientRect(),sf=imgElement.naturalWidth/r.width,rad=Math.max(0.5,6*sf),rng=Math.ceil(rad),sx=Math.max(0,c.x-rng),sy=Math.max(0,c.y-rng),ex=Math.min(imgElement.naturalWidth,c.x+rng),ey=Math.min(imgElement.naturalHeight,c.y+rng),w=ex-sx,h=ey-sy;
+  if(w<=0||h<=0)return null;const dat=offCtx.getImageData(sx,sy,w,h).data;let rsum=0,gsum=0,bsum=0,cnt=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(Math.pow((sx+x)-c.x,2)+Math.pow((sy+y)-c.y,2)<=rad*rad){const i=(y*w+x)*4;rsum+=dat[i];gsum+=dat[i+1];bsum+=dat[i+2];cnt++}}
+  return cnt===0?null:{r:Math.round(rsum/cnt),g:Math.round(gsum/cnt),b:Math.round(bsum/cnt)};
+}
+function renderPM(tCol,minE){
+  const con=document.getElementById('focusContainer');con.innerHTML=''; const h=document.createElement('div');h.id='trayHint';h.style.cssText="color:var(--text-secondary);font-size:13px;font-weight:500;margin-top:16px;opacity:0.8;text-align:center;line-height:1.5;max-width:280px;";
+  const w=document.createElement('div');w.className='focus-blob-wrapper active';
+  updateStatusBadge(minE);
+  const b=document.createElement('div');b.className='focus-blob preview-mode';b.style.setProperty('--target-color',tCol);w.appendChild(b);con.appendChild(w);h.innerText="已取样。点击胶囊认识色域，或点击自动计算。";con.appendChild(h);
+  document.getElementById('manualBar').style.display='flex';document.getElementById('manualBarHeader').style.display='flex';
+}
+function showInfo(){showToast("欢迎使用调色助手Studio版。取色后点击“自动调色”即可获取配方。")}
+
+window.addEventListener('DOMContentLoaded', () => {
+    initApp();
+});
+</script>
+</body>
+</html>
