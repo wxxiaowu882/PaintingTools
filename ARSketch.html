@@ -60,6 +60,13 @@
             transform: translate(-50%, -50%);
             transform-style: preserve-3d; 
             will-change: transform, opacity;
+            /* 平滑过渡滤镜效果 */
+            transition: filter 0.3s ease; 
+        }
+
+        /* 线稿模式滤镜类 */
+        .sketch-mode {
+            filter: url(#edge-detection) brightness(1.5) contrast(1.5);
         }
 
         /* === UI 控制层 === */
@@ -187,6 +194,21 @@
 </head>
 <body>
 
+    <!-- SVG 滤镜定义 (隐藏) -->
+    <svg style="display: none;">
+        <defs>
+            <filter id="edge-detection">
+                <!-- 1. 转灰度 -->
+                <feColorMatrix type="matrix" values="0.33 0.33 0.33 0 0
+                                                     0.33 0.33 0.33 0 0
+                                                     0.33 0.33 0.33 0 0
+                                                     0 0 0 1 0"/>
+                <!-- 2. 边缘检测卷积核 -->
+                <feConvolveMatrix order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1"/>
+            </filter>
+        </defs>
+    </svg>
+
     <!-- 屏幕日志窗口 -->
     <div id="debug-console">日志窗口 (等待操作)...</div>
 
@@ -241,10 +263,13 @@
         </div>
 
         <!-- 更多设置按钮 -->
-        <button class="panel-btn" id="btn-more" onclick="toggleMore()" style="background: rgba(255,255,255,0.05); color: #aaa; margin: 4px 0; font-size: 11px; padding: 4px 0; max-width: none;">﹀ 更多设置 (旋转/视角)</button>
+        <button class="panel-btn" id="btn-more" onclick="toggleMore()" style="background: rgba(255,255,255,0.05); color: #aaa; margin: 4px 0; font-size: 11px; padding: 4px 0; max-width: none;">﹀ 更多设置 (旋转/视角/线稿)</button>
 
         <!-- 折叠区域 -->
         <div id="more-controls">
+            <!-- 新增：线稿模式开关 -->
+            <button class="panel-btn" onclick="toggleSketchMode(this)" style="margin-bottom: 4px; background: rgba(255, 255, 255, 0.1);">✏️ 开启线稿模式</button>
+            
             <div class="row">
                 <span class="label">旋转</span>
                 <input type="range" id="rotateZ" min="-180" max="180" step="1" value="0" oninput="updateVisuals()">
@@ -285,6 +310,7 @@
             videoDevices: [], 
             currentDeviceIndex: 0,
             cameraActive: false,
+            sketchMode: false, // 线稿模式状态
             // 视觉参数
             opacity: 0.5,
             scale: 1, 
@@ -331,7 +357,21 @@
                 btn.innerText = "︿ 收起设置";
             } else {
                 moreDiv.style.display = 'none';
-                btn.innerText = "﹀ 更多设置 (旋转/视角)";
+                btn.innerText = "﹀ 更多设置 (旋转/视角/线稿)";
+            }
+        }
+
+        // 切换线稿模式
+        function toggleSketchMode(btn) {
+            state.sketchMode = !state.sketchMode;
+            if (state.sketchMode) {
+                els.screenImg.classList.add('sketch-mode');
+                btn.innerText = "📝 关闭线稿模式";
+                btn.style.background = "#007AFF";
+            } else {
+                els.screenImg.classList.remove('sketch-mode');
+                btn.innerText = "✏️ 开启线稿模式";
+                btn.style.background = "rgba(255, 255, 255, 0.1)";
             }
         }
 
