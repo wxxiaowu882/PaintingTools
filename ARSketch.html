@@ -8,6 +8,21 @@
     <style>
         body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #000; }
         
+        /* === 新增：屏幕调试日志台 === */
+        #debug-console {
+            position: fixed; top: 0; left: 0; width: 100%; height: 120px;
+            background: rgba(0, 0, 0, 0.6); 
+            color: #0f0; 
+            font-family: monospace; 
+            font-size: 10px;
+            overflow-y: auto; 
+            z-index: 10000;
+            padding: 5px;
+            pointer-events: none; /* 防止阻挡操作，但无法手动滚动 */
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
         /* === 全局视口容器 === */
         #global-viewport {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -170,6 +185,9 @@
 </head>
 <body>
 
+    <!-- 屏幕日志窗口 -->
+    <div id="debug-console">Wait for logs...</div>
+
     <div id="start-screen">
         <h1 style="margin-bottom: 10px;">🎨 描摹助手</h1>
         <p style="opacity: 0.6; margin-bottom: 40px; font-size: 14px;">透视叠加 · 极简版</p>
@@ -240,6 +258,14 @@
     </div>
 
     <script>
+        // 日志辅助函数
+        function log(msg) {
+            const consoleDiv = document.getElementById('debug-console');
+            consoleDiv.innerHTML += `<div>[${new Date().toLocaleTimeString().split(' ')[0]}] ${msg}</div>`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            console.log(msg);
+        }
+
         const state = {
             imageLoaded: false,
             locked: false,
@@ -309,6 +335,7 @@
         async function startApp() {
             if (!state.imageLoaded) return;
             try {
+                log("正在请求默认后置摄像头...");
                 // 1. 先尝试获取默认的后置摄像头
                 let stream = await navigator.mediaDevices.getUserMedia({
                     audio: false,
@@ -318,12 +345,22 @@
                         height: { ideal: 2160 } 
                     }
                 });
+                log("默认摄像头已获取。");
 
                 // --- 2. 隐形优化：自动寻找广角镜头 ---
                 try {
+                    log("正在列举所有摄像头...");
                     // 获取设备列表
                     const devices = await navigator.mediaDevices.enumerateDevices();
                     const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                    
+                    if (videoDevices.length === 0) {
+                        log("警告: 未发现视频输入设备 (enumerateDevices返回空)");
+                    }
+
+                    videoDevices.forEach(d => {
+                        log(`发现: ${d.label} (ID: ${d.deviceId.substr(0,5)}...)`);
+                    });
                     
                     // 关键词匹配：寻找 label 中包含 "wide", "0.5", "ultra" 等字眼的后置镜头
                     const wideDevice = videoDevices.find(d => {
@@ -335,9 +372,14 @@
 
                     // 如果找到了明确的广角镜头，且当前流的设备ID不是它，则切换
                     if (wideDevice) {
+                        log(`>>> 匹配到广角镜头: ${wideDevice.label}`);
                         const currentTrack = stream.getVideoTracks()[0];
-                        if (currentTrack.getSettings().deviceId !== wideDevice.deviceId) {
-                            console.log("Auto-switching to Wide Angle Lens:", wideDevice.label);
+                        const currentSettings = currentTrack.getSettings();
+                        
+                        // 注意：有些浏览器在getSettings里不返回deviceId，这可能导致误判
+                        // 如果能确认不是同一个，才切换
+                        if (currentSettings.deviceId !== wideDevice.deviceId) {
+                            log("正在切换到广角镜头...");
                             // 停止旧流
                             currentTrack.stop();
                             // 开启新流
@@ -349,10 +391,16 @@
                                     height: { ideal: 2160 } 
                                 }
                             });
+                            log("广角镜头切换成功！");
+                        } else {
+                            log("当前已经是广角镜头，无需切换。");
                         }
+                    } else {
+                        log("未匹配到明显的广角镜头关键字，保持默认。");
                     }
                 } catch (e) {
-                    console.warn("Auto-wide angle switch failed (minor issue, ignoring):", e);
+                    log(`自动切换广角失败/不支持: ${e.message}`);
+                    console.warn("Auto-wide angle switch failed:", e);
                 }
                 // ------------------------------------
 
@@ -364,8 +412,12 @@
                 const capabilities = track.getCapabilities ? track.getCapabilities() : {};
                 if (capabilities.focusMode) {
                     document.getElementById('btn-focus').style.display = 'flex';
+                    log("支持手动对焦模式。");
+                } else {
+                    log("不支持 focusMode 能力。");
                 }
             } catch (err) {
+                log(`错误: ${err.name} - ${err.message}`);
                 alert("摄像头启动失败，请确保允许访问或使用HTTPS环境。\n错误: " + err);
             }
             els.startScreen.style.display = 'none';
@@ -390,9 +442,11 @@
                 btn.innerHTML = state.focusLocked ? "🎯 已锁对焦" : "🎯 锁定对焦";
                 btn.style.background = state.focusLocked ? "rgba(255, 59, 48, 0.8)" : "rgba(0, 0, 0, 0.5)";
                 btn.style.borderColor = state.focusLocked ? "transparent" : "rgba(255,255,255,0.2)";
+                log(`对焦模式切换为: ${mode}`);
             } catch (err) {
                 console.error("Focus failed", err);
                 state.focusLocked = !state.focusLocked;
+                log(`对焦切换失败: ${err.message}`);
                 alert("操作失败：您的设备可能不支持手动锁定特定焦距。");
             }
         }
