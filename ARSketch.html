@@ -8,15 +8,23 @@
     <style>
         body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #000; }
         
+        /* === 新增：全局视口容器 (用于整体缩放) === */
+        #global-viewport {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            transform-origin: center center; /* 从中心缩放 */
+            will-change: transform;
+            z-index: 0;
+        }
+
         /* === 背景视频层 === */
         #bg-video {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover; z-index: 1; 
         }
 
         /* === 屏幕静态层 === */
         #screen-layer {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10; pointer-events: auto; overflow: hidden;
             display: none; cursor: grab;
             perspective: 1000px; 
@@ -136,15 +144,18 @@
         <p id="file-name" style="margin-top: 20px; font-size: 12px; color: #007AFF;"></p>
     </div>
 
-    <!-- 背景视频流 -->
-    <video id="bg-video" autoplay playsinline muted></video>
+    <!-- 全局视口：包含视频和绘图层 -->
+    <div id="global-viewport">
+        <!-- 背景视频流 -->
+        <video id="bg-video" autoplay playsinline muted></video>
+        <!-- 绘图层 -->
+        <div id="screen-layer">
+            <img id="screen-img" src="" alt="Overlay">
+        </div>
+    </div>
 
     <!-- 独立的对焦按钮 -->
     <button onclick="toggleFocus()" id="btn-focus">🎯 锁定对焦</button>
-
-    <div id="screen-layer">
-        <img id="screen-img" src="" alt="Overlay">
-    </div>
 
     <!-- 恢复按钮 (初始隐藏) -->
     <button id="restore-btn" onclick="toggleUI(true)">🛠️</button>
@@ -217,6 +228,7 @@
             restoreBtn: document.getElementById('restore-btn'),
             bgVideo: document.getElementById('bg-video'),
             btnLock: document.getElementById('btn-lock'),
+            viewport: document.getElementById('global-viewport'), // 新增
             inputs: {
                 opacity: document.getElementById('opacity'),
                 scale: document.getElementById('scale'),
@@ -283,7 +295,7 @@
             updateVisuals();
         }
 
-        // 切换对焦模式 (修复模糊 Bug)
+        // 切换对焦模式
         async function toggleFocus() {
             if (!state.videoTrack) return;
             
@@ -294,17 +306,12 @@
                 const mode = state.focusLocked ? 'manual' : 'continuous';
                 const constraints = { advanced: [{ focusMode: mode }] };
 
-                // --- 核心修复：锁定当前焦距 ---
-                // 如果是锁定操作，尝试获取当前摄像头的焦距值，并显式设置该值
-                // 否则有些设备会默认重置到 0 或无限远，导致画面变糊
                 if (state.focusLocked) {
                     const settings = state.videoTrack.getSettings();
-                    // 检查是否存在当前焦距值
                     if (settings.focusDistance) {
                         constraints.advanced[0].focusDistance = settings.focusDistance;
                     }
                 }
-                // -----------------------------
                 
                 await state.videoTrack.applyConstraints(constraints);
                 
@@ -341,10 +348,20 @@
             els.screenImg.style.transform = transform;
         }
 
-        // 4. 拖拽逻辑
+        // 4. 手势逻辑 (重构：支持双指缩放全局)
         let isDragging = false;
         let startX = 0, startY = 0;
         let initialScreenX = 0, initialScreenY = 0;
+        
+        // 全局缩放状态
+        let globalScale = 1, globalTx = 0, globalTy = 0;
+        let startDist = 0;
+        let startCenter = {x:0, y:0};
+        let startGlobal = {s:1, x:0, y:0};
+
+        // 辅助函数
+        const getDist = (t1, t2) => Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        const getCenter = (t1, t2) => ({ x: (t1.clientX + t2.clientX)/2, y: (t1.clientY + t2.clientY)/2 });
 
         const onDown = (clientX, clientY) => {
             if (state.locked) return;
@@ -367,25 +384,57 @@
 
         const onUp = () => { isDragging = false; els.screenLayer.style.cursor = 'grab'; };
 
+        // 绑定事件到 screenLayer (用于捕获开始) 和 window (用于全局移动)
+        els.screenLayer.addEventListener('touchstart', e => {
+            if (e.touches.length === 2) {
+                // 双指：开始全局缩放
+                isDragging = false; // 中断单指拖拽
+                startDist = getDist(e.touches[0], e.touches[1]);
+                startCenter = getCenter(e.touches[0], e.touches[1]);
+                startGlobal = { s: globalScale, x: globalTx, y: globalTy };
+                e.preventDefault();
+            } else if (e.touches.length === 1) {
+                // 单指：开始参考图拖拽
+                onDown(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, {passive:false});
+
+        window.addEventListener('touchmove', e => {
+            if (e.touches.length === 2) {
+                // 双指：执行全局缩放和平移
+                const currDist = getDist(e.touches[0], e.touches[1]);
+                const currCenter = getCenter(e.touches[0], e.touches[1]);
+                
+                // 计算缩放
+                const scaleRatio = currDist / startDist;
+                globalScale = Math.max(1, Math.min(startGlobal.s * scaleRatio, 5)); // 限制 1x - 5x
+                
+                // 计算平移 (跟随手指移动)
+                const dx = currCenter.x - startCenter.x;
+                const dy = currCenter.y - startCenter.y;
+                globalTx = startGlobal.x + dx;
+                globalTy = startGlobal.y + dy;
+                
+                // 应用到全局视口
+                els.viewport.style.transform = `translate(${globalTx}px, ${globalTy}px) scale(${globalScale})`;
+                e.preventDefault(); // 阻止浏览器默认缩放
+            } else if (e.touches.length === 1 && isDragging) {
+                // 单指：执行参考图拖拽
+                e.preventDefault();
+                onMove(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, {passive:false});
+
+        window.addEventListener('touchend', e => {
+            if (e.touches.length === 0) {
+                onUp();
+            }
+        });
+        
+        // 鼠标兼容 (仅限单指逻辑)
         els.screenLayer.addEventListener('mousedown', e => { e.preventDefault(); onDown(e.clientX, e.clientY); });
         window.addEventListener('mousemove', e => { if (isDragging) { e.preventDefault(); onMove(e.clientX, e.clientY); } });
         window.addEventListener('mouseup', onUp);
-        
-        els.screenLayer.addEventListener('touchstart', e => { 
-            if (e.touches.length === 1) { 
-                e.preventDefault(); 
-                onDown(e.touches[0].clientX, e.touches[0].clientY); 
-            }
-        }, {passive:false});
-        
-        window.addEventListener('touchmove', e => { 
-            if (isDragging && e.touches.length === 1) { 
-                e.preventDefault(); 
-                onMove(e.touches[0].clientX, e.touches[0].clientY); 
-            }
-        }, {passive:false});
-        
-        window.addEventListener('touchend', onUp);
 
         function resetParams() {
             state.screenX = 0; state.screenY = 0;
@@ -393,6 +442,11 @@
             els.inputs.rotateZ.value = 0;
             els.inputs.perspective.value = 1000; 
             els.inputs.rotateX.value = 0;
+            
+            // 重置全局缩放
+            globalScale = 1; globalTx = 0; globalTy = 0;
+            els.viewport.style.transform = `translate(0px, 0px) scale(1)`;
+            
             updateVisuals();
         }
 
