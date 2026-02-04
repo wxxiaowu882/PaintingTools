@@ -21,7 +21,7 @@
             pointer-events: none;
             white-space: pre-wrap;
             word-break: break-all;
-            display: none; /* 默认隐藏日志，清爽界面 */
+            display: none; /* 默认隐藏日志 */
         }
 
         /* === 全局视口容器 === */
@@ -43,7 +43,8 @@
             z-index: 10; pointer-events: auto; overflow: hidden;
             display: none; cursor: grab;
             perspective: 1000px; 
-            perspective-origin: center center;
+            /* 优化：视点下移至 80%，减少调节透视时的垂直漂移感 */
+            perspective-origin: 50% 80%;
         }
         #screen-layer:active { cursor: grabbing; }
         
@@ -53,7 +54,7 @@
             max-width: 80%; 
             max-height: 80%;
             pointer-events: none; 
-            /* 核心：锚点设为底部中心，保证调节透视时底边不动 */
+            /* 锚点保持底部中心 */
             transform-origin: center bottom;
             transform: translate(-50%, -50%);
             transform-style: preserve-3d; 
@@ -68,7 +69,8 @@
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-radius: 16px; 
-            padding: 10px 12px; 
+            /* 优化：顶部内边距增加到 35px，避开右上角的收起按钮 */
+            padding: 35px 12px 12px 12px; 
             border: 1px solid rgba(255,255,255,0.1);
             box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             display: flex; flex-direction: column; 
@@ -78,8 +80,8 @@
         }
 
         .btn-minimize {
-            position: absolute; top: 5px; right: 5px;
-            width: 20px; height: 20px; padding: 0;
+            position: absolute; top: 8px; right: 8px;
+            width: 24px; height: 24px; padding: 0;
             background: rgba(255,255,255,0.1); border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-size: 10px; border: none; cursor: pointer; color: #ccc;
@@ -96,47 +98,6 @@
             z-index: 99; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        /* 对焦控制区 (右上角) */
-        #focus-container {
-            position: fixed; top: 20px; right: 20px;
-            z-index: 200;
-            display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
-        }
-
-        #btn-focus {
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(8px);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 20px;
-            padding: 6px 14px;
-            font-size: 12px;
-            font-weight: 600;
-            display: none; 
-            align-items: center; gap: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            cursor: pointer;
-        }
-
-        /* 手动焦距滑块容器 */
-        #focus-slider-wrap {
-            display: none;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(5px);
-            padding: 10px 5px;
-            border-radius: 10px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        /* 竖向滑块样式 */
-        input[type=range].v-slider {
-            writing-mode: bt-lr; /* IE/Edge */
-            -webkit-appearance: slider-vertical; /* Webkit */
-            width: 30px;
-            height: 120px;
-            cursor: pointer;
-        }
-
         .row { 
             display: flex; align-items: center; justify-content: space-between; gap: 8px; 
             height: 32px; 
@@ -150,8 +111,8 @@
             line-height: 1;
         }
         
-        /* === 通用横向滑块样式 === */
-        input[type=range]:not(.v-slider) { 
+        /* === 滑块样式 === */
+        input[type=range] { 
             -webkit-appearance: none; 
             flex: 1; 
             background: transparent;
@@ -160,7 +121,7 @@
             cursor: pointer;
         }
 
-        input[type=range]:not(.v-slider)::-webkit-slider-runnable-track {
+        input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
             height: 4px; 
             background: rgba(255,255,255,0.2);
@@ -168,7 +129,7 @@
             border: none;
         }
 
-        input[type=range]:not(.v-slider)::-webkit-slider-thumb {
+        input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
             height: 24px; 
             width: 24px; 
@@ -238,15 +199,7 @@
         </div>
     </div>
 
-    <!-- 右上角对焦控制区 -->
-    <div id="focus-container">
-        <button onclick="toggleFocus()" id="btn-focus">🎯 锁定对焦</button>
-        <div id="focus-slider-wrap">
-            <!-- 垂直滑块 -->
-            <input type="range" class="v-slider" id="manual-focus" min="0" max="100" step="1" oninput="updateFocusDistance(this.value)">
-        </div>
-    </div>
-
+    <!-- 恢复按钮 (初始隐藏) -->
     <button id="restore-btn" onclick="toggleUI(true)">🛠️</button>
 
     <div class="ui-layer" id="controls" style="display: none;">
@@ -258,7 +211,7 @@
              <button class="panel-btn" onclick="document.getElementById('file-input').click()" style="background: rgba(0,122,255,0.25); color: #4facfe;">📂 换图</button>
              <!-- 切换镜头 -->
              <button class="panel-btn" id="btn-switch-cam" onclick="switchCamera()" style="display:none; background: rgba(255,255,255,0.15);">🔄 换镜</button>
-             <!-- 启停摄像头 (新增) -->
+             <!-- 启停摄像头 -->
              <button class="panel-btn" id="btn-toggle-cam" onclick="toggleCameraState()" style="display:none; background: rgba(255,59,48,0.25); color: #ff6b6b; max-width: 40px;">⏹</button>
         </div>
 
@@ -313,7 +266,6 @@
         const state = {
             imageLoaded: false,
             locked: false,
-            focusLocked: false, 
             videoTrack: null,   
             videoDevices: [], 
             currentDeviceIndex: 0,
@@ -341,8 +293,7 @@
             btnLock: document.getElementById('btn-lock'),
             viewport: document.getElementById('global-viewport'),
             btnSwitch: document.getElementById('btn-switch-cam'),
-            btnToggleCam: document.getElementById('btn-toggle-cam'), // 新增
-            focusSliderWrap: document.getElementById('focus-slider-wrap'), // 新增
+            btnToggleCam: document.getElementById('btn-toggle-cam'),
             inputs: {
                 opacity: document.getElementById('opacity'),
                 scale: document.getElementById('scale'),
@@ -445,19 +396,6 @@
                 els.btnToggleCam.style.display = 'block';
                 els.btnToggleCam.innerText = '⏹';
                 
-                // 检查对焦能力
-                const capabilities = state.videoTrack.getCapabilities ? state.videoTrack.getCapabilities() : {};
-                if (capabilities.focusMode) {
-                    document.getElementById('btn-focus').style.display = 'flex';
-                    // 初始化滑块范围
-                    if (capabilities.focusDistance) {
-                        const slider = document.getElementById('manual-focus');
-                        slider.min = capabilities.focusDistance.min || 0;
-                        slider.max = capabilities.focusDistance.max || 100;
-                        slider.step = capabilities.focusDistance.step || 0.1;
-                    }
-                    log("支持手动对焦。");
-                }
             } catch(e) {
                 log("流初始化失败: " + e.message);
                 throw e;
@@ -514,55 +452,6 @@
                     els.btnToggleCam.style.color = '#ff6b6b';
                     log("摄像头已恢复");
                 });
-            }
-        }
-
-        // 核心优化：手动对焦滑块控制
-        async function toggleFocus() {
-            if (!state.videoTrack) return;
-            const btn = document.getElementById('btn-focus');
-            state.focusLocked = !state.focusLocked;
-            
-            try {
-                // 切换到 Manual 模式
-                const mode = state.focusLocked ? 'manual' : 'continuous';
-                const constraints = { advanced: [{ focusMode: mode }] };
-                await state.videoTrack.applyConstraints(constraints);
-                
-                if (state.focusLocked) {
-                    btn.innerHTML = "🎯 调节焦距";
-                    btn.style.background = "rgba(255, 59, 48, 0.8)";
-                    btn.style.borderColor = "transparent";
-                    els.focusSliderWrap.style.display = 'block'; // 显示滑块
-                    
-                    // 读取当前值赋给滑块
-                    const settings = state.videoTrack.getSettings();
-                    if (settings.focusDistance) {
-                        document.getElementById('manual-focus').value = settings.focusDistance;
-                    }
-                } else {
-                    btn.innerHTML = "🎯 锁定对焦";
-                    btn.style.background = "rgba(0, 0, 0, 0.5)";
-                    btn.style.borderColor = "rgba(255,255,255,0.2)";
-                    els.focusSliderWrap.style.display = 'none'; // 隐藏滑块
-                }
-                log(`对焦模式: ${mode}`);
-            } catch (err) {
-                state.focusLocked = !state.focusLocked; 
-                log(`对焦切换失败: ${err.message}`);
-                alert("设备不支持手动锁定模式。");
-            }
-        }
-
-        // 实时调节焦距
-        async function updateFocusDistance(val) {
-            if (!state.videoTrack || !state.focusLocked) return;
-            try {
-                await state.videoTrack.applyConstraints({
-                    advanced: [{ focusMode: 'manual', focusDistance: parseFloat(val) }]
-                });
-            } catch(e) {
-                // 忽略频繁调节时的微小错误
             }
         }
 
