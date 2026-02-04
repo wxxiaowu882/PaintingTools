@@ -43,7 +43,7 @@
             z-index: 10; pointer-events: auto; overflow: hidden;
             display: none; cursor: grab;
             perspective: 1000px; 
-            /* 保持底部视点，减少漂移 */
+            /* 保持底部视点 */
             perspective-origin: 50% 100%;
         }
         #screen-layer:active { cursor: grabbing; }
@@ -61,12 +61,7 @@
             transform-style: preserve-3d; 
             will-change: transform, opacity;
             /* 平滑过渡滤镜效果 */
-            transition: filter 0.3s ease; 
-        }
-
-        /* 线稿模式滤镜类 */
-        .sketch-mode {
-            filter: url(#edge-detection) brightness(1.5) contrast(1.5);
+            transition: filter 0.2s ease; 
         }
 
         /* === UI 控制层 === */
@@ -263,17 +258,19 @@
         </div>
 
         <!-- 更多设置按钮 -->
-        <button class="panel-btn" id="btn-more" onclick="toggleMore()" style="background: rgba(255,255,255,0.05); color: #aaa; margin: 4px 0; font-size: 11px; padding: 4px 0; max-width: none;">﹀ 更多设置 (旋转/视角/线稿)</button>
+        <button class="panel-btn" id="btn-more" onclick="toggleMore()" style="background: rgba(255,255,255,0.05); color: #aaa; margin: 4px 0; font-size: 11px; padding: 4px 0; max-width: none;">﹀ 更多设置 (线稿/视角)</button>
 
         <!-- 折叠区域 -->
         <div id="more-controls">
             <!-- 新增：线稿模式开关 -->
             <button class="panel-btn" onclick="toggleSketchMode(this)" style="margin-bottom: 4px; background: rgba(255, 255, 255, 0.1);">✏️ 开启线稿模式</button>
             
-            <div class="row">
-                <span class="label">旋转</span>
-                <input type="range" id="rotateZ" min="-180" max="180" step="1" value="0" oninput="updateVisuals()">
+            <!-- 新增：线稿强度调节（替代了旋转） -->
+            <div class="row" id="sketch-strength-row" style="display: none;">
+                <span class="label">线强度</span>
+                <input type="range" id="lineStrength" min="0.5" max="10" step="0.1" value="2" oninput="updateVisuals()">
             </div>
+
             <div class="row">
                 <span class="label">俯仰</span>
                 <!-- 俯仰决定图片远端的上下位置 -->
@@ -314,7 +311,7 @@
             // 视觉参数
             opacity: 0.5,
             scale: 1, 
-            rotateZ: 0,
+            lineStrength: 2, // 线稿强度
             perspective: 1000, 
             rotateX: 0,
             screenX: 0,
@@ -335,10 +332,11 @@
             viewport: document.getElementById('global-viewport'),
             btnSwitch: document.getElementById('btn-switch-cam'),
             btnToggleCam: document.getElementById('btn-toggle-cam'),
+            sketchRow: document.getElementById('sketch-strength-row'),
             inputs: {
                 opacity: document.getElementById('opacity'),
                 scale: document.getElementById('scale'),
-                rotateZ: document.getElementById('rotateZ'),
+                lineStrength: document.getElementById('lineStrength'),
                 perspective: document.getElementById('perspective'),
                 rotateX: document.getElementById('rotateX')
             }
@@ -365,14 +363,15 @@
         function toggleSketchMode(btn) {
             state.sketchMode = !state.sketchMode;
             if (state.sketchMode) {
-                els.screenImg.classList.add('sketch-mode');
                 btn.innerText = "📝 关闭线稿模式";
                 btn.style.background = "#007AFF";
+                els.sketchRow.style.display = 'flex'; // 显示强度滑块
             } else {
-                els.screenImg.classList.remove('sketch-mode');
                 btn.innerText = "✏️ 开启线稿模式";
                 btn.style.background = "rgba(255, 255, 255, 0.1)";
+                els.sketchRow.style.display = 'none'; // 隐藏强度滑块
             }
+            updateVisuals();
         }
 
         els.fileInput.addEventListener('change', (e) => {
@@ -515,18 +514,25 @@
         function updateVisuals() {
             state.opacity = els.inputs.opacity.value;
             state.scale = els.inputs.scale.value;
-            state.rotateZ = els.inputs.rotateZ.value;
+            // 移除 rotateZ，改为线稿强度
+            state.lineStrength = els.inputs.lineStrength.value;
             state.perspective = els.inputs.perspective.value;
             state.rotateX = els.inputs.rotateX.value;
 
             els.screenLayer.style.perspective = `${state.perspective}px`;
-            els.screenImg.style.opacity = state.opacity;
+            
+            // 动态构建滤镜字符串
+            let filters = `opacity(${state.opacity})`;
+            if (state.sketchMode) {
+                // 叠加线稿滤镜 + 动态对比度
+                filters += ` url(#edge-detection) brightness(1.2) contrast(${state.lineStrength}) grayscale(1)`;
+            }
+            els.screenImg.style.filter = filters;
             
             // 保持 transform-origin 为 center bottom
             const transform = `
                 translate(calc(-50% + ${state.screenX}px), calc(-50% + ${state.screenY}px)) 
                 rotateX(${state.rotateX}deg) 
-                rotateZ(${state.rotateZ}deg) 
                 scale(${state.scale})
             `;
             els.screenImg.style.transform = transform;
@@ -605,7 +611,7 @@
         function resetParams() {
             state.screenX = 0; state.screenY = 0;
             els.inputs.scale.value = 1; 
-            els.inputs.rotateZ.value = 0;
+            els.inputs.lineStrength.value = 2; // 重置线稿强度
             els.inputs.perspective.value = 1000; 
             els.inputs.rotateX.value = 0;
             globalScale = 1; globalTx = 0; globalTy = 0;
@@ -618,7 +624,7 @@
             els.btnLock.innerText = state.locked ? "🔒 已锁定" : "🔓 锁定画面";
             els.btnLock.style.background = state.locked ? "#FF3B30" : "rgba(255,255,255,0.15)";
             els.inputs.scale.disabled = state.locked;
-            els.inputs.rotateZ.disabled = state.locked;
+            els.inputs.lineStrength.disabled = state.locked;
             els.inputs.perspective.disabled = state.locked;
             els.inputs.rotateX.disabled = state.locked;
         }
