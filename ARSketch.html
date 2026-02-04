@@ -109,7 +109,15 @@
         }
         
         .label { font-size: 12px; min-width: 50px; color: #ddd; text-align: right; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-        input[type=range] { flex: 1; accent-color: #007AFF; height: 3px; border-radius: 2px; }
+        
+        /* 修改：增大滑块的高度（点击热区），解决手指粗不好拖动的问题 */
+        input[type=range] { 
+            flex: 1; 
+            accent-color: #007AFF; 
+            height: 30px; /* 从 3px 增加到 30px，增大触控面积 */
+            border-radius: 2px; 
+            cursor: pointer;
+        }
         
         button.panel-btn {
             /* 修改：减少按钮内边距，使其更紧凑 */
@@ -250,18 +258,21 @@
             els.restoreBtn.style.display = show ? 'none' : 'flex';
         }
 
-        // 1. 上传图片
+        // 1. 上传图片 (优化：使用 createObjectURL 提升大图性能)
         els.fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                els.screenImg.src = event.target.result;
+            
+            // 使用 URL.createObjectURL 替代 FileReader
+            const imgUrl = URL.createObjectURL(file);
+            els.screenImg.src = imgUrl;
+            
+            els.screenImg.onload = () => {
                 state.imageLoaded = true;
                 els.fileName.innerText = `✅ 已选: ${file.name}`;
                 els.btnStartCam.style.display = 'block'; 
+                // 可选：释放内存，但为了保证 src 持续有效，这里暂不 revoke
             };
-            reader.readAsDataURL(file);
         });
 
         // 2. 启动摄像头和应用
