@@ -8,9 +8,9 @@
     <style>
         body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #000; }
         
-        /* === 新增：屏幕调试日志台 === */
+        /* === 屏幕调试日志台 === */
         #debug-console {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100px;
+            position: fixed; top: 0; left: 0; width: 100%; height: 80px;
             background: rgba(0, 0, 0, 0.5); 
             color: #0f0; 
             font-family: monospace; 
@@ -21,6 +21,7 @@
             pointer-events: none;
             white-space: pre-wrap;
             word-break: break-all;
+            display: none; /* 默认隐藏日志，清爽界面 */
         }
 
         /* === 全局视口容器 === */
@@ -34,6 +35,7 @@
         #bg-video {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover; z-index: 1; 
+            background: #000;
         }
 
         #screen-layer {
@@ -51,14 +53,14 @@
             max-width: 80%; 
             max-height: 80%;
             pointer-events: none; 
-            /* 修改核心：锚点改为底部中心，符合描摹习惯 */
+            /* 核心：锚点设为底部中心，保证调节透视时底边不动 */
             transform-origin: center bottom;
             transform: translate(-50%, -50%);
             transform-style: preserve-3d; 
             will-change: transform, opacity;
         }
 
-        /* === UI 控制层 (深度瘦身版) === */
+        /* === UI 控制层 === */
         .ui-layer {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             width: 85%; max-width: 320px; 
@@ -94,9 +96,14 @@
             z-index: 99; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        #btn-focus {
+        /* 对焦控制区 (右上角) */
+        #focus-container {
             position: fixed; top: 20px; right: 20px;
             z-index: 200;
+            display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+        }
+
+        #btn-focus {
             background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(8px);
             color: white;
@@ -108,6 +115,25 @@
             display: none; 
             align-items: center; gap: 6px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+
+        /* 手动焦距滑块容器 */
+        #focus-slider-wrap {
+            display: none;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            padding: 10px 5px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        /* 竖向滑块样式 */
+        input[type=range].v-slider {
+            writing-mode: bt-lr; /* IE/Edge */
+            -webkit-appearance: slider-vertical; /* Webkit */
+            width: 30px;
+            height: 120px;
             cursor: pointer;
         }
 
@@ -124,8 +150,8 @@
             line-height: 1;
         }
         
-        /* === 滑块样式 === */
-        input[type=range] { 
+        /* === 通用横向滑块样式 === */
+        input[type=range]:not(.v-slider) { 
             -webkit-appearance: none; 
             flex: 1; 
             background: transparent;
@@ -134,7 +160,7 @@
             cursor: pointer;
         }
 
-        input[type=range]::-webkit-slider-runnable-track {
+        input[type=range]:not(.v-slider)::-webkit-slider-runnable-track {
             width: 100%;
             height: 4px; 
             background: rgba(255,255,255,0.2);
@@ -142,7 +168,7 @@
             border: none;
         }
 
-        input[type=range]::-webkit-slider-thumb {
+        input[type=range]:not(.v-slider)::-webkit-slider-thumb {
             -webkit-appearance: none;
             height: 24px; 
             width: 24px; 
@@ -212,7 +238,15 @@
         </div>
     </div>
 
-    <button onclick="toggleFocus()" id="btn-focus">🎯 锁定对焦</button>
+    <!-- 右上角对焦控制区 -->
+    <div id="focus-container">
+        <button onclick="toggleFocus()" id="btn-focus">🎯 锁定对焦</button>
+        <div id="focus-slider-wrap">
+            <!-- 垂直滑块 -->
+            <input type="range" class="v-slider" id="manual-focus" min="0" max="100" step="1" oninput="updateFocusDistance(this.value)">
+        </div>
+    </div>
+
     <button id="restore-btn" onclick="toggleUI(true)">🛠️</button>
 
     <div class="ui-layer" id="controls" style="display: none;">
@@ -222,8 +256,10 @@
         <div style="display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px;">
              <!-- 更换图片 -->
              <button class="panel-btn" onclick="document.getElementById('file-input').click()" style="background: rgba(0,122,255,0.25); color: #4facfe;">📂 换图</button>
-             <!-- 新增：手动切换镜头 (默认隐藏) -->
-             <button class="panel-btn" id="btn-switch-cam" onclick="switchCamera()" style="display:none; background: rgba(255,255,255,0.15);">🔄 切换镜头</button>
+             <!-- 切换镜头 -->
+             <button class="panel-btn" id="btn-switch-cam" onclick="switchCamera()" style="display:none; background: rgba(255,255,255,0.15);">🔄 换镜</button>
+             <!-- 启停摄像头 (新增) -->
+             <button class="panel-btn" id="btn-toggle-cam" onclick="toggleCameraState()" style="display:none; background: rgba(255,59,48,0.25); color: #ff6b6b; max-width: 40px;">⏹</button>
         </div>
 
         <!-- 常用设置 (常驻) -->
@@ -247,10 +283,12 @@
             </div>
             <div class="row">
                 <span class="label">俯仰</span>
+                <!-- 俯仰决定图片远端的上下位置 -->
                 <input type="range" id="rotateX" min="-60" max="60" step="1" value="0" oninput="updateVisuals()">
             </div>
             <div class="row">
                 <span class="label">视距</span>
+                <!-- 视距决定图片远端的聚拢程度 (近大远小) -->
                 <input type="range" id="perspective" min="200" max="1800" step="10" value="1000" oninput="updateVisuals()">
             </div>
         </div>
@@ -277,8 +315,10 @@
             locked: false,
             focusLocked: false, 
             videoTrack: null,   
-            videoDevices: [], // 存储所有视频设备
+            videoDevices: [], 
             currentDeviceIndex: 0,
+            cameraActive: false,
+            // 视觉参数
             opacity: 0.5,
             scale: 1, 
             rotateZ: 0,
@@ -300,7 +340,9 @@
             bgVideo: document.getElementById('bg-video'),
             btnLock: document.getElementById('btn-lock'),
             viewport: document.getElementById('global-viewport'),
-            btnSwitch: document.getElementById('btn-switch-cam'), // 新增
+            btnSwitch: document.getElementById('btn-switch-cam'),
+            btnToggleCam: document.getElementById('btn-toggle-cam'), // 新增
+            focusSliderWrap: document.getElementById('focus-slider-wrap'), // 新增
             inputs: {
                 opacity: document.getElementById('opacity'),
                 scale: document.getElementById('scale'),
@@ -315,7 +357,6 @@
             els.restoreBtn.style.display = show ? 'none' : 'flex';
         }
 
-        // 新增：切换更多设置显示
         function toggleMore() {
             const moreDiv = document.getElementById('more-controls');
             const btn = document.getElementById('btn-more');
@@ -340,20 +381,16 @@
             };
         });
 
-        // 核心修改：在 startApp 中加入自动寻找广角镜头的逻辑
         async function startApp() {
             if (!state.imageLoaded) return;
             try {
                 log("正在请求默认后置摄像头...");
                 
-                // 1. 获取设备列表供手动切换
                 try {
                     const devices = await navigator.mediaDevices.enumerateDevices();
                     state.videoDevices = devices.filter(d => d.kind === 'videoinput');
                     log(`共发现 ${state.videoDevices.length} 个视频设备`);
-                    state.videoDevices.forEach((d, i) => log(`[${i}] ${d.label || 'Unknown Camera'}`));
                     
-                    // 如果多于1个设备，显示切换按钮
                     if (state.videoDevices.length > 1) {
                         els.btnSwitch.style.display = 'block';
                     }
@@ -361,13 +398,12 @@
                     log("无法列举设备: " + e.message);
                 }
 
-                // 2. 尝试智能选择（之前逻辑保留，但增加手动回退）
+                // 智能寻找广角
                 let constraints = { 
                     audio: false, 
                     video: { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 2160 } } 
                 };
 
-                // 尝试查找广角
                 const wideDevice = state.videoDevices.find(d => {
                     const l = d.label.toLowerCase();
                     return (l.includes('back') || l.includes('rear') || l.includes('environment')) && 
@@ -381,7 +417,6 @@
                         width: { ideal: 3840 }, 
                         height: { ideal: 2160 } 
                     };
-                    // 更新当前索引
                     state.currentDeviceIndex = state.videoDevices.indexOf(wideDevice);
                 }
 
@@ -398,33 +433,43 @@
             updateVisuals();
         }
 
-        // 封装流初始化
         async function initStream(constraints) {
             if (state.videoTrack) {
                 state.videoTrack.stop();
             }
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            els.bgVideo.srcObject = stream;
-            state.videoTrack = stream.getVideoTracks()[0];
-            
-            // 检查对焦能力
-            const capabilities = state.videoTrack.getCapabilities ? state.videoTrack.getCapabilities() : {};
-            if (capabilities.focusMode) {
-                document.getElementById('btn-focus').style.display = 'flex';
-                log("设备支持对焦控制");
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                els.bgVideo.srcObject = stream;
+                state.videoTrack = stream.getVideoTracks()[0];
+                state.cameraActive = true;
+                els.btnToggleCam.style.display = 'block';
+                els.btnToggleCam.innerText = '⏹';
+                
+                // 检查对焦能力
+                const capabilities = state.videoTrack.getCapabilities ? state.videoTrack.getCapabilities() : {};
+                if (capabilities.focusMode) {
+                    document.getElementById('btn-focus').style.display = 'flex';
+                    // 初始化滑块范围
+                    if (capabilities.focusDistance) {
+                        const slider = document.getElementById('manual-focus');
+                        slider.min = capabilities.focusDistance.min || 0;
+                        slider.max = capabilities.focusDistance.max || 100;
+                        slider.step = capabilities.focusDistance.step || 0.1;
+                    }
+                    log("支持手动对焦。");
+                }
+            } catch(e) {
+                log("流初始化失败: " + e.message);
+                throw e;
             }
         }
 
-        // 新增：手动切换摄像头逻辑
+        // 切换摄像头
         async function switchCamera() {
             if (state.videoDevices.length < 2) return;
-            
-            // 循环索引
             state.currentDeviceIndex = (state.currentDeviceIndex + 1) % state.videoDevices.length;
             const device = state.videoDevices[state.currentDeviceIndex];
-            
             log(`切换至: ${device.label || 'Camera ' + state.currentDeviceIndex}`);
-            
             const constraints = {
                 audio: false,
                 video: { 
@@ -433,7 +478,6 @@
                     height: { ideal: 2160 } 
                 }
             };
-            
             try {
                 await initStream(constraints);
             } catch (e) {
@@ -441,24 +485,84 @@
             }
         }
 
+        // 新增：启停摄像头
+        function toggleCameraState() {
+            if (!state.videoTrack) return;
+            
+            if (state.cameraActive) {
+                // 停止
+                state.videoTrack.stop(); // 完全释放硬件
+                els.bgVideo.srcObject = null;
+                state.cameraActive = false;
+                els.btnToggleCam.innerText = '▶';
+                els.btnToggleCam.style.background = 'rgba(76, 217, 100, 0.25)';
+                els.btnToggleCam.style.color = '#4cd964';
+                log("摄像头已暂停");
+            } else {
+                // 重新启动 (使用当前索引的设备)
+                const device = state.videoDevices[state.currentDeviceIndex];
+                let constraints = { audio: false };
+                if (device) {
+                    constraints.video = { deviceId: { exact: device.deviceId }, width: { ideal: 3840 } };
+                } else {
+                    constraints.video = { facingMode: 'environment', width: { ideal: 3840 } };
+                }
+                
+                initStream(constraints).then(() => {
+                    els.btnToggleCam.innerText = '⏹';
+                    els.btnToggleCam.style.background = 'rgba(255, 59, 48, 0.25)';
+                    els.btnToggleCam.style.color = '#ff6b6b';
+                    log("摄像头已恢复");
+                });
+            }
+        }
+
+        // 核心优化：手动对焦滑块控制
         async function toggleFocus() {
             if (!state.videoTrack) return;
             const btn = document.getElementById('btn-focus');
             state.focusLocked = !state.focusLocked;
+            
             try {
+                // 切换到 Manual 模式
                 const mode = state.focusLocked ? 'manual' : 'continuous';
-                // 修复：移除 focusDistance，仅切换模式，避免 out of range 错误
                 const constraints = { advanced: [{ focusMode: mode }] };
-                
                 await state.videoTrack.applyConstraints(constraints);
                 
-                btn.innerHTML = state.focusLocked ? "🎯 已锁对焦" : "🎯 锁定对焦";
-                btn.style.background = state.focusLocked ? "rgba(255, 59, 48, 0.8)" : "rgba(0, 0, 0, 0.5)";
-                btn.style.borderColor = state.focusLocked ? "transparent" : "rgba(255,255,255,0.2)";
+                if (state.focusLocked) {
+                    btn.innerHTML = "🎯 调节焦距";
+                    btn.style.background = "rgba(255, 59, 48, 0.8)";
+                    btn.style.borderColor = "transparent";
+                    els.focusSliderWrap.style.display = 'block'; // 显示滑块
+                    
+                    // 读取当前值赋给滑块
+                    const settings = state.videoTrack.getSettings();
+                    if (settings.focusDistance) {
+                        document.getElementById('manual-focus').value = settings.focusDistance;
+                    }
+                } else {
+                    btn.innerHTML = "🎯 锁定对焦";
+                    btn.style.background = "rgba(0, 0, 0, 0.5)";
+                    btn.style.borderColor = "rgba(255,255,255,0.2)";
+                    els.focusSliderWrap.style.display = 'none'; // 隐藏滑块
+                }
                 log(`对焦模式: ${mode}`);
             } catch (err) {
-                state.focusLocked = !state.focusLocked; // 回滚状态
-                log(`对焦操作被拒绝: ${err.message}`); // 仅记录日志，不再弹窗打扰
+                state.focusLocked = !state.focusLocked; 
+                log(`对焦切换失败: ${err.message}`);
+                alert("设备不支持手动锁定模式。");
+            }
+        }
+
+        // 实时调节焦距
+        async function updateFocusDistance(val) {
+            if (!state.videoTrack || !state.focusLocked) return;
+            try {
+                await state.videoTrack.applyConstraints({
+                    advanced: [{ focusMode: 'manual', focusDistance: parseFloat(val) }]
+                });
+            } catch(e) {
+                // 忽略频繁调节时的微小错误
             }
         }
 
