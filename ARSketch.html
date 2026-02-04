@@ -5,30 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>AR 描摹助手 | 视觉维度</title>
     
+    <script async src="https://docs.opencv.org/4.5.5/opencv.js" onload="onOpenCvReady()"></script>
+
     <style>
         body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #000; }
         
-        /* === 屏幕调试日志台 === */
         #debug-console {
             position: fixed; top: 0; left: 0; width: 100%; height: 80px;
             background: rgba(0, 0, 0, 0.5); 
-            color: #0f0; 
-            font-family: monospace; 
-            font-size: 9px;
-            overflow-y: auto; 
-            z-index: 10000;
-            padding: 5px;
-            pointer-events: none;
-            white-space: pre-wrap;
-            word-break: break-all;
+            color: #0f0; font-family: monospace; font-size: 9px;
+            overflow-y: auto; z-index: 10000; padding: 5px; pointer-events: none;
             display: none; 
         }
 
-        /* === 全局视口容器 === */
         #global-viewport {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            transform-origin: center center;
-            will-change: transform;
             z-index: 0;
         }
 
@@ -43,28 +34,45 @@
             z-index: 10; pointer-events: auto; overflow: hidden;
             display: none; cursor: grab;
             perspective: 1000px; 
-            /* 保持底部视点 */
             perspective-origin: 50% 100%;
         }
         #screen-layer:active { cursor: grabbing; }
         
-        #screen-img {
+        /* 核心架构修改：
+           新增一个 transform-wrapper 容器。
+           所有的 3D 变换 (rotate, scale, translate) 都施加在这个容器上。
+           内部的 img 和 canvas 只要填满容器即可，不再单独应用变换。
+           这能物理上保证 100% 无偏移。
+        */
+        #transform-wrapper {
             position: absolute;
-            top: 38%; 
-            left: 50%;
-            max-width: 80%; 
-            max-height: 80%;
-            pointer-events: none; 
-            /* 锚点保持底部中心 */
+            top: 38%; left: 50%;
+            /* 初始尺寸为0，加载图片后由 JS 撑开 */
+            width: 0; height: 0; 
             transform-origin: center bottom;
-            transform: translate(-50%, -50%);
-            transform-style: preserve-3d; 
+            transform: translate(-50%, -50%); /* 初始居中 */
+            transform-style: preserve-3d;
             will-change: transform, opacity;
-            /* 平滑过渡滤镜效果 */
-            transition: filter 0.2s ease; 
         }
 
-        /* === UI 控制层 === */
+        /* 内部元素统一样式，绝对重合 */
+        .layer-content {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: fill; /* 确保填满容器 */
+            pointer-events: none;
+        }
+
+        #screen-img {
+            transition: opacity 0.2s ease; 
+        }
+
+        #cv-canvas {
+            display: none; 
+            /* 简单的混合模式即可，因为我们已经生成了透明图 */
+        }
+
         .ui-layer {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             width: 85%; max-width: 320px; 
@@ -72,7 +80,6 @@
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-radius: 16px; 
-            /* 恢复紧凑的内边距 */
             padding: 12px; 
             border: 1px solid rgba(255,255,255,0.1);
             box-shadow: 0 4px 20px rgba(0,0,0,0.4);
@@ -82,14 +89,13 @@
             transition: height 0.3s ease;
         }
 
-        /* 右上角：收起按钮 */
         .btn-minimize {
             position: absolute; top: 6px; right: 6px;
             width: 24px; height: 24px; padding: 0;
             background: rgba(255,255,255,0.1); border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-size: 10px; border: none; cursor: pointer; color: #ccc;
-            z-index: 102; /* 确保在最上层 */
+            z-index: 102; 
         }
         
         #restore-btn {
@@ -103,80 +109,28 @@
             z-index: 99; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        /* 顶部工具栏容器 */
         .toolbar-row {
-            display: flex; 
-            justify-content: flex-start; 
-            gap: 8px; 
-            margin-bottom: 4px;
-            /* 关键：右侧留白，防止按钮和小三角重叠 */
-            margin-right: 30px; 
+            display: flex; justify-content: flex-start; gap: 8px; margin-bottom: 4px; margin-right: 30px; 
         }
 
-        .row { 
-            display: flex; align-items: center; justify-content: space-between; gap: 8px; 
-            height: 32px; 
-        }
+        .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 32px; }
         
-        .label { 
-            font-size: 11px; 
-            min-width: 42px; 
-            color: #ccc; 
-            text-align: right; 
-            line-height: 1;
-        }
+        .label { font-size: 11px; min-width: 42px; color: #ccc; text-align: right; line-height: 1; }
         
-        /* === 滑块样式 === */
-        input[type=range] { 
-            -webkit-appearance: none; 
-            flex: 1; 
-            background: transparent;
-            height: 40px; 
-            margin: 0;
-            cursor: pointer;
-        }
+        input[type=range] { -webkit-appearance: none; flex: 1; background: transparent; height: 40px; margin: 0; cursor: pointer; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; border: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.5); margin-top: -10px; position: relative; z-index: 10; }
 
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px; 
-            background: rgba(255,255,255,0.2);
-            border-radius: 2px;
-            border: none;
-        }
-
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 24px; 
-            width: 24px; 
-            border-radius: 50%;
-            background: #fff;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.5);
-            margin-top: -10px; 
-            position: relative;
-            z-index: 10;
-        }
+        .sketch-switch { width: 20px; height: 20px; accent-color: #007AFF; cursor: pointer; margin: 0; }
 
         button.panel-btn {
-            flex: 1; 
-            padding: 6px 0; 
-            border-radius: 6px; 
-            border: none;
-            background: rgba(255,255,255,0.1); 
-            color: white;
-            font-size: 12px; 
-            font-weight: 500; 
-            cursor: pointer; 
-            transition: 0.2s;
-            max-width: 100px; /* 限制按钮最大宽度，防止太宽 */
+            flex: 1; padding: 6px 0; border-radius: 6px; border: none;
+            background: rgba(255,255,255,0.1); color: white; font-size: 12px; font-weight: 500; 
+            cursor: pointer; transition: 0.2s; max-width: 100px; 
         }
         button.active { background: #007AFF; color: white; }
 
-        /* 新增：更多设置容器 */
-        #more-controls {
-            display: none; /* 默认隐藏 */
-            flex-direction: column;
-            gap: 2px;
-        }
+        #more-controls { display: none; flex-direction: column; gap: 2px; }
         
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -189,27 +143,11 @@
 </head>
 <body>
 
-    <!-- SVG 滤镜定义 (隐藏) -->
-    <svg style="display: none;">
-        <defs>
-            <filter id="edge-detection">
-                <!-- 1. 转灰度 -->
-                <feColorMatrix type="matrix" values="0.33 0.33 0.33 0 0
-                                                     0.33 0.33 0.33 0 0
-                                                     0.33 0.33 0.33 0 0
-                                                     0 0 0 1 0"/>
-                <!-- 2. 边缘检测卷积核 -->
-                <feConvolveMatrix order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1"/>
-            </filter>
-        </defs>
-    </svg>
-
-    <!-- 屏幕日志窗口 -->
-    <div id="debug-console">日志窗口 (等待操作)...</div>
+    <div id="debug-console">日志窗口...</div>
 
     <div id="start-screen">
         <h1 style="margin-bottom: 10px;">🎨 描摹助手</h1>
-        <p style="opacity: 0.6; margin-bottom: 40px; font-size: 14px;">透视叠加 · 极简版</p>
+        <p style="opacity: 0.6; margin-bottom: 40px; font-size: 14px;">OpenCV 智能自适应引擎</p>
         <div style="display: flex; flex-direction: column; gap: 15px; width: 200px;">
             <button onclick="document.getElementById('file-input').click()" style="background: #333; border: 1px solid #555; padding: 12px; border-radius: 8px; color:white;">
                 1. 选择图片
@@ -219,35 +157,30 @@
             </button>
         </div>
         <input type="file" id="file-input" accept="image/*">
-        <p id="file-name" style="margin-top: 20px; font-size: 12px; color: #007AFF;"></p>
     </div>
 
-    <!-- 全局视口 -->
     <div id="global-viewport">
         <video id="bg-video" autoplay playsinline muted></video>
         <div id="screen-layer">
-            <img id="screen-img" src="" alt="Overlay">
+            <!-- 变换容器 -->
+            <div id="transform-wrapper">
+                <img id="screen-img" class="layer-content" src="" alt="Original">
+                <canvas id="cv-canvas" class="layer-content"></canvas>
+            </div>
         </div>
     </div>
 
-    <!-- 恢复按钮 (初始隐藏) -->
     <button id="restore-btn" onclick="toggleUI(true)">🛠️</button>
 
     <div class="ui-layer" id="controls" style="display: none;">
-        <!-- 右上角：收起面板 -->
         <button class="btn-minimize" onclick="toggleUI(false)">🔽</button>
 
-        <!-- 工具栏 (更紧凑) -->
         <div class="toolbar-row">
-             <!-- 更换图片 -->
              <button class="panel-btn" onclick="document.getElementById('file-input').click()" style="background: rgba(0,122,255,0.25); color: #4facfe;">📂 换图</button>
-             <!-- 切换镜头 (仅多摄显示) -->
              <button class="panel-btn" id="btn-switch-cam" onclick="switchCamera()" style="display:none; background: rgba(255,255,255,0.15);">🔄 换镜</button>
-             <!-- 启停摄像头 (回归工具栏) -->
              <button class="panel-btn" id="btn-toggle-cam" onclick="toggleCameraState()" style="display:none; background: rgba(255,59,48,0.25); color: #ff6b6b; max-width: 40px;">⏹</button>
         </div>
 
-        <!-- 常用设置 (常驻) -->
         <div class="row">
             <span class="label">透明</span>
             <input type="range" id="opacity" min="0" max="1" step="0.001" value="0.5" oninput="updateVisuals()">
@@ -257,29 +190,30 @@
             <input type="range" id="scale" min="0.1" max="5.7" step="0.001" value="1" oninput="updateVisuals()">
         </div>
 
-        <!-- 更多设置按钮 -->
-        <button class="panel-btn" id="btn-more" onclick="toggleMore()" style="background: rgba(255,255,255,0.05); color: #aaa; margin: 4px 0; font-size: 11px; padding: 4px 0; max-width: none;">﹀ 更多设置 (线稿/视角)</button>
+        <button class="panel-btn" id="btn-more" onclick="toggleMore()" style="background: rgba(255,255,255,0.05); color: #aaa; margin: 4px 0; font-size: 11px; padding: 4px 0; max-width: none;">﹀ 更多设置 (视角/线稿)</button>
 
-        <!-- 折叠区域 -->
         <div id="more-controls">
-            <!-- 新增：线稿模式开关 -->
-            <button class="panel-btn" onclick="toggleSketchMode(this)" style="margin-bottom: 4px; background: rgba(255, 255, 255, 0.1);">✏️ 开启线稿模式</button>
-            
-            <!-- 新增：线稿强度调节（替代了旋转） -->
-            <div class="row" id="sketch-strength-row" style="display: none;">
-                <span class="label">线强度</span>
-                <input type="range" id="lineStrength" min="0.5" max="10" step="0.1" value="2" oninput="updateVisuals()">
-            </div>
-
             <div class="row">
                 <span class="label">俯仰</span>
-                <!-- 俯仰决定图片远端的上下位置 -->
                 <input type="range" id="rotateX" min="-60" max="60" step="1" value="0" oninput="updateVisuals()">
             </div>
             <div class="row">
                 <span class="label">视距</span>
-                <!-- 视距决定图片远端的聚拢程度 (近大远小) -->
                 <input type="range" id="perspective" min="200" max="1800" step="10" value="1000" oninput="updateVisuals()">
+            </div>
+
+            <div class="row">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span class="label" style="text-align: left; min-width: auto; color:#fff;">线稿</span>
+                    <input type="checkbox" id="sketch-toggle" class="sketch-switch" onchange="toggleSketchMode()">
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 6px; flex: 1; margin-left: 10px;">
+                    <span class="label" style="min-width: auto;">细节</span>
+                    <!-- 自适应阈值 Block Size: 必须是奇数，范围 3-99 -->
+                    <!-- 滑块逻辑：值越小，Block越小，对局部细节越敏感 -->
+                    <input type="range" id="lineStrength" min="0" max="100" step="1" value="50" oninput="updateCvThreshold()" disabled>
+                </div>
             </div>
         </div>
         
@@ -290,15 +224,9 @@
     </div>
 
     <script>
-        // 日志辅助函数
-        function log(msg) {
-            const consoleDiv = document.getElementById('debug-console');
-            if (consoleDiv) {
-                consoleDiv.innerHTML += `<div>> ${msg}</div>`;
-                consoleDiv.scrollTop = consoleDiv.scrollHeight;
-            }
-            console.log(msg);
-        }
+        let cvReady = false;
+        function onOpenCvReady() { cvReady = true; console.log("OpenCV Ready"); }
+        function log(msg) { console.log(msg); } // 简化日志
 
         const state = {
             imageLoaded: false,
@@ -307,11 +235,10 @@
             videoDevices: [], 
             currentDeviceIndex: 0,
             cameraActive: false,
-            sketchMode: false, // 线稿模式状态
-            // 视觉参数
+            sketchMode: false,
             opacity: 0.5,
             scale: 1, 
-            lineStrength: 2, // 线稿强度
+            lineStrength: 50, // 映射到 BlockSize
             perspective: 1000, 
             rotateX: 0,
             screenX: 0,
@@ -322,17 +249,17 @@
             startScreen: document.getElementById('start-screen'),
             fileInput: document.getElementById('file-input'),
             btnStartCam: document.getElementById('btn-start-cam'),
-            fileName: document.getElementById('file-name'),
             screenLayer: document.getElementById('screen-layer'), 
+            wrapper: document.getElementById('transform-wrapper'), // 新增容器
             screenImg: document.getElementById('screen-img'),
+            cvCanvas: document.getElementById('cv-canvas'),
             controls: document.getElementById('controls'),
             restoreBtn: document.getElementById('restore-btn'),
             bgVideo: document.getElementById('bg-video'),
             btnLock: document.getElementById('btn-lock'),
-            viewport: document.getElementById('global-viewport'),
             btnSwitch: document.getElementById('btn-switch-cam'),
             btnToggleCam: document.getElementById('btn-toggle-cam'),
-            sketchRow: document.getElementById('sketch-strength-row'),
+            sketchToggle: document.getElementById('sketch-toggle'),
             inputs: {
                 opacity: document.getElementById('opacity'),
                 scale: document.getElementById('scale'),
@@ -355,158 +282,192 @@
                 btn.innerText = "︿ 收起设置";
             } else {
                 moreDiv.style.display = 'none';
-                btn.innerText = "﹀ 更多设置 (旋转/视角/线稿)";
+                btn.innerText = "﹀ 更多设置 (视角/线稿)";
             }
         }
 
-        // 切换线稿模式
-        function toggleSketchMode(btn) {
-            state.sketchMode = !state.sketchMode;
+        // === OpenCV 自适应阈值逻辑 (智能版) ===
+        let processingTimer = null;
+
+        function toggleSketchMode() {
+            if (!cvReady) {
+                alert("OpenCV 引擎加载中...");
+                els.sketchToggle.checked = false;
+                return;
+            }
+
+            state.sketchMode = els.sketchToggle.checked;
+            els.inputs.lineStrength.disabled = !state.sketchMode;
+            els.inputs.lineStrength.style.opacity = state.sketchMode ? "1" : "0.3";
+
             if (state.sketchMode) {
-                btn.innerText = "📝 关闭线稿模式";
-                btn.style.background = "#007AFF";
-                els.sketchRow.style.display = 'flex'; // 显示强度滑块
+                els.cvCanvas.style.display = 'block';
+                els.screenImg.style.opacity = 0; 
+                processOpenCV(); 
             } else {
-                btn.innerText = "✏️ 开启线稿模式";
-                btn.style.background = "rgba(255, 255, 255, 0.1)";
-                els.sketchRow.style.display = 'none'; // 隐藏强度滑块
+                els.cvCanvas.style.display = 'none';
+                els.screenImg.style.opacity = state.opacity;
             }
             updateVisuals();
         }
 
+        function updateCvThreshold() {
+            if (!state.sketchMode) return;
+            state.lineStrength = parseInt(els.inputs.lineStrength.value);
+            if (processingTimer) clearTimeout(processingTimer);
+            processingTimer = setTimeout(processOpenCV, 100);
+        }
+
+        function processOpenCV() {
+            if (!cvReady || !els.screenImg.src) return;
+
+            try {
+                let src = cv.imread(els.screenImg);
+                let gray = new cv.Mat();
+                let edges = new cv.Mat();
+                let dst = new cv.Mat();
+                
+                // 1. 转灰度
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+                
+                // 2. 高斯模糊 (轻微去噪)
+                let ksize = new cv.Size(3, 3);
+                cv.GaussianBlur(gray, gray, ksize, 0, 0, cv.BORDER_DEFAULT);
+
+                // 3. 自适应阈值 (Adaptive Threshold) - 智能提取自然线条
+                // Block Size 决定局部敏感度。必须是奇数。
+                // 映射规则：滑块 0-100 -> BlockSize 3-31 (约)
+                // 值越小，细节越多；值越大，只看大轮廓。
+                let blockSize = 3 + 2 * Math.floor((100 - state.lineStrength) / 7); 
+                if (blockSize < 3) blockSize = 3;
+                
+                // C (Constant) 减去的常数，用于去噪背景
+                let C = 2; 
+
+                // ADAPTIVE_THRESH_GAUSSIAN_C 比 MEAN_C 更自然
+                cv.adaptiveThreshold(gray, edges, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, blockSize, C);
+
+                // 4. 反色 (因为 adaptiveThreshold 输出是 白纸黑字，我们需要 黑纸白线 作为 Alpha)
+                // 实际上 adaptiveThreshold 结果：背景白(255)，线条黑(0)
+                // 我们想要：背景透明(Alpha 0)，线条黑(Alpha 255)
+                // 所以我们需要把 0->255 (线条), 255->0 (背景)
+                cv.bitwise_not(edges, edges); 
+
+                // 5. 构建透明图 (RGBA)
+                // RGB = 0 (黑)
+                // A = edges
+                let channels = new cv.MatVector();
+                let black = new cv.Mat.zeros(edges.rows, edges.cols, cv.CV_8UC1);
+                
+                channels.push_back(black); // R
+                channels.push_back(black); // G
+                channels.push_back(black); // B
+                channels.push_back(edges); // A
+                
+                cv.merge(channels, dst);
+
+                cv.imshow('cv-canvas', dst);
+
+                src.delete(); gray.delete(); edges.delete(); dst.delete(); 
+                black.delete(); channels.delete(); ksize = null;
+
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // === 图片加载与容器尺寸同步 ===
         els.fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             const imgUrl = URL.createObjectURL(file);
             els.screenImg.src = imgUrl;
+            
             els.screenImg.onload = () => {
                 state.imageLoaded = true;
-                els.fileName.innerText = `✅ 已选: ${file.name}`;
                 els.btnStartCam.style.display = 'block'; 
+                
+                // 关键：根据图片原始尺寸设置 wrapper 尺寸
+                // 这样 transform-origin 才能正确工作
+                const w = els.screenImg.naturalWidth;
+                const h = els.screenImg.naturalHeight;
+                
+                // 保持比例缩放到屏幕合适大小
+                // 简单起见，我们直接设为 naturalSize，然后靠 scale 缩放
+                // 为了避免过大导致内存爆，限制一下
+                els.wrapper.style.width = w + "px";
+                els.wrapper.style.height = h + "px";
+                
+                // 同步 Canvas 大小
+                els.cvCanvas.width = w;
+                els.cvCanvas.height = h;
+
+                if (state.sketchMode) setTimeout(processOpenCV, 100);
+                updateVisuals();
             };
         });
 
         async function startApp() {
             if (!state.imageLoaded) return;
             try {
-                log("正在请求默认后置摄像头...");
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                state.videoDevices = devices.filter(d => d.kind === 'videoinput');
+                if (state.videoDevices.length > 1) els.btnSwitch.style.display = 'block';
+
+                let constraints = { audio: false, video: { facingMode: 'environment', width: { ideal: 3840 } } };
                 
-                try {
-                    const devices = await navigator.mediaDevices.enumerateDevices();
-                    state.videoDevices = devices.filter(d => d.kind === 'videoinput');
-                    log(`共发现 ${state.videoDevices.length} 个视频设备`);
-                    
-                    if (state.videoDevices.length > 1) {
-                        els.btnSwitch.style.display = 'block';
-                    }
-                } catch (e) {
-                    log("无法列举设备: " + e.message);
-                }
-
-                // 智能寻找广角
-                let constraints = { 
-                    audio: false, 
-                    video: { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 2160 } } 
-                };
-
                 const wideDevice = state.videoDevices.find(d => {
                     const l = d.label.toLowerCase();
-                    return (l.includes('back') || l.includes('rear') || l.includes('environment')) && 
-                           (l.includes('wide') || l.includes('0.5') || l.includes('ultra') || l.includes('广角'));
+                    return (l.includes('back') || l.includes('rear')) && (l.includes('wide') || l.includes('0.5'));
                 });
 
                 if (wideDevice) {
-                    log(`智能匹配到广角: ${wideDevice.label}`);
-                    constraints.video = { 
-                        deviceId: { exact: wideDevice.deviceId },
-                        width: { ideal: 3840 }, 
-                        height: { ideal: 2160 } 
-                    };
+                    constraints.video = { deviceId: { exact: wideDevice.deviceId }, width: { ideal: 3840 } };
                     state.currentDeviceIndex = state.videoDevices.indexOf(wideDevice);
                 }
 
                 await initStream(constraints);
-
             } catch (err) {
-                log(`启动错误: ${err.name}`);
-                alert("摄像头启动失败，请检查权限或HTTPS。\n" + err);
+                alert("摄像头错误: " + err.message);
             }
             els.startScreen.style.display = 'none';
             els.screenLayer.style.display = 'block'; 
-            els.screenImg.style.display = 'block';
             els.controls.style.display = 'flex';
             updateVisuals();
         }
 
         async function initStream(constraints) {
-            if (state.videoTrack) {
-                state.videoTrack.stop();
-            }
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                els.bgVideo.srcObject = stream;
-                state.videoTrack = stream.getVideoTracks()[0];
-                state.cameraActive = true;
-                
-                // 显示启停按钮
-                els.btnToggleCam.style.display = 'block'; // 改为 block，由 flex 容器控制布局
-                els.btnToggleCam.innerText = '⏹';
-                
-            } catch(e) {
-                log("流初始化失败: " + e.message);
-                throw e;
-            }
+            if (state.videoTrack) state.videoTrack.stop();
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            els.bgVideo.srcObject = stream;
+            state.videoTrack = stream.getVideoTracks()[0];
+            state.cameraActive = true;
+            els.btnToggleCam.style.display = 'block'; 
+            els.btnToggleCam.innerText = '⏹';
         }
 
-        // 切换摄像头
         async function switchCamera() {
             if (state.videoDevices.length < 2) return;
             state.currentDeviceIndex = (state.currentDeviceIndex + 1) % state.videoDevices.length;
             const device = state.videoDevices[state.currentDeviceIndex];
-            log(`切换至: ${device.label || 'Camera ' + state.currentDeviceIndex}`);
-            const constraints = {
-                audio: false,
-                video: { 
-                    deviceId: { exact: device.deviceId },
-                    width: { ideal: 3840 }, 
-                    height: { ideal: 2160 } 
-                }
-            };
-            try {
-                await initStream(constraints);
-            } catch (e) {
-                log("切换失败: " + e.message);
-            }
+            const constraints = { audio: false, video: { deviceId: { exact: device.deviceId }, width: { ideal: 3840 } } };
+            await initStream(constraints);
         }
 
-        // 启停摄像头
         function toggleCameraState() {
-            if (!state.videoTrack && !state.cameraActive) return; // 尚未初始化
-            
+            if (!state.videoTrack) return;
             if (state.cameraActive) {
-                // 停止
-                if(state.videoTrack) state.videoTrack.stop(); 
+                state.videoTrack.stop(); 
                 els.bgVideo.srcObject = null;
                 state.cameraActive = false;
                 els.btnToggleCam.innerText = '▶';
                 els.btnToggleCam.style.background = 'rgba(76, 217, 100, 0.25)';
-                els.btnToggleCam.style.color = '#4cd964';
-                log("摄像头已暂停");
             } else {
-                // 重新启动
                 const device = state.videoDevices[state.currentDeviceIndex];
-                let constraints = { audio: false };
-                if (device) {
-                    constraints.video = { deviceId: { exact: device.deviceId }, width: { ideal: 3840 } };
-                } else {
-                    constraints.video = { facingMode: 'environment', width: { ideal: 3840 } };
-                }
-                
+                const constraints = { audio: false, video: device ? { deviceId: { exact: device.deviceId } } : { facingMode: 'environment' } };
                 initStream(constraints).then(() => {
                     els.btnToggleCam.innerText = '⏹';
                     els.btnToggleCam.style.background = 'rgba(255, 59, 48, 0.25)';
-                    els.btnToggleCam.style.color = '#ff6b6b';
-                    log("摄像头已恢复");
                 });
             }
         }
@@ -514,40 +475,30 @@
         function updateVisuals() {
             state.opacity = els.inputs.opacity.value;
             state.scale = els.inputs.scale.value;
-            // 移除 rotateZ，改为线稿强度
-            state.lineStrength = els.inputs.lineStrength.value;
             state.perspective = els.inputs.perspective.value;
             state.rotateX = els.inputs.rotateX.value;
 
             els.screenLayer.style.perspective = `${state.perspective}px`;
             
-            // 动态构建滤镜字符串
-            let filters = `opacity(${state.opacity})`;
             if (state.sketchMode) {
-                // 叠加线稿滤镜 + 动态对比度
-                filters += ` url(#edge-detection) brightness(1.2) contrast(${state.lineStrength}) grayscale(1)`;
+                els.cvCanvas.style.opacity = state.opacity;
+            } else {
+                els.screenImg.style.opacity = state.opacity;
             }
-            els.screenImg.style.filter = filters;
-            
-            // 保持 transform-origin 为 center bottom
+
+            // 所有的变换都应用在 wrapper 上
+            // 内部 img 和 canvas 不需要 transform
             const transform = `
                 translate(calc(-50% + ${state.screenX}px), calc(-50% + ${state.screenY}px)) 
                 rotateX(${state.rotateX}deg) 
                 scale(${state.scale})
             `;
-            els.screenImg.style.transform = transform;
+            els.wrapper.style.transform = transform;
         }
 
         let isDragging = false;
         let startX = 0, startY = 0;
         let initialScreenX = 0, initialScreenY = 0;
-        let globalScale = 1, globalTx = 0, globalTy = 0;
-        let startDist = 0;
-        let startCenter = {x:0, y:0};
-        let startGlobal = {s:1, x:0, y:0};
-
-        const getDist = (t1, t2) => Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-        const getCenter = (t1, t2) => ({ x: (t1.clientX + t2.clientX)/2, y: (t1.clientY + t2.clientY)/2 });
 
         const onDown = (clientX, clientY) => {
             if (state.locked) return;
@@ -571,39 +522,17 @@
         const onUp = () => { isDragging = false; els.screenLayer.style.cursor = 'grab'; };
 
         els.screenLayer.addEventListener('touchstart', e => {
-            if (e.touches.length === 2) {
-                isDragging = false;
-                startDist = getDist(e.touches[0], e.touches[1]);
-                startCenter = getCenter(e.touches[0], e.touches[1]);
-                startGlobal = { s: globalScale, x: globalTx, y: globalTy };
-                e.preventDefault();
-            } else if (e.touches.length === 1) {
-                onDown(e.touches[0].clientX, e.touches[0].clientY);
-            }
+            if (e.touches.length === 1) onDown(e.touches[0].clientX, e.touches[0].clientY);
         }, {passive:false});
 
         window.addEventListener('touchmove', e => {
-            if (e.touches.length === 2) {
-                const currDist = getDist(e.touches[0], e.touches[1]);
-                const currCenter = getCenter(e.touches[0], e.touches[1]);
-                const scaleRatio = currDist / startDist;
-                globalScale = Math.max(1, Math.min(startGlobal.s * scaleRatio, 5));
-                const dx = currCenter.x - startCenter.x;
-                const dy = currCenter.y - startCenter.y;
-                globalTx = startGlobal.x + dx;
-                globalTy = startGlobal.y + dy;
-                els.viewport.style.transform = `translate(${globalTx}px, ${globalTy}px) scale(${globalScale})`;
-                e.preventDefault();
-            } else if (e.touches.length === 1 && isDragging) {
+            if (e.touches.length === 1 && isDragging) {
                 e.preventDefault();
                 onMove(e.touches[0].clientX, e.touches[0].clientY);
             }
         }, {passive:false});
 
-        window.addEventListener('touchend', e => {
-            if (e.touches.length === 0) onUp();
-        });
-        
+        window.addEventListener('touchend', e => { if (e.touches.length === 0) onUp(); });
         els.screenLayer.addEventListener('mousedown', e => { e.preventDefault(); onDown(e.clientX, e.clientY); });
         window.addEventListener('mousemove', e => { if (isDragging) { e.preventDefault(); onMove(e.clientX, e.clientY); } });
         window.addEventListener('mouseup', onUp);
@@ -611,11 +540,9 @@
         function resetParams() {
             state.screenX = 0; state.screenY = 0;
             els.inputs.scale.value = 1; 
-            els.inputs.lineStrength.value = 2; // 重置线稿强度
             els.inputs.perspective.value = 1000; 
             els.inputs.rotateX.value = 0;
-            globalScale = 1; globalTx = 0; globalTy = 0;
-            els.viewport.style.transform = `translate(0px, 0px) scale(1)`;
+            els.wrapper.style.transform = `translate(-50%, -50%) scale(1)`;
             updateVisuals();
         }
 
@@ -624,7 +551,6 @@
             els.btnLock.innerText = state.locked ? "🔒 已锁定" : "🔓 锁定画面";
             els.btnLock.style.background = state.locked ? "#FF3B30" : "rgba(255,255,255,0.15)";
             els.inputs.scale.disabled = state.locked;
-            els.inputs.lineStrength.disabled = state.locked;
             els.inputs.perspective.disabled = state.locked;
             els.inputs.rotateX.disabled = state.locked;
         }
