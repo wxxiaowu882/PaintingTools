@@ -8,21 +8,19 @@
     <style>
         body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #000; }
         
-        /* === 新增：全局视口容器 (用于整体缩放) === */
+        /* === 全局视口容器 === */
         #global-viewport {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            transform-origin: center center; /* 从中心缩放 */
+            transform-origin: center center;
             will-change: transform;
             z-index: 0;
         }
 
-        /* === 背景视频层 === */
         #bg-video {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover; z-index: 1; 
         }
 
-        /* === 屏幕静态层 === */
         #screen-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10; pointer-events: auto; overflow: hidden;
@@ -44,35 +42,31 @@
             will-change: transform, opacity;
         }
 
-        /* === UI 控制层 (优化：更紧凑、更透明) === */
+        /* === UI 控制层 (深度瘦身版) === */
         .ui-layer {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 90%; max-width: 400px;
-            /* 修改：透明度降低至 0.6 */
-            background: rgba(20, 20, 22, 0.6); 
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 85%; max-width: 320px; 
+            background: rgba(10, 10, 12, 0.7); 
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-radius: 16px; 
-            /* 修改：进一步减少内边距，使面板更紧凑 */
-            padding: 10px 15px; 
+            padding: 10px 12px; 
             border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             display: flex; flex-direction: column; 
-            /* 修改：减少通用间距，改用 row padding 控制滑块距离 */
             gap: 2px; 
             color: white; z-index: 100;
+            transition: height 0.3s ease; /* 添加平滑过渡 */
         }
 
-        /* 收起按钮样式 */
         .btn-minimize {
-            position: absolute; top: 8px; right: 8px;
-            width: 24px; height: 24px; padding: 0;
+            position: absolute; top: 5px; right: 5px;
+            width: 20px; height: 20px; padding: 0;
             background: rgba(255,255,255,0.1); border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            font-size: 12px; border: none; cursor: pointer; color: #ccc;
+            font-size: 10px; border: none; cursor: pointer; color: #ccc;
         }
         
-        /* 恢复按钮样式 */
         #restore-btn {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             width: 44px; height: 44px; border-radius: 22px;
@@ -84,7 +78,6 @@
             z-index: 99; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        /* 新增：独立对焦按钮样式 (右上角) */
         #btn-focus {
             position: fixed; top: 20px; right: 20px;
             z-index: 200;
@@ -93,39 +86,78 @@
             color: white;
             border: 1px solid rgba(255,255,255,0.2);
             border-radius: 20px;
-            padding: 8px 16px;
-            font-size: 13px;
+            padding: 6px 14px;
+            font-size: 12px;
             font-weight: 600;
-            display: none; /* 默认隐藏，有能力时显示 */
+            display: none; 
             align-items: center; gap: 6px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             cursor: pointer;
         }
 
-        /* 修改：增加滑块行的上下内边距，拉大间距方便手指操作 */
         .row { 
             display: flex; align-items: center; justify-content: space-between; gap: 8px; 
-            padding: 10px 0; 
+            height: 32px; 
         }
         
-        .label { font-size: 12px; min-width: 50px; color: #ddd; text-align: right; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        .label { 
+            font-size: 11px; 
+            min-width: 42px; 
+            color: #ccc; 
+            text-align: right; 
+            line-height: 1;
+        }
         
-        /* 修改：增大滑块的高度（点击热区），解决手指粗不好拖动的问题 */
+        /* === 滑块样式 === */
         input[type=range] { 
+            -webkit-appearance: none; 
             flex: 1; 
-            accent-color: #007AFF; 
-            height: 30px; /* 从 3px 增加到 30px，增大触控面积 */
-            border-radius: 2px; 
+            background: transparent;
+            height: 40px; 
+            margin: 0;
             cursor: pointer;
         }
-        
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px; 
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            border: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px; 
+            width: 24px; 
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.5);
+            margin-top: -10px; 
+            position: relative;
+            z-index: 10;
+        }
+
         button.panel-btn {
-            /* 修改：减少按钮内边距，使其更紧凑 */
-            flex: 1; padding: 8px; border-radius: 8px; border: none;
-            background: rgba(255,255,255,0.15); color: white;
-            font-size: 13px; font-weight: 500; cursor: pointer; transition: 0.2s; white-space: nowrap;
+            flex: 1; 
+            padding: 6px 0; 
+            border-radius: 6px; 
+            border: none;
+            background: rgba(255,255,255,0.1); 
+            color: white;
+            font-size: 12px; 
+            font-weight: 500; 
+            cursor: pointer; 
+            transition: 0.2s;
         }
         button.active { background: #007AFF; color: white; }
+
+        /* 新增：更多设置容器 */
+        #more-controls {
+            display: none; /* 默认隐藏 */
+            flex-direction: column;
+            gap: 2px;
+        }
         
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -134,18 +166,13 @@
             color: white; text-align: center;
         }
         #file-input { display: none; }
-        
-        .section-title {
-            font-size: 10px; color: #aaa; margin-top: 4px; margin-bottom: 0px; 
-            text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
-        }
     </style>
 </head>
 <body>
 
     <div id="start-screen">
-        <h1 style="margin-bottom: 10px;">🎨 描摹助手 (透视版)</h1>
-        <p style="opacity: 0.6; margin-bottom: 40px; font-size: 14px;">更稳、更准的透视叠加方案</p>
+        <h1 style="margin-bottom: 10px;">🎨 描摹助手</h1>
+        <p style="opacity: 0.6; margin-bottom: 40px; font-size: 14px;">透视叠加 · 极简版</p>
         <div style="display: flex; flex-direction: column; gap: 15px; width: 200px;">
             <button onclick="document.getElementById('file-input').click()" style="background: #333; border: 1px solid #555; padding: 12px; border-radius: 8px; color:white;">
                 1. 选择图片
@@ -158,55 +185,55 @@
         <p id="file-name" style="margin-top: 20px; font-size: 12px; color: #007AFF;"></p>
     </div>
 
-    <!-- 全局视口：包含视频和绘图层 -->
+    <!-- 全局视口 -->
     <div id="global-viewport">
-        <!-- 背景视频流 -->
         <video id="bg-video" autoplay playsinline muted></video>
-        <!-- 绘图层 -->
         <div id="screen-layer">
             <img id="screen-img" src="" alt="Overlay">
         </div>
     </div>
 
-    <!-- 独立的对焦按钮 -->
     <button onclick="toggleFocus()" id="btn-focus">🎯 锁定对焦</button>
-
-    <!-- 恢复按钮 (初始隐藏) -->
     <button id="restore-btn" onclick="toggleUI(true)">🛠️</button>
 
     <div class="ui-layer" id="controls" style="display: none;">
         <button class="btn-minimize" onclick="toggleUI(false)">🔽</button>
 
-        <!-- 顶部工具栏 -->
-        <div style="display: flex; justify-content: flex-start; margin-bottom: 2px;">
+        <!-- 更换图片 -->
+        <div style="display: flex; justify-content: flex-start; margin-bottom: 4px;">
              <button class="panel-btn" onclick="document.getElementById('file-input').click()" style="background: rgba(0,122,255,0.25); color: #4facfe; flex: none; width: 100%;">📂 更换图片</button>
         </div>
 
-        <div class="section-title">基础调整</div>
+        <!-- 常用设置 (常驻) -->
         <div class="row">
-            <span class="label">透明度</span>
+            <span class="label">透明</span>
             <input type="range" id="opacity" min="0" max="1" step="0.001" value="0.5" oninput="updateVisuals()">
         </div>
         <div class="row">
             <span class="label">缩放</span>
             <input type="range" id="scale" min="0.1" max="5.7" step="0.001" value="1" oninput="updateVisuals()">
         </div>
-        <div class="row">
-            <span class="label">平面旋转</span>
-            <input type="range" id="rotateZ" min="-180" max="180" step="1" value="0" oninput="updateVisuals()">
-        </div>
 
-        <div class="section-title">3D 透视矫正</div>
-        <div class="row">
-            <span class="label">俯仰视角</span>
-            <input type="range" id="rotateX" min="-60" max="60" step="1" value="0" oninput="updateVisuals()">
-        </div>
-        <div class="row">
-            <span class="label">视距</span>
-            <input type="range" id="perspective" min="200" max="1800" step="10" value="1000" oninput="updateVisuals()">
+        <!-- 更多设置按钮 -->
+        <button class="panel-btn" id="btn-more" onclick="toggleMore()" style="background: rgba(255,255,255,0.05); color: #aaa; margin: 4px 0; font-size: 11px; padding: 4px 0;">﹀ 更多设置 (旋转/视角)</button>
+
+        <!-- 折叠区域 -->
+        <div id="more-controls">
+            <div class="row">
+                <span class="label">旋转</span>
+                <input type="range" id="rotateZ" min="-180" max="180" step="1" value="0" oninput="updateVisuals()">
+            </div>
+            <div class="row">
+                <span class="label">俯仰</span>
+                <input type="range" id="rotateX" min="-60" max="60" step="1" value="0" oninput="updateVisuals()">
+            </div>
+            <div class="row">
+                <span class="label">视距</span>
+                <input type="range" id="perspective" min="200" max="1800" step="10" value="1000" oninput="updateVisuals()">
+            </div>
         </div>
         
-        <div style="display: flex; gap: 8px; margin-top: 5px;">
+        <div style="display: flex; gap: 8px; margin-top: 6px;">
             <button class="panel-btn" onclick="toggleLock()" id="btn-lock">🔓 锁定画面</button>
             <button class="panel-btn" onclick="resetParams()">重置</button>
         </div>
@@ -218,15 +245,11 @@
             locked: false,
             focusLocked: false, 
             videoTrack: null,   
-            // 基础参数
             opacity: 0.5,
             scale: 1, 
             rotateZ: 0,
-            // 透视参数
             perspective: 1000, 
             rotateX: 0,
-            rotateY: 0, 
-            // 位移
             screenX: 0,
             screenY: 0
         };
@@ -242,7 +265,7 @@
             restoreBtn: document.getElementById('restore-btn'),
             bgVideo: document.getElementById('bg-video'),
             btnLock: document.getElementById('btn-lock'),
-            viewport: document.getElementById('global-viewport'), // 新增
+            viewport: document.getElementById('global-viewport'),
             inputs: {
                 opacity: document.getElementById('opacity'),
                 scale: document.getElementById('scale'),
@@ -252,90 +275,75 @@
             }
         };
 
-        // UI 切换
         function toggleUI(show) {
             els.controls.style.display = show ? 'flex' : 'none';
             els.restoreBtn.style.display = show ? 'none' : 'flex';
         }
 
-        // 1. 上传图片 (优化：使用 createObjectURL 提升大图性能)
+        // 新增：切换更多设置显示
+        function toggleMore() {
+            const moreDiv = document.getElementById('more-controls');
+            const btn = document.getElementById('btn-more');
+            if (moreDiv.style.display === 'none' || moreDiv.style.display === '') {
+                moreDiv.style.display = 'flex';
+                btn.innerText = "︿ 收起设置";
+            } else {
+                moreDiv.style.display = 'none';
+                btn.innerText = "﹀ 更多设置 (旋转/视角)";
+            }
+        }
+
         els.fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            
-            // 使用 URL.createObjectURL 替代 FileReader
             const imgUrl = URL.createObjectURL(file);
             els.screenImg.src = imgUrl;
-            
             els.screenImg.onload = () => {
                 state.imageLoaded = true;
                 els.fileName.innerText = `✅ 已选: ${file.name}`;
                 els.btnStartCam.style.display = 'block'; 
-                // 可选：释放内存，但为了保证 src 持续有效，这里暂不 revoke
             };
         });
 
-        // 2. 启动摄像头和应用
         async function startApp() {
             if (!state.imageLoaded) return;
-            
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     audio: false,
-                    video: { 
-                        facingMode: 'environment', 
-                        width: { ideal: 3840 },    
-                        height: { ideal: 2160 } 
-                    }
+                    video: { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 2160 } }
                 });
                 els.bgVideo.srcObject = stream;
-
                 const track = stream.getVideoTracks()[0];
                 state.videoTrack = track;
-                
                 const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-                
                 if (capabilities.focusMode) {
-                    const btnFocus = document.getElementById('btn-focus');
-                    btnFocus.style.display = 'flex'; // 使用 flex 以保持图标对齐
+                    document.getElementById('btn-focus').style.display = 'flex';
                 }
-
             } catch (err) {
                 alert("摄像头启动失败，请确保允许访问或使用HTTPS环境。\n错误: " + err);
             }
-
             els.startScreen.style.display = 'none';
             els.screenLayer.style.display = 'block'; 
             els.screenImg.style.display = 'block';
             els.controls.style.display = 'flex';
-            
             updateVisuals();
         }
 
-        // 切换对焦模式
         async function toggleFocus() {
             if (!state.videoTrack) return;
-            
             const btn = document.getElementById('btn-focus');
             state.focusLocked = !state.focusLocked;
-            
             try {
                 const mode = state.focusLocked ? 'manual' : 'continuous';
                 const constraints = { advanced: [{ focusMode: mode }] };
-
                 if (state.focusLocked) {
                     const settings = state.videoTrack.getSettings();
-                    if (settings.focusDistance) {
-                        constraints.advanced[0].focusDistance = settings.focusDistance;
-                    }
+                    if (settings.focusDistance) constraints.advanced[0].focusDistance = settings.focusDistance;
                 }
-                
                 await state.videoTrack.applyConstraints(constraints);
-                
                 btn.innerHTML = state.focusLocked ? "🎯 已锁对焦" : "🎯 锁定对焦";
                 btn.style.background = state.focusLocked ? "rgba(255, 59, 48, 0.8)" : "rgba(0, 0, 0, 0.5)";
                 btn.style.borderColor = state.focusLocked ? "transparent" : "rgba(255,255,255,0.2)";
-                
             } catch (err) {
                 console.error("Focus failed", err);
                 state.focusLocked = !state.focusLocked;
@@ -343,7 +351,6 @@
             }
         }
 
-        // 3. 核心视觉更新
         function updateVisuals() {
             state.opacity = els.inputs.opacity.value;
             state.scale = els.inputs.scale.value;
@@ -353,30 +360,18 @@
 
             els.screenLayer.style.perspective = `${state.perspective}px`;
             els.screenImg.style.opacity = state.opacity;
-            
-            const transform = `
-                translate(calc(-50% + ${state.screenX}px), calc(-50% + ${state.screenY}px))
-                rotateX(${state.rotateX}deg)
-                rotateY(${state.rotateY}deg)
-                rotateZ(${state.rotateZ}deg)
-                scale(${state.scale})
-            `;
-            
+            const transform = `translate(calc(-50% + ${state.screenX}px), calc(-50% + ${state.screenY}px)) rotateX(${state.rotateX}deg) rotateZ(${state.rotateZ}deg) scale(${state.scale})`;
             els.screenImg.style.transform = transform;
         }
 
-        // 4. 手势逻辑 (重构：支持双指缩放全局)
         let isDragging = false;
         let startX = 0, startY = 0;
         let initialScreenX = 0, initialScreenY = 0;
-        
-        // 全局缩放状态
         let globalScale = 1, globalTx = 0, globalTy = 0;
         let startDist = 0;
         let startCenter = {x:0, y:0};
         let startGlobal = {s:1, x:0, y:0};
 
-        // 辅助函数
         const getDist = (t1, t2) => Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
         const getCenter = (t1, t2) => ({ x: (t1.clientX + t2.clientX)/2, y: (t1.clientY + t2.clientY)/2 });
 
@@ -401,54 +396,40 @@
 
         const onUp = () => { isDragging = false; els.screenLayer.style.cursor = 'grab'; };
 
-        // 绑定事件到 screenLayer (用于捕获开始) 和 window (用于全局移动)
         els.screenLayer.addEventListener('touchstart', e => {
             if (e.touches.length === 2) {
-                // 双指：开始全局缩放
-                isDragging = false; // 中断单指拖拽
+                isDragging = false;
                 startDist = getDist(e.touches[0], e.touches[1]);
                 startCenter = getCenter(e.touches[0], e.touches[1]);
                 startGlobal = { s: globalScale, x: globalTx, y: globalTy };
                 e.preventDefault();
             } else if (e.touches.length === 1) {
-                // 单指：开始参考图拖拽
                 onDown(e.touches[0].clientX, e.touches[0].clientY);
             }
         }, {passive:false});
 
         window.addEventListener('touchmove', e => {
             if (e.touches.length === 2) {
-                // 双指：执行全局缩放和平移
                 const currDist = getDist(e.touches[0], e.touches[1]);
                 const currCenter = getCenter(e.touches[0], e.touches[1]);
-                
-                // 计算缩放
                 const scaleRatio = currDist / startDist;
-                globalScale = Math.max(1, Math.min(startGlobal.s * scaleRatio, 5)); // 限制 1x - 5x
-                
-                // 计算平移 (跟随手指移动)
+                globalScale = Math.max(1, Math.min(startGlobal.s * scaleRatio, 5));
                 const dx = currCenter.x - startCenter.x;
                 const dy = currCenter.y - startCenter.y;
                 globalTx = startGlobal.x + dx;
                 globalTy = startGlobal.y + dy;
-                
-                // 应用到全局视口
                 els.viewport.style.transform = `translate(${globalTx}px, ${globalTy}px) scale(${globalScale})`;
-                e.preventDefault(); // 阻止浏览器默认缩放
+                e.preventDefault();
             } else if (e.touches.length === 1 && isDragging) {
-                // 单指：执行参考图拖拽
                 e.preventDefault();
                 onMove(e.touches[0].clientX, e.touches[0].clientY);
             }
         }, {passive:false});
 
         window.addEventListener('touchend', e => {
-            if (e.touches.length === 0) {
-                onUp();
-            }
+            if (e.touches.length === 0) onUp();
         });
         
-        // 鼠标兼容 (仅限单指逻辑)
         els.screenLayer.addEventListener('mousedown', e => { e.preventDefault(); onDown(e.clientX, e.clientY); });
         window.addEventListener('mousemove', e => { if (isDragging) { e.preventDefault(); onMove(e.clientX, e.clientY); } });
         window.addEventListener('mouseup', onUp);
@@ -459,11 +440,8 @@
             els.inputs.rotateZ.value = 0;
             els.inputs.perspective.value = 1000; 
             els.inputs.rotateX.value = 0;
-            
-            // 重置全局缩放
             globalScale = 1; globalTx = 0; globalTy = 0;
             els.viewport.style.transform = `translate(0px, 0px) scale(1)`;
-            
             updateVisuals();
         }
 
@@ -471,17 +449,13 @@
             state.locked = !state.locked;
             els.btnLock.innerText = state.locked ? "🔒 已锁定" : "🔓 锁定画面";
             els.btnLock.style.background = state.locked ? "#FF3B30" : "rgba(255,255,255,0.15)";
-            
             els.inputs.scale.disabled = state.locked;
             els.inputs.rotateZ.disabled = state.locked;
             els.inputs.perspective.disabled = state.locked;
             els.inputs.rotateX.disabled = state.locked;
         }
 
-        document.body.addEventListener('click', () => {
-            if(els.bgVideo.paused) els.bgVideo.play();
-        }, {once:true});
-
+        document.body.addEventListener('click', () => { if(els.bgVideo.paused) els.bgVideo.play(); }, {once:true});
     </script>
 </body>
 </html>
