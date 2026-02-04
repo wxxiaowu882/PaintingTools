@@ -5,38 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>AR 描摹助手 | 视觉维度</title>
     
-    <!-- 1. A-Frame 1.2.0 (稳定版) -->
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <!-- 2. AR.js for A-Frame -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-
     <style>
-        body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #111; }
-        .a-enter-vr { display: none; }
+        body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #000; }
+        
+        /* === 背景视频层 === */
+        #bg-video {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; z-index: 1; 
+            /* 镜像翻转通常不需要，除非是前置摄像头，这里默认后置 */
+        }
 
         /* === 屏幕静态层 === */
         #screen-layer {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10; pointer-events: auto; overflow: hidden;
             display: none; cursor: grab;
+            /* 3D 透视容器设置 - 初始值，会被JS覆盖 */
+            perspective: 1000px; 
+            perspective-origin: center center;
         }
-        /* 校准时显示半透明参考图 */
-        #screen-layer.calibrating { pointer-events: none; opacity: 0.4; } 
         #screen-layer:active { cursor: grabbing; }
         
         #screen-img {
             position: absolute;
             top: 50%; left: 50%;
-            /* 关键：限制最大尺寸，防止图片过大溢出 */
+            /* 关键：限制最大尺寸 */
             max-width: 80%; 
             max-height: 80%;
-            /* 移除固定 width，让 max-width 生效，保持比例 */
             pointer-events: none; 
-            /* 修改回：锚点设为中心 */
+            /* 锚点设为中心 */
             transform-origin: center center;
-            /* 恢复默认居中 translate */
-            transform: translate(-50%, -50%); 
-            /* 移除 transition 以保证实时拖拽跟手 */
+            /* 初始居中 */
+            transform: translate(-50%, -50%);
+            /* 开启3D变换支持 */
+            transform-style: preserve-3d; 
+            will-change: transform, opacity;
         }
 
         /* === UI 控制层 === */
@@ -46,7 +49,7 @@
             background: rgba(28, 28, 30, 0.9); backdrop-filter: blur(10px);
             border-radius: 20px; padding: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            display: flex; flex-direction: column; gap: 15px;
+            display: flex; flex-direction: column; gap: 12px; /* 稍微紧凑一点 */
             color: white; z-index: 100;
         }
 
@@ -71,28 +74,8 @@
             z-index: 99; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        .top-bar {
-            position: fixed; top: 0; left: 0; width: 100%; height: 60px;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
-            z-index: 100; display: flex; align-items: center; justify-content: space-between;
-            padding: 0 20px; box-sizing: border-box; color: white;
-            pointer-events: none; 
-        }
-        .top-bar > * { pointer-events: auto; }
-
-        .status-badge {
-            background: rgba(255,255,255,0.2); padding: 5px 12px;
-            border-radius: 15px; font-size: 12px; font-weight: 600;
-            display: flex; align-items: center; gap: 5px;
-        }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #aaa; }
-        .status-dot.active { background: #4CD964; box-shadow: 0 0 8px #4CD964; }
-        .status-dot.calib { background: #FFD60A; box-shadow: 0 0 8px #FFD60A; animation: pulse 1s infinite; }
-
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-
         .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .label { font-size: 14px; min-width: 40px; color: #ccc; }
+        .label { font-size: 13px; min-width: 55px; color: #ccc; text-align: right; }
         input[type=range] { flex: 1; accent-color: #007AFF; height: 4px; border-radius: 2px; }
         
         button {
@@ -109,13 +92,17 @@
             color: white; text-align: center;
         }
         #file-input { display: none; }
+        
+        .section-title {
+            font-size: 12px; color: #666; margin-top: 5px; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px;
+        }
     </style>
 </head>
 <body>
 
     <div id="start-screen">
-        <h1 style="margin-bottom: 10px;">🎨 AR 描摹助手</h1>
-        <p style="opacity: 0.6; margin-bottom: 40px; font-size: 14px;">双模引擎：屏幕固定 + AR 空间跟随</p>
+        <h1 style="margin-bottom: 10px;">🎨 描摹助手 (透视版)</h1>
+        <p style="opacity: 0.6; margin-bottom: 40px; font-size: 14px;">更稳、更准的透视叠加方案</p>
         <div style="display: flex; flex-direction: column; gap: 15px; width: 200px;">
             <button onclick="document.getElementById('file-input').click()" style="background: #333; border: 1px solid #555;">
                 1. 选择图片
@@ -128,92 +115,71 @@
         <p id="file-name" style="margin-top: 20px; font-size: 12px; color: #007AFF;"></p>
     </div>
 
-    <!-- AR 场景 -->
-    <a-scene 
-        id="ar-scene"
-        embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; maxDetectionRate: 60; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720;"
-        renderer="logarithmicDepthBuffer: true;"
-        vr-mode-ui="enabled: false">
-
-        <!-- smoothCount=10 增加平滑度 -->
-        <a-marker preset="hiro" id="ar-marker" emitevents="true" smooth="true" smoothCount="10" smoothTolerance="0.01">
-            <!-- 初始 visible=false，校准完成后显示 -->
-            <a-image 
-                id="ar-img" 
-                src="" 
-                position="0 0 0" 
-                rotation="-90 0 0" 
-                scale="1 1 1"
-                opacity="0.5"
-                visible="false">
-            </a-image>
-        </a-marker>
-        <a-entity camera></a-entity>
-    </a-scene>
+    <!-- 背景视频流 -->
+    <video id="bg-video" autoplay playsinline muted></video>
 
     <div id="screen-layer">
         <img id="screen-img" src="" alt="Overlay">
-    </div>
-
-    <div class="top-bar">
-        <div class="status-badge">
-            <div class="status-dot" id="status-dot"></div>
-            <span id="status-text">手动模式</span>
-        </div>
-        <button style="width: auto; padding: 5px 15px; font-size: 12px;" onclick="toggleLock()" id="btn-lock">🔓</button>
     </div>
 
     <!-- 恢复按钮 (初始隐藏) -->
     <button id="restore-btn" onclick="toggleUI(true)">🛠️</button>
 
     <div class="ui-layer" id="controls" style="display: none;">
-        <!-- 最小化按钮 -->
         <button class="btn-minimize" onclick="toggleUI(false)">🔽</button>
 
+        <!-- 新增：更换图片按钮 -->
+        <button onclick="document.getElementById('file-input').click()" style="background: rgba(0,122,255,0.2); color: #007AFF; margin-right: 30px;">📂 更换图片</button>
+
+        <div class="section-title">基础调整</div>
         <div class="row">
-            <span class="label">透明</span>
-            <input type="range" id="opacity" min="0" max="1" step="0.05" value="0.5" oninput="updateVisuals()">
+            <span class="label">透明度</span>
+            <!-- 优化：step 改为 0.001 以实现更平滑的滑动 -->
+            <input type="range" id="opacity" min="0" max="1" step="0.001" value="0.5" oninput="updateVisuals()">
         </div>
         <div class="row">
-            <span class="label">大小</span>
-            <input type="range" id="scale" min="0.1" max="5" step="0.1" value="1" oninput="updateVisuals()">
+            <span class="label">缩放</span>
+            <!-- 修改范围 0.1 ~ 5.7 (原最大值的3倍)，step 更细致 -->
+            <input type="range" id="scale" min="0.1" max="5.7" step="0.001" value="1" oninput="updateVisuals()">
         </div>
         <div class="row">
-            <span class="label">旋转</span>
-            <input type="range" id="rotate" min="0" max="360" step="1" value="0" oninput="updateVisuals()">
+            <span class="label">平面旋转</span>
+            <!-- 修改范围 -180 ~ 180，默认 0 在正中间 -->
+            <input type="range" id="rotateZ" min="-180" max="180" step="1" value="0" oninput="updateVisuals()">
+        </div>
+
+        <div class="section-title">3D 透视矫正 (解决斜拍变形)</div>
+        <div class="row">
+            <span class="label">俯仰视角</span> <!-- Rotate X -->
+            <input type="range" id="rotateX" min="-60" max="60" step="1" value="0" oninput="updateVisuals()">
+        </div>
+        <div class="row">
+            <span class="label">视距(焦距)</span> <!-- Moved here -->
+            <!-- 修改范围 200 ~ 1800，默认 1000 在正中间 -->
+            <input type="range" id="perspective" min="200" max="1800" step="10" value="1000" oninput="updateVisuals()">
         </div>
         
-        <div style="display: flex; gap: 10px; margin-top: 10px;">
-            <button id="btn-mode" onclick="toggleMode()">📍 启用跟随</button>
-            <button onclick="resetParams()">重置</button>
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button onclick="toggleLock()" id="btn-lock">🔓 锁定画面</button>
+            <button onclick="resetParams()">重置参数</button>
         </div>
-        <p style="margin: 0; font-size: 10px; opacity: 0.4; text-align: center;">跟随模式需对准 Hiro 标记</p>
     </div>
 
     <script>
         const state = {
             imageLoaded: false,
-            cameraStarted: false,
-            arMode: false,
-            markerFound: false,
             locked: false,
-            // 变换参数
+            // 基础参数
             opacity: 0.5,
             scale: 1, 
-            rotate: 0,
-            // 屏幕偏移
+            rotateZ: 0,
+            // 透视参数
+            perspective: 1000, 
+            rotateX: 0,
+            rotateY: 0, // 保留变量但默认0
+            // 位移
             screenX: 0,
-            screenY: 0,
-            // AR 尺寸校准
-            arScaleMult: null,
-            arBaseWidth: 1,
-            arWidth: 1,  // AR 图片原始宽
-            arHeight: 1, // AR 图片原始高
-            // 缓存的屏幕图片原始宽度（不含缩放）
-            cachedClientWidth: 0,
-            // 校准计数器
-            calibFrameCount: 0
+            screenY: 0
         };
 
         const els = {
@@ -223,62 +189,33 @@
             fileName: document.getElementById('file-name'),
             screenLayer: document.getElementById('screen-layer'), 
             screenImg: document.getElementById('screen-img'),
-            arImg: document.getElementById('ar-img'),
             controls: document.getElementById('controls'),
-            statusText: document.getElementById('status-text'),
-            statusDot: document.getElementById('status-dot'),
-            marker: document.getElementById('ar-marker'),
-            btnMode: document.getElementById('btn-mode'),
-            restoreBtn: document.getElementById('restore-btn'), // 新增
-            scene: document.querySelector('a-scene'),
+            restoreBtn: document.getElementById('restore-btn'),
+            bgVideo: document.getElementById('bg-video'),
+            btnLock: document.getElementById('btn-lock'),
             inputs: {
                 opacity: document.getElementById('opacity'),
                 scale: document.getElementById('scale'),
-                rotate: document.getElementById('rotate')
+                rotateZ: document.getElementById('rotateZ'),
+                perspective: document.getElementById('perspective'),
+                rotateX: document.getElementById('rotateX')
+                // rotateY removed
             }
         };
 
-        // UI 切换功能
+        // UI 切换
         function toggleUI(show) {
-            if (show) {
-                els.controls.style.display = 'flex';
-                els.restoreBtn.style.display = 'none';
-            } else {
-                els.controls.style.display = 'none';
-                els.restoreBtn.style.display = 'flex';
-            }
+            els.controls.style.display = show ? 'flex' : 'none';
+            els.restoreBtn.style.display = show ? 'none' : 'flex';
         }
 
-        // 1. 上传
+        // 1. 上传图片
         els.fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = function(event) {
-                const src = event.target.result;
-                els.screenImg.src = src;
-                els.screenImg.style.display = 'block'; 
-                els.arImg.setAttribute('src', src);
-
-                // 计算基础比例
-                const tempImg = new Image();
-                tempImg.onload = () => {
-                    const ratio = tempImg.naturalWidth / tempImg.naturalHeight;
-                    // 保存比例供校准使用
-                    if (ratio > 1) {
-                        state.arBaseWidth = 1;
-                        state.arWidth = 1;
-                        state.arHeight = 1 / ratio;
-                    } else {
-                        state.arBaseWidth = ratio;
-                        state.arWidth = ratio;
-                        state.arHeight = 1;
-                    }
-                    els.arImg.setAttribute('width', state.arWidth);
-                    els.arImg.setAttribute('height', state.arHeight);
-                };
-                tempImg.src = src;
-
+                els.screenImg.src = event.target.result;
                 state.imageLoaded = true;
                 els.fileName.innerText = `✅ 已选: ${file.name}`;
                 els.btnStartCam.style.display = 'block'; 
@@ -286,210 +223,72 @@
             reader.readAsDataURL(file);
         });
 
-        // 2. 启动
-        function startApp() {
+        // 2. 启动摄像头和应用
+        async function startApp() {
             if (!state.imageLoaded) return;
+            
+            // 尝试启动后置摄像头
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: false,
+                    video: { 
+                        facingMode: 'environment', // 优先后置
+                        // 优化：尝试请求 4K 分辨率，浏览器会自动回退到设备支持的最高分辨率
+                        width: { ideal: 3840 },    
+                        height: { ideal: 2160 } 
+                    }
+                });
+                els.bgVideo.srcObject = stream;
+            } catch (err) {
+                alert("摄像头启动失败，请确保允许访问或使用HTTPS环境。\n错误: " + err);
+                // 即使摄像头失败，也允许进入编辑模式（可能用户只想看图）
+            }
+
             els.startScreen.style.display = 'none';
             els.screenLayer.style.display = 'block'; 
-            els.screenImg.style.display = 'block'; // 确保显示
+            els.screenImg.style.display = 'block';
             els.controls.style.display = 'flex';
-            state.cameraStarted = true;
             
-            // 优化点1：启动时重置居中
-            state.screenX = 0; 
-            state.screenY = 0;
             updateVisuals();
         }
 
-        // 3. 模式切换
-        function toggleMode() {
-            state.arMode = !state.arMode;
-            
-            if (state.arMode) {
-                // 进入 AR 模式
-                
-                // 优化点2：记录当前屏幕图片的“原始”渲染宽度（clientWidth 不包含 transform: scale）
-                // 这样我们就可以计算出“不缩放时的基准像素宽度”，然后在 AR 中应用同样的 scale
-                state.cachedClientWidth = els.screenImg.clientWidth;
-
-                els.btnMode.classList.add('active');
-                els.btnMode.innerText = "📺 切回屏幕";
-                
-                // 重置校准
-                state.arScaleMult = null;
-                state.calibFrameCount = 0;
-                
-                // 隐藏 AR 图，等待校准
-                els.arImg.setAttribute('visible', 'false');
-                
-                // 保持屏幕图可见，用于视觉校准过渡
-                els.screenLayer.classList.add('calibrating');
-                
-                if (state.markerFound) {
-                    startCalibration();
-                } else {
-                    els.statusText.innerText = "寻找标记...";
-                    els.statusDot.className = "status-dot";
-                }
-            } else {
-                // 切回手动
-                els.btnMode.classList.remove('active');
-                els.btnMode.innerText = "📍 启用跟随";
-                
-                els.screenLayer.style.display = 'block'; 
-                els.screenLayer.classList.remove('calibrating');
-                els.screenImg.style.opacity = state.opacity;
-                els.arImg.setAttribute('visible', 'false'); 
-                
-                els.statusText.innerText = "屏幕手动模式";
-                els.statusDot.className = "status-dot active";
-            }
-            updateVisuals();
-        }
-
-        // 4. 视觉更新
+        // 3. 核心视觉更新 (CSS 3D Transform)
         function updateVisuals() {
             state.opacity = els.inputs.opacity.value;
             state.scale = els.inputs.scale.value;
-            state.rotate = els.inputs.rotate.value;
+            state.rotateZ = els.inputs.rotateZ.value;
+            // 获取透视值
+            state.perspective = els.inputs.perspective.value;
+            state.rotateX = els.inputs.rotateX.value;
+            // state.rotateY = els.inputs.rotateY.value; // Removed
 
-            // 屏幕图
-            if (!els.screenLayer.classList.contains('calibrating')) {
-                els.screenImg.style.opacity = state.opacity;
-            }
-            // 修改回：使用中心锚点逻辑，恢复 -50% 居中偏移
-            els.screenImg.style.transform = 
-                `translate(calc(-50% + ${state.screenX}px), calc(-50% + ${state.screenY}px)) ` + 
-                `scale(${state.scale}) rotate(${state.rotate}deg)`;
+            // 应用透视到父容器
+            els.screenLayer.style.perspective = `${state.perspective}px`;
 
-            // AR 图
-            // 核心：应用校准系数 arScaleMult
-            const finalARScale = state.scale * (state.arScaleMult || 1);
+            els.screenImg.style.opacity = state.opacity;
             
-            els.arImg.setAttribute('opacity', state.opacity);
-            els.arImg.object3D.rotation.set(
-                THREE.Math.degToRad(-90), 
-                THREE.Math.degToRad(state.rotate), 
-                0
-            );
+            // CSS 变换顺序：位移 -> 透视 -> 3D旋转 -> 平面旋转 -> 缩放
+            // 注意：translate(-50%, -50%) 用于将图片中心对齐到 (0,0) 点，是布局基准
+            // 额外的 translate(${state.screenX}px, ...) 是用户的拖拽位移
             
-            // 修改回：移除偏移，使中心对齐 Marker 中心
-            els.arImg.object3D.position.set(0, 0, 0);
-            els.arImg.object3D.scale.set(finalARScale, finalARScale, 1);
+            const transform = `
+                translate(calc(-50% + ${state.screenX}px), calc(-50% + ${state.screenY}px))
+                rotateX(${state.rotateX}deg)
+                rotateY(${state.rotateY}deg)
+                rotateZ(${state.rotateZ}deg)
+                scale(${state.scale})
+            `;
+            
+            els.screenImg.style.transform = transform;
         }
 
-        // --- 核心：连续动态校准 ---
-        function startCalibration() {
-            els.statusText.innerText = "📐 校准大小...";
-            els.statusDot.className = "status-dot calib";
-            els.screenLayer.classList.add('calibrating'); 
-            requestAnimationFrame(calibrateLoop);
-        }
-
-        function calibrateLoop() {
-            if (!state.arMode || !els.marker.object3D.visible) {
-                els.screenLayer.classList.remove('calibrating');
-                if (state.arMode) els.arImg.setAttribute('visible', 'false');
-                return;
-            }
-
-            // 校准 30 帧 (约0.5秒) 以稳定数值
-            if (state.calibFrameCount < 30) {
-                performCalibrationStep();
-                state.calibFrameCount++;
-                requestAnimationFrame(calibrateLoop);
-            } else {
-                finishCalibration();
-            }
-        }
-
-        function performCalibrationStep() {
-            const camera = els.scene.camera;
-            const object3D = els.marker.object3D;
-            
-            // 使用左右边缘点 (-0.5 到 0.5) 计算 1 个单位宽度在屏幕上的投影长度
-            // 这样比中心到边缘更准，且符合 state.arBaseWidth 的定义
-            // 假设 AR 图片的局部空间宽度是 state.arBaseWidth
-            const halfW = state.arBaseWidth / 2;
-            
-            const pLeft = new THREE.Vector3(-halfW, 0, 0);
-            pLeft.applyMatrix4(object3D.matrixWorld).project(camera);
-            
-            const pRight = new THREE.Vector3(halfW, 0, 0);
-            pRight.applyMatrix4(object3D.matrixWorld).project(camera);
-            
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-            
-            const x1 = (pLeft.x * 0.5 + 0.5) * w;
-            const y1 = -(pLeft.y * 0.5 + 0.5) * h;
-            const x2 = (pRight.x * 0.5 + 0.5) * w;
-            const y2 = -(pRight.y * 0.5 + 0.5) * h;
-            
-            const distPx = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-            
-            if (distPx > 1) {
-                // 公式推导：
-                // AR_Visual_Width_Px = distPx * FinalARScale
-                // Screen_Visual_Width_Px = state.cachedClientWidth * state.scale
-                // 我们希望：AR_Visual_Width_Px == Screen_Visual_Width_Px
-                // distPx * state.scale * arScaleMult = state.cachedClientWidth * state.scale
-                // 消去 state.scale:
-                // arScaleMult = state.cachedClientWidth / distPx
-                
-                const calculatedMult = state.cachedClientWidth / distPx;
-                
-                if (calculatedMult > 0 && calculatedMult < 1000) {
-                    if (state.arScaleMult === null) {
-                        state.arScaleMult = calculatedMult;
-                    } else {
-                        // 平滑逼近
-                        state.arScaleMult += (calculatedMult - state.arScaleMult) * 0.2;
-                    }
-                    
-                    updateVisuals(); 
-                    els.arImg.setAttribute('visible', 'true');
-                }
-            }
-        }
-
-        function finishCalibration() {
-            els.statusText.innerText = "✅ 跟随中 (已锁定)";
-            els.statusDot.className = "status-dot active";
-            els.screenLayer.classList.remove('calibrating');
-            els.screenLayer.style.display = 'none'; // 隐藏参考图
-        }
-
-        // --- AR 事件 ---
-        els.marker.addEventListener('markerFound', () => {
-            state.markerFound = true;
-            if (state.arMode) {
-                if (state.arScaleMult === null) {
-                    startCalibration();
-                } else {
-                    els.statusText.innerText = "AR 跟随中";
-                    els.statusDot.className = "status-dot active";
-                    els.arImg.setAttribute('visible', 'true');
-                }
-            }
-        });
-
-        els.marker.addEventListener('markerLost', () => {
-            state.markerFound = false;
-            if (state.arMode) {
-                els.statusText.innerText = "⚠️ 寻找标记...";
-                els.statusDot.className = "status-dot";
-                els.arImg.setAttribute('visible', 'false');
-            }
-        });
-
-        // --- 6. 拖拽逻辑 (优化点3：鼠标支持) ---
+        // 4. 拖拽逻辑 (支持鼠标和触摸)
         let isDragging = false;
         let startX = 0, startY = 0;
         let initialScreenX = 0, initialScreenY = 0;
 
         const onDown = (clientX, clientY) => {
-            if (state.locked || state.arMode) return;
+            if (state.locked) return;
             isDragging = true;
             startX = clientX;
             startY = clientY;
@@ -509,31 +308,55 @@
 
         const onUp = () => { isDragging = false; els.screenLayer.style.cursor = 'grab'; };
 
+        // 绑定事件
         els.screenLayer.addEventListener('mousedown', e => { e.preventDefault(); onDown(e.clientX, e.clientY); });
         window.addEventListener('mousemove', e => { if (isDragging) { e.preventDefault(); onMove(e.clientX, e.clientY); } });
         window.addEventListener('mouseup', onUp);
         
-        els.screenLayer.addEventListener('touchstart', e => { if (e.touches.length===1) { e.preventDefault(); onDown(e.touches[0].clientX, e.touches[0].clientY); }}, {passive:false});
-        window.addEventListener('touchmove', e => { if (isDragging && e.touches.length===1) { e.preventDefault(); onMove(e.touches[0].clientX, e.touches[0].clientY); }}, {passive:false});
+        els.screenLayer.addEventListener('touchstart', e => { 
+            if (e.touches.length === 1) { 
+                e.preventDefault(); 
+                onDown(e.touches[0].clientX, e.touches[0].clientY); 
+            }
+        }, {passive:false});
+        
+        window.addEventListener('touchmove', e => { 
+            if (isDragging && e.touches.length === 1) { 
+                e.preventDefault(); 
+                onMove(e.touches[0].clientX, e.touches[0].clientY); 
+            }
+        }, {passive:false});
+        
         window.addEventListener('touchend', onUp);
 
+        // 辅助功能
         function resetParams() {
             state.screenX = 0; state.screenY = 0;
             els.inputs.scale.value = 1; 
-            els.inputs.rotate.value = 0;
+            els.inputs.rotateZ.value = 0;
+            els.inputs.perspective.value = 1000; // 重置透视
+            els.inputs.rotateX.value = 0;
+            // els.inputs.rotateY.value = 0; // Removed
             updateVisuals();
         }
 
         function toggleLock() {
             state.locked = !state.locked;
-            document.getElementById('btn-lock').innerText = state.locked ? "🔒" : "🔓";
-            els.controls.classList.toggle('locked', state.locked);
+            els.btnLock.innerText = state.locked ? "🔒 已锁定" : "🔓 锁定画面";
+            els.btnLock.style.background = state.locked ? "#FF3B30" : "rgba(255,255,255,0.15)";
+            
+            // 锁定 UI 面板中影响位置的控件 (可选)
+            els.inputs.scale.disabled = state.locked;
+            els.inputs.rotateZ.disabled = state.locked;
+            els.inputs.perspective.disabled = state.locked;
+            els.inputs.rotateX.disabled = state.locked;
+            // els.inputs.rotateY.disabled = state.locked; // Removed
         }
 
-        window.addEventListener('click', function () {
-            const v = document.querySelector('video');
-            if (v && v.paused) v.play();
-        });
+        // 解决 iOS Safari 视频自动播放问题
+        document.body.addEventListener('click', () => {
+            if(els.bgVideo.paused) els.bgVideo.play();
+        }, {once:true});
 
     </script>
 </body>
