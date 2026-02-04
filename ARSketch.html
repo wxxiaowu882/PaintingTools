@@ -53,13 +53,13 @@
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-radius: 16px; 
-            /* 修改：减少内边距 */
-            padding: 15px; 
+            /* 修改：进一步减少内边距，使面板更紧凑 */
+            padding: 10px 15px; 
             border: 1px solid rgba(255,255,255,0.1);
             box-shadow: 0 8px 32px rgba(0,0,0,0.3);
             display: flex; flex-direction: column; 
-            /* 修改：减少间距 */
-            gap: 8px; 
+            /* 修改：减少通用间距，改用 row padding 控制滑块距离 */
+            gap: 2px; 
             color: white; z-index: 100;
         }
 
@@ -102,12 +102,18 @@
             cursor: pointer;
         }
 
-        .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        /* 修改：增加滑块行的上下内边距，拉大间距方便手指操作 */
+        .row { 
+            display: flex; align-items: center; justify-content: space-between; gap: 8px; 
+            padding: 10px 0; 
+        }
+        
         .label { font-size: 12px; min-width: 50px; color: #ddd; text-align: right; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
         input[type=range] { flex: 1; accent-color: #007AFF; height: 3px; border-radius: 2px; }
         
         button.panel-btn {
-            flex: 1; padding: 10px; border-radius: 8px; border: none;
+            /* 修改：减少按钮内边距，使其更紧凑 */
+            flex: 1; padding: 8px; border-radius: 8px; border: none;
             background: rgba(255,255,255,0.15); color: white;
             font-size: 13px; font-weight: 500; cursor: pointer; transition: 0.2s; white-space: nowrap;
         }
@@ -164,7 +170,7 @@
         <button class="btn-minimize" onclick="toggleUI(false)">🔽</button>
 
         <!-- 顶部工具栏 -->
-        <div style="display: flex; justify-content: flex-start; margin-bottom: 5px;">
+        <div style="display: flex; justify-content: flex-start; margin-bottom: 2px;">
              <button class="panel-btn" onclick="document.getElementById('file-input').click()" style="background: rgba(0,122,255,0.25); color: #4facfe; flex: none; width: 100%;">📂 更换图片</button>
         </div>
 
@@ -192,7 +198,7 @@
             <input type="range" id="perspective" min="200" max="1800" step="10" value="1000" oninput="updateVisuals()">
         </div>
         
-        <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <div style="display: flex; gap: 8px; margin-top: 5px;">
             <button class="panel-btn" onclick="toggleLock()" id="btn-lock">🔓 锁定画面</button>
             <button class="panel-btn" onclick="resetParams()">重置</button>
         </div>
