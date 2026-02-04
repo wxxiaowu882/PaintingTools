@@ -43,20 +43,19 @@
             z-index: 10; pointer-events: auto; overflow: hidden;
             display: none; cursor: grab;
             perspective: 1000px; 
-            /* 核心修改：视点锁定在底部中心，配合 transform-origin 实现"钉住底部"的效果 */
+            /* 保持底部视点，减少漂移 */
             perspective-origin: 50% 100%;
         }
         #screen-layer:active { cursor: grabbing; }
         
         #screen-img {
             position: absolute;
-            /* 核心修改：初始位置上移至 38%，避开底部面板 */
             top: 38%; 
             left: 50%;
             max-width: 80%; 
             max-height: 80%;
             pointer-events: none; 
-            /* 核心修改：变换原点锁定底部中心 */
+            /* 锚点保持底部中心 */
             transform-origin: center bottom;
             transform: translate(-50%, -50%);
             transform-style: preserve-3d; 
@@ -71,12 +70,12 @@
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-radius: 16px; 
-            /* 顶部留出空间给左上/右上角的小按钮 */
-            padding: 30px 12px 10px 12px; 
+            /* 恢复紧凑的内边距 */
+            padding: 12px; 
             border: 1px solid rgba(255,255,255,0.1);
             box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             display: flex; flex-direction: column; 
-            gap: 2px; 
+            gap: 4px; 
             color: white; z-index: 100;
             transition: height 0.3s ease;
         }
@@ -88,17 +87,7 @@
             background: rgba(255,255,255,0.1); border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-size: 10px; border: none; cursor: pointer; color: #ccc;
-        }
-
-        /* 左上角：启停摄像头按钮 (新增位置) */
-        .btn-camera-toggle {
-            position: absolute; top: 6px; left: 6px;
-            width: 24px; height: 24px; padding: 0;
-            background: rgba(255, 59, 48, 0.2); 
-            border-radius: 50%;
-            display: none; /* 初始隐藏 */
-            align-items: center; justify-content: center;
-            font-size: 10px; border: none; cursor: pointer; color: #ff6b6b;
+            z-index: 102; /* 确保在最上层 */
         }
         
         #restore-btn {
@@ -110,6 +99,16 @@
             display: none; 
             align-items: center; justify-content: center;
             z-index: 99; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        /* 顶部工具栏容器 */
+        .toolbar-row {
+            display: flex; 
+            justify-content: flex-start; 
+            gap: 8px; 
+            margin-bottom: 4px;
+            /* 关键：右侧留白，防止按钮和小三角重叠 */
+            margin-right: 30px; 
         }
 
         .row { 
@@ -166,6 +165,7 @@
             font-weight: 500; 
             cursor: pointer; 
             transition: 0.2s;
+            max-width: 100px; /* 限制按钮最大宽度，防止太宽 */
         }
         button.active { background: #007AFF; color: white; }
 
@@ -217,17 +217,17 @@
     <button id="restore-btn" onclick="toggleUI(true)">🛠️</button>
 
     <div class="ui-layer" id="controls" style="display: none;">
-        <!-- 左上角：启停摄像头 -->
-        <button class="btn-camera-toggle" id="btn-toggle-cam" onclick="toggleCameraState()">⏹</button>
         <!-- 右上角：收起面板 -->
         <button class="btn-minimize" onclick="toggleUI(false)">🔽</button>
 
         <!-- 工具栏 (更紧凑) -->
-        <div style="display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px;">
+        <div class="toolbar-row">
              <!-- 更换图片 -->
              <button class="panel-btn" onclick="document.getElementById('file-input').click()" style="background: rgba(0,122,255,0.25); color: #4facfe;">📂 换图</button>
              <!-- 切换镜头 (仅多摄显示) -->
              <button class="panel-btn" id="btn-switch-cam" onclick="switchCamera()" style="display:none; background: rgba(255,255,255,0.15);">🔄 换镜</button>
+             <!-- 启停摄像头 (回归工具栏) -->
+             <button class="panel-btn" id="btn-toggle-cam" onclick="toggleCameraState()" style="display:none; background: rgba(255,59,48,0.25); color: #ff6b6b; max-width: 40px;">⏹</button>
         </div>
 
         <!-- 常用设置 (常驻) -->
@@ -241,7 +241,7 @@
         </div>
 
         <!-- 更多设置按钮 -->
-        <button class="panel-btn" id="btn-more" onclick="toggleMore()" style="background: rgba(255,255,255,0.05); color: #aaa; margin: 4px 0; font-size: 11px; padding: 4px 0;">﹀ 更多设置 (旋转/视角)</button>
+        <button class="panel-btn" id="btn-more" onclick="toggleMore()" style="background: rgba(255,255,255,0.05); color: #aaa; margin: 4px 0; font-size: 11px; padding: 4px 0; max-width: none;">﹀ 更多设置 (旋转/视角)</button>
 
         <!-- 折叠区域 -->
         <div id="more-controls">
@@ -262,8 +262,8 @@
         </div>
         
         <div style="display: flex; gap: 8px; margin-top: 6px;">
-            <button class="panel-btn" onclick="toggleLock()" id="btn-lock">🔓 锁定画面</button>
-            <button class="panel-btn" onclick="resetParams()">重置</button>
+            <button class="panel-btn" onclick="toggleLock()" id="btn-lock" style="max-width: none;">🔓 锁定画面</button>
+            <button class="panel-btn" onclick="resetParams()" style="max-width: none;">重置</button>
         </div>
     </div>
 
@@ -410,7 +410,7 @@
                 state.cameraActive = true;
                 
                 // 显示启停按钮
-                els.btnToggleCam.style.display = 'flex';
+                els.btnToggleCam.style.display = 'block'; // 改为 block，由 flex 容器控制布局
                 els.btnToggleCam.innerText = '⏹';
                 
             } catch(e) {
