@@ -305,16 +305,62 @@
             };
         });
 
+        // 核心修改：在 startApp 中加入自动寻找广角镜头的逻辑
         async function startApp() {
             if (!state.imageLoaded) return;
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
+                // 1. 先尝试获取默认的后置摄像头
+                let stream = await navigator.mediaDevices.getUserMedia({
                     audio: false,
-                    video: { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 2160 } }
+                    video: { 
+                        facingMode: 'environment', 
+                        width: { ideal: 3840 }, 
+                        height: { ideal: 2160 } 
+                    }
                 });
+
+                // --- 2. 隐形优化：自动寻找广角镜头 ---
+                try {
+                    // 获取设备列表
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                    
+                    // 关键词匹配：寻找 label 中包含 "wide", "0.5", "ultra" 等字眼的后置镜头
+                    const wideDevice = videoDevices.find(d => {
+                        const label = d.label.toLowerCase();
+                        const isBack = label.includes('back') || label.includes('rear') || label.includes('environment');
+                        const isWide = label.includes('wide') || label.includes('0.5') || label.includes('ultra') || label.includes('广角');
+                        return isBack && isWide;
+                    });
+
+                    // 如果找到了明确的广角镜头，且当前流的设备ID不是它，则切换
+                    if (wideDevice) {
+                        const currentTrack = stream.getVideoTracks()[0];
+                        if (currentTrack.getSettings().deviceId !== wideDevice.deviceId) {
+                            console.log("Auto-switching to Wide Angle Lens:", wideDevice.label);
+                            // 停止旧流
+                            currentTrack.stop();
+                            // 开启新流
+                            stream = await navigator.mediaDevices.getUserMedia({
+                                audio: false,
+                                video: { 
+                                    deviceId: { exact: wideDevice.deviceId },
+                                    width: { ideal: 3840 },    
+                                    height: { ideal: 2160 } 
+                                }
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Auto-wide angle switch failed (minor issue, ignoring):", e);
+                }
+                // ------------------------------------
+
                 els.bgVideo.srcObject = stream;
+                
                 const track = stream.getVideoTracks()[0];
                 state.videoTrack = track;
+                
                 const capabilities = track.getCapabilities ? track.getCapabilities() : {};
                 if (capabilities.focusMode) {
                     document.getElementById('btn-focus').style.display = 'flex';
