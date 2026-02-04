@@ -81,7 +81,7 @@
         button {
             flex: 1; padding: 12px; border-radius: 12px; border: none;
             background: rgba(255,255,255,0.15); color: white;
-            font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s;
+            font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; white-space: nowrap;
         }
         button.active { background: #007AFF; color: white; }
         
@@ -159,9 +159,10 @@
             <input type="range" id="perspective" min="200" max="1800" step="10" value="1000" oninput="updateVisuals()">
         </div>
         
-        <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <div style="display: flex; gap: 5px; margin-top: 15px;">
+            <button onclick="toggleFocus()" id="btn-focus" style="display:none;">🎯 锁定对焦</button>
             <button onclick="toggleLock()" id="btn-lock">🔓 锁定画面</button>
-            <button onclick="resetParams()">重置参数</button>
+            <button onclick="resetParams()">重置</button>
         </div>
     </div>
 
@@ -169,6 +170,8 @@
         const state = {
             imageLoaded: false,
             locked: false,
+            focusLocked: false, // 新增：对焦状态
+            videoTrack: null,   // 新增：视频轨道
             // 基础参数
             opacity: 0.5,
             scale: 1, 
@@ -239,6 +242,21 @@
                     }
                 });
                 els.bgVideo.srcObject = stream;
+
+                // --- 新增：获取视频轨道并检查是否支持对焦 ---
+                const track = stream.getVideoTracks()[0];
+                state.videoTrack = track;
+                
+                // 检查设备能力
+                const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+                
+                // 如果设备支持 focusMode，则显示锁定按钮
+                if (capabilities.focusMode) {
+                    const btnFocus = document.getElementById('btn-focus');
+                    btnFocus.style.display = 'block';
+                }
+                // ------------------------------------------
+
             } catch (err) {
                 alert("摄像头启动失败，请确保允许访问或使用HTTPS环境。\n错误: " + err);
                 // 即使摄像头失败，也允许进入编辑模式（可能用户只想看图）
@@ -250,6 +268,32 @@
             els.controls.style.display = 'flex';
             
             updateVisuals();
+        }
+
+        // 新增：切换对焦模式
+        async function toggleFocus() {
+            if (!state.videoTrack) return;
+            
+            const btn = document.getElementById('btn-focus');
+            state.focusLocked = !state.focusLocked;
+            
+            try {
+                // manual = 锁定/手动, continuous = 自动跟随
+                const mode = state.focusLocked ? 'manual' : 'continuous';
+                
+                await state.videoTrack.applyConstraints({
+                    advanced: [{ focusMode: mode }]
+                });
+                
+                // 更新UI状态
+                btn.innerText = state.focusLocked ? "🎯 已锁对焦" : "🎯 锁定对焦";
+                btn.style.background = state.focusLocked ? "#FF3B30" : "rgba(255,255,255,0.15)";
+            } catch (err) {
+                console.error("Focus failed", err);
+                // 某些设备可能报错，尝试回退状态
+                state.focusLocked = !state.focusLocked;
+                alert("抱歉，您的设备可能不支持手动锁定对焦。");
+            }
         }
 
         // 3. 核心视觉更新 (CSS 3D Transform)
