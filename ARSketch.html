@@ -12,7 +12,6 @@
         #bg-video {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover; z-index: 1; 
-            /* 镜像翻转通常不需要，除非是前置摄像头，这里默认后置 */
         }
 
         /* === 屏幕静态层 === */
@@ -20,7 +19,6 @@
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10; pointer-events: auto; overflow: hidden;
             display: none; cursor: grab;
-            /* 3D 透视容器设置 - 初始值，会被JS覆盖 */
             perspective: 1000px; 
             perspective-origin: center center;
         }
@@ -29,59 +27,81 @@
         #screen-img {
             position: absolute;
             top: 50%; left: 50%;
-            /* 关键：限制最大尺寸 */
             max-width: 80%; 
             max-height: 80%;
             pointer-events: none; 
-            /* 锚点设为中心 */
             transform-origin: center center;
-            /* 初始居中 */
             transform: translate(-50%, -50%);
-            /* 开启3D变换支持 */
             transform-style: preserve-3d; 
             will-change: transform, opacity;
         }
 
-        /* === UI 控制层 === */
+        /* === UI 控制层 (优化：更紧凑、更透明) === */
         .ui-layer {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             width: 90%; max-width: 400px;
-            background: rgba(28, 28, 30, 0.9); backdrop-filter: blur(10px);
-            border-radius: 20px; padding: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            display: flex; flex-direction: column; gap: 12px; /* 稍微紧凑一点 */
+            /* 修改：透明度降低至 0.6 */
+            background: rgba(20, 20, 22, 0.6); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 16px; 
+            /* 修改：减少内边距 */
+            padding: 15px; 
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            display: flex; flex-direction: column; 
+            /* 修改：减少间距 */
+            gap: 8px; 
             color: white; z-index: 100;
         }
 
         /* 收起按钮样式 */
         .btn-minimize {
-            position: absolute; top: 10px; right: 10px;
-            width: 30px; height: 30px; padding: 0;
+            position: absolute; top: 8px; right: 8px;
+            width: 24px; height: 24px; padding: 0;
             background: rgba(255,255,255,0.1); border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            font-size: 14px; border: none; cursor: pointer; color: #ccc;
+            font-size: 12px; border: none; cursor: pointer; color: #ccc;
         }
         
         /* 恢复按钮样式 */
         #restore-btn {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 48px; height: 48px; border-radius: 24px;
-            background: rgba(28, 28, 30, 0.9); backdrop-filter: blur(10px);
+            width: 44px; height: 44px; border-radius: 22px;
+            background: rgba(20, 20, 22, 0.6); backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.1);
             color: white; font-size: 20px; 
-            display: none; /* 默认隐藏 */
+            display: none; 
             align-items: center; justify-content: center;
             z-index: 99; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .label { font-size: 13px; min-width: 55px; color: #ccc; text-align: right; }
-        input[type=range] { flex: 1; accent-color: #007AFF; height: 4px; border-radius: 2px; }
+        /* 新增：独立对焦按钮样式 (右上角) */
+        #btn-focus {
+            position: fixed; top: 20px; right: 20px;
+            z-index: 200;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            display: none; /* 默认隐藏，有能力时显示 */
+            align-items: center; gap: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+
+        .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .label { font-size: 12px; min-width: 50px; color: #ddd; text-align: right; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        input[type=range] { flex: 1; accent-color: #007AFF; height: 3px; border-radius: 2px; }
         
-        button {
-            flex: 1; padding: 12px; border-radius: 12px; border: none;
+        button.panel-btn {
+            flex: 1; padding: 10px; border-radius: 8px; border: none;
             background: rgba(255,255,255,0.15); color: white;
-            font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; white-space: nowrap;
+            font-size: 13px; font-weight: 500; cursor: pointer; transition: 0.2s; white-space: nowrap;
         }
         button.active { background: #007AFF; color: white; }
         
@@ -94,7 +114,8 @@
         #file-input { display: none; }
         
         .section-title {
-            font-size: 12px; color: #666; margin-top: 5px; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px;
+            font-size: 10px; color: #aaa; margin-top: 4px; margin-bottom: 0px; 
+            text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
         }
     </style>
 </head>
@@ -104,10 +125,10 @@
         <h1 style="margin-bottom: 10px;">🎨 描摹助手 (透视版)</h1>
         <p style="opacity: 0.6; margin-bottom: 40px; font-size: 14px;">更稳、更准的透视叠加方案</p>
         <div style="display: flex; flex-direction: column; gap: 15px; width: 200px;">
-            <button onclick="document.getElementById('file-input').click()" style="background: #333; border: 1px solid #555;">
+            <button onclick="document.getElementById('file-input').click()" style="background: #333; border: 1px solid #555; padding: 12px; border-radius: 8px; color:white;">
                 1. 选择图片
             </button>
-            <button id="btn-start-cam" onclick="startApp()" class="active" style="display: none;">
+            <button id="btn-start-cam" onclick="startApp()" class="active" style="display: none; padding: 12px; border-radius: 8px; border:none; background:#007AFF; color:white;">
                 2. 启动摄像头
             </button>
         </div>
@@ -117,6 +138,9 @@
 
     <!-- 背景视频流 -->
     <video id="bg-video" autoplay playsinline muted></video>
+
+    <!-- 独立的对焦按钮 -->
+    <button onclick="toggleFocus()" id="btn-focus">🎯 锁定对焦</button>
 
     <div id="screen-layer">
         <img id="screen-img" src="" alt="Overlay">
@@ -128,41 +152,38 @@
     <div class="ui-layer" id="controls" style="display: none;">
         <button class="btn-minimize" onclick="toggleUI(false)">🔽</button>
 
-        <!-- 新增：更换图片按钮 -->
-        <button onclick="document.getElementById('file-input').click()" style="background: rgba(0,122,255,0.2); color: #007AFF; margin-right: 30px;">📂 更换图片</button>
+        <!-- 顶部工具栏 -->
+        <div style="display: flex; justify-content: flex-start; margin-bottom: 5px;">
+             <button class="panel-btn" onclick="document.getElementById('file-input').click()" style="background: rgba(0,122,255,0.25); color: #4facfe; flex: none; width: 100%;">📂 更换图片</button>
+        </div>
 
         <div class="section-title">基础调整</div>
         <div class="row">
             <span class="label">透明度</span>
-            <!-- 优化：step 改为 0.001 以实现更平滑的滑动 -->
             <input type="range" id="opacity" min="0" max="1" step="0.001" value="0.5" oninput="updateVisuals()">
         </div>
         <div class="row">
             <span class="label">缩放</span>
-            <!-- 修改范围 0.1 ~ 5.7 (原最大值的3倍)，step 更细致 -->
             <input type="range" id="scale" min="0.1" max="5.7" step="0.001" value="1" oninput="updateVisuals()">
         </div>
         <div class="row">
             <span class="label">平面旋转</span>
-            <!-- 修改范围 -180 ~ 180，默认 0 在正中间 -->
             <input type="range" id="rotateZ" min="-180" max="180" step="1" value="0" oninput="updateVisuals()">
         </div>
 
-        <div class="section-title">3D 透视矫正 (解决斜拍变形)</div>
+        <div class="section-title">3D 透视矫正</div>
         <div class="row">
-            <span class="label">俯仰视角</span> <!-- Rotate X -->
+            <span class="label">俯仰视角</span>
             <input type="range" id="rotateX" min="-60" max="60" step="1" value="0" oninput="updateVisuals()">
         </div>
         <div class="row">
-            <span class="label">视距(焦距)</span> <!-- Moved here -->
-            <!-- 修改范围 200 ~ 1800，默认 1000 在正中间 -->
+            <span class="label">视距</span>
             <input type="range" id="perspective" min="200" max="1800" step="10" value="1000" oninput="updateVisuals()">
         </div>
         
-        <div style="display: flex; gap: 5px; margin-top: 15px;">
-            <button onclick="toggleFocus()" id="btn-focus" style="display:none;">🎯 锁定对焦</button>
-            <button onclick="toggleLock()" id="btn-lock">🔓 锁定画面</button>
-            <button onclick="resetParams()">重置</button>
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <button class="panel-btn" onclick="toggleLock()" id="btn-lock">🔓 锁定画面</button>
+            <button class="panel-btn" onclick="resetParams()">重置</button>
         </div>
     </div>
 
@@ -170,8 +191,8 @@
         const state = {
             imageLoaded: false,
             locked: false,
-            focusLocked: false, // 新增：对焦状态
-            videoTrack: null,   // 新增：视频轨道
+            focusLocked: false, 
+            videoTrack: null,   
             // 基础参数
             opacity: 0.5,
             scale: 1, 
@@ -179,7 +200,7 @@
             // 透视参数
             perspective: 1000, 
             rotateX: 0,
-            rotateY: 0, // 保留变量但默认0
+            rotateY: 0, 
             // 位移
             screenX: 0,
             screenY: 0
@@ -202,7 +223,6 @@
                 rotateZ: document.getElementById('rotateZ'),
                 perspective: document.getElementById('perspective'),
                 rotateX: document.getElementById('rotateX')
-                // rotateY removed
             }
         };
 
@@ -230,36 +250,29 @@
         async function startApp() {
             if (!state.imageLoaded) return;
             
-            // 尝试启动后置摄像头
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     audio: false,
                     video: { 
-                        facingMode: 'environment', // 优先后置
-                        // 优化：尝试请求 4K 分辨率，浏览器会自动回退到设备支持的最高分辨率
+                        facingMode: 'environment', 
                         width: { ideal: 3840 },    
                         height: { ideal: 2160 } 
                     }
                 });
                 els.bgVideo.srcObject = stream;
 
-                // --- 新增：获取视频轨道并检查是否支持对焦 ---
                 const track = stream.getVideoTracks()[0];
                 state.videoTrack = track;
                 
-                // 检查设备能力
                 const capabilities = track.getCapabilities ? track.getCapabilities() : {};
                 
-                // 如果设备支持 focusMode，则显示锁定按钮
                 if (capabilities.focusMode) {
                     const btnFocus = document.getElementById('btn-focus');
-                    btnFocus.style.display = 'block';
+                    btnFocus.style.display = 'flex'; // 使用 flex 以保持图标对齐
                 }
-                // ------------------------------------------
 
             } catch (err) {
                 alert("摄像头启动失败，请确保允许访问或使用HTTPS环境。\n错误: " + err);
-                // 即使摄像头失败，也允许进入编辑模式（可能用户只想看图）
             }
 
             els.startScreen.style.display = 'none';
@@ -270,7 +283,7 @@
             updateVisuals();
         }
 
-        // 新增：切换对焦模式
+        // 切换对焦模式 (修复模糊 Bug)
         async function toggleFocus() {
             if (!state.videoTrack) return;
             
@@ -278,42 +291,44 @@
             state.focusLocked = !state.focusLocked;
             
             try {
-                // manual = 锁定/手动, continuous = 自动跟随
                 const mode = state.focusLocked ? 'manual' : 'continuous';
+                const constraints = { advanced: [{ focusMode: mode }] };
+
+                // --- 核心修复：锁定当前焦距 ---
+                // 如果是锁定操作，尝试获取当前摄像头的焦距值，并显式设置该值
+                // 否则有些设备会默认重置到 0 或无限远，导致画面变糊
+                if (state.focusLocked) {
+                    const settings = state.videoTrack.getSettings();
+                    // 检查是否存在当前焦距值
+                    if (settings.focusDistance) {
+                        constraints.advanced[0].focusDistance = settings.focusDistance;
+                    }
+                }
+                // -----------------------------
                 
-                await state.videoTrack.applyConstraints({
-                    advanced: [{ focusMode: mode }]
-                });
+                await state.videoTrack.applyConstraints(constraints);
                 
-                // 更新UI状态
-                btn.innerText = state.focusLocked ? "🎯 已锁对焦" : "🎯 锁定对焦";
-                btn.style.background = state.focusLocked ? "#FF3B30" : "rgba(255,255,255,0.15)";
+                btn.innerHTML = state.focusLocked ? "🎯 已锁对焦" : "🎯 锁定对焦";
+                btn.style.background = state.focusLocked ? "rgba(255, 59, 48, 0.8)" : "rgba(0, 0, 0, 0.5)";
+                btn.style.borderColor = state.focusLocked ? "transparent" : "rgba(255,255,255,0.2)";
+                
             } catch (err) {
                 console.error("Focus failed", err);
-                // 某些设备可能报错，尝试回退状态
                 state.focusLocked = !state.focusLocked;
-                alert("抱歉，您的设备可能不支持手动锁定对焦。");
+                alert("操作失败：您的设备可能不支持手动锁定特定焦距。");
             }
         }
 
-        // 3. 核心视觉更新 (CSS 3D Transform)
+        // 3. 核心视觉更新
         function updateVisuals() {
             state.opacity = els.inputs.opacity.value;
             state.scale = els.inputs.scale.value;
             state.rotateZ = els.inputs.rotateZ.value;
-            // 获取透视值
             state.perspective = els.inputs.perspective.value;
             state.rotateX = els.inputs.rotateX.value;
-            // state.rotateY = els.inputs.rotateY.value; // Removed
 
-            // 应用透视到父容器
             els.screenLayer.style.perspective = `${state.perspective}px`;
-
             els.screenImg.style.opacity = state.opacity;
-            
-            // CSS 变换顺序：位移 -> 透视 -> 3D旋转 -> 平面旋转 -> 缩放
-            // 注意：translate(-50%, -50%) 用于将图片中心对齐到 (0,0) 点，是布局基准
-            // 额外的 translate(${state.screenX}px, ...) 是用户的拖拽位移
             
             const transform = `
                 translate(calc(-50% + ${state.screenX}px), calc(-50% + ${state.screenY}px))
@@ -326,7 +341,7 @@
             els.screenImg.style.transform = transform;
         }
 
-        // 4. 拖拽逻辑 (支持鼠标和触摸)
+        // 4. 拖拽逻辑
         let isDragging = false;
         let startX = 0, startY = 0;
         let initialScreenX = 0, initialScreenY = 0;
@@ -352,7 +367,6 @@
 
         const onUp = () => { isDragging = false; els.screenLayer.style.cursor = 'grab'; };
 
-        // 绑定事件
         els.screenLayer.addEventListener('mousedown', e => { e.preventDefault(); onDown(e.clientX, e.clientY); });
         window.addEventListener('mousemove', e => { if (isDragging) { e.preventDefault(); onMove(e.clientX, e.clientY); } });
         window.addEventListener('mouseup', onUp);
@@ -373,14 +387,12 @@
         
         window.addEventListener('touchend', onUp);
 
-        // 辅助功能
         function resetParams() {
             state.screenX = 0; state.screenY = 0;
             els.inputs.scale.value = 1; 
             els.inputs.rotateZ.value = 0;
-            els.inputs.perspective.value = 1000; // 重置透视
+            els.inputs.perspective.value = 1000; 
             els.inputs.rotateX.value = 0;
-            // els.inputs.rotateY.value = 0; // Removed
             updateVisuals();
         }
 
@@ -389,15 +401,12 @@
             els.btnLock.innerText = state.locked ? "🔒 已锁定" : "🔓 锁定画面";
             els.btnLock.style.background = state.locked ? "#FF3B30" : "rgba(255,255,255,0.15)";
             
-            // 锁定 UI 面板中影响位置的控件 (可选)
             els.inputs.scale.disabled = state.locked;
             els.inputs.rotateZ.disabled = state.locked;
             els.inputs.perspective.disabled = state.locked;
             els.inputs.rotateX.disabled = state.locked;
-            // els.inputs.rotateY.disabled = state.locked; // Removed
         }
 
-        // 解决 iOS Safari 视频自动播放问题
         document.body.addEventListener('click', () => {
             if(els.bgVideo.paused) els.bgVideo.play();
         }, {once:true});
