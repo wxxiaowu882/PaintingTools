@@ -418,7 +418,16 @@
             if (state.videoTrack) state.videoTrack.stop();
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             els.bgVideo.srcObject = stream;
-            state.videoTrack = stream.getVideoTracks()[0];
+            const track = stream.getVideoTracks()[0];
+            state.videoTrack = track;
+            
+            // 核心修复：同步实际开启的摄像头设备 ID 到状态中，确保停启后能回到正确镜头
+            const settings = track.getSettings();
+            if (settings.deviceId && state.videoDevices.length > 0) {
+                const idx = state.videoDevices.findIndex(d => d.deviceId === settings.deviceId);
+                if (idx !== -1) state.currentDeviceIndex = idx;
+            }
+
             state.cameraActive = true;
             els.btnToggleCam.style.display = 'block'; 
             els.btnToggleCam.innerText = '⏹';
@@ -442,7 +451,7 @@
                 els.btnToggleCam.style.background = 'rgba(76, 217, 100, 0.25)';
             } else {
                 const device = state.videoDevices[state.currentDeviceIndex];
-                // 修复：确保重启时带上分辨率约束和选定的设备ID，防止自动切换到前置摄像头
+                // 确保重启时带上分辨率约束和选定的设备ID，防止自动切换到前置摄像头
                 const constraints = { 
                     audio: false, 
                     video: device ? 
