@@ -21,7 +21,6 @@
         #global-viewport {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 0;
-            /* 允许全局变换 */
             transform-origin: center center;
             will-change: transform;
         }
@@ -235,7 +234,6 @@
             rotateX: 0,
             screenX: 0,
             screenY: 0,
-            // 新增：全局视口变换
             viewScale: 1,
             viewX: 0,
             viewY: 0
@@ -376,7 +374,6 @@
                 
                 state.screenX = 0;
                 state.screenY = 0; 
-                // 新图片载入时，重置全局视口
                 state.viewScale = 1;
                 state.viewX = 0;
                 state.viewY = 0;
@@ -457,11 +454,9 @@
             state.perspective = els.inputs.perspective.value;
             state.rotateX = els.inputs.rotateX.value;
 
-            // 1. 更新全局视口变换 (摄像头+图片绑定)
             const viewportTransform = `translate(${state.viewX}px, ${state.viewY}px) scale(${state.viewScale})`;
             els.globalViewport.style.transform = viewportTransform;
 
-            // 2. 更新内部层变换
             els.screenLayer.style.perspective = `${state.perspective}px`;
             
             if (state.sketchMode) {
@@ -478,13 +473,11 @@
             els.wrapper.style.transform = transform;
         }
 
-        // 交互逻辑增强
         let isDragging = false;
         let isPinching = false;
         let startX = 0, startY = 0;
         let initialScreenX = 0, initialScreenY = 0;
         
-        // 双指交互临时状态
         let initialDistance = 0;
         let initialViewScale = 1;
         let initialMidX = 0, initialMidY = 0;
@@ -517,63 +510,54 @@
 
         els.screenLayer.addEventListener('touchstart', e => {
             if (state.locked) return;
-            if (e.touches.length === 1) {
-                onDown(e.touches[0].clientX, e.touches[0].clientY);
-            } else if (e.touches.length === 2) {
-                // 进入双指缩放/移动模式
+            if (e.touches.length === 2) {
+                e.preventDefault(); // 关键：阻止浏览器默认缩放
                 isPinching = true;
-                const t1 = e.touches[0];
-                const t2 = e.touches[1];
-                
-                const dx = t1.clientX - t2.clientX;
-                const dy = t1.clientY - t2.clientY;
+                const t1 = e.touches[0], t2 = e.touches[1];
+                const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
                 initialDistance = Math.sqrt(dx * dx + dy * dy);
                 initialViewScale = state.viewScale;
-                
                 initialMidX = (t1.clientX + t2.clientX) / 2;
                 initialMidY = (t1.clientY + t2.clientY) / 2;
                 initialViewX = state.viewX;
                 initialViewY = state.viewY;
+            } else if (e.touches.length === 1) {
+                isPinching = false;
+                onDown(e.touches[0].clientX, e.touches[0].clientY);
             }
         }, {passive:false});
 
         window.addEventListener('touchmove', e => {
             if (state.locked) return;
-            if (e.touches.length === 1 && isDragging && !isPinching) {
-                e.preventDefault();
-                onMove(e.touches[0].clientX, e.touches[0].clientY);
-            } else if (e.touches.length === 2 && isPinching) {
-                e.preventDefault();
-                const t1 = e.touches[0];
-                const t2 = e.touches[1];
-                
-                // 处理整体缩放
-                const dx = t1.clientX - t2.clientX;
-                const dy = t1.clientY - t2.clientY;
+            if (e.touches.length === 2 && isPinching) {
+                e.preventDefault(); // 关键：阻止滚动
+                const t1 = e.touches[0], t2 = e.touches[1];
+                const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                if (initialDistance > 0) {
-                    state.viewScale = initialViewScale * (dist / initialDistance);
-                }
-                
-                // 处理整体移动
-                const midX = (t1.clientX + t2.clientX) / 2;
-                const midY = (t1.clientY + t2.clientY) / 2;
+                if (initialDistance > 0) state.viewScale = initialViewScale * (dist / initialDistance);
+                const midX = (t1.clientX + t2.clientX) / 2, midY = (t1.clientY + t2.clientY) / 2;
                 state.viewX = initialViewX + (midX - initialMidX);
                 state.viewY = initialViewY + (midY - initialMidY);
-                
                 updateVisuals();
+            } else if (e.touches.length === 1 && isDragging && !isPinching) {
+                onMove(e.touches[0].clientX, e.touches[0].clientY);
             }
         }, {passive:false});
 
         window.addEventListener('touchend', e => { 
-            if (e.touches.length === 0) onUp();
-            else if (e.touches.length === 1) {
-                // 如果还剩一个手指，尝试切回拖拽，但通常为了平滑建议直接结束
+            if (e.touches.length === 0) {
+                onUp();
+            } else if (e.touches.length === 1) {
                 isPinching = false;
+                // 重置拖拽锚点，防止手指切换时画面闪跳
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                initialScreenX = state.screenX;
+                initialScreenY = state.screenY;
+                isDragging = true;
             }
         });
 
-        // 桌面端保持原有逻辑
         els.screenLayer.addEventListener('mousedown', e => { e.preventDefault(); onDown(e.clientX, e.clientY); });
         window.addEventListener('mousemove', e => { if (isDragging) { e.preventDefault(); onMove(e.clientX, e.clientY); } });
         window.addEventListener('mouseup', onUp);
