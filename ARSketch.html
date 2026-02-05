@@ -327,7 +327,6 @@
                 let blockSize = 3 + 2 * Math.floor((100 - state.lineStrength) / 7); 
                 if (blockSize < 3) blockSize = 3;
                 let C = 2; 
-                // 修复拼写错误，恢复功能
                 cv.adaptiveThreshold(gray, edges, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, blockSize, C);
                 cv.bitwise_not(edges, edges); 
                 let channels = new cv.MatVector();
@@ -388,23 +387,25 @@
         async function startApp() {
             if (!state.imageLoaded) return;
             try {
+                // 先开启流，以便在 iOS 上获取完整的设备标签和权限
+                let constraints = { audio: false, video: { facingMode: 'environment', width: { ideal: 3840 } } };
+                await initStream(constraints);
+
+                // 流开启后，获取准确的设备列表
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 state.videoDevices = devices.filter(d => d.kind === 'videoinput');
                 if (state.videoDevices.length > 1) els.btnSwitch.style.display = 'block';
 
-                let constraints = { audio: false, video: { facingMode: 'environment', width: { ideal: 3840 } } };
-                
+                // 尝试定位广角镜头（如果存在）
                 const wideDevice = state.videoDevices.find(d => {
                     const l = d.label.toLowerCase();
                     return (l.includes('back') || l.includes('rear')) && (l.includes('wide') || l.includes('0.5'));
                 });
 
                 if (wideDevice) {
-                    constraints.video = { deviceId: { exact: wideDevice.deviceId }, width: { ideal: 3840 } };
-                    state.currentDeviceIndex = state.videoDevices.indexOf(wideDevice);
+                    const wideConstraints = { audio: false, video: { deviceId: { exact: wideDevice.deviceId }, width: { ideal: 3840 } } };
+                    await initStream(wideConstraints);
                 }
-
-                await initStream(constraints);
             } catch (err) {
                 alert("摄像头错误: " + err.message);
             }
@@ -421,16 +422,22 @@
             const track = stream.getVideoTracks()[0];
             state.videoTrack = track;
             
-            // 核心修复：同步实际开启的摄像头设备 ID 到状态中，确保停启后能回到正确镜头
+            // 核心修复：iOS 上 deviceId 并不总是可靠，这里增加根据当前设置同步索引的逻辑
             const settings = track.getSettings();
-            if (settings.deviceId && state.videoDevices.length > 0) {
-                const idx = state.videoDevices.findIndex(d => d.deviceId === settings.deviceId);
+            if (state.videoDevices.length > 0) {
+                // 优先根据 ID 匹配
+                let idx = state.videoDevices.findIndex(d => settings.deviceId && d.deviceId === settings.deviceId);
+                // 如果 ID 匹配失败（iOS 常见情况），且已知当前是后置，则更新索引
+                if (idx === -1 && settings.facingMode === 'environment') {
+                    idx = state.videoDevices.findIndex(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('rear'));
+                }
                 if (idx !== -1) state.currentDeviceIndex = idx;
             }
 
             state.cameraActive = true;
             els.btnToggleCam.style.display = 'block'; 
             els.btnToggleCam.innerText = '⏹';
+            return stream;
         }
 
         async function switchCamera() {
@@ -442,7 +449,7 @@
         }
 
         function toggleCameraState() {
-            if (!state.videoTrack) return;
+            if (!state.videoTrack && !state.cameraActive) return;
             if (state.cameraActive) {
                 state.videoTrack.stop(); 
                 els.bgVideo.srcObject = null;
@@ -451,12 +458,16 @@
                 els.btnToggleCam.style.background = 'rgba(76, 217, 100, 0.25)';
             } else {
                 const device = state.videoDevices[state.currentDeviceIndex];
-                // 确保重启时带上分辨率约束和选定的设备ID，防止自动切换到前置摄像头
+                // 核心修复：针对 iOS，在约束中同时提供 deviceId 和 facingMode 提示
+                // 这样即使 ID 发生微变，系统也会优先留在后置（environment）摄像头上
                 const constraints = { 
                     audio: false, 
-                    video: device ? 
-                        { deviceId: { exact: device.deviceId }, width: { ideal: 3840 } } : 
-                        { facingMode: 'environment', width: { ideal: 3840 } } 
+                    video: {
+                        width: { ideal: 3840 },
+                        ...(device && device.deviceId ? { deviceId: { exact: device.deviceId } } : { facingMode: 'environment' }),
+                        // 强制提示 iOS 保持环境方向
+                        facingMode: 'environment'
+                    }
                 };
                 initStream(constraints).then(() => {
                     els.btnToggleCam.innerText = '⏹';
