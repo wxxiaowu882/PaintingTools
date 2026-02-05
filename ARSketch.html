@@ -52,18 +52,18 @@
         #screen-layer:active { cursor: grabbing; }
         
         /* 变换容器：
-           它的尺寸会被 JS 设置为图片的【原始分辨率】，以保证 OpenCV 处理精度。
-           它的位置被固定在屏幕上方区域。
-           通过 scale() 来控制它在屏幕上的实际显示大小。
+           优化定位：top: 65% 位于屏幕中下部（控制面板上方）。
+           transform: translate(-50%, -100%) 意味着元素的"底边中心"对齐到 top: 65% 的位置。
+           这样图片就是向上显示的，完全不会被面板遮挡。
         */
         #transform-wrapper {
             position: absolute;
-            /* 初始定位在屏幕 38% 的高度，避开底部面板 */
-            top: 38%; left: 50%;
+            top: 65%; left: 50%;
             /* 宽高由 JS 动态设置 */
             width: 0; height: 0; 
             transform-origin: center bottom;
-            transform: translate(-50%, -50%); 
+            /* 初始变换，Y轴 -100% 确保底部对齐 */
+            transform: translate(-50%, -100%); 
             transform-style: preserve-3d;
             will-change: transform, opacity;
         }
@@ -78,15 +78,11 @@
         }
 
         #screen-img {
-            /* 移除之前可能导致冲突的 max-width/top/left */
             transition: opacity 0.2s ease; 
         }
 
         #cv-canvas {
             display: none; 
-            /* 混合模式：确保白底变透明 (OpenCV输出是黑底白线，反色后是白底黑线，multiply让白底透明) */
-            /* 但我们在JS里已经做了透明处理，这里可以保留默认或根据需要调整 */
-            /* 现在的JS逻辑直接生成了透明PNG，所以这里其实不需要特殊混合模式，正常显示即可 */
         }
 
         /* === UI 控制层 === */
@@ -480,20 +476,25 @@
                 els.cvCanvas.width = w;
                 els.cvCanvas.height = h;
 
-                // --- 自动计算适配屏幕的缩放比例 ---
-                // 目标：将图片缩放到屏幕可视区域的合适大小（例如宽度的85%或高度的50%）
-                // 这样无论图片多大，都会显示在控制面板上方的区域
-                const safeW = window.innerWidth * 0.85;
-                // 预留底部空间给面板 (约占 40-50%)
-                const safeH = window.innerHeight * 0.55; 
+                // --- 自动计算适配屏幕的缩放比例 (Auto-Fit) ---
+                // 目标：图片显示在控制面板上方的区域
+                // 可用高度约 60% (top:65% 以上区域)
+                const safeW = window.innerWidth * 0.9;
+                const safeH = window.innerHeight * 0.6; 
                 
                 const scaleW = safeW / w;
                 const scaleH = safeH / h;
                 const fitScale = Math.min(scaleW, scaleH);
                 
-                // 更新缩放状态
+                // 重置状态
                 state.scale = fitScale;
+                state.screenX = 0;
+                state.screenY = 0;
+                state.rotateX = 0;
+                
+                // 更新控件
                 els.inputs.scale.value = fitScale;
+                els.inputs.rotateX.value = 0;
 
                 if (state.sketchMode) setTimeout(processOpenCV, 100);
                 updateVisuals();
@@ -580,8 +581,9 @@
             }
 
             // 所有的变换都应用在 wrapper 上
+            // 垂直位移 -100% 确保底边对齐
             const transform = `
-                translate(calc(-50% + ${state.screenX}px), calc(-50% + ${state.screenY}px)) 
+                translate(calc(-50% + ${state.screenX}px), calc(-100% + ${state.screenY}px)) 
                 rotateX(${state.rotateX}deg) 
                 scale(${state.scale})
             `;
@@ -635,9 +637,7 @@
             els.inputs.perspective.value = 1000; 
             els.inputs.rotateX.value = 0;
             
-            // 重置位置时，也要重新计算适配比例，或简单重置为1（如果不重新计算，用户可能找不到图）
-            // 这里我们简单重置位置，Scale 保持用户当前设定，或者重置回 FitScale
-            // 为了体验好，仅重置位置
+            // 重置时不影响当前比例
             updateVisuals();
         }
 
