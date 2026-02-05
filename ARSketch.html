@@ -387,14 +387,21 @@
         async function startApp() {
             if (!state.imageLoaded) return;
             try {
-                // 先开启流，确保在 iOS 上获取完整的设备标签和权限
+                // 1. 先开启流获取权限
                 let constraints = { audio: false, video: { facingMode: 'environment', width: { ideal: 3840 } } };
                 await initStream(constraints);
 
+                // 2. 获取准确的设备列表
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 state.videoDevices = devices.filter(d => d.kind === 'videoinput');
                 if (state.videoDevices.length > 1) els.btnSwitch.style.display = 'block';
 
+                // 3. 关键同步：此时 videoDevices 已有值，手动同步一次当前活跃轨道的设备索引
+                const settings = state.videoTrack.getSettings();
+                const currentIdx = state.videoDevices.findIndex(d => settings.deviceId && d.deviceId === settings.deviceId);
+                if (currentIdx !== -1) state.currentDeviceIndex = currentIdx;
+
+                // 4. 尝试寻找广角镜头
                 const wideDevice = state.videoDevices.find(d => {
                     const l = d.label.toLowerCase();
                     return (l.includes('back') || l.includes('rear')) && (l.includes('wide') || l.includes('0.5'));
@@ -470,8 +477,6 @@
                 els.btnToggleCam.style.background = 'rgba(76, 217, 100, 0.25)';
             } else {
                 const device = state.videoDevices[state.currentDeviceIndex];
-                // 核心修复：针对 iOS 显式指定 facingMode 为 environment
-                // Safari 对 facingMode 的优先级极高，配合 deviceId 可确保留在后置
                 const constraints = { 
                     audio: false, 
                     video: {
