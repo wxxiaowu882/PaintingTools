@@ -327,7 +327,7 @@
                 let blockSize = 3 + 2 * Math.floor((100 - state.lineStrength) / 7); 
                 if (blockSize < 3) blockSize = 3;
                 let C = 2; 
-                // 修复了之前的拼写错误
+                // 修复拼写错误，恢复功能
                 cv.adaptiveThreshold(gray, edges, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, blockSize, C);
                 cv.bitwise_not(edges, edges); 
                 let channels = new cv.MatVector();
@@ -442,7 +442,13 @@
                 els.btnToggleCam.style.background = 'rgba(76, 217, 100, 0.25)';
             } else {
                 const device = state.videoDevices[state.currentDeviceIndex];
-                const constraints = { audio: false, video: device ? { deviceId: { exact: device.deviceId } } : { facingMode: 'environment' } };
+                // 修复：确保重启时带上分辨率约束和选定的设备ID，防止自动切换到前置摄像头
+                const constraints = { 
+                    audio: false, 
+                    video: device ? 
+                        { deviceId: { exact: device.deviceId }, width: { ideal: 3840 } } : 
+                        { facingMode: 'environment', width: { ideal: 3840 } } 
+                };
                 initStream(constraints).then(() => {
                     els.btnToggleCam.innerText = '⏹';
                     els.btnToggleCam.style.background = 'rgba(255, 59, 48, 0.25)';
