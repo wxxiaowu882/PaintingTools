@@ -21,6 +21,9 @@
         #global-viewport {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 0;
+            /* 允许全局变换 */
+            transform-origin: center center;
+            will-change: transform;
         }
 
         #bg-video {
@@ -40,11 +43,11 @@
         
         #transform-wrapper {
             position: absolute;
-            top: 45%; /* 将挂载点设为 45% 高度处，作为图片的“底座” */
+            top: 45%; 
             left: 50%;
             width: 0; height: 0; 
-            transform-origin: center bottom; /* 变换中心在底部 */
-            transform: translate(-50%, -100%); /* 初始向上伸展，确保底边在 45% 处 */
+            transform-origin: center bottom; 
+            transform: translate(-50%, -100%); 
             transform-style: preserve-3d;
             will-change: transform, opacity;
         }
@@ -231,13 +234,18 @@
             perspective: 1000, 
             rotateX: 0,
             screenX: 0,
-            screenY: 0
+            screenY: 0,
+            // 新增：全局视口变换
+            viewScale: 1,
+            viewX: 0,
+            viewY: 0
         };
 
         const els = {
             startScreen: document.getElementById('start-screen'),
             fileInput: document.getElementById('file-input'),
             btnStartCam: document.getElementById('btn-start-cam'),
+            globalViewport: document.getElementById('global-viewport'),
             screenLayer: document.getElementById('screen-layer'), 
             wrapper: document.getElementById('transform-wrapper'), 
             screenImg: document.getElementById('screen-img'),
@@ -355,10 +363,8 @@
                 els.cvCanvas.width = w;
                 els.cvCanvas.height = h;
 
-                // --- 自动缩放逻辑：将图片底部锚定在屏幕约 45% 处 ---
                 const padding = 40; 
                 const availableW = window.innerWidth - padding;
-                // 限制可用高度为屏幕高度的 40%，确保图片上方也有留白，完全位于上半屏
                 const availableH = window.innerHeight * 0.40; 
                 
                 let initialScale = Math.min(availableW / w, availableH / h);
@@ -368,9 +374,12 @@
                 state.scale = initialScale;
                 els.inputs.scale.value = initialScale;
                 
-                // 强制位移归零
                 state.screenX = 0;
                 state.screenY = 0; 
+                // 新图片载入时，重置全局视口
+                state.viewScale = 1;
+                state.viewX = 0;
+                state.viewY = 0;
 
                 if (state.sketchMode) setTimeout(processOpenCV, 100);
                 updateVisuals();
@@ -448,6 +457,11 @@
             state.perspective = els.inputs.perspective.value;
             state.rotateX = els.inputs.rotateX.value;
 
+            // 1. 更新全局视口变换 (摄像头+图片绑定)
+            const viewportTransform = `translate(${state.viewX}px, ${state.viewY}px) scale(${state.viewScale})`;
+            els.globalViewport.style.transform = viewportTransform;
+
+            // 2. 更新内部层变换
             els.screenLayer.style.perspective = `${state.perspective}px`;
             
             if (state.sketchMode) {
@@ -456,7 +470,6 @@
                 els.screenImg.style.opacity = state.opacity;
             }
 
-            // 关键逻辑：使用 translate(..., -100%) 确保容器底部锚定在 top: 45% 的位置
             const transform = `
                 translate(calc(-50% + ${state.screenX}px), calc(-100% + ${state.screenY}px)) 
                 rotateX(${state.rotateX}deg) 
@@ -465,9 +478,17 @@
             els.wrapper.style.transform = transform;
         }
 
+        // 交互逻辑增强
         let isDragging = false;
+        let isPinching = false;
         let startX = 0, startY = 0;
         let initialScreenX = 0, initialScreenY = 0;
+        
+        // 双指交互临时状态
+        let initialDistance = 0;
+        let initialViewScale = 1;
+        let initialMidX = 0, initialMidY = 0;
+        let initialViewX = 0, initialViewY = 0;
 
         const onDown = (clientX, clientY) => {
             if (state.locked) return;
@@ -480,7 +501,7 @@
         };
 
         const onMove = (clientX, clientY) => {
-            if (!isDragging) return;
+            if (!isDragging || isPinching) return;
             const dx = clientX - startX;
             const dy = clientY - startY;
             state.screenX = initialScreenX + dx;
@@ -488,26 +509,80 @@
             updateVisuals();
         };
 
-        const onUp = () => { isDragging = false; els.screenLayer.style.cursor = 'grab'; };
+        const onUp = () => { 
+            isDragging = false; 
+            isPinching = false;
+            els.screenLayer.style.cursor = 'grab'; 
+        };
 
         els.screenLayer.addEventListener('touchstart', e => {
-            if (e.touches.length === 1) onDown(e.touches[0].clientX, e.touches[0].clientY);
-        }, {passive:false});
-
-        window.addEventListener('touchmove', e => {
-            if (e.touches.length === 1 && isDragging) {
-                e.preventDefault();
-                onMove(e.touches[0].clientX, e.touches[0].clientY);
+            if (state.locked) return;
+            if (e.touches.length === 1) {
+                onDown(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length === 2) {
+                // 进入双指缩放/移动模式
+                isPinching = true;
+                const t1 = e.touches[0];
+                const t2 = e.touches[1];
+                
+                const dx = t1.clientX - t2.clientX;
+                const dy = t1.clientY - t2.clientY;
+                initialDistance = Math.sqrt(dx * dx + dy * dy);
+                initialViewScale = state.viewScale;
+                
+                initialMidX = (t1.clientX + t2.clientX) / 2;
+                initialMidY = (t1.clientY + t2.clientY) / 2;
+                initialViewX = state.viewX;
+                initialViewY = state.viewY;
             }
         }, {passive:false});
 
-        window.addEventListener('touchend', e => { if (e.touches.length === 0) onUp(); });
+        window.addEventListener('touchmove', e => {
+            if (state.locked) return;
+            if (e.touches.length === 1 && isDragging && !isPinching) {
+                e.preventDefault();
+                onMove(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length === 2 && isPinching) {
+                e.preventDefault();
+                const t1 = e.touches[0];
+                const t2 = e.touches[1];
+                
+                // 处理整体缩放
+                const dx = t1.clientX - t2.clientX;
+                const dy = t1.clientY - t2.clientY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (initialDistance > 0) {
+                    state.viewScale = initialViewScale * (dist / initialDistance);
+                }
+                
+                // 处理整体移动
+                const midX = (t1.clientX + t2.clientX) / 2;
+                const midY = (t1.clientY + t2.clientY) / 2;
+                state.viewX = initialViewX + (midX - initialMidX);
+                state.viewY = initialViewY + (midY - initialMidY);
+                
+                updateVisuals();
+            }
+        }, {passive:false});
+
+        window.addEventListener('touchend', e => { 
+            if (e.touches.length === 0) onUp();
+            else if (e.touches.length === 1) {
+                // 如果还剩一个手指，尝试切回拖拽，但通常为了平滑建议直接结束
+                isPinching = false;
+            }
+        });
+
+        // 桌面端保持原有逻辑
         els.screenLayer.addEventListener('mousedown', e => { e.preventDefault(); onDown(e.clientX, e.clientY); });
         window.addEventListener('mousemove', e => { if (isDragging) { e.preventDefault(); onMove(e.clientX, e.clientY); } });
         window.addEventListener('mouseup', onUp);
 
         function resetParams() {
             state.screenX = 0; state.screenY = 0;
+            state.viewScale = 1;
+            state.viewX = 0;
+            state.viewY = 0;
             els.inputs.perspective.value = 1000; 
             els.inputs.rotateX.value = 0;
             updateVisuals();
