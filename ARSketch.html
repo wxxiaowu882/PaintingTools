@@ -5,33 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>AR 描摹助手 | 视觉维度</title>
     
-    <!-- 引入 OpenCV.js (异步加载) -->
     <script async src="https://docs.opencv.org/4.5.5/opencv.js" onload="onOpenCvReady()"></script>
 
     <style>
         body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #000; }
         
-        /* === 屏幕调试日志台 === */
         #debug-console {
             position: fixed; top: 0; left: 0; width: 100%; height: 80px;
             background: rgba(0, 0, 0, 0.5); 
-            color: #0f0; 
-            font-family: monospace; 
-            font-size: 9px;
-            overflow-y: auto; 
-            z-index: 10000;
-            padding: 5px;
-            pointer-events: none;
-            white-space: pre-wrap;
-            word-break: break-all;
+            color: #0f0; font-family: monospace; font-size: 9px;
+            overflow-y: auto; z-index: 10000; padding: 5px; pointer-events: none;
             display: none; 
         }
 
-        /* === 全局视口容器 === */
         #global-viewport {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            transform-origin: center center;
-            will-change: transform;
             z-index: 0;
         }
 
@@ -46,27 +34,21 @@
             z-index: 10; pointer-events: auto; overflow: hidden;
             display: none; cursor: grab;
             perspective: 1000px; 
-            /* 保持底部视点 */
             perspective-origin: 50% 100%;
         }
         #screen-layer:active { cursor: grabbing; }
         
-        /* 变换容器：
-           Top: 65% 是基准线 (控制面板上方)。
-           Translate Y: -100% 确保容器的"底边"对齐到这条基准线。
-        */
         #transform-wrapper {
             position: absolute;
-            top: 65%; left: 50%;
-            /* 宽高由 JS 动态设置 */
+            top: 45%; /* 将挂载点设为 45% 高度处，作为图片的“底座” */
+            left: 50%;
             width: 0; height: 0; 
-            transform-origin: center bottom;
-            transform: translate(-50%, -100%); 
+            transform-origin: center bottom; /* 变换中心在底部 */
+            transform: translate(-50%, -100%); /* 初始向上伸展，确保底边在 45% 处 */
             transform-style: preserve-3d;
             will-change: transform, opacity;
         }
 
-        /* 内部内容：必须填满容器，不做额外变换 */
         .layer-content {
             position: absolute;
             top: 0; left: 0;
@@ -75,7 +57,6 @@
             pointer-events: none;
         }
 
-        /* 修复：移除 #screen-img 上所有可能冲突的定位样式 */
         #screen-img {
             transition: opacity 0.2s ease; 
         }
@@ -84,7 +65,6 @@
             display: none; 
         }
 
-        /* === UI 控制层 === */
         .ui-layer {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             width: 85%; max-width: 320px; 
@@ -101,7 +81,6 @@
             transition: height 0.3s ease;
         }
 
-        /* 右上角：收起按钮 */
         .btn-minimize {
             position: absolute; top: 6px; right: 6px;
             width: 24px; height: 24px; padding: 0;
@@ -122,88 +101,28 @@
             z-index: 99; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        /* 顶部工具栏容器 */
         .toolbar-row {
-            display: flex; 
-            justify-content: flex-start; 
-            gap: 8px; 
-            margin-bottom: 4px;
-            margin-right: 30px; 
+            display: flex; justify-content: flex-start; gap: 8px; margin-bottom: 4px; margin-right: 30px; 
         }
 
-        .row { 
-            display: flex; align-items: center; justify-content: space-between; gap: 8px; 
-            height: 32px; 
-        }
+        .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 32px; }
         
-        .label { 
-            font-size: 11px; 
-            min-width: 42px; 
-            color: #ccc; 
-            text-align: right; 
-            line-height: 1;
-        }
+        .label { font-size: 11px; min-width: 42px; color: #ccc; text-align: right; line-height: 1; }
         
-        /* === 滑块样式 === */
-        input[type=range] { 
-            -webkit-appearance: none; 
-            flex: 1; 
-            background: transparent;
-            height: 40px; 
-            margin: 0;
-            cursor: pointer;
-        }
+        input[type=range] { -webkit-appearance: none; flex: 1; background: transparent; height: 40px; margin: 0; cursor: pointer; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; border: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.5); margin-top: -10px; position: relative; z-index: 10; }
 
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px; 
-            background: rgba(255,255,255,0.2);
-            border-radius: 2px;
-            border: none;
-        }
-
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 24px; 
-            width: 24px; 
-            border-radius: 50%;
-            background: #fff;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.5);
-            margin-top: -10px; 
-            position: relative;
-            z-index: 10;
-        }
-
-        /* === 简单的开关样式 === */
-        .sketch-switch {
-            width: 20px; 
-            height: 20px; 
-            accent-color: #007AFF;
-            cursor: pointer;
-            margin: 0;
-        }
+        .sketch-switch { width: 20px; height: 20px; accent-color: #007AFF; cursor: pointer; margin: 0; }
 
         button.panel-btn {
-            flex: 1; 
-            padding: 6px 0; 
-            border-radius: 6px; 
-            border: none;
-            background: rgba(255,255,255,0.1); 
-            color: white;
-            font-size: 12px; 
-            font-weight: 500; 
-            cursor: pointer; 
-            transition: 0.2s;
-            max-width: 100px; 
+            flex: 1; padding: 6px 0; border-radius: 6px; border: none;
+            background: rgba(255,255,255,0.1); color: white; font-size: 12px; font-weight: 500; 
+            cursor: pointer; transition: 0.2s; max-width: 100px; 
         }
         button.active { background: #007AFF; color: white; }
 
-        /* 新增：更多设置容器 */
-        #more-controls {
-            display: none; /* 默认隐藏 */
-            flex-direction: column;
-            gap: 2px;
-        }
+        #more-controls { display: none; flex-direction: column; gap: 2px; }
         
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -216,8 +135,7 @@
 </head>
 <body>
 
-    <!-- 屏幕日志窗口 -->
-    <div id="debug-console">日志窗口 (等待操作)...</div>
+    <div id="debug-console">日志窗口...</div>
 
     <div id="start-screen">
         <h1 style="margin-bottom: 10px;">🎨 描摹助手</h1>
@@ -231,14 +149,11 @@
             </button>
         </div>
         <input type="file" id="file-input" accept="image/*">
-        <p id="file-name" style="margin-top: 20px; font-size: 12px; color: #007AFF;"></p>
     </div>
 
-    <!-- 全局视口 -->
     <div id="global-viewport">
         <video id="bg-video" autoplay playsinline muted></video>
         <div id="screen-layer">
-            <!-- 变换容器 -->
             <div id="transform-wrapper">
                 <img id="screen-img" class="layer-content" src="" alt="Original">
                 <canvas id="cv-canvas" class="layer-content"></canvas>
@@ -246,40 +161,29 @@
         </div>
     </div>
 
-    <!-- 恢复按钮 (初始隐藏) -->
     <button id="restore-btn" onclick="toggleUI(true)">🛠️</button>
 
     <div class="ui-layer" id="controls" style="display: none;">
-        <!-- 右上角：收起面板 -->
         <button class="btn-minimize" onclick="toggleUI(false)">🔽</button>
 
-        <!-- 工具栏 (更紧凑) -->
         <div class="toolbar-row">
-             <!-- 更换图片 -->
              <button class="panel-btn" onclick="document.getElementById('file-input').click()" style="background: rgba(0,122,255,0.25); color: #4facfe;">📂 换图</button>
-             <!-- 切换镜头 (仅多摄显示) -->
              <button class="panel-btn" id="btn-switch-cam" onclick="switchCamera()" style="display:none; background: rgba(255,255,255,0.15);">🔄 换镜</button>
-             <!-- 启停摄像头 (回归工具栏) -->
              <button class="panel-btn" id="btn-toggle-cam" onclick="toggleCameraState()" style="display:none; background: rgba(255,59,48,0.25); color: #ff6b6b; max-width: 40px;">⏹</button>
         </div>
 
-        <!-- 常用设置 (常驻) -->
         <div class="row">
             <span class="label">透明</span>
             <input type="range" id="opacity" min="0" max="1" step="0.001" value="0.5" oninput="updateVisuals()">
         </div>
         <div class="row">
             <span class="label">缩放</span>
-            <!-- 增加精度 -->
             <input type="range" id="scale" min="0.01" max="5.7" step="0.001" value="1" oninput="updateVisuals()">
         </div>
 
-        <!-- 更多设置按钮 -->
         <button class="panel-btn" id="btn-more" onclick="toggleMore()" style="background: rgba(255,255,255,0.05); color: #aaa; margin: 4px 0; font-size: 11px; padding: 4px 0; max-width: none;">﹀ 更多设置 (视角/线稿)</button>
 
-        <!-- 折叠区域 -->
         <div id="more-controls">
-            
             <div class="row">
                 <span class="label">俯仰</span>
                 <input type="range" id="rotateX" min="-60" max="60" step="1" value="0" oninput="updateVisuals()">
@@ -289,19 +193,15 @@
                 <input type="range" id="perspective" min="200" max="1800" step="10" value="1000" oninput="updateVisuals()">
             </div>
 
-            <!-- 线稿控制组合行 -->
             <div class="row">
-                <!-- 左侧：线稿开关 -->
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <span class="label" style="text-align: left; min-width: auto; color:#fff;">线稿</span>
                     <input type="checkbox" id="sketch-toggle" class="sketch-switch" onchange="toggleSketchMode()">
                 </div>
                 
-                <!-- 右侧：强度滑块 (OpenCV Threshold) -->
                 <div style="display: flex; align-items: center; gap: 6px; flex: 1; margin-left: 10px;">
                     <span class="label" style="min-width: auto;">细节</span>
-                    <!-- Canny 阈值：范围 10-150，默认 50 -->
-                    <input type="range" id="lineStrength" min="10" max="150" step="5" value="50" oninput="updateCvThreshold()" disabled>
+                    <input type="range" id="lineStrength" min="0" max="100" step="1" value="50" oninput="updateCvThreshold()" disabled>
                 </div>
             </div>
         </div>
@@ -315,7 +215,7 @@
     <script>
         let cvReady = false;
         function onOpenCvReady() { cvReady = true; console.log("OpenCV Ready"); }
-        function log(msg) { console.log(msg); } // 简化日志
+        function log(msg) { console.log(msg); } 
 
         const state = {
             imageLoaded: false,
@@ -327,10 +227,9 @@
             sketchMode: false,
             opacity: 0.5,
             scale: 1, 
-            lineStrength: 50, // Canny 低阈值
+            lineStrength: 50, 
             perspective: 1000, 
             rotateX: 0,
-            rotateZ: 0,
             screenX: 0,
             screenY: 0
         };
@@ -339,16 +238,14 @@
             startScreen: document.getElementById('start-screen'),
             fileInput: document.getElementById('file-input'),
             btnStartCam: document.getElementById('btn-start-cam'),
-            fileName: document.getElementById('file-name'),
             screenLayer: document.getElementById('screen-layer'), 
-            wrapper: document.getElementById('transform-wrapper'), // 新增容器
+            wrapper: document.getElementById('transform-wrapper'), 
             screenImg: document.getElementById('screen-img'),
             cvCanvas: document.getElementById('cv-canvas'),
             controls: document.getElementById('controls'),
             restoreBtn: document.getElementById('restore-btn'),
             bgVideo: document.getElementById('bg-video'),
             btnLock: document.getElementById('btn-lock'),
-            viewport: document.getElementById('global-viewport'),
             btnSwitch: document.getElementById('btn-switch-cam'),
             btnToggleCam: document.getElementById('btn-toggle-cam'),
             sketchToggle: document.getElementById('sketch-toggle'),
@@ -378,7 +275,6 @@
             }
         }
 
-        // === OpenCV 处理核心逻辑 ===
         let processingTimer = null;
 
         function toggleSketchMode() {
@@ -418,41 +314,29 @@
                 let gray = new cv.Mat();
                 let edges = new cv.Mat();
                 let dst = new cv.Mat();
-                
-                // 1. 转灰度
                 cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-                
-                // 2. 高斯模糊
                 let ksize = new cv.Size(3, 3);
                 cv.GaussianBlur(gray, gray, ksize, 0, 0, cv.BORDER_DEFAULT);
-
-                // 3. Canny 边缘检测
-                let t1 = state.lineStrength; 
-                let t2 = t1 * 3; 
-                cv.Canny(gray, edges, t1, t2, 3, true);
-
-                // 4. 构建透明背景黑线图
+                let blockSize = 3 + 2 * Math.floor((100 - state.lineStrength) / 7); 
+                if (blockSize < 3) blockSize = 3;
+                let C = 2; 
+                cv.adaptiveThreshold(gray, edges, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, blockSize, C);
+                cv.bitwise_not(edges, edges); 
                 let channels = new cv.MatVector();
                 let black = new cv.Mat.zeros(edges.rows, edges.cols, cv.CV_8UC1);
-                
-                channels.push_back(black); // R
-                channels.push_back(black); // G
-                channels.push_back(black); // B
-                channels.push_back(edges); // A
-                
+                channels.push_back(black); 
+                channels.push_back(black); 
+                channels.push_back(black); 
+                channels.push_back(edges); 
                 cv.merge(channels, dst);
-
                 cv.imshow('cv-canvas', dst);
-
                 src.delete(); gray.delete(); edges.delete(); dst.delete(); 
                 black.delete(); channels.delete(); ksize = null;
-
             } catch (err) {
                 console.error(err);
             }
         }
 
-        // === 图片加载与容器尺寸同步 ===
         els.fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -463,37 +347,30 @@
                 state.imageLoaded = true;
                 els.btnStartCam.style.display = 'block'; 
                 
-                // 获取原图尺寸
                 const w = els.screenImg.naturalWidth;
                 const h = els.screenImg.naturalHeight;
                 
-                // 设置容器为原始分辨率
                 els.wrapper.style.width = w + "px";
                 els.wrapper.style.height = h + "px";
-                
-                // 同步 Canvas 大小
                 els.cvCanvas.width = w;
                 els.cvCanvas.height = h;
 
-                // --- 自动计算适配屏幕的缩放比例 (Auto-Fit) ---
-                // 目标：图片显示在控制面板上方的区域
-                // 可用高度约 60% (top:65% 以上区域)
-                const safeW = window.innerWidth * 0.9;
-                const safeH = window.innerHeight * 0.6; 
+                // --- 自动缩放逻辑：将图片底部锚定在屏幕约 45% 处 ---
+                const padding = 40; 
+                const availableW = window.innerWidth - padding;
+                // 限制可用高度为屏幕高度的 40%，确保图片上方也有留白，完全位于上半屏
+                const availableH = window.innerHeight * 0.40; 
                 
-                const scaleW = safeW / w;
-                const scaleH = safeH / h;
-                const fitScale = Math.min(scaleW, scaleH);
+                let initialScale = Math.min(availableW / w, availableH / h);
+                if (initialScale > 1) initialScale = 1; 
+                if (initialScale < 0.01) initialScale = 0.01;
+
+                state.scale = initialScale;
+                els.inputs.scale.value = initialScale;
                 
-                // 重置状态
-                state.scale = fitScale;
+                // 强制位移归零
                 state.screenX = 0;
-                state.screenY = 0;
-                state.rotateX = 0;
-                
-                // 更新控件
-                els.inputs.scale.value = fitScale;
-                els.inputs.rotateX.value = 0;
+                state.screenY = 0; 
 
                 if (state.sketchMode) setTimeout(processOpenCV, 100);
                 updateVisuals();
@@ -579,8 +456,7 @@
                 els.screenImg.style.opacity = state.opacity;
             }
 
-            // 所有的变换都应用在 wrapper 上
-            // 垂直位移 -100% 确保底边对齐
+            // 关键逻辑：使用 translate(..., -100%) 确保容器底部锚定在 top: 45% 的位置
             const transform = `
                 translate(calc(-50% + ${state.screenX}px), calc(-100% + ${state.screenY}px)) 
                 rotateX(${state.rotateX}deg) 
@@ -632,11 +508,8 @@
 
         function resetParams() {
             state.screenX = 0; state.screenY = 0;
-            els.inputs.scale.value = 1; 
             els.inputs.perspective.value = 1000; 
             els.inputs.rotateX.value = 0;
-            
-            // 重置时不影响当前比例
             updateVisuals();
         }
 
