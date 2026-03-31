@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Sketchfab 独立测试页</title>
+<style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #111; user-select: none; -webkit-user-select: none; touch-action: pan-x pan-y; }
+    .sketchfab-embed-wrapper { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+    iframe { width: 100%; height: 100%; border: none; outline: none; }
+    .mask-top { position: absolute; top: 0; left: 0; width: calc(100% - 45px); height: 45px; background: transparent; z-index: 10; pointer-events: auto; }
+    .mask-bottom { position: absolute; bottom: 0; left: 0; width: 100%; height: 45px; background: #111; z-index: 10; pointer-events: auto; }
+</style>
+</head>
+<body>
+    <div class="sketchfab-embed-wrapper">
+        <div class="mask-top"></div>
+        <iframe id="api-frame" title="Colourcoded head muscle chart" frameborder="0" allowfullscreen mozallowfullscreen="true" webkitallowfullscreen="true" allow="autoplay; fullscreen; xr-spatial-tracking" xr-spatial-tracking execution-while-out-of-viewport execution-while-not-rendered web-share src="https://sketchfab.com/models/bfef52b99a9646fa835ee9575aa2cc6b/embed?autostart=1&annotations_visible=1&preload=1&dnt=1"> </iframe>    
+               <!--两种模型备份 男头骨：bfef52b99a9646fa835ee9575aa2cc6b | 女头骨：d7b999491ab4441885384ef1d4646830-->
+        <!-- 新增：右侧悬浮的中英文对照抽屉面板 (可折叠版) -->
+        <div id="dict-panel" style="display:none;position:absolute;top:45px;bottom:45px;right:0;width:340px;max-width:85%;background:rgba(15,15,15,0.85);color:#ddd;overflow-y:auto;padding:15px;font-size:12px;z-index:20;box-sizing:border-box;border-left:1px solid rgba(255,255,255,0.1);font-family:sans-serif;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);">
+            <h3 style="margin:-15px -15px 10px -15px;border-bottom:1px solid #333;padding-bottom:8px;font-size:14px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:-15px;background:rgba(15,15,15,0.9);padding-top:15px;padding-left:15px;padding-right:15px;z-index:2;">
+                <span>📚 头骨详解手册</span>
+                <span onclick="toggleDict()" style="cursor:pointer;color:#888;font-size:16px;">✕</span>
+            </h3>
+            <div style="line-height:1.4;">
+                <details style="margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px;"><summary style="cursor:pointer;outline:none;color:#fff;font-weight:bold;">① 额骨 <span style="font-size:9px;color:#555;font-weight:normal;">(FRONTAL BONE)</span></summary><div style="padding-top:6px;color:#bbb;font-size:11px;">构成了前额的骨质部分和眼眶的上边缘。在绘画中，它是塑造头部上半部大块体积的核心，其表面的平缓起伏决定了额头高光的形状和受光面积，也是顶光的首要聚集区。</div></details>
+                <details style="margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px;"><summary style="cursor:pointer;outline:none;color:#fff;font-weight:bold;">② 鼻骨 <span style="font-size:9px;color:#555;font-weight:normal;">(NASAL BONE)</span></summary><div style="padding-top:6px;color:#bbb;font-size:11px;">构成了鼻梁的上半部。它的宽度和倾斜度直接决定了山根的高低与鼻子的立体感。在侧面或半侧面像中，鼻骨与下半部鼻软骨的交接处常常形成一个可见的微妙转折起伏。</div></details>
+                <details style="margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px;"><summary style="cursor:pointer;outline:none;color:#fff;font-weight:bold;">③ 颧骨 <span style="font-size:9px;color:#555;font-weight:normal;">(ZYGOMATIC BONE)</span></summary><div style="padding-top:6px;color:#bbb;font-size:11px;">位于面颊的外上方，是面部最重要的“承重墙”之一。它不仅决定了脸颊的最高点（苹果肌高光区）和脸部最宽处，更是面部“正前面”转向“侧面”的绝对分界线，直接影响明暗交界线的走向。</div></details>
+                <details style="margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px;"><summary style="cursor:pointer;outline:none;color:#fff;font-weight:bold;">④ 上颌骨 <span style="font-size:9px;color:#555;font-weight:normal;">(MAXILLA)</span></summary><div style="padding-top:6px;color:#bbb;font-size:11px;">构成了面部中庭的基础基座，并承载上排牙齿。在体块上它将整个嘴部区域向前推，为上嘴唇的饱满度、法令纹的起伏以及人中的深度提供坚实的内部支撑。</div></details>
+                <details style="margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px;"><summary style="cursor:pointer;outline:none;color:#fff;font-weight:bold;">⑤ 下颌骨 <span style="font-size:9px;color:#555;font-weight:normal;">(MANDIBLE)</span></summary><div style="padding-top:6px;color:#bbb;font-size:11px;">面部最大且唯一可活动的骨头。它勾勒了整个下半张脸的轮廓线（下颌线），其前端决定了下巴的形状，后部的转角（下颌角）则是画侧脸时定位脖子、脸颊分界以及排布下颌底面暗部的关键基准线。</div></details>
+                <details style="margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px;"><summary style="cursor:pointer;outline:none;color:#fff;font-weight:bold;">⑥ 顶骨 <span style="font-size:9px;color:#555;font-weight:normal;">(PARIETAL BONE)</span></summary><div style="padding-top:6px;color:#bbb;font-size:11px;">构成了颅腔的侧壁和顶部，像一个巨大的圆顶。它决定了头骨上半部的整体圆润感和宽窄比例，在顶光照射下，这里是头发高光的主要依附面和头部最高点的所在。</div></details>
+                <details style="margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px;"><summary style="cursor:pointer;outline:none;color:#fff;font-weight:bold;">⑦ 蝶骨 <span style="font-size:9px;color:#555;font-weight:normal;">(SPHENOID BONE)</span></summary><div style="padding-top:6px;color:#bbb;font-size:11px;">位于颅骨深处，部分参与构成眼眶的内壁。在表面结构上较少直接体现，但在理解眼窝深部的空间深度和眼球被镶嵌进去的凹陷感时，它是内部的重要结构底座。</div></details>
+                <details style="margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px;"><summary style="cursor:pointer;outline:none;color:#fff;font-weight:bold;">⑧ 颞骨 <span style="font-size:9px;color:#555;font-weight:normal;">(TEMPORAL BONE)</span></summary><div style="padding-top:6px;color:#bbb;font-size:11px;">构成头部侧面（太阳穴区域）的平坦基底。在绘画中，这一块通常处于头部的侧面暗部或灰部。它包含了耳道开口，是我们绘画时定位耳朵精确位置的核心解剖锚点。</div></details>
+                <details style="margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px;"><summary style="cursor:pointer;outline:none;color:#fff;font-weight:bold;">⑨ 枕骨 <span style="font-size:9px;color:#555;font-weight:normal;">(OCCIPITAL BONE)</span></summary><div style="padding-top:6px;color:#bbb;font-size:11px;">构成了后脑勺的底座。在画侧面或背面时，枕骨的弧度决定了后脑的饱满程度，同时它也是颈部粗壮肌肉（如斜方肌）向上附着的重要“挂钩”，决定了头颈相连的动态线条。</div></details>
+                <details style="margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px;"><summary style="cursor:pointer;outline:none;color:#fff;font-weight:bold;">⑩ 泪骨 <span style="font-size:9px;color:#555;font-weight:normal;">(LACRIMAL BONE)</span></summary><div style="padding-top:6px;color:#bbb;font-size:11px;">眼眶内侧壁的一小块骨头，位于内眼角（内眦）区域。它形成的小凹陷决定了鼻根与眼角之间那道深刻的阴影，是刻画眼部立体感和深邃感的关键细节转折处。</div></details>
+
+                
+            </div>
+        </div>
+
+        <div class="mask-bottom" style="display:flex; justify-content:flex-end; align-items:center; padding-right:15px; box-sizing:border-box;">
+
+            <div onclick="window.location.href='Portrait.html'" style="color:#ccc; font-size:20px; cursor:pointer; margin-right:auto; padding-left:15px; font-weight:bold; line-height:1;">←</div>
+            <!-- 新增：触发字典面板的开关按钮 -->
+            <button onclick="toggleDict()" style="background:rgba(0,120,255,0.2); border:1px solid rgba(0,120,255,0.4); color:#fff; font-size:11px; padding:4px 8px; border-radius:4px; cursor:pointer; margin-right:10px; font-weight:bold;">📚 头骨详解</button>
+            <div onclick="toggleAnno(this)" style="display:flex; align-items:center; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#ccc; font-size:11px; padding:4px 8px; border-radius:4px; cursor:pointer;"><div style="width:12px; height:12px; border:1px solid #ccc; border-radius:2px; margin-right:4px; display:flex; align-items:center; justify-content:center;"><span style="color:#fff; font-weight:bold; font-size:10px; line-height:1;">✓</span></div>显示标注</div>
+        </div>
+    </div>
+    <script>
+    function toggleAnno(btn){var f=document.getElementById('api-frame');var s=btn.querySelector('span');if(f.src.includes('annotations_visible=0')){f.src=f.src.replace('annotations_visible=0','annotations_visible=1');s.style.display='inline';}else{f.src=f.src.replace('annotations_visible=1','annotations_visible=0');s.style.display='none';}}
+    // 新增：极其简短的字典显隐逻辑
+    function toggleDict(){var d=document.getElementById('dict-panel');d.style.display=d.style.display==='none'?'block':'none';}
+    </script>
+</body>
+</html>
+
+

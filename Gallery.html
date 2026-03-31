@@ -1,0 +1,2318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>作品档案库 · 童画师吴晓</title>
+    <meta name="description" content="童画师吴晓的个人绘画作品展馆。包含儿童题材肖像画、手绘细节展示。每一幅画作都承载着独特的故事与温度。">
+    <meta name="keywords" content="吴晓,童画师吴晓,儿童肖像画,手绘作品展,绘画作品集,水彩肖像,油画肖像,画廊">
+    <meta name="author" content="童画师吴晓">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"ImageGallery","name":"童画师吴晓的绘画作品展馆","description":"展示童画师吴晓的原创儿童肖像画及绘画细节","url":"https://www.wuxiaoart.com/gallery.html","author":{"@type":"Person","name":"吴晓"}}</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400&display=swap" rel="stylesheet">
+    <script src="docs/js/GlobalMenu.js"></script>
+    <style>
+        /* 全局防选择与基础重置 */
+        body { margin: 0; background-color: #050505; font-family: 'Inter', system-ui, sans-serif; color: #fff; overflow-x: hidden; user-select: none; -webkit-user-select: none; }
+        .font-hairline { font-weight: 100; } .font-thin { font-weight: 200; }
+        ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        
+        /* 菜单按钮样式保留 */
+        .nav-font-hairline{font-weight:100!important;font-family:'Inter',sans-serif!important} .nav-font-thin{font-weight:200!important;font-family:'Inter',sans-serif!important}
+        #menu-trigger { position:fixed; top:24px; right:24px; width:44px; height:44px; display:flex; flex-direction:column; justify-content:center; align-items:flex-end; cursor:pointer; z-index:2147483648; background:transparent; pointer-events:auto; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); transition: opacity 0.5s; }
+        .menu-line { height:1.5px; background-color:#fff; transition:all .3s ease; margin:3.5px 0; display:block; border-radius:1px; }
+        .line-1 { width:28px; transform-origin:right center; } .line-2 { width:20px; } .line-3 { width:28px; transform-origin:right center; }
+        #menu-trigger:hover .line-1 { transform:rotate(45deg) translateY(-2px); } #menu-trigger:hover .line-2 { opacity:0; } #menu-trigger:hover .line-3 { transform:rotate(-45deg) translateY(2px); }
+        .menu-open .line-1 { transform:rotate(45deg) translateY(-2px); background-color:#fff; } .menu-open .line-2 { opacity:0; } .menu-open .line-3 { transform:rotate(-45deg) translateY(2px); background-color:#fff; }
+        #menu-trigger.hide-in-viewer { opacity: 0; visibility: hidden; pointer-events: none; }
+
+        /* === 极度柔和的背景预览层 === */
+        #bg-preview { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: #050505; }
+        #bg-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; filter: grayscale(20%) blur(15px) brightness(0.6) sepia(30%); transition: opacity 2.5s ease-in-out; will-change: opacity; }
+
+        .site-header { position: fixed; top: 0; left: 0; width: 100%; z-index: 40; padding: 5vh 5vw; display: flex; pointer-events: none; background: linear-gradient(to bottom, rgba(5,5,5,0.9) 0%, rgba(5,5,5,0) 100%); }
+        .header-title { font-size: 14px; letter-spacing: 0.5em; text-transform: uppercase; color: rgba(255,255,255,0.6); pointer-events: auto; }
+        
+        /* === 错落有致的排版 === */
+        .gallery-container { position: relative; z-index: 10; padding: 25vh 5vw 15vh 5vw; max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 3rem; }
+        .artwork-item { display: flex; align-items: center; justify-content: space-between; cursor: pointer; opacity: 0; transform: translateY(20px); transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 1.2s ease; group; }
+        .artwork-item.is-visible { transform: translateY(0); opacity: 1; }
+        
+        /* 利用算法生成放松的呼吸感排版布局 (伪随机错落) */
+        .artwork-item:nth-child(4n+1) { padding-left: 0%; padding-right: 18%; }
+        .artwork-item:nth-child(4n+2) { padding-left: 12%; padding-right: 5%; }
+        .artwork-item:nth-child(4n+3) { padding-left: 5%; padding-right: 15%; }
+        .artwork-item:nth-child(4n+4) { padding-left: 18%; padding-right: 0%; }
+
+        .art-index { font-family: 'Inter', monospace; font-weight: 100; color: rgba(255,255,255,0.15); font-size: 11px; width: 40px; transition: color 0.8s; }
+        .artwork-meta { flex: 1; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        .artwork-title { font-size: 1.15rem; font-weight: 200; letter-spacing: 0.25em; color: rgba(255,255,255,0.4); transition: all 0.8s ease; transform-origin: left; display: inline-block; }
+        .artwork-subtitle { font-size: 10px; font-weight: 100; letter-spacing: 0.15em; color: rgba(255,255,255,0.2); text-align: right; transition: color 0.8s; }
+        
+        /* === 微呼吸动效 === */
+        @keyframes gentleBreath {
+            0%, 100% { transform: scale(1) translateX(0); opacity: 0.4; }
+            50% { transform: scale(1.03) translateX(8px); opacity: 1; text-shadow: 0 0 25px rgba(255,255,255,0.3); }
+        }
+        .artwork-item.is-breathing .artwork-title { animation: gentleBreath 4.5s ease-in-out infinite; color: #fff; }
+        .artwork-item.is-breathing .art-index { color: rgba(255,255,255,0.7); }
+        .artwork-item.is-breathing .artwork-subtitle { color: rgba(255,255,255,0.6); }
+
+        /* 隐藏原始图片，但保留给JS和SEO提取 */
+        .img-wrapper, .seo-hidden-images { display: none !important; }
+
+        /* === 沉浸式放映厅 (Cinematic Viewer) 保留原样 === */
+        #cinematic-viewer { position: fixed; inset: 0; background: #000; z-index: 100; opacity: 0; visibility: hidden; transition: opacity 0.8s ease, visibility 0.8s; display: flex; align-items: center; justify-content: center; }
+        #cinematic-viewer.active { opacity: 1; visibility: visible; }
+        .viewer-ui { position: absolute; inset: 0; z-index: 110; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 4vh 4vw; opacity: 0; transition: opacity 0.5s ease; }
+        #cinematic-viewer.active .viewer-ui { opacity: 1; transition-delay: 0.5s; } #cinematic-viewer.ui-hidden .viewer-ui { opacity: 0; }
+        .viewer-close { pointer-events: auto; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.3s; margin-left: auto; }
+        .viewer-close:hover { background: rgba(255,255,255,0.15); } .viewer-close svg { stroke: rgba(255,255,255,0.6); }
+        .progress-container { width: 100%; display: flex; gap: 4px; pointer-events: auto; margin-top: auto; padding-bottom: 2vh; }
+        .progress-bar { height: 2px; flex: 1; background: rgba(255,255,255,0.1); border-radius: 1px; overflow: hidden; }
+        .progress-fill { height: 100%; width: 0%; background: rgba(255,255,255,0.8); transition: width linear; }
+        .viewer-slide { position: absolute; inset: 0; opacity: 0; transition: opacity 2s ease-in-out; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .viewer-slide.active { opacity: 1; z-index: 105; }
+        .viewer-slide img { width: 100%; height: 100%; object-fit: contain; transform: scale(1); transition: transform 10s linear; }
+        .viewer-slide.active img { transform: scale(1.05); }
+        .intermission-title { position: absolute; z-index: 120; text-align: center; opacity: 0; transform: translateY(10px); transition: opacity 1.5s ease, transform 1.5s ease; pointer-events: none; }
+        .intermission-title.show { opacity: 1; transform: translateY(0); }
+    </style>
+</head>
+<body>
+    <!-- 极度柔和的交叉淡入层 -->
+    <div id="bg-preview"></div>
+
+    <div id="menu-trigger" onclick="toggleMenu()" title="切换菜单"><span class="menu-line line-1"></span><span class="menu-line line-2"></span><span class="menu-line line-3"></span></div>
+
+    <header class="site-header">
+        <div class="header-title">
+            <div class="font-thin tracking-[0.4em] text-white">THE ARCHIVE</div>
+            <div class="font-hairline text-[10px] mt-1 text-white/40">COLLECTION INDEX</div>
+        </div>
+    </header>
+
+    <!-- 极简档案目录列表 -->
+    <main class="gallery-container" id="gallery-container">
+        <!-- 基础内容保留，顺序将由JS随机打乱 -->
+       <article class="artwork-item" data-id="art-01">
+            <div class="art-index">01.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">当粉帽遇见暖阳</h3><p class="artwork-subtitle">5 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/当粉帽遇见暖阳/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/当粉帽遇见暖阳/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/当粉帽遇见暖阳/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/当粉帽遇见暖阳/4.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/当粉帽遇见暖阳/5.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-02">
+            <div class="art-index">02.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">笑把时光揉成暖</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/笑把时光揉成暖/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-03">
+            <div class="art-index">03.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">水纹织就的亲昵</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/水纹织就的亲昵/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/水纹织就的亲昵/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/水纹织就的亲昵/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-04">
+            <div class="art-index">04.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">红温柔裹住清眸</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/红温柔裹住清眸/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/红温柔裹住清眸/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/红温柔裹住清眸/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-05">
+            <div class="art-index">05.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">指尖偷吻了春风</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/指尖偷吻了春风/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/指尖偷吻了春风/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/指尖偷吻了春风/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-06">
+            <div class="art-index">06.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">她望着，风忘了走</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/她望着，风忘了走/002.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/她望着，风忘了走/1.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/她望着，风忘了走/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/她望着，风忘了走/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-07">
+            <div class="art-index">07.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">落在肩上的绿</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/落在肩上的绿/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/落在肩上的绿/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/落在肩上的绿/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-08">
+            <div class="art-index">08.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">每天爱你多一点</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/每天爱你多一点/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/每天爱你多一点/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/每天爱你多一点/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-09">
+            <div class="art-index">09.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">绿意的呢喃</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/绿意的呢喃/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/绿意的呢喃/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/绿意的呢喃/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-10">
+            <div class="art-index">10.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">掌心里的笑响</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/掌心里的笑响/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/掌心里的笑响/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/掌心里的笑响/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-11">
+            <div class="art-index">11.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">她与臂弯的约定</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/她与臂弯的约定/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/她与臂弯的约定/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/她与臂弯的约定/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-12">
+            <div class="art-index">12.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">开心了一整个冬</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/开心了一整个冬/001XL.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/开心了一整个冬/004.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/开心了一整个冬/08.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-13">
+            <div class="art-index">13.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">肩背的温度</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/肩背的温度/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/肩背的温度/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/肩背的温度/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-14">
+            <div class="art-index">14.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">远方的你</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/远方的你/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/远方的你/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-15">
+            <div class="art-index">15.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">孔雀蓝</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/孔雀蓝/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/孔雀蓝/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/孔雀蓝/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-16">
+            <div class="art-index">16.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">萱草花</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/萱草花/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/萱草花/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/萱草花/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-17">
+            <div class="art-index">17.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">爱米莉的快乐</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/爱米莉的快乐/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/爱米莉的快乐/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/爱米莉的快乐/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-18">
+            <div class="art-index">18.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">天使在发光</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/天使在发光/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/天使在发光/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/天使在发光/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-19">
+            <div class="art-index">19.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">当美丽与笑容一起被绑架</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/当美丽与笑容一起被绑架/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/当美丽与笑容一起被绑架/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/当美丽与笑容一起被绑架/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/当美丽与笑容一起被绑架/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-20">
+            <div class="art-index">20.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">竹蜻蜓</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/竹蜻蜓/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/竹蜻蜓/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/竹蜻蜓/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-21">
+            <div class="art-index">21.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">绿色的味道</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/绿色的味道/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/绿色的味道/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/绿色的味道/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-22">
+            <div class="art-index">22.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">中秋的礼物</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/中秋的礼物/001Siu.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/中秋的礼物/011.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/中秋的礼物/012.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-23">
+            <div class="art-index">23.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">全澳洲的希望</h3><p class="artwork-subtitle">5 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/全澳洲的希望/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/全澳洲的希望/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/全澳洲的希望/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/全澳洲的希望/4.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/全澳洲的希望/5.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-24">
+            <div class="art-index">24.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">让足尖在绿意里发芽</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/让足尖在绿意里发芽/001_wu.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/让足尖在绿意里发芽/010.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/让足尖在绿意里发芽/011.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-25">
+            <div class="art-index">25.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">蕾丝在给春天写镂空的信</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/蕾丝在给春天写镂空的信/001_ontheroad.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/蕾丝在给春天写镂空的信/004.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/蕾丝在给春天写镂空的信/017.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-26">
+            <div class="art-index">26.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">过去和将来的美好</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/过去和将来的美好/zy001.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-27">
+            <div class="art-index">27.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">玫瑰和你</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/玫瑰和你/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/玫瑰和你/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/玫瑰和你/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-28">
+            <div class="art-index">28.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">乔治娅</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/乔治娅/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/乔治娅/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/乔治娅/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/乔治娅/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-29">
+            <div class="art-index">29.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">把夏天戴在头上</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/把夏天戴在头上/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/把夏天戴在头上/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/把夏天戴在头上/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-30">
+            <div class="art-index">30.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">树荫之外即阳光</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/树荫之外即阳光/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/树荫之外即阳光/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/树荫之外即阳光/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/树荫之外即阳光/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-31">
+            <div class="art-index">31.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">诠释安静</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/诠释安静/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/诠释安静/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/诠释安静/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-32">
+            <div class="art-index">32.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">妈妈做的饭就是回忆</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/妈妈做的饭就是回忆/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/妈妈做的饭就是回忆/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/妈妈做的饭就是回忆/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-33">
+            <div class="art-index">33.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">每年的生日礼物</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/每年的生日礼物/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/每年的生日礼物/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/每年的生日礼物/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/每年的生日礼物/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-34">
+            <div class="art-index">34.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">我是个男孩</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/我是个男孩/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/我是个男孩/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/我是个男孩/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/我是个男孩/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-35">
+            <div class="art-index">35.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">暖冬</h3><p class="artwork-subtitle">5 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/暖冬/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/暖冬/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/暖冬/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/暖冬/4.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/暖冬/5.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-36">
+            <div class="art-index">36.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">露台上的红</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/露台上的红/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/露台上的红/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/露台上的红/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-37">
+            <div class="art-index">37.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">静眸含星</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/静眸含星/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/静眸含星/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/静眸含星/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-38">
+            <div class="art-index">38.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">好奇的眸语</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/好奇的眸语/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/好奇的眸语/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/好奇的眸语/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-39">
+            <div class="art-index">39.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">水露年华</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/水露年华/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/水露年华/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/水露年华/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-40">
+            <div class="art-index">40.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">当可爱劫持了美丽</h3><p class="artwork-subtitle">3 IMAGES • ACRYLIC</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/当可爱劫持了美丽/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/当可爱劫持了美丽/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/当可爱劫持了美丽/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-41">
+            <div class="art-index">41.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">似梦，是光</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/似梦，是光/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/似梦，是光/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/似梦，是光/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-42">
+            <div class="art-index">42.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">春，粉的底色</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/春，粉的底色/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/春，粉的底色/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/春，粉的底色/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/春，粉的底色/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-43">
+            <div class="art-index">43.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">藤椅边的绿</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/藤椅边的绿/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/藤椅边的绿/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/藤椅边的绿/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-44">
+            <div class="art-index">44.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">猫，积木，成长</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/猫，积木，成长/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/猫，积木，成长/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/猫，积木，成长/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-45">
+            <div class="art-index">45.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">锦袍加身，吉祥如意</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/锦袍加身，吉祥如意/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/锦袍加身，吉祥如意/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/锦袍加身，吉祥如意/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-46">
+            <div class="art-index">46.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">醉颜似蝶</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/醉颜似蝶/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/醉颜似蝶/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/醉颜似蝶/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/醉颜似蝶/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-47">
+            <div class="art-index">47.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">水塘边</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/水塘边/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/水塘边/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-48">
+            <div class="art-index">48.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">笑春风</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/笑春风/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/笑春风/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/笑春风/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-49">
+            <div class="art-index">49.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">一眼送福春浸意</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/一眼送福春浸意/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/一眼送福春浸意/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/一眼送福春浸意/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-50">
+            <div class="art-index">50.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">哥哥的笑</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/哥哥的笑/120_mmexport1680477648652.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/哥哥的笑/121_mmexport1680477644773.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/哥哥的笑/260_1645419182783_0001.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-51">
+            <div class="art-index">51.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">古典色彩</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/古典色彩/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/古典色彩/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/古典色彩/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-52">
+            <div class="art-index">52.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">电影《乔治娅》</h3><p class="artwork-subtitle">4 IMAGES • OIL</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/电影《乔治娅》/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/电影《乔治娅》/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/电影《乔治娅》/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/电影《乔治娅》/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-53">
+            <div class="art-index">53.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">那一刻，来自妈妈的礼物</h3><p class="artwork-subtitle">3 IMAGES • OIL</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/那一刻，来自妈妈的礼物/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/那一刻，来自妈妈的礼物/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/那一刻，来自妈妈的礼物/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-54">
+            <div class="art-index">54.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">爱你的小酒窝</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/爱你的小酒窝/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/爱你的小酒窝/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/爱你的小酒窝/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/爱你的小酒窝/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-55">
+            <div class="art-index">55.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">花观鱼</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/花观鱼/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/花观鱼/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/花观鱼/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/花观鱼/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-56">
+            <div class="art-index">56.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">风吻墨丝吟</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/风吻墨丝吟/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/风吻墨丝吟/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/风吻墨丝吟/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-57">
+            <div class="art-index">57.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">云鬓侧</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/云鬓侧/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/云鬓侧/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/云鬓侧/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/云鬓侧/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-58">
+            <div class="art-index">58.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">绾春意</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/绾春意/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/绾春意/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/绾春意/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/绾春意/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-59">
+            <div class="art-index">59.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">凝晴侧</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/凝晴侧/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/凝晴侧/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/凝晴侧/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/凝晴侧/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-60">
+            <div class="art-index">60.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">枕光笑</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/枕光笑/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/枕光笑/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/枕光笑/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-61">
+            <div class="art-index">61.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">清瞳含星落绿痕</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/清瞳含星落绿痕/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/清瞳含星落绿痕/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/清瞳含星落绿痕/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-62">
+            <div class="art-index">62.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">笑揽春山青</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/笑揽春山青/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/笑揽春山青/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-63">
+            <div class="art-index">63.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">并肩温情</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/并肩温情/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/并肩温情/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/并肩温情/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-64">
+            <div class="art-index">64.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">蓝影清瞳</h3><p class="artwork-subtitle">5 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/蓝影清瞳/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/蓝影清瞳/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/蓝影清瞳/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/蓝影清瞳/4.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/蓝影清瞳/5.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-65">
+            <div class="art-index">65.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">苏菲娅之夏</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/苏菲娅之夏/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/苏菲娅之夏/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/苏菲娅之夏/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-66">
+            <div class="art-index">66.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">红唇栖紫雾</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/红唇栖紫雾/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/红唇栖紫雾/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/红唇栖紫雾/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/红唇栖紫雾/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-67">
+            <div class="art-index">67.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">黛青颜</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/黛青颜/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/黛青颜/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/黛青颜/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-68">
+            <div class="art-index">68.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">嫣笑望云间</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/嫣笑望云间/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/嫣笑望云间/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/嫣笑望云间/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/嫣笑望云间/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-69">
+            <div class="art-index">69.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">别，在雾里</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/别，在雾里/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/别，在雾里/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/别，在雾里/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-70">
+            <div class="art-index">70.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">青甜</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/青甜/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/青甜/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-71">
+            <div class="art-index">71.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">温柔和爱在凝视你</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/温柔和爱在凝视你/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/温柔和爱在凝视你/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/温柔和爱在凝视你/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-72">
+            <div class="art-index">72.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">粉檐下的眸</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/粉檐下的眸/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/粉檐下的眸/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/粉檐下的眸/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-73">
+            <div class="art-index">73.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">晴天的风吹起笑容</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/晴天的风吹起笑容/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/晴天的风吹起笑容/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/晴天的风吹起笑容/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/晴天的风吹起笑容/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-74">
+            <div class="art-index">74.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">浅笑归云</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/浅笑归云/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/浅笑归云/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/浅笑归云/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/浅笑归云/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-75">
+            <div class="art-index">75.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">再回古典</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/再回古典/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/再回古典/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/再回古典/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-76">
+            <div class="art-index">76.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">穿越了20年的成熟与自信</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/穿越了20年的成熟与自信/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/穿越了20年的成熟与自信/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/穿越了20年的成熟与自信/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-77">
+            <div class="art-index">77.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">从梦中走来</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/从梦中走来/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/从梦中走来/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/从梦中走来/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-78">
+            <div class="art-index">78.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">甜酒</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/甜酒/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/甜酒/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/甜酒/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-79">
+            <div class="art-index">79.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">风柔笑轻扬</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/风柔笑轻扬/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/风柔笑轻扬/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/风柔笑轻扬/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-80">
+            <div class="art-index">80.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">辫绾春</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/辫绾春/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/辫绾春/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-81">
+            <div class="art-index">81.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">笑怀萌时光</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/笑怀萌时光/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/笑怀萌时光/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-82">
+            <div class="art-index">82.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">小甜酒，笑酒甜</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/小甜酒，笑酒甜/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/小甜酒，笑酒甜/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/小甜酒，笑酒甜/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-83">
+            <div class="art-index">83.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">澜色清眸</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/澜色清眸/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/澜色清眸/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/澜色清眸/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-84">
+            <div class="art-index">84.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">萌飒稚心</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/萌飒稚心/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/萌飒稚心/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/萌飒稚心/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-85">
+            <div class="art-index">85.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">绿思红</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/绿思红/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/绿思红/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/绿思红/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/绿思红/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-86">
+            <div class="art-index">86.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">柔萌嬉清间</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/柔萌嬉清间/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/柔萌嬉清间/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/柔萌嬉清间/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-87">
+            <div class="art-index">87.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">漪间璞玉笑，岚里甜澜生</h3><p class="artwork-subtitle">5 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/漪间璞玉笑，岚里甜澜生/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/漪间璞玉笑，岚里甜澜生/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/漪间璞玉笑，岚里甜澜生/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/漪间璞玉笑，岚里甜澜生/4.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/漪间璞玉笑，岚里甜澜生/5.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-88">
+            <div class="art-index">88.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">天禧笑意浓</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/天禧笑意浓/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/天禧笑意浓/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/天禧笑意浓/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-89">
+            <div class="art-index">89.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">颜如玉，惜娇眠</h3><p class="artwork-subtitle">5 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/颜如玉，惜娇眠/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/颜如玉，惜娇眠/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/颜如玉，惜娇眠/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/颜如玉，惜娇眠/4.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/颜如玉，惜娇眠/5.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-90">
+            <div class="art-index">90.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">红妍绯色</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/红妍绯色/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/红妍绯色/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/红妍绯色/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/红妍绯色/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-91">
+            <div class="art-index">91.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">桃蝶伴清欢</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/桃蝶伴清欢/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/桃蝶伴清欢/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/桃蝶伴清欢/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-92">
+            <div class="art-index">92.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">小辫惹风轻，稚眸望春云</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/小辫惹风轻，稚眸望春云/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/小辫惹风轻，稚眸望春云/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/小辫惹风轻，稚眸望春云/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/小辫惹风轻，稚眸望春云/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-93">
+            <div class="art-index">93.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">星衣裹萌，笑揽星芒</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/星衣裹萌，笑揽星芒/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/星衣裹萌，笑揽星芒/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-94">
+            <div class="art-index">94.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">伴初程</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/伴初程/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-95">
+            <div class="art-index">95.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">稚怀星梦</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/稚怀星梦/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/稚怀星梦/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/稚怀星梦/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-96">
+            <div class="art-index">96.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">《乔治娅》第二幅</h3><p class="artwork-subtitle">1 IMAGE • OIL</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/《乔治娅》第二幅/IMG_5738.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-97">
+            <div class="art-index">97.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">兄妹的那分时光</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/兄妹的那分时光/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/兄妹的那分时光/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/兄妹的那分时光/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-98">
+            <div class="art-index">98.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">再回古典</h3><p class="artwork-subtitle">4 IMAGES • OIL</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/再回古典/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/再回古典/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/再回古典/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/再回古典/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-99">
+            <div class="art-index">99.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">月颜清辉，寻幽入墨</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/月颜清辉，寻幽入墨/01.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/月颜清辉，寻幽入墨/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/月颜清辉，寻幽入墨/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-100">
+            <div class="art-index">100.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">光落笑靥，柔暖入心</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/光落笑靥，柔暖入心/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/光落笑靥，柔暖入心/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/光落笑靥，柔暖入心/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/光落笑靥，柔暖入心/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-101">
+            <div class="art-index">101.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">童年的神秘园</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/童年的神秘园/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/童年的神秘园/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/童年的神秘园/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-102">
+            <div class="art-index">102.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">乔治娅和多娜</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/乔治娅和多娜/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/乔治娅和多娜/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/乔治娅和多娜/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-103">
+            <div class="art-index">103.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">是你期待的美</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/是你期待的美/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/是你期待的美/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/是你期待的美/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/是你期待的美/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-104">
+            <div class="art-index">104.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">忆童年</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/忆童年/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/忆童年/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/忆童年/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/忆童年/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-105">
+            <div class="art-index">105.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">能不忆江南？</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/能不忆江南？/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/能不忆江南？/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/能不忆江南？/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/能不忆江南？/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-106">
+            <div class="art-index">106.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">墙畔笑</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/墙畔笑/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/墙畔笑/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/墙畔笑/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/墙畔笑/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-107">
+            <div class="art-index">107.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">拈花墨蓝紫飘香</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/拈花墨蓝紫飘香/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/拈花墨蓝紫飘香/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/拈花墨蓝紫飘香/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/拈花墨蓝紫飘香/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-108">
+            <div class="art-index">108.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">蝶红落春绿，星眸乱我心</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/蝶红落春绿，星眸乱我心/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/蝶红落春绿，星眸乱我心/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/蝶红落春绿，星眸乱我心/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/蝶红落春绿，星眸乱我心/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-109">
+            <div class="art-index">109.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">回眸拾春风</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/回眸拾春风/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/回眸拾春风/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-110">
+            <div class="art-index">110.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">青柠</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/青柠/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/青柠/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-111">
+            <div class="art-index">111.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">眸底天真，稚眼无尘</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/眸底天真，稚眼无尘/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-112">
+            <div class="art-index">112.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">冬天的色彩</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/冬天的色彩/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-113">
+            <div class="art-index">113.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">委屈</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/委屈/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-114">
+            <div class="art-index">114.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">如梦似幻</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/如梦似幻/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-115">
+            <div class="art-index">115.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">在笔尖长大</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/在笔尖长大/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/在笔尖长大/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/在笔尖长大/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/在笔尖长大/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-116">
+            <div class="art-index">116.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">圣诞精灵</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/圣诞精灵/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/圣诞精灵/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-117">
+            <div class="art-index">117.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">梦中的天鹅</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/梦中的天鹅/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-118">
+            <div class="art-index">118.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">天使的羽毛</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/天使的羽毛/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/天使的羽毛/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/天使的羽毛/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-119">
+            <div class="art-index">119.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">清瞳映笑，眸底藏星</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/清瞳映笑，眸底藏星/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/清瞳映笑，眸底藏星/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-120">
+            <div class="art-index">120.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">粉衣沾得梦边香，藏尽世间温柔</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/粉衣沾得梦边香，藏尽世间温柔/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/粉衣沾得梦边香，藏尽世间温柔/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-121">
+            <div class="art-index">121.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">田园东方</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/田园东方/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/田园东方/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-122">
+            <div class="art-index">122.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">早晨的树林</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/早晨的树林/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-123">
+            <div class="art-index">123.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">是她来啦</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/是她来啦/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-124">
+            <div class="art-index">124.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">芳草碧连天</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/芳草碧连天/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/芳草碧连天/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-125">
+            <div class="art-index">125.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">警官你好呀</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/警官你好呀/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/警官你好呀/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-126">
+            <div class="art-index">126.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">黄衫映冰暖童颜</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/黄衫映冰暖童颜/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/黄衫映冰暖童颜/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-127">
+            <div class="art-index">127.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">含光望春</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/含光望春/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/含光望春/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/含光望春/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-128">
+            <div class="art-index">128.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">黄绒裹清眸，映得粉腮柔</h3><p class="artwork-subtitle">4 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/黄绒裹清眸，映得粉腮柔/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/黄绒裹清眸，映得粉腮柔/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/黄绒裹清眸，映得粉腮柔/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/黄绒裹清眸，映得粉腮柔/4.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-129">
+            <div class="art-index">129.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">蓝天和薰衣草</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/蓝天和薰衣草/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/蓝天和薰衣草/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/蓝天和薰衣草/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-130">
+            <div class="art-index">130.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">这一瞥，停止了时光</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/这一瞥，停止了时光/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/这一瞥，停止了时光/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-131">
+            <div class="art-index">131.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">家乡湖畔的那片蓝</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/家乡湖畔的那片蓝/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/家乡湖畔的那片蓝/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/家乡湖畔的那片蓝/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-132">
+            <div class="art-index">132.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">海洋之心</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/海洋之心/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/海洋之心/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/海洋之心/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-133">
+            <div class="art-index">133.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">沉默的涟漪</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/沉默的涟漪/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-134">
+            <div class="art-index">134.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">我知道你在画我</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/我知道你在画我/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/我知道你在画我/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/我知道你在画我/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-135">
+            <div class="art-index">135.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">沐春风</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/沐春风/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/沐春风/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/沐春风/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-136">
+            <div class="art-index">136.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">古典美的传说</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/古典美的传说/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/古典美的传说/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-137">
+            <div class="art-index">137.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">秀兰邓波儿</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/秀兰邓波儿/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-138">
+            <div class="art-index">138.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">黄金时代</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/黄金时代/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-139">
+            <div class="art-index">139.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">我先下班啦</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/我先下班啦/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-140">
+            <div class="art-index">140.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">娜娜的气质</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/娜娜的气质/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-141">
+            <div class="art-index">141.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">海鸥</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/海鸥/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-142">
+            <div class="art-index">142.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">外婆家的阿咪</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/外婆家的阿咪/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/外婆家的阿咪/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/外婆家的阿咪/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-143">
+            <div class="art-index">143.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">梦见小时候</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/梦见小时候/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/梦见小时候/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-144">
+            <div class="art-index">144.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">唇角一弯樱桃红</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/唇角一弯樱桃红/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/唇角一弯樱桃红/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-145">
+            <div class="art-index">145.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">秀兰邓波儿长大了</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/秀兰邓波儿长大了/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-146">
+            <div class="art-index">146.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">田园晨光</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/田园晨光/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/田园晨光/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/田园晨光/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-147">
+            <div class="art-index">147.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">绾紫结，忆仙颜</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/绾紫结，忆仙颜/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-148">
+            <div class="art-index">148.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">海洋之眼</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/海洋之眼/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/海洋之眼/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-149">
+            <div class="art-index">149.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">温柔时光</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/温柔时光/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/温柔时光/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-150">
+            <div class="art-index">150.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">流光溢彩</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/流光溢彩/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-151">
+            <div class="art-index">151.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">粉色的蕾丝帽</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/粉色的蕾丝帽/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/粉色的蕾丝帽/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-152">
+            <div class="art-index">152.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">胜利的喜悦</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/胜利的喜悦/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-153">
+            <div class="art-index">153.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">风吹乱了发</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/风吹乱了发/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-154">
+            <div class="art-index">154.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">茜茜的红帽子</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/茜茜的红帽子/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-155">
+            <div class="art-index">155.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">初见</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/初见/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-156">
+            <div class="art-index">156.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">浅雾嫣容</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/浅雾嫣容/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-157">
+            <div class="art-index">157.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">指畔童颜梦</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/指畔童颜梦/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-158">
+            <div class="art-index">158.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">雾里藏星</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/雾里藏星/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/雾里藏星/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/雾里藏星/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-159">
+            <div class="art-index">159.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">颜若雾，丝如漪</h3><p class="artwork-subtitle">5 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/颜若雾，丝如漪/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/颜若雾，丝如漪/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/颜若雾，丝如漪/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/颜若雾，丝如漪/4.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/颜若雾，丝如漪/5.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-160">
+            <div class="art-index">160.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">蝶落妍，春未阑</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/蝶落妍，春未阑/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-161">
+            <div class="art-index">161.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">浅笑是未拆的糖纸</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/浅笑是未拆的糖纸/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-162">
+            <div class="art-index">162.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">尝下我奶味的拳</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/尝下我奶味的拳/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-163">
+            <div class="art-index">163.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">你的同桌女孩</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/你的同桌女孩/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-164">
+            <div class="art-index">164.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">真我</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/真我/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-165">
+            <div class="art-index">165.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">清淡的浓烈</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/清淡的浓烈/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/清淡的浓烈/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-166">
+            <div class="art-index">166.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">簪花</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/簪花/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-167">
+            <div class="art-index">167.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">踏青的兄妹</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/踏青的兄妹/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/踏青的兄妹/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-168">
+            <div class="art-index">168.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">爸爸带我看风景</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/爸爸带我看风景/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-169">
+            <div class="art-index">169.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">儿时的油菜田</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/儿时的油菜田/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/儿时的油菜田/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-170">
+            <div class="art-index">170.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">漂流本</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/漂流本/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-171">
+            <div class="art-index">171.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">白玫情深</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/白玫情深/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/白玫情深/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-172">
+            <div class="art-index">172.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">素色玫瑰</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/素色玫瑰/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-173">
+            <div class="art-index">173.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">雾的思绪</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/雾的思绪/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-174">
+            <div class="art-index">174.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">温柔的等待</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/温柔的等待/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-175">
+            <div class="art-index">175.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">时光尽完美</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/时光尽完美/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/时光尽完美/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-176">
+            <div class="art-index">176.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">我愿是你裙摆上的一片碎花</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/我愿是你裙摆上的一片碎花/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-177">
+            <div class="art-index">177.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">笃定</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/笃定/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-178">
+            <div class="art-index">178.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">再回首</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/再回首/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-179">
+            <div class="art-index">179.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">给岁月以文明</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/给岁月以文明/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-180">
+            <div class="art-index">180.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">窗外的绿色</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/窗外的绿色/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-181">
+            <div class="art-index">181.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">美丽新疆</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/美丽新疆/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-182">
+            <div class="art-index">182.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">至纯至真</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/至纯至真/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-183">
+            <div class="art-index">183.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">心的方向</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/心的方向/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-184">
+            <div class="art-index">184.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">海的和声</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/海的和声/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-185">
+            <div class="art-index">185.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">睡前故事</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/睡前故事/001.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-186">
+            <div class="art-index">186.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">摇篮中的小宇宙</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/摇篮中的小宇宙/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/摇篮中的小宇宙/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-187">
+            <div class="art-index">187.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">童真是淡淡的绿</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/童真是淡淡的绿/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/童真是淡淡的绿/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-188">
+            <div class="art-index">188.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">宝石绿</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/宝石绿/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/宝石绿/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/宝石绿/3.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-189">
+            <div class="art-index">189.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">唇语</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/唇语/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-190">
+            <div class="art-index">190.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">信任</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/信任/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-191">
+            <div class="art-index">191.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">安全的感觉</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/安全的感觉/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/安全的感觉/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-192">
+            <div class="art-index">192.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">欣赏</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/欣赏/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-193">
+            <div class="art-index">193.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">我心依旧</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/我心依旧/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-194">
+            <div class="art-index">194.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">穿透我的心</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/穿透我的心/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/穿透我的心/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-195">
+            <div class="art-index">195.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">东方的笑</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/东方的笑/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-196">
+            <div class="art-index">196.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">长亭外，古道边</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/长亭外，古道边/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/长亭外，古道边/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-197">
+            <div class="art-index">197.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">此情可待</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/此情可待/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-198">
+            <div class="art-index">198.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">绿涧红颜光落处</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/绿涧红颜光落处/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-199">
+            <div class="art-index">199.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">期待</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/期待/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-200">
+            <div class="art-index">200.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">成熟的从容</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/成熟的从容/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-201">
+            <div class="art-index">201.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">他们的世界</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/他们的世界/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-202">
+            <div class="art-index">202.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">紫晕初妆</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/紫晕初妆/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/紫晕初妆/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-203">
+            <div class="art-index">203.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">浅蓝初梦</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/浅蓝初梦/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/浅蓝初梦/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-204">
+            <div class="art-index">204.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">拾光里的小欢喜</h3><p class="artwork-subtitle">1 IMAGE • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/拾光里的小欢喜/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-205">
+            <div class="art-index">205.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">童颜一笑暖平生</h3><p class="artwork-subtitle">2 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/童颜一笑暖平生/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/童颜一笑暖平生/2.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-206">
+            <div class="art-index">206.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">这一眼，软了时光</h3><p class="artwork-subtitle">5 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/这一眼，软了时光/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/这一眼，软了时光/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/这一眼，软了时光/3.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/这一眼，软了时光/4.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/这一眼，软了时光/5.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-207">
+            <div class="art-index">207.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">花帽下的甜</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/花帽下的甜/001.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/花帽下的甜/002.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/花帽下的甜/003.jpg" loading="lazy">
+            </div>
+        </article>
+
+        <article class="artwork-item" data-id="art-208">
+            <div class="art-index">208.</div>
+            <div class="artwork-meta"><h3 class="artwork-title">红巾系温柔</h3><p class="artwork-subtitle">3 IMAGES • WATERCOLOR</p></div>
+            <div class="img-wrapper"><img src="./docs/galleryIMG/红巾系温柔/1.jpg" loading="lazy"></div>
+            <div class="seo-hidden-images">
+                <img src="./docs/galleryIMG/红巾系温柔/2.jpg" loading="lazy">
+                <img src="./docs/galleryIMG/红巾系温柔/3.jpg" loading="lazy">
+            </div>
+        </article>
+    </main>
+
+    <!-- 沉浸式电影级放映厅 -->
+    <div id="cinematic-viewer">
+        <div id="viewer-track"></div>
+        <div id="intermission-title" class="intermission-title">
+            <div class="font-thin text-2xl tracking-[0.3em] text-white mb-2" id="inter-main-title">TITLE</div>
+            <div class="font-hairline text-xs tracking-[0.2em] text-white/40" id="inter-sub-title">SUBTITLE</div>
+        </div>
+        <div class="viewer-ui">
+            <!-- 修复了手动触发关闭事件 -->
+            <div class="viewer-close" onclick="closeViewer()" title="返回档案录">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="w-full flex flex-col gap-4">
+                <div class="text-center">
+                    <div class="font-hairline text-sm tracking-[0.2em] text-white/80" id="viewer-title">作品名称</div>
+                    <div class="font-hairline text-[10px] tracking-widest text-white/30 mt-1" id="viewer-progress-text">1 / 3</div>
+                </div>
+                <div class="progress-container" id="progress-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEO隐藏内容 -->
+    <div style="position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none;">
+        <h1>童画师吴晓的个人绘画作品档案</h1><p>本页面收录了童画师吴晓创作的全部儿童题材肖像画。点击档案目录即可沉浸式全屏观影。</p>
+    </div>
+
+    <script>
+        // 核心交互变量
+        let galleryData = [];
+        let visibleIndices = new Set();
+        let isHovering = false;
+        let isViewing = false; // 是否在放映厅中
+        let cycleTimeout = null;
+        let activeItemDom = null;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const container = document.getElementById('gallery-container');
+            const bgPreview = document.getElementById('bg-preview');
+            
+            // 1. 开局洗牌机制：打乱顺序注入新鲜感
+            let rawItems = Array.from(container.querySelectorAll('.artwork-item'));
+            rawItems.sort(() => Math.random() - 0.5);
+            rawItems.forEach((item, index) => {
+                item.querySelector('.art-index').innerText = String(index + 1).padStart(2, '0') + '.';
+                container.appendChild(item); // 重新挂载 DOM 以改变物理顺序
+            });
+
+            // 2. 重新提取最终乱序后的数据
+            const artworks = document.querySelectorAll('.artwork-item');
+            galleryData = Array.from(artworks).map(item => {
+                return {
+                    title: item.querySelector('.artwork-title').innerText,
+                    subtitle: item.querySelector('.artwork-subtitle').innerText,
+                    images: [item.querySelector('.img-wrapper img').src, ...Array.from(item.querySelectorAll('.seo-hidden-images img')).map(img => img.src)]
+                };
+            });
+
+            // 3. 交叉淡化渲染背景逻辑 (温柔过渡)
+            function softChangeBg(src) {
+                const newImg = document.createElement('img');
+                newImg.src = src;
+                bgPreview.appendChild(newImg);
+                newImg.offsetHeight; // force reflow
+                newImg.style.opacity = '0.35'; // 最终显示的透明度
+                
+                // 清理旧层
+                const oldImgs = bgPreview.querySelectorAll('img:not(:last-child)');
+                oldImgs.forEach(img => {
+                    img.style.opacity = '0';
+                    setTimeout(() => img.remove(), 2500); // 彻底褪去后销毁
+                });
+            }
+
+            // 4. 激活某一个主题的呼吸反馈
+            function activateItem(index) {
+                clearTimeout(cycleTimeout);
+                if (activeItemDom) activeItemDom.classList.remove('is-breathing');
+                
+                const item = artworks[index];
+                if(!item || isViewing) return;
+
+                item.classList.add('is-breathing');
+                activeItemDom = item;
+                softChangeBg(galleryData[index].images[0]);
+
+                if (!isHovering) {
+                    // 自动托管状态：完成本轮后，静候 4.5 秒进入下一个随机循环
+                    scheduleNextCycle(4500);
+                }
+            }
+
+            // 5. 自动托管循环算法
+            function scheduleNextCycle(delay) {
+                clearTimeout(cycleTimeout);
+                cycleTimeout = setTimeout(() => {
+                    if (isHovering || isViewing || visibleIndices.size === 0) return;
+                    // 从当前屏幕视口内的作品中随机抽取一个
+                    const arr = Array.from(visibleIndices);
+                    const randomIdx = arr[Math.floor(Math.random() * arr.length)];
+                    activateItem(randomIdx);
+                }, delay);
+            }
+
+            // 6. Intersection Observer 监听可视区域及进场动画
+            const visObserver = new IntersectionObserver((entries, obs) => {
+                entries.forEach((entry) => {
+                    const idx = parseInt(entry.target.dataset.idx);
+                    if (entry.isIntersecting) {
+                        visibleIndices.add(idx);
+                        // 进场浮现动画
+                        if(!entry.target.classList.contains('is-visible')) {
+                            setTimeout(() => { entry.target.classList.add('is-visible'); }, (idx%5) * 80);
+                        }
+                    } else {
+                        visibleIndices.delete(idx);
+                    }
+                });
+            }, { threshold: 0.3 }); // 30% 露面就算可见
+
+            // 绑定事件与初始化
+            artworks.forEach((item, index) => {
+                item.dataset.idx = index;
+                visObserver.observe(item);
+
+                // 悬停/触碰接管主导权
+                item.addEventListener('mouseenter', () => { isHovering = true; activateItem(index); });
+                item.addEventListener('mouseleave', () => { isHovering = false; scheduleNextCycle(1500); });
+                
+                // 点击全屏放映
+                item.addEventListener('click', () => {
+                    isViewing = true;
+                    clearTimeout(cycleTimeout);
+                    bgPreview.innerHTML = ''; // 清空背景层以进入极黑状态
+                    if(activeItemDom) activeItemDom.classList.remove('is-breathing');
+                    startCinematicViewer(index);
+                });
+            });
+
+            // 延迟 1 秒后开始第一次自动循环点名
+            setTimeout(() => scheduleNextCycle(1000), 1000);
+
+            // 监听浏览器的物理返回事件 (通过 popstate 拦截)
+            window.addEventListener('popstate', () => {
+                if (isViewing && window.location.hash !== '#view') {
+                    closeViewer(true);
+                }
+            });
+        });
+
+        // --- 电影级沉浸观影逻辑 ---
+        let currentArtIndex = 0, currentImgIndex = 0, slideshowTimer = null, progressTimer = null;
+        const SLIDE_DURATION = 6000, INTERMISSION_DURATION = 3000;
+
+        const viewer = document.getElementById('cinematic-viewer'), viewerTrack = document.getElementById('viewer-track');
+        const vTitle = document.getElementById('viewer-title'), vProgressText = document.getElementById('viewer-progress-text');
+        const progressContainer = document.getElementById('progress-container');
+        const interTitle = document.getElementById('intermission-title'), interMain = document.getElementById('inter-main-title'), interSub = document.getElementById('inter-sub-title');
+
+        function startCinematicViewer(artIndex) {
+            currentArtIndex = artIndex; currentImgIndex = 0;
+            viewer.classList.add('active'); document.body.style.overflow = 'hidden';
+            const menuBtn = document.getElementById('menu-trigger'); if(menuBtn) menuBtn.classList.add('hide-in-viewer');
+            
+            // 加入历史记录，以便拦截系统/浏览器的返回键
+            if (window.location.hash !== '#view') {
+                history.pushState({ viewing: true }, '', '#view');
+            }
+            
+            playArtwork(currentArtIndex);
+        }
+
+        // 接收 fromPopState 参数，区分是用户点击UI关闭，还是按了物理返回键
+        function closeViewer(fromPopState = false) {
+            clearTimeout(slideshowTimer); clearInterval(progressTimer);
+            viewer.classList.remove('active'); document.body.style.overflow = '';
+            const menuBtn = document.getElementById('menu-trigger'); if(menuBtn) menuBtn.classList.remove('hide-in-viewer');
+            isViewing = false; // 解除观影锁死
+            
+            // 如果是用户点击UI上的返回按钮，且目前哈希值为 #view，则程序模拟一次后退，保持历史栈整洁
+            if (fromPopState !== true && window.location.hash === '#view') {
+                history.back();
+            }
+            
+            setTimeout(() => { 
+                viewerTrack.innerHTML = ''; interTitle.classList.remove('show'); 
+                // 恢复后台自动播放循环
+                const artworks = document.querySelectorAll('.artwork-item');
+                if(artworks.length > 0) {
+                   const ev = new Event('mouseleave');
+                   artworks[0].dispatchEvent(ev);
+                }
+            }, 800);
+        }
+
+        function playArtwork(artIndex) {
+            currentImgIndex = 0; const artwork = galleryData[artIndex];
+            interMain.innerText = artwork.title; interSub.innerText = artwork.subtitle;
+            viewerTrack.innerHTML = ''; progressContainer.innerHTML = '';
+            viewer.classList.add('ui-hidden'); interTitle.classList.add('show');
+
+            clearTimeout(slideshowTimer);
+            slideshowTimer = setTimeout(() => {
+                interTitle.classList.remove('show'); viewer.classList.remove('ui-hidden');
+                artwork.images.forEach((src, i) => {
+                    const slide = document.createElement('div'); slide.className = 'viewer-slide'; slide.innerHTML = `<img src="${src}" alt="Detail ${i}">`; viewerTrack.appendChild(slide);
+                    const bar = document.createElement('div'); bar.className = 'progress-bar'; bar.innerHTML = `<div class="progress-fill" id="fill-${i}"></div>`; progressContainer.appendChild(bar);
+                });
+                // 核心修复：强制浏览器执行一次 DOM 重绘，让其锁定第一张图处于 opacity: 0 的状态
+                viewerTrack.offsetHeight; 
+                // 给予 50ms 缓冲后执行 showImage，完美衔接最初的柔和 2 秒淡入特效
+                setTimeout(() => showImage(0), 50);
+            }, INTERMISSION_DURATION);
+        }
+
+        function showImage(imgIndex) {
+            const artwork = galleryData[currentArtIndex], slides = document.querySelectorAll('.viewer-slide');
+            slides.forEach((slide, i) => i === imgIndex ? slide.classList.add('active') : slide.classList.remove('active'));
+            vTitle.innerText = artwork.title; vProgressText.innerText = `${imgIndex + 1} / ${artwork.images.length}`;
+
+            document.querySelectorAll('.progress-fill').forEach(fill => { fill.style.transition = 'none'; fill.style.width = '0%'; });
+            for(let i=0; i<imgIndex; i++) { document.getElementById(`fill-${i}`).style.width = '100%'; }
+
+            const currentFill = document.getElementById(`fill-${imgIndex}`);
+            currentFill.offsetHeight; // force reflow
+            currentFill.style.transition = `width ${SLIDE_DURATION}ms linear`; currentFill.style.width = '100%';
+
+            clearTimeout(slideshowTimer);
+            slideshowTimer = setTimeout(() => {
+                if (imgIndex + 1 < artwork.images.length) showImage(imgIndex + 1);
+                else { currentArtIndex = (currentArtIndex + 1) % galleryData.length; playArtwork(currentArtIndex); }
+            }, SLIDE_DURATION);
+        }
+
+        let uiIdleTimer;
+        viewer.addEventListener('mousemove', () => {
+            if(!interTitle.classList.contains('show')) {
+                viewer.classList.remove('ui-hidden'); clearTimeout(uiIdleTimer);
+                uiIdleTimer = setTimeout(() => { viewer.classList.add('ui-hidden'); }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>

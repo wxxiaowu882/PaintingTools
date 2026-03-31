@@ -1,0 +1,277 @@
+<!DOCTYPE html> <html lang="zh-CN"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"> <title>手绘工坊 · 童画师吴晓</title>
+<!-- ========== SEO优化开始 ========== -->
+<!-- 页面描述：50-160字符，包含核心关键词 --> <meta name="description" content="童画师吴晓设计的专业绘画工具集，包含色阶图生成器、智能调色助手、AR线稿描摹工具，帮助绘画爱好者提升创作效率。免费在线使用。"> <!-- 关键词：包含品牌词和功能词 --> <meta name="keywords" content="吴晓,童画师吴晓,童话师吴晓,手绘工坊,绘画工具,色阶图生成,智能调色,AR线稿描摹,孟塞尔色立体,颜色调配工具">
+<meta name="author" content="童画师吴晓"> <!-- Open Graph 社交媒体优化 --> <meta property="og:title" content="手绘工坊 · 童画师吴晓 - 专业绘画工具集">
+<meta property="og:description" content="童画师吴晓设计的免费在线绘画工具：色阶图生成、智能调色、AR线稿描摹，帮助绘画创作。"> <meta property="og:image" content="docs/img/wuxiao_s.jpg">
+<meta property="og:url" content="https://www.wuxiaoart.com/index.html"> <meta property="og:type" content="website">
+<meta property="og:site_name" content="手绘工坊 · 童画师吴晓 - 专业绘画工具集"> <!-- Twitter Card --> <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="手绘工坊 · 童画师吴晓 - 专业绘画工具集"> <meta name="twitter:description" content="童画师吴晓设计的免费在线绘画工具：色阶图生成、智能调色、AR线稿描摹">
+<meta name="twitter:image" content="docs/img/wuxiao_s.jpg"> <!-- 结构化数据 (JSON-LD) - 对搜索引擎友好 --> <script type="application/ld+json"> { "@context": "https://schema.org",
+"@type": "WebApplication", "name": "手绘工坊 · 童画师吴晓 - 专业绘画工具集", "description": "童画师吴晓设计的免费在线绘画工具集合，包含色阶图生成、智能调色、AR线稿描摹功能",
+"url": "https://www.wuxiaoart.com/index.html", "author": { "@type": "Person", "name": "吴晓",
+"alternateName": ["童画师吴晓", "童话师吴晓"], "jobTitle": "儿童类肖像定制画师", "description": "专职画师，并致力于设计实用的绘画辅助工具和教程" },
+"applicationCategory": "DesignApplication", "operatingSystem": "Any", "offers": { "@type": "Offer",
+"price": "0", "priceCurrency": "CNY" }, "aggregateRating": { "@type": "AggregateRating",
+"ratingValue": "4.8", "ratingCount": "128" } } </script> <!-- ========== SEO优化结束 ========== -->
+<!-- 引入 Tailwind CSS --> <script src="docs/js/tailwind-play.js"></script> <!-- 引入极细字体 Inter --> <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet"> <script async src="docs/js/es-module-shims.js"></script>
+<script type="importmap"> { "imports": { "three": "./docs/js/three/three.module.js", "three/addons/controls/OrbitControls.js": "./docs/js/three/OrbitControls.js",
+"@tweenjs/tween.js": "./docs/js/tween/tween.esm.js" } } </script> 
+<!-- 引入全局菜单组件 --> <script src="docs/js/GlobalMenu.js"></script>
+<style>
+body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+/* 强制极细字体风格 */ .font-hairline { font-weight: 100; } .font-thin { font-weight: 200; }
+/* 呼吸光点动画 */ .breath-point { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4); animation: pulse-white 3s infinite; }
+@keyframes pulse-white { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4); }
+70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(255, 255, 255, 0); }
+100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); } }
+/* === 优化：选色器热区扩大与安卓适配 === */ .color-input-wrapper { position: relative; width: 60px; /* 扩大热区至 60x60 */
+height: 60px; display: flex; align-items: center; justify-content: center; cursor: pointer; /* overflow: hidden; 移除此属性以免切断光晕 */ }
+/* 隐藏的原生 Input，铺满整个热区 */ .color-input-wrapper input[type="color"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 0; margin: 0; opacity: 0; /* 完全透明 */
+cursor: pointer; z-index: 10; /* 确保在最上层 */
+border: none; -webkit-appearance: none; /* 移除 iOS/Android 默认外观 */
+background: transparent; }
+/* 视觉上的光点 (居中) */
+#colorPreview { width: 6px; height: 6px; /* 保持精致小巧 */
+pointer-events: none; /* 点击穿透给 input */ }
+/* 微信引导遮罩 */ .wechat-guide { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 99999;
+display: none; flex-direction: column; align-items: flex-end; padding: 20px 30px; color: white; text-align: right; } .wechat-guide .arrow { font-size: 40px; margin-bottom: 10px; animation: bounce 1.5s infinite; color: #fff; }
+.wechat-guide .text { font-size: 16px; line-height: 1.6; font-weight: 500; color: #fff; }
+@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+/* === VISION DIMENSIONS 标题样式 (分行版) === */ .site-title { position: absolute; top: 5vh; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+text-align: center; width: 100%; gap: 0; } .title-line { font-size: 28px; font-weight: 100; letter-spacing: 0.2em; line-height: 1.3; color: rgba(255, 255, 255, 0.75); text-transform: uppercase; background: linear-gradient(135deg,
+rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.65) 50%, rgba(255, 255, 255, 0.4) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: flex; align-items: center;
+justify-content: center; } .subtitle { font-size: 10px; color: rgba(255, 255, 255, 0.4); letter-spacing: 0.5em; margin-top: 14px; font-weight: 200; text-transform: uppercase; }
+/* 嵌入文字中的头像圆圈 */ .avatar-o { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%;
+background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05)); border: 1px solid rgba(255, 255, 255, 0.35); backdrop-filter: blur(6px); box-shadow: 0 0 20px rgba(255,255,255,0.15); margin: 0 0.15em; position: relative;
+-webkit-text-fill-color: initial; background-clip: border-box; color: white; pointer-events: auto; cursor: pointer; overflow: hidden; transition: transform 0.3s ease, border-color 0.3s; } .avatar-o:hover { transform: scale(1.1);
+border-color: rgba(255,255,255,0.6); } .avatar-emoji { font-size: 20px; opacity: 0.95; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); } .avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; opacity: 0.5;
+transition: opacity 0.3s ease, transform 0.3s ease, filter 0.3s ease; } .avatar-o:hover .avatar-img { opacity: 0.8; filter: brightness(1.2); animation: pulse-white 3s infinite; }
+/* 画布容器样式 - 增加位置下移 */
+#canvas-container { width: 100%; height: 100%; fixed: top-0; left: 0; z-index: 0; /* 核心修改：整体下移 5% */
+transform: translateY(5vh); }
+@media (min-width: 640px) { .site-title { top: 7vh; } .title-line { font-size: 48px; letter-spacing: 0.3em; line-height: 1.4; } .subtitle { font-size: 12px; letter-spacing: 0.8em; margin-top: 20px; }
+.avatar-o { width: 58px; height: 58px; margin: 0 0.2em; border-width: 1.5px; } .avatar-emoji { font-size: 32px; } } </style> <script> (function(){ // 微信引导层开关 - 设置为 false 即可禁用
+/* 配合 GlobalMenu.js，只在菜单打开时变为 X */
+.menu-open .line-1 { transform: rotate(45deg) translateY(-1.5px); }
+.menu-open .line-2 { opacity: 0; }
+.menu-open .line-3 { transform: rotate(-45deg) translateY(1.5px); }
+var SHOW_WECHAT_GUIDE = false; // true: 显示引导层, false: 不显示
+var ua = navigator.userAgent.toLowerCase(); if(ua.match(/MicroMessenger/i)=="micromessenger" && SHOW_WECHAT_GUIDE){ document.write('<style>.wechat-guide{display:flex !important;}</style>'); } })(); </script> </head>
+<body class="text-white selection:bg-white/10"> <!-- 微信引导 --> <div class="wechat-guide" onclick="this.style.display='none'"> <div class="arrow">↗</div>
+<div class="text">为了更好的体验<br>请点击右上角菜单<br>选择 <strong>在浏览器中打开</strong> 🌍</div> </div> <!-- UI 层 --> <div id="ui-layer" class="fixed inset-0 z-10 pointer-events-none">
+<!-- 1. 顶部居中：身份印记 --> <div class="site-title"> <div class="title-line">
+VISI<div class="avatar-o" onclick="toggleMenu()" title="童画师吴晓"><img src="docs/img/wuxiao_s.jpg" alt="童画师吴晓" class="avatar-img"></div>N
+</div> <div class="title-line"> DIMENSIONS </div> <div class="subtitle">COLOR • FORM <br/>CREATION</div> </div> <!-- 2. 右上角：总控菜单开关 (尺寸缩小，颜色调暗，位置贴近边缘) -->
+<div id="menu-trigger" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center cursor-pointer pointer-events-auto group z-50 transition-all duration-300 animate-pulse hover:animate-none hover:bg-white/25" style="animation-duration: 4s;" onclick="toggleMenu()">
+    <div class="relative w-6 h-3 flex flex-col justify-between items-end transition-all duration-300 group-hover:h-4">
+        <!-- 三条极细线 -->
+        <div class="line-1 w-full h-[1px] bg-white transition-all duration-300 origin-right"></div>
+        <div class="line-2 w-2/3 h-[1px] bg-white transition-all duration-300"></div>
+        <div class="line-3 w-full h-[1px] bg-white transition-all duration-300 origin-right"></div>
+    </div>
+</div> <!-- 3. 底部居中：隐形控制器 (文案更新) --> <div class="absolute bottom-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-4 pointer-events-auto z-40">
+<!-- 选色器：热区已扩大 --> <div class="color-input-wrapper group" title="点击更改颜色"> <div id="colorPreview" class="rounded-full bg-white breath-point transition-all duration-500 group-hover:scale-[3] group-hover:bg-white"></div>
+<input type="color" id="colorPicker" value="#ffffff"> </div> <div class="flex flex-col items-center gap-1 opacity-40 hover:opacity-80 transition-opacity duration-500"> <span class="font-hairline text-[9px] tracking-[0.2em] text-white">by 童画师吴晓</span> </div>
+</div> </div> <div id="scene-loader" class="fixed inset-0 z-0 flex flex-col items-center justify-center transition-opacity duration-1000 pointer-events-none">
+<div class="w-3 h-3 rounded-full bg-white/70 animate-pulse mb-6"></div> <div class="font-hairline text-[10px] tracking-[0.4em] text-white/40 uppercase animate-pulse" style="animation-delay: 0.5s;">Loading Dimensions...</div> </div> <!-- 3D 画布容器，已应用 translateY 下移 -->
+<div id="canvas-container" class="fixed top-0 left-0"></div> <script type="module"> import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; import * as TWEEN from '@tweenjs/tween.js'; // Configuration
+const CONFIG = { particleCount: window.innerWidth < 768 ? 35000 : 75000, height: 40, radius: 26, currentBaseSize: 0.85 }; let scene, camera, renderer, controls; let particleSystem; let selectionMarker;
+let selectedColor = new THREE.Color('#ffffff'); let particleTexture; let isAnimatingCamera = false; let mouseX = 0, mouseY = 0; // For Parallax
+let skeletonGroup; // For Axis
+
+// === 可扩充的开场动画调度系统 ===
+const ANIM_COUNT = 3; // 当前支持的方案总数
+let entranceAnimType = Math.floor(Math.random() * ANIM_COUNT) + 1; // 随机抽取 1, 2, 3
+// 如果抽中方案3(从秩序到感知)，初始必须是标准圆柱体(0)；其余方案直接是孟塞尔体(0.55)
+let shapeMode = (entranceAnimType === 3) ? 0 : 0.55; 
+
+// Idle Timer State
+let lastInteractionTime = Date.now(); const IDLE_TIMEOUT = 5000; // Data Stores (新增 scatter 阵列以备方案2使用)
+const particlesData = { baseX: [], baseY: [], baseZ: [], munsellX: [], munsellY: [], munsellZ: [], scatterX: [], scatterY: [], scatterZ: [], colorRGB: [] }; // --- UTILS ---
+function createSoftParticleTexture() { const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64; const ctx = canvas.getContext('2d');
+const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32); grad.addColorStop(0, 'rgba(255,255,255,1.0)'); grad.addColorStop(0.2, 'rgba(255,255,255,0.8)'); grad.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+grad.addColorStop(1.0, 'rgba(255,255,255,0.0)'); ctx.fillStyle = grad; ctx.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(canvas); }
+function cosineInterpolate(y1, y2, mu) { const mu2 = (1 - Math.cos(mu * Math.PI)) / 2; return (y1 * (1 - mu2) + y2 * mu2); }
+function getMunsellCharacteristics(h) { if (h >= 0.9999) h = 0; const hueDeg = h * 360; const keys = [ { h: 0,   v: 0.45, c: 1.0 }, { h: 60,  v: 0.85, c: 0.8 }, { h: 120, v: 0.55, c: 0.5 }, { h: 180, v: 0.65, c: 0.4 },
+{ h: 240, v: 0.35, c: 0.7 }, { h: 300, v: 0.30, c: 0.65 }, { h: 360, v: 0.45, c: 1.0 } ]; for (let i = 0; i < keys.length - 1; i++) { if (hueDeg >= keys[i].h && hueDeg < keys[i+1].h) {
+const t = (hueDeg - keys[i].h) / (keys[i+1].h - keys[i].h); return { peakL: cosineInterpolate(keys[i].v, keys[i+1].v, t), maxChroma: cosineInterpolate(keys[i].c, keys[i+1].c, t) }; } }
+return { peakL: 0.45, maxChroma: 1.0 }; }
+function calculateData(h, s, l) { const standardDist = Math.abs(2 * l - 1); const standardBulge = Math.cos(standardDist * Math.PI / 2); const standardR = s * CONFIG.radius * 0.7 * standardBulge; const standardY = (l - 0.5) * CONFIG.height;
+const { peakL, maxChroma } = getMunsellCharacteristics(h); const tempColor = new THREE.Color().setHSL(h, s, l); const luma = 0.2126 * tempColor.r + 0.7152 * tempColor.g + 0.0722 * tempColor.b; const perceptualL = Math.pow(luma, 1/2.2);
+const munsellY = (perceptualL - 0.5) * CONFIG.height; let dist = 0; if (l > peakL) dist = (l - peakL) / (1 - peakL); else dist = (peakL - l) / peakL; let bulge = Math.pow(Math.cos(dist * Math.PI / 2), 0.8);
+const munsellR = s * CONFIG.radius * maxChroma * bulge; const theta = h * Math.PI * 2; const cos = Math.cos(theta); const sin = Math.sin(theta); return { base: { x: standardR * cos, y: standardY, z: standardR * sin },
+munsell: { x: munsellR * cos, y: munsellY, z: munsellR * sin }, rgb: tempColor }; }
+function init() { particleTexture = createSoftParticleTexture(); const container = document.getElementById('canvas-container'); scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050505); // Subtle Fog
+scene.fog = new THREE.FogExp2(0x050505, 0.002); camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000); 
+camera.position.set(0, 15, 115); renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false }); renderer.setPixelRatio(window.devicePixelRatio); renderer.setSize(window.innerWidth, window.innerHeight);
+container.appendChild(renderer.domElement); controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = 0.05; controls.autoRotate = true; controls.autoRotateSpeed = 1.8;
+controls.addEventListener('start', () => { lastInteractionTime = Date.now(); controls.autoRotate = false; }); // Idle Reset Logic
+const resetIdleTimer = () => { lastInteractionTime = Date.now(); controls.autoRotate = false; }; renderer.domElement.addEventListener('pointerdown', resetIdleTimer);
+renderer.domElement.addEventListener('pointermove', (e) => { if (!controls.autoRotate) lastInteractionTime = Date.now(); // Parallax Factor
+mouseX = (e.clientX - window.innerWidth / 2) * 0.05; mouseY = (e.clientY - window.innerHeight / 2) * 0.05; }); generateColorSolid(); createSkeleton(); // V3.1: Always show skeleton axis
+createSelectionMarker(); scene.add(new THREE.AmbientLight(0x444444)); window.addEventListener('resize', onWindowResize); setupUI(); 
+
+// === 执行抽取的开场动画逻辑 ===
+// 基础隐身状态设定
+particleSystem.material.opacity = 0;
+const axisMat = skeletonGroup.children[0].material; 
+axisMat.opacity = 0;
+const positions = particleSystem.geometry.attributes.position.array;
+
+switch(entranceAnimType) {
+    case 1:
+        // 【方案一：深空浮现】安静、克制、呼吸感
+        particleSystem.scale.setScalar(0.85);
+        skeletonGroup.scale.setScalar(0.85);
+        new TWEEN.Tween({ op: 0, sc: 0.85 })
+            .to({ op: 0.9, sc: 1.0 }, 3500)
+            .easing(TWEEN.Easing.Cubic.Out)
+            .delay(200)
+            .onUpdate((obj) => {
+                particleSystem.material.opacity = obj.op;
+                particleSystem.scale.setScalar(obj.sc);
+                skeletonGroup.scale.setScalar(obj.sc);
+                axisMat.opacity = obj.op * (0.15 / 0.9);
+            }).start();
+        break;
+
+    case 2:
+        // 【方案二：星尘凝结】(修复版：改为 Quartic.Out 起步极快，结尾柔和，告别漫长黑屏等待)
+        particleSystem.material.size = 0.01;
+        skeletonGroup.scale.setScalar(0.01);
+        // 初始化“大爆炸”坐标
+        for (let i = 0; i < CONFIG.particleCount; i++) {
+            const idx = i * 3;
+            positions[idx] = particlesData.baseX[i] + (particlesData.munsellX[i] - particlesData.baseX[i]) * shapeMode + particlesData.scatterX[i];
+            positions[idx+1] = particlesData.baseY[i] + (particlesData.munsellY[i] - particlesData.baseY[i]) * shapeMode + particlesData.scatterY[i];
+            positions[idx+2] = particlesData.baseZ[i] + (particlesData.munsellZ[i] - particlesData.baseZ[i]) * shapeMode + particlesData.scatterZ[i];
+        }
+        particleSystem.geometry.attributes.position.needsUpdate = true;
+
+        new TWEEN.Tween({ scatter: 1, opacity: 0, size: 0.01 })
+            .to({ scatter: 0, opacity: 0.9, size: CONFIG.currentBaseSize }, 4000)
+            .easing(TWEEN.Easing.Quartic.Out) // 核心修改：起步极猛，瞬间褪去黑屏；结尾阻尼绵长，无咔哒感
+            .delay(200)
+            .onUpdate((obj) => {
+                particleSystem.material.opacity = obj.opacity;
+                particleSystem.material.size = obj.size;
+                skeletonGroup.scale.setScalar(1.0 - obj.scatter);
+                axisMat.opacity = obj.opacity * (0.15 / 0.9);
+                // 高性能插值收缩
+                for (let i = 0; i < CONFIG.particleCount; i++) {
+                    const idx = i * 3;
+                    const targetX = particlesData.baseX[i] + (particlesData.munsellX[i] - particlesData.baseX[i]) * shapeMode;
+                    const targetY = particlesData.baseY[i] + (particlesData.munsellY[i] - particlesData.baseY[i]) * shapeMode;
+                    const targetZ = particlesData.baseZ[i] + (particlesData.munsellZ[i] - particlesData.baseZ[i]) * shapeMode;
+                    positions[idx] = targetX + particlesData.scatterX[i] * obj.scatter;
+                    positions[idx+1] = targetY + particlesData.scatterY[i] * obj.scatter;
+                    positions[idx+2] = targetZ + particlesData.scatterZ[i] * obj.scatter;
+                }
+                particleSystem.geometry.attributes.position.needsUpdate = true;
+            }).start();
+        break;
+
+    case 3:
+        // 【方案三：从秩序到感知】学术与哲理，形态的绽放
+        particleSystem.scale.setScalar(0.9);
+        skeletonGroup.scale.setScalar(0.9);
+        new TWEEN.Tween({ mode: 0, opacity: 0, scale: 0.9 })
+            .to({ mode: 0.55, opacity: 0.9, scale: 1.0 }, 3500)
+            .easing(TWEEN.Easing.Cubic.InOut)
+            .delay(200)
+            .onUpdate((obj) => {
+                shapeMode = obj.mode;
+                particleSystem.material.opacity = obj.opacity;
+                particleSystem.scale.setScalar(obj.scale);
+                skeletonGroup.scale.setScalar(obj.scale);
+                axisMat.opacity = obj.opacity * (0.15 / 0.9);
+                for (let i = 0; i < CONFIG.particleCount; i++) {
+                    const idx = i * 3;
+                    positions[idx] = particlesData.baseX[i] + (particlesData.munsellX[i] - particlesData.baseX[i]) * shapeMode;
+                    positions[idx+1] = particlesData.baseY[i] + (particlesData.munsellY[i] - particlesData.baseY[i]) * shapeMode;
+                    positions[idx+2] = particlesData.baseZ[i] + (particlesData.munsellZ[i] - particlesData.baseZ[i]) * shapeMode;
+                }
+                particleSystem.geometry.attributes.position.needsUpdate = true;
+            }).start();
+        break;
+}
+// ===============================================
+
+animate(); }
+function generateColorSolid() { const geometry = new THREE.BufferGeometry(); const positions = []; const colorRGB = []; particlesData.baseX = []; particlesData.baseY = []; particlesData.baseZ = [];
+particlesData.munsellX = []; particlesData.munsellY = []; particlesData.munsellZ = []; particlesData.scatterX = []; particlesData.scatterY = []; particlesData.scatterZ = [];
+
+for (let i = 0; i < CONFIG.particleCount; i++) { const h = Math.random(); const s = Math.sqrt(Math.random()); const l = Math.random();
+const data = calculateData(h, s, l); positions.push( data.base.x + (data.munsell.x - data.base.x) * shapeMode, data.base.y + (data.munsell.y - data.base.y) * shapeMode, data.base.z + (data.munsell.z - data.base.z) * shapeMode );
+colorRGB.push(data.rgb.r, data.rgb.g, data.rgb.b); particlesData.baseX.push(data.base.x); particlesData.baseY.push(data.base.y); particlesData.baseZ.push(data.base.z);
+particlesData.munsellX.push(data.munsell.x); particlesData.munsellY.push(data.munsell.y); particlesData.munsellZ.push(data.munsell.z); 
+
+// 统一预计算散布数组，供爆炸凝结动画备用调用
+const scatterRadius = 300 + Math.random() * 400; 
+const sTheta = Math.random() * 2 * Math.PI;
+const sPhi = Math.acos((Math.random() * 2) - 1);
+particlesData.scatterX.push(scatterRadius * Math.sin(sPhi) * Math.cos(sTheta));
+particlesData.scatterY.push(scatterRadius * Math.sin(sPhi) * Math.sin(sTheta));
+particlesData.scatterZ.push(scatterRadius * Math.cos(sPhi));
+}
+particlesData.colorRGB = new Float32Array(colorRGB); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+geometry.setAttribute('color', new THREE.BufferAttribute(particlesData.colorRGB, 3)); const material = new THREE.PointsMaterial({ size: CONFIG.currentBaseSize, map: particleTexture, vertexColors: true,
+transparent: true, opacity: 0.9, sizeAttenuation: true, alphaTest: 0.001, blending: THREE.NormalBlending, depthWrite: false }); particleSystem = new THREE.Points(geometry, material); scene.add(particleSystem); }
+// V3.1: Modified to show simple axis always
+function createSkeleton() { skeletonGroup = new THREE.Group(); scene.add(skeletonGroup); const axisMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15, // Low opacity for elegance
+blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }); // Central Axis Line
+const axisGeo = new THREE.CylinderGeometry(0.02, 0.02, CONFIG.height + 10, 8); const axisMesh = new THREE.Mesh(axisGeo, axisMat); skeletonGroup.add(axisMesh); // Top Arrow
+const arrowGeo = new THREE.ConeGeometry(0.3, 1.2, 16); const arrowMesh = new THREE.Mesh(arrowGeo, axisMat); arrowMesh.position.y = (CONFIG.height + 10) / 2; skeletonGroup.add(arrowMesh); }
+function createSelectionMarker() { const group = new THREE.Group(); group.add(new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffffff })));
+const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, side: THREE.DoubleSide }); group.add(new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.05, 16, 64), ringMat));
+const ring2 = new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.02, 16, 64), ringMat); ring2.rotation.x = Math.PI / 2; group.add(ring2); selectionMarker = group; selectionMarker.visible = false; scene.add(selectionMarker); }
+function setupUI() { const picker = document.getElementById('colorPicker'); const preview = document.getElementById('colorPreview'); picker.addEventListener('input', (e) => {
+selectedColor.set(e.target.value); preview.style.backgroundColor = e.target.value; const hsl = {}; selectedColor.getHSL(hsl); update3DSelection(hsl); }); 
+// Zoom & Navigate Animation
+window.zoomAndNavigate = function(url) { isAnimatingCamera = true; controls.autoRotate = false; controls.enabled = false; // 1. Hide UI immediately
+document.getElementById('ui-layer').style.opacity = '0'; const go = document.getElementById('global-menu-overlay'); if(go) go.classList.remove('active');
+
+// [新增] 提前在动画结尾阶段加入整体淡出，完美掩盖浏览器加载新页面时的掉帧停滞
+setTimeout(function() { document.body.style.transition = "opacity 0.4s ease-out"; document.body.style.opacity = "0"; }, 600);
+
+// 2. Faster zoom with smoother easing
+new TWEEN.Tween(camera.position) .to({ x: 0, y: 0, z: 0 }, 1000) // 从1500ms减少到1000ms
+.easing(TWEEN.Easing.Cubic.InOut) // 改为更平滑的缓动
+.onUpdate(() => camera.lookAt(0,0,0)) .onComplete(() => { // 添加一个微小的延迟确保动画完全结束
+setTimeout(() => { window.location.href = url; }, 50); }) .start(); }; }
+function update3DSelection(hsl) { controls.autoRotate = false; selectionMarker.visible = true; const data = calculateData(hsl.h, hsl.s, hsl.l); const x = data.base.x + (data.munsell.x - data.base.x) * shapeMode;
+const y = data.base.y + (data.munsell.y - data.base.y) * shapeMode; const z = data.base.z + (data.munsell.z - data.base.z) * shapeMode; new TWEEN.Tween(selectionMarker.position) .to({ x: x, y: y, z: z }, 800) .easing(TWEEN.Easing.Cubic.Out)
+.onUpdate(() => selectionMarker.lookAt(camera.position)) .start(); selectionMarker.children[0].material.color.setHSL(hsl.h, hsl.s, hsl.l); const theta = hsl.h * Math.PI * 2; const offsetAngle = Math.PI / 4;
+const finalAngle = theta + offsetAngle; const camDist = 115; // Maintain V3.1 distance
+const camHeight = Math.max(30, y + 20); new TWEEN.Tween(camera.position) .to({ x: camDist * Math.cos(finalAngle), y: camHeight, z: camDist * Math.sin(finalAngle) }, 1500) .easing(TWEEN.Easing.Quadratic.InOut) .onComplete(() => {
+isAnimatingCamera = false; controls.enabled = true; controls.target.set(0, 0, 0); controls.update(); }) .start(); }
+function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+function animate(time) { requestAnimationFrame(animate); TWEEN.update(time); if (!isAnimatingCamera) { controls.update(); // Parallax Effect: V3.1
+if (particleSystem) { // Subtle tilt based on mouse position
+particleSystem.rotation.x += (mouseY * 0.0005 - particleSystem.rotation.x) * 0.05; particleSystem.rotation.y += (mouseX * 0.0005 - particleSystem.rotation.y) * 0.05; if (skeletonGroup) { skeletonGroup.rotation.x = particleSystem.rotation.x;
+skeletonGroup.rotation.y = particleSystem.rotation.y; } } }
+if (!controls.autoRotate && !isAnimatingCamera) { if (Date.now() - lastInteractionTime > IDLE_TIMEOUT) { controls.autoRotate = true; } }
+if (selectionMarker && selectionMarker.visible) { selectionMarker.children[1].rotation.x = Math.sin(time * 0.002) * 0.5; selectionMarker.children[2].rotation.x = (Math.PI / 2) + Math.cos(time * 0.002) * 0.5; }
+renderer.render(scene, camera); }
+// === [修改] iOS Safari 返回缓存自愈代码 ===
+window.addEventListener('pageshow', function(event) { // event.persisted 为 true 表示从缓存恢复
+if (event.persisted) { 
+// 0. 瞬间恢复 body 的透明度，防止后退时依然是黑屏
+document.body.style.transition = "none"; document.body.style.opacity = "1";
+// 1. 强制重置 UI 可见性
+document.getElementById('ui-layer').style.opacity = '1'; 
+const go = document.getElementById('global-menu-overlay'); if(go) go.classList.remove('active');
+// 2. 强制重置相机位置 (V3.1 基准)
+if (camera) { camera.position.set(0, 15, 115); camera.lookAt(0, 0, 0); }
+// 3. 强制重置控制器
+if (controls) { controls.enabled = true; controls.autoRotate = true; controls.target.set(0, 0, 0); controls.update(); }
+// 4. 重置动画锁
+isAnimatingCamera = false; } }); // 延迟 50ms 执行 init，让头尾 UI 和局部 Loading 优先渲染完毕
+setTimeout(function() { init(); var loader = document.getElementById('scene-loader'); if (loader) { loader.style.opacity = '0';
+setTimeout(function() { loader.style.display = 'none'; }, 1000); } }, 50); </script> <!-- ========== SEO隐藏内容区域开始 ========== -->
+<!-- 此区域对用户隐藏，但对搜索引擎可见，用于增强关键词密度 --> <div style="position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none;"> <h1>手绘工坊 · 童画师吴晓</h1> <h2>专业绘画工具集合 - 童画师吴晓设计</h2> <p>童画师吴晓，是专业的儿童肖像定制画师。本工具集是童画师吴晓为绘画爱好者设计的免费在线工具，包含色阶图生成、智能调色、AR线稿描摹等功能，旨在帮助绘画爱好者提升创作效率。</p>
+<p>所有工具均由童画师吴晓作为产品经理的身份参与设计，且完全免费开放使用。童画师吴晓致力于为绘画社区提供实用的辅助工具。</p> <p>核心关键词：吴晓, 童画师吴晓, 童话师吴晓, 手绘工坊, 绘画工具, 色阶图生成, 智能调色, AR线稿描摹, 孟塞尔色立体, 颜色调配, 绘画辅助软件, 免费在线工具</p> <p>功能关键词：网格起型工具, 颜料管理系统, 颜色匹配工具, AR绘画辅助, 增强现实描摹, 水彩调色助手, 油画颜色调配</p> </div>
+<!-- ========== SEO隐藏内容区域结束 ========== --> </body> </html>

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>我爱你们 - 绘画辅助</title>
+
+<!-- ========== SEO优化开始 ========== -->
+<meta name="description" content="童画师吴晓设计的色阶图生成与网格起型工具，帮助绘画者快速创建色阶参考和构图网格，提升绘画准确度。免费在线工具。">
+<meta name="keywords" content="吴晓,童画师吴晓,色阶图生成,网格起型,绘画辅助工具,颜色参考,构图工具,绘画网格,我爱你们工具">
+<meta name="author" content="童画师吴晓">
+<meta property="og:title" content="色阶图生成器 · 网格起型工具 - 童画师吴晓">
+<meta property="og:description" content="童画师吴晓设计的免费色阶图生成与网格起型工具，帮助绘画构图和颜色参考">
+<meta property="og:image" content="docs/img/wuxiao_s.jpg">
+<meta property="og:url" content="https://www.wuxiaoart.com/GR.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="手绘工坊 · 童画师吴晓">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="色阶图生成器 · 网格起型工具 - 童画师吴晓">
+<meta name="twitter:description" content="童画师吴晓设计的免费色阶图生成与网格起型工具，帮助绘画构图">
+<meta name="twitter:image" content="docs/img/wuxiao_s.jpg">
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "色阶图生成器 · 网格起型工具",
+    "description": "童画师吴晓设计的色阶图生成与网格起型工具，帮助绘画构图和颜色参考",
+    "url": "https://www.wuxiaoart.com/GR.html",
+    "author": {
+        "@type": "Person",
+        "name": "吴晓",
+        "alternateName": "童画师吴晓",
+        "jobTitle": "儿童肖像定制画师",
+        "description": "专业儿童类题材肖像绘画师，并致力于设计实用的绘画辅助工具和教程"
+    },
+    "applicationCategory": "DesignApplication",
+    "operatingSystem": "Any",
+    "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "CNY"
+    }
+}
+</script>
+<!-- ========== SEO优化结束 ========== -->
+
+<!-- 引入极细字体 Inter 统一品牌视觉 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&display=swap" rel="stylesheet">
+
+<script src="docs/js/GlobalMenu.js"></script>
+
+<style>
+/* === 0. 核心重置 & 基础变量 (雅致弥散风) === */
+:root{
+    --primary-black: #111111;
+    --bg-body: #F5F5F7; 
+    --bg-shell: #FFFFFF;
+    --bg-control: #FAFAFC;
+    --text-main: #1D1D1F;
+    --text-sub: #86868B;
+    --border-color: rgba(0,0,0,0.06);
+    --paper-ratio: 0.716;
+    /* 引入极致柔和的弥散阴影 */
+    --shadow-app: 0 20px 60px rgba(0,0,0,0.04);
+    --shadow-card: 0 20px 40px rgba(0,0,0,0.08);
+    --shadow-btn: 0 8px 20px rgba(0,0,0,0.1);
+    --trans-spring: cubic-bezier(0.16, 1, 0.3, 1);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;outline:none}img{-webkit-touch-callout:none}
+html,body{margin:0;padding:0;width:100%;min-height:100vh;background-color:var(--bg-body);padding-bottom:env(safe-area-inset-bottom);font-family:'Inter',system-ui,sans-serif;color:var(--text-main);-webkit-user-select:none;user-select:none;display:block;padding-top:20px;padding-bottom:20px;touch-action:pan-y;-webkit-text-size-adjust:100%}
+
+/* === 1. 外壳与布局 === */
+.app-shell{width:100%;max-width:1400px;margin:0 auto;background-color:var(--bg-shell);position:relative;border-radius:16px;box-shadow:var(--shadow-app);border:1px solid rgba(0,0,0,0.04);overflow:hidden;min-height:calc(100vh - 40px);display:flex;flex-direction:column}
+
+/* 头部改为高级毛玻璃质感 */
+header{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding:16px 24px 0;border-bottom:1px solid var(--border-color);position:relative;z-index:10;display:flex;flex-direction:column;align-items:flex-start}
+
+/* === 2. 品牌与标题区域 (高级深灰) === */
+.brand-card{display:flex;align-items:center;gap:14px;padding:6px 0;cursor:pointer;margin-bottom:16px;width:100%;transition:opacity 0.3s}.brand-card:active{opacity:0.6}
+.brand-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#FF9500,#FF5E3A);display:flex;align-items:center;justify-content:center;font-size:20px;color:white;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.05);flex-shrink:0}
+.brand-info{display:flex;flex-direction:column;justify-content:center;text-align:left}
+.brand-name{font-size:17px;font-weight:300;letter-spacing:0.15em;color:var(--primary-black);line-height:1.2;display:flex;align-items:center;gap:6px}
+.brand-arrow{font-size:12px;color:rgba(0,0,0,0.2);margin-top:1px}
+.brand-desc{font-size:10px;color:var(--text-sub);line-height:1.2;margin-top:4px;font-weight:300;letter-spacing:0.1em;text-transform:uppercase}
+
+/* === 3. 顶部 Tabs 切换 (雅致细线) === */
+.tabs{display:flex;gap:40px;justify-content:center;width:100%}
+.tab-btn{flex:1;max-width:200px;padding:10px 0 14px;font-size:14px;font-weight:300;letter-spacing:0.15em;color:var(--text-sub);background:transparent;border:none;cursor:pointer;position:relative;transition:all 0.3s var(--trans-spring)}
+.tab-btn.active{color:var(--primary-black);font-weight:400}
+.tab-btn::after{content:'';position:absolute;bottom:-1px;left:50%;transform:translateX(-50%) scaleX(0);width:40px;height:1.5px;background-color:var(--primary-black);border-radius:2px;transition:transform 0.4s var(--trans-spring)}
+.tab-btn.active::after{transform:translateX(-50%) scaleX(1)}
+.tab-content{display:none;width:100%}.tab-content.active{display:block;animation:fadeEffect 0.6s var(--trans-spring)}@keyframes fadeEffect{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* === 4. 控制面板区域 === */
+.controls-panel{background:var(--bg-shell);padding:20px 24px;display:flex;flex-direction:column;gap:16px;border-bottom:1px solid var(--border-color)}
+.control-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+
+/* 按钮物理阻尼感 */
+.btn-upload{width:100%;height:48px;background-color:var(--primary-black);color:white;border-radius:12px;font-size:14px;font-weight:300;letter-spacing:0.15em;display:flex;align-items:center;justify-content:center;gap:8px;border:none;cursor:pointer;box-shadow:var(--shadow-btn);transition:all 0.4s var(--trans-spring)}
+.btn-upload:hover{box-shadow: 0 12px 24px rgba(0,0,0,0.15); transform: translateY(-1px);}
+.btn-upload:active{transform:scale(0.97); box-shadow: 0 4px 10px rgba(0,0,0,0.1);}
+.btn-upload.orange{background-color:var(--primary-black);} 
+
+.merged-capsule{display:flex;align-items:center;width:100%;background:var(--bg-control);border-radius:10px;height:46px;padding:0;border:1px solid var(--border-color)}
+.capsule-item{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:100%;cursor:pointer;transition:background 0.3s;position:relative}
+.capsule-item:first-child{border-top-left-radius:10px;border-bottom-left-radius:10px}
+.capsule-item:last-child{border-top-right-radius:10px;border-bottom-right-radius:10px}
+.capsule-item:only-child{border-radius:10px}
+.capsule-item:active{background:rgba(0,0,0,0.04)}
+.capsule-divider{width:1px;height:24px;background:var(--border-color);flex-shrink:0}
+.color-wrapper{width:20px;height:20px;border-radius:5px;border:1px solid rgba(0,0,0,0.1);overflow:hidden;position:relative;cursor:pointer;flex-shrink:0;box-shadow:inset 0 2px 4px rgba(0,0,0,0.05)}
+input[type="color"]{position:absolute;top:-50%;left:-50%;width:200%;height:200%;padding:0;border:none;cursor:pointer;background:transparent}
+input[type=checkbox]{width:16px;height:16px;accent-color:var(--primary-black);margin:0;cursor:pointer}
+.orange-accent input[type=checkbox]{accent-color:var(--primary-black);}
+.label-text{font-size:13px;font-weight:300;letter-spacing:0.05em;color:var(--text-main)}
+
+/* === Slider 样式极简细化 === */
+.slider-row{display:flex;align-items:center;gap:12px;width:100%;background:var(--bg-control);padding:4px 6px;border-radius:10px;border:1px solid var(--border-color)}
+.slider-container-transparent{flex:1;height:40px;display:flex;align-items:center;padding:0 4px;gap:10px}
+.btn-micro{width:32px;height:32px;border-radius:50%;background:#FFFFFF;border:1px solid var(--border-color);color:var(--text-main);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;transition:all 0.3s var(--trans-spring);flex-shrink:0;font-weight:200;box-shadow:0 2px 8px rgba(0,0,0,0.02)}
+.btn-micro:active{background:#F0F0F0;transform:scale(0.92)}
+input[type=range]{-webkit-appearance:none;width:100%;height:3px;background:#E5E5EA;border-radius:1.5px;background-image:linear-gradient(var(--track-color,var(--primary-black)),var(--track-color,var(--primary-black)));background-size:var(--percent,0%) 100%;background-repeat:no-repeat;cursor:pointer;border:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;height:20px;width:20px;border-radius:50%;background:#fff;border:1px solid rgba(0,0,0,0.1);box-shadow:0 4px 10px rgba(0,0,0,0.1);transition:transform 0.2s var(--trans-spring)}
+input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
+
+/* === 模式切换按钮 === */
+.mode-switch{display:flex;background:var(--bg-control);padding:4px;border-radius:10px;width:100%;border:1px solid var(--border-color)}
+.mode-btn{flex:1;padding:0 8px;font-size:12px;font-weight:300;letter-spacing:0.05em;color:var(--text-sub);border:none;background:transparent;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.4s var(--trans-spring);cursor:pointer;white-space:nowrap;height:38px}
+.mode-btn.active{background:var(--primary-black);color:#fff;font-weight:300;border:none;box-shadow:var(--shadow-btn)}
+.mode-btn.active.blue-text{color:#fff;} 
+
+/* === 5. 画布与视口区域 (极简艺术空间) === */
+.canvas-area{width:100%;height:calc(100vw / var(--paper-ratio));max-height:70vh;min-height:400px;background:#F9F9FB;display:flex;justify-content:center;align-items:center;overflow:hidden;border-top:1px solid var(--border-color);border-bottom:1px solid var(--border-color);position:relative;touch-action:pan-y}
+.empty-placeholder{width:85%;height:85%;background:transparent;border-radius:20px;border:1px dashed rgba(0,0,0,0.15);color:#A0A0A5;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:all 0.4s var(--trans-spring);cursor:pointer}.empty-placeholder:hover{border-color:rgba(0,0,0,0.3);background:rgba(0,0,0,0.01)}
+.empty-placeholder:active{transform:scale(0.98)}
+.plus-icon{font-size:56px;margin-bottom:16px;line-height:1;font-weight:100;color:rgba(0,0,0,0.15);transition:color 0.3s}.empty-placeholder:hover .plus-icon{color:rgba(0,0,0,0.3)}
+
+/* === 6. 底部工具栏与操作区 === */
+.bottom-toolbar{background:var(--bg-shell);padding:14px 24px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;gap:16px}
+.btn-flat{height:38px;padding:0 16px;background:var(--bg-control);border:1px solid var(--border-color);border-radius:8px;font-size:12px;font-weight:300;letter-spacing:0.05em;color:var(--text-main);cursor:pointer;transition:all 0.3s var(--trans-spring)}.btn-flat:active{background:#E5E5EA;transform:scale(0.95)}
+.zoom-display{font-size:12px;font-weight:300;letter-spacing:0.05em;color:var(--text-sub);width:45px;text-align:center}
+.bottom-actions{background:var(--bg-shell);padding:20px 24px 28px;display:flex;gap:16px}
+.btn-cta{flex:1;height:52px;background:var(--primary-black);color:white;border-radius:12px;font-size:14px;font-weight:300;letter-spacing:0.15em;border:none;cursor:pointer;box-shadow:var(--shadow-btn);display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.4s var(--trans-spring)}.btn-cta:active{transform:scale(0.97);opacity:0.9}
+.btn-cta.orange{background:var(--primary-black);box-shadow:var(--shadow-btn);}
+.btn-secondary{flex:1;height:52px;background:#fff;color:var(--primary-black);border-radius:12px;font-size:13px;font-weight:300;letter-spacing:0.1em;border:1px solid var(--border-color);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.4s var(--trans-spring);box-shadow:0 4px 12px rgba(0,0,0,0.02)}.btn-secondary:active{background:#F5F5F7;transform:scale(0.97)}
+.btn-secondary.soft-orange{background:#fff;color:var(--primary-black);border:1px solid var(--border-color);}.btn-secondary.soft-orange:active{background:#F5F5F7}
+
+/* === 7. 模态框 (关于 & 预览) 提升 Z-index 及材质 === */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(12px);z-index:2147483640;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity 0.4s ease}.modal-overlay.active{display:flex;opacity:1}
+.about-card{width:90%;max-width:340px;background:rgba(255,255,255,0.95);border:1px solid rgba(255,255,255,0.5);border-radius:24px;padding:36px 28px;box-shadow:var(--shadow-card);transform:scale(0.95);transition:transform 0.5s var(--trans-spring);text-align:center;position:relative}.modal-overlay.active .about-card{transform:scale(1)}
+.about-avatar-large{width:72px;height:72px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:24px;color:white;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.05), 0 8px 20px rgba(0,0,0,0.1)}
+.about-title{font-size:18px;font-weight:300;letter-spacing:0.15em;margin-bottom:8px;color:var(--text-main)}
+.about-subtitle{font-size:11px;color:var(--text-sub);margin-bottom:28px;font-weight:300;letter-spacing:0.05em}
+.about-tag-capsule{display:inline-block;background:var(--bg-control);padding:6px 14px;border-radius:20px;font-size:10px;color:var(--text-sub);margin-bottom:8px;font-weight:300;letter-spacing:0.05em;border:1px solid var(--border-color)}
+.brand-text-highlight{color:#000;font-weight:400;}
+.close-btn{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.04);border:none;color:var(--text-sub);font-size:22px;font-weight:200;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.3s var(--trans-spring);line-height:1;z-index:10}.close-btn:hover{background:rgba(0,0,0,0.08);color:#000}.close-btn:active{transform:scale(0.9)}
+.share-btn{flex:1;height:auto;min-height:54px;background:var(--primary-black);color:white;border-radius:14px;font-weight:300;letter-spacing:0.1em;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:var(--shadow-btn);transition:all 0.4s var(--trans-spring);padding:8px 12px}.share-btn:active{transform:scale(0.96);opacity:0.9}
+.fav-btn{flex:1;height:auto;min-height:54px;background:#fff;color:var(--text-main);border-radius:14px;font-weight:300;letter-spacing:0.1em;border:1px solid var(--border-color);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.4s var(--trans-spring);box-shadow:0 4px 12px rgba(0,0,0,0.02)}.fav-btn:active{background:#F5F5F7;transform:scale(0.96)}
+.action-row{display:flex;gap:12px;margin-bottom:28px}
+.social-link{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--text-main);padding:14px 10px;font-weight:300;letter-spacing:0.05em;background:var(--bg-control);border:1px solid var(--border-color);border-radius:12px;margin-bottom:10px;text-decoration:none;cursor:pointer;transition:all 0.4s var(--trans-spring);white-space:nowrap}.social-link:active{transform:scale(0.97);background:#E5E5EA}
+.copy-right{margin-top:28px;font-size:10px;color:rgba(0,0,0,0.3);line-height:1.6;border-top:1px solid var(--border-color);padding-top:20px;font-weight:300;letter-spacing:0.05em}
+
+/* === 微信引导层 === */
+.wechat-guide{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:99999;display:none;flex-direction:column;align-items:flex-end;padding:20px 30px;color:white;text-align:right}
+.wechat-guide .arrow{font-size:40px;margin-bottom:10px;animation:bounce 1.5s infinite;color:#fff;font-weight:100}
+.wechat-guide .text{font-size:14px;line-height:1.8;font-weight:300;letter-spacing:0.1em;color:#fff}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+
+/* === 预览图样式 === */
+.preview-img{display:block;margin:0 auto;max-width:100%;max-height:55vh;border-radius:8px;box-shadow:var(--shadow-card);margin-bottom:20px;-webkit-touch-callout:default;pointer-events:auto;border:1px solid var(--border-color)}
+.share-options{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:20px 0}
+.share-option{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px 8px;background:var(--bg-control);border-radius:8px;border:1px solid transparent;cursor:pointer;transition:all 0.2s}.share-option:active{background:#EFEFF4;transform:scale(0.98)}
+.share-icon{font-size:24px;margin-bottom:8px}.share-label{font-size:12px;font-weight:300;letter-spacing:0.05em;color:var(--text-main)}
+
+@media (max-width: 768px){body{padding:0}.app-shell{max-width:100%;margin:0;border-radius:0;box-shadow:none;min-height:100vh;border:none}.canvas-area{height:calc(100vw / var(--paper-ratio));max-height:70vh}}
+
+/* === 核心修复：Toast 提升 Z-index 至全宇宙最高，防止被 Modal 遮挡 === */
+.toast-container{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(20,20,20,0.9);color:white;padding:16px 28px;border-radius:12px;font-size:13px;font-weight:300;letter-spacing:0.05em;text-align:center;z-index:2147483660 !important;opacity:0;transition:opacity 0.4s var(--trans-spring), transform 0.4s var(--trans-spring);pointer-events:none;max-width:80%;box-shadow:0 15px 40px rgba(0,0,0,0.3);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1)}
+.toast-container.show{opacity:1; transform:translate(-50%,-50%) scale(1.05)}
+</style>
+<script>(function(){var ua=navigator.userAgent.toLowerCase();if(ua.match(/MicroMessenger/i)=="micromessenger"){document.write('<style>.wechat-guide{display:flex !important;}</style>');}})();</script>
+
+<!-- === 全局菜单系统定制 (因本页为亮色背景，需覆盖菜单横线为黑色) === -->
+<style>
+.nav-font-hairline{font-weight:100!important;font-family:'Inter',sans-serif!important}
+.nav-font-thin{font-weight:200!important;font-family:'Inter',sans-serif!important}
+#menu-trigger{
+    position:absolute;top:20px;right:20px;
+    width:44px;height:44px;
+    display:flex;flex-direction:column;justify-content:center;align-items:flex-end;
+    cursor:pointer;
+    z-index:2147483648;
+    background:transparent;
+    pointer-events:auto;
+}
+.menu-line{height:1.5px;background-color:var(--primary-black);transition:all .3s ease;margin:3.5px 0;display:block;border-radius:0}
+.line-1{width:28px;transform-origin:right center}
+.line-2{width:20px}
+.line-3{width:28px;transform-origin:right center}
+.menu-open .line-1{transform:rotate(45deg) translateY(-2px); background-color:var(--primary-black)}
+.menu-open .line-2{opacity:0}
+.menu-open .line-3{transform:rotate(-45deg) translateY(2px); background-color:var(--primary-black)}
+</style>
+
+</head>
+<body>
+<div class="wechat-guide" id="wechatGuide" onclick="this.style.display='none'"><div class="arrow">↗</div><div class="text">为了更好的画画体验<br>请点击右上角菜单<br>选择 <strong style="font-weight:400; color:#fff;">在浏览器中打开</strong></div></div>
+<div class="app-shell">
+
+<!-- 1. 菜单开关 -->
+<div id="menu-trigger" onclick="toggleMenu()" title="切换菜单">
+    <span class="menu-line line-1"></span>
+    <span class="menu-line line-2"></span>
+    <span class="menu-line line-3"></span>
+</div>
+
+<header>
+    <div class="brand-card" onclick="toggleModal('aboutModal', true)">
+        <div class="brand-avatar" style="background-image: url('docs/img/wuxiao_s.jpg'); background-size: cover; background-position: center;"></div>
+        <div class="brand-info"><div class="brand-name">我爱你们 <span class="brand-arrow">›</span></div><div class="brand-desc">By 童画师吴晓</div></div>
+    </div>
+    <div class="tabs">
+        <button class="tab-btn active" data-theme="blue" onclick="switchTab('grid', this)">网格起型</button>
+        <button class="tab-btn" data-theme="orange" onclick="switchTab('poster', this)">色阶图生成</button>
+    </div>
+</header>
+<div id="grid-content" class="tab-content active"><div class="controls-panel"><div class="control-row"><button class="btn-upload">打开相册图片</button></div><div class="control-row"><div class="merged-capsule"><div class="capsule-item" onclick="document.querySelector('#gridColor').click()"><div class="color-wrapper" title="网格颜色"><input type="color" id="gridColor" value="#505050" oninput="drawGrid()"></div><span class="label-text">网格颜色</span></div><div class="capsule-divider"></div><label class="capsule-item"><input type="checkbox" id="squareGridCheck"><span class="label-text">正方格</span></label></div></div><div class="slider-row"><div class="slider-container-transparent"><button class="btn-micro" onclick="adjustGridSize(-0.1)">-</button><input type="range" id="gridSize" min="2" max="15" value="3" step="0.05" oninput="drawGrid()"><button class="btn-micro" onclick="adjustGridSize(0.1)">+</button></div><div style="font-size: 13px; font-weight: 300; letter-spacing:0.05em; color: var(--text-sub); width: 24px; text-align: right; padding-right: 8px;" id="gridSizeVal">3.0</div></div><div class="control-row"><div class="mode-switch"><button class="mode-btn active blue-text" id="modeMove" onclick="setGridMode('move')">双指移动视图</button><button class="mode-btn" id="modeGrid" onclick="setGridMode('grid')">双指移动网格</button></div></div></div><div class="canvas-area" id="gridWindow">
+    <div class="empty-placeholder" id="gridPlaceholder" onclick="document.getElementById('gridImageInput').click()">
+        <div class="plus-icon">+</div>
+        <div style="font-weight: 300; letter-spacing: 0.2em; color: rgba(0,0,0,0.3); margin-bottom: 6px;">请选择图片</div>
+        <div style="font-size: 11px; font-weight: 200; letter-spacing: 0.1em; color: rgba(0,0,0,0.2);">双指操作</div>
+    </div>
+<canvas id="gridCanvas" style="display:none;"></canvas></div><div class="bottom-toolbar"><button class="btn-flat" onclick="resetGridOffset()">重置网格</button><div style="display: flex; align-items: center; gap: 8px;"><button class="btn-micro" onclick="updateZoom('grid', -0.1)">-</button><span class="zoom-display" id="gridZoomVal">100%</span><button class="btn-micro" onclick="updateZoom('grid', 0.1)">+</button></div><button class="btn-flat" onclick="fitView('grid')">适应</button></div><div class="bottom-actions"><button class="btn-cta" onclick="previewCanvas('gridCanvas', '网格参考图.jpg')">保存网格图</button></div></div>
+<div id="poster-content" class="tab-content"><div class="controls-panel"><div class="control-row"><button class="btn-upload orange">打开相册图片</button></div><div class="control-row"><div class="merged-capsule"><label class="capsule-item orange-accent"><input type="checkbox" id="grayscaleCheck" onchange="processPoster()"><span class="label-text">开启黑白模式</span></label></div></div><div class="slider-row"><div class="slider-container-transparent"><button class="btn-micro" onclick="adjustPosterLevel(-1)">-</button><input type="range" id="posterLevel" min="2" max="20" value="12" step="1" oninput="handlePosterSliderInput(this)" style="--track-color: var(--primary-black);"><button class="btn-micro" onclick="adjustPosterLevel(1)">+</button></div><div style="font-size: 13px; font-weight: 300; letter-spacing:0.05em; color: var(--text-sub); width: 24px; text-align: right; padding-right: 8px;" id="posterLevelVal">12</div></div></div><div class="canvas-area" id="posterWindow">
+    <div class="empty-placeholder" id="posterPlaceholder" onclick="document.getElementById('posterImageInput').click()">
+        <div class="plus-icon">+</div>
+        <div style="font-weight: 300; letter-spacing: 0.2em; color: rgba(0,0,0,0.3);">请选择图片</div>
+    </div>
+<canvas id="posterCanvas" style="display:none;"></canvas></div><div class="bottom-toolbar"><div style="width: 40px;"></div><div style="display: flex; align-items: center; gap: 8px;"><button class="btn-micro" onclick="updateZoom('poster', -0.1)">-</button><span class="zoom-display" id="posterZoomVal">100%</span><button class="btn-micro" onclick="updateZoom('poster', 0.1)">+</button></div><button class="btn-flat" onclick="fitView('poster')">适应</button></div><div class="bottom-actions"><button class="btn-secondary soft-orange" onclick="saveFourPanelComparison()">保存4联对比图</button><button class="btn-cta orange" onclick="previewCanvas('posterCanvas', '色块概括图.jpg')">保存色阶图</button></div></div>
+</div>
+<div class="modal-overlay" id="aboutModal" onclick="if(event.target === this) toggleModal('aboutModal', false)"><div class="about-card"><button class="close-btn" onclick="toggleModal('aboutModal', false)">×</button>
+    <div class="about-avatar-large" style="background-image: url('docs/img/wuxiao_s.jpg'); background-size: cover; background-position: center;"></div>
+<div class="about-title">童画师吴晓</div><div class="about-subtitle"><div class="about-tag-capsule">儿童肖像画师 · 水彩 · 油画</div><div>用心画画，用爱发电</div></div><div style="font-size: 12.5px; color: var(--text-sub); margin-bottom: 28px; line-height: 1.8; padding: 0 4px; text-align: left; font-weight:300; letter-spacing:0.05em;">“<span class="brand-text-highlight">我爱你们</span>”不仅是工具的名字，更是我的心声。深知学画路上的不易，希望这个永久免费的小工具，能陪你画出更美好的世界。<br><br>如果它帮到了你，请把这份爱传递给更多画友，这是我更新最大的动力！</div><div class="action-row"><button class="share-btn" onclick="shareApp()"><div style="display:flex; flex-direction: column; line-height: 1.3; align-items: center; text-align: center;"><span>传递这份爱</span></div></button><button class="fav-btn" onclick="addToFavorites()">收藏本站</button></div><div style="text-align:left; margin-top:16px;"><div class="social-link" onclick="copyText('童画师吴晓', '小红书')">小红书：童画师吴晓 (围观日常)</div><div class="social-link" onclick="copyText('lightouches', '微信')">微信：lightouches (点击复制)</div></div><div class="copy-right">© 2026 童画师吴晓. All Rights Reserved.<br>欢迎分享，未经许可禁止商业使用。</div></div></div>
+<div class="modal-overlay" id="previewModal" onclick="if(event.target === this) toggleModal('previewModal', false)"><div class="about-card" style="width:95%; padding:24px 20px;"><h3 style="margin-top:0; font-size:15px; font-weight:300; letter-spacing:0.1em; color:var(--text-main);">预览结果</h3><img id="previewImage" class="preview-img" src="" alt="预览图片" style="display:none;"><div style="background:#F7F8FA; height:200px; border-radius:12px; border:1px dashed var(--border-color); display:flex; align-items:center; justify-content:center; margin-bottom:16px; color:var(--text-sub); display:none;" class="preview-placeholder">[生成的图片将显示在这里]</div><div id="mobileSaveHint" style="font-size:12px; color:var(--text-sub); font-weight:300; letter-spacing:0.05em; margin-bottom:20px; display:none;">请长按上方图片保存到相册</div><div id="pcSaveHint" style="font-size:12px; color:var(--text-sub); font-weight:300; letter-spacing:0.05em; margin-bottom:20px; display:none;">请点击下方按钮下载图片</div><div style="display:flex; gap:16px;"><button id="downloadBtn" class="share-btn" style="background:var(--primary-black); color:white; flex:1; display:none;" onclick="downloadPreviewImage()">下载图片</button><button class="btn-secondary" style="flex:1;" onclick="toggleModal('previewModal', false)">关闭</button></div></div></div>
+<script>
+// === 全局状态 & 基础函数 (保留100%原逻辑) ===
+const state={currentGridMode:'move',grid:{scale:1,panX:0,panY:0,isDraggingImg:false,isDraggingGrid:false,startX:0,startY:0,minScale:1,lastDist:0,lastCenter:{x:0,y:0},density:3.0,isSquareGrid:false},poster:{scale:1,panX:0,panY:0,isDraggingImg:false,startX:0,startY:0,minScale:1,lastDist:0,lastCenter:{x:0,y:0}}};
+function setGridMode(mode){state.currentGridMode=mode;document.getElementById('modeMove').className=mode==='move'?'mode-btn active blue-text':'mode-btn';document.getElementById('modeGrid').className=mode==='grid'?'mode-btn active blue-text':'mode-btn'}
+function switchTab(tabId,btn){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.tab-content').forEach(c=>{c.style.display='none';c.classList.remove('active')});const target=document.getElementById(tabId+'-content');target.style.display='block';target.classList.add('active')}
+// 生成带时间戳的文件名
+function generateTimestampFilename(baseName){if(baseName.endsWith('.jpg')){baseName=baseName.slice(0,-4)}const now=new Date();const month=String(now.getMonth()+1).padStart(2,'0');const day=String(now.getDate()).padStart(2,'0');const hours=String(now.getHours()).padStart(2,'0');const minutes=String(now.getMinutes()).padStart(2,'0');const seconds=String(now.getSeconds()).padStart(2,'0');return `${baseName}_${month}${day}_${hours}_${minutes}_${seconds}.jpg`}
+// 限制 Canvas 尺寸避免崩溃
+function limitCanvasSize(canvas,maxWidth=2560,maxHeight=2560){const width=canvas.width;const height=canvas.height;if(width<=maxWidth&&height<=maxHeight){return canvas}const ratio=Math.min(maxWidth/width,maxHeight/height);const newWidth=Math.floor(width*ratio);const newHeight=Math.floor(height*ratio);const newCanvas=document.createElement('canvas');newCanvas.width=newWidth;newCanvas.height=newHeight;const ctx=newCanvas.getContext('2d');ctx.drawImage(canvas,0,0,width,height,0,0,newWidth,newHeight);return newCanvas}
+// 预览 Canvas (支持高分屏)
+function previewCanvas(canvasId,baseName){const type=canvasId==='gridCanvas'?'grid':'poster';const sourceImg=type==='grid'?gridOriginalImg:posterOriginalImg;if(!sourceImg){showToast('请先上传图片！');return}const stage=document.getElementById(type+'Window');const sourceCanvas=document.getElementById(canvasId);const s=state[type];const scaledWidth=sourceCanvas.width*s.scale;const scaledHeight=sourceCanvas.height*s.scale;const imgLeft=(stage.clientWidth/2)-(scaledWidth/2)+s.panX;const imgTop=(stage.clientHeight/2)-(scaledHeight/2)+s.panY;const isFullyCovered=imgLeft<=0&&imgTop<=0&&imgLeft+scaledWidth>=stage.clientWidth&&imgTop+scaledHeight>=stage.clientHeight;const exportCanvas=document.createElement('canvas');if(isFullyCovered){exportCanvas.width=stage.clientWidth;exportCanvas.height=stage.clientHeight;const ctx=exportCanvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,exportCanvas.width,exportCanvas.height);ctx.save();ctx.translate(exportCanvas.width/2,exportCanvas.height/2);ctx.translate(s.panX,s.panY);ctx.scale(s.scale,s.scale);ctx.translate(-sourceCanvas.width/2,-sourceCanvas.height/2);ctx.drawImage(sourceCanvas,0,0);ctx.restore()}else{exportCanvas.width=sourceCanvas.width;exportCanvas.height=sourceCanvas.height;const ctx=exportCanvas.getContext('2d');ctx.drawImage(sourceCanvas,0,0)}const filename=generateTimestampFilename(baseName);const previewImage=document.getElementById('previewImage');const previewPlaceholder=document.querySelector('.preview-placeholder');previewImage.src=exportCanvas.toDataURL('image/jpeg',0.95);previewImage.alt=filename;previewImage.style.display='block';if(previewPlaceholder)previewPlaceholder.style.display='none';toggleModal('previewModal',true)}
+// 下载 Canvas (Legacy, 现主要用 previewCanvas)
+function downloadCanvas(canvasId,baseName){const type=canvasId==='gridCanvas'?'grid':'poster';const sourceImg=type==='grid'?gridOriginalImg:posterOriginalImg;if(!sourceImg){showToast('请先上传图片！');return}const stage=document.getElementById(type+'Window');const sourceCanvas=document.getElementById(canvasId);const s=state[type];const scaledWidth=sourceCanvas.width*s.scale;const scaledHeight=sourceCanvas.height*s.scale;const imgLeft=(stage.clientWidth/2)-(scaledWidth/2)+s.panX;const imgTop=(stage.clientHeight/2)-(scaledHeight/2)+s.panY;const isFullyCovered=imgLeft<=0&&imgTop<=0&&imgLeft+scaledWidth>=stage.clientWidth&&imgTop+scaledHeight>=stage.clientHeight;const exportCanvas=document.createElement('canvas');if(isFullyCovered){exportCanvas.width=stage.clientWidth;exportCanvas.height=stage.clientHeight;const ctx=exportCanvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,exportCanvas.width,exportCanvas.height);ctx.save();ctx.translate(exportCanvas.width/2,exportCanvas.height/2);ctx.translate(s.panX,s.panY);ctx.scale(s.scale,s.scale);ctx.translate(-sourceCanvas.width/2,-sourceCanvas.height/2);ctx.drawImage(sourceCanvas,0,0);ctx.restore()}else{exportCanvas.width=sourceCanvas.width;exportCanvas.height=sourceCanvas.height;const ctx=exportCanvas.getContext('2d');ctx.drawImage(sourceCanvas,0,0)}const filename=generateTimestampFilename(baseName);const link=document.createElement('a');link.download=filename;link.href=exportCanvas.toDataURL('image/jpeg',0.95);document.body.appendChild(link);link.click();document.body.removeChild(link)}
+// 视图控制函数
+function calculateMinScale(type){const win=document.getElementById(type+'Window');const canvas=document.getElementById(type+'Canvas');if(canvas.width===0)return 1;return Math.min(win.clientWidth/canvas.width,win.clientHeight/canvas.height)}
+function updateCanvasTransform(type){const s=state[type];const canvas=document.getElementById(type+'Canvas');const zoomVal=document.getElementById(type+'ZoomVal');canvas.style.transform=`translate3d(${s.panX}px, ${s.panY}px, 0) scale(${s.scale})`;zoomVal.innerText=Math.round(s.scale/s.minScale*100)+'%'}
+function updateZoom(type,delta,isAbsolute=false){const s=state[type];if(!s.minScale||s.minScale===1)s.minScale=calculateMinScale(type);let newScale;if(isAbsolute)newScale=delta;else newScale=s.scale+(delta*s.minScale);if(newScale<s.minScale)newScale=s.minScale;if(newScale>s.minScale*10)newScale=s.minScale*10;s.scale=newScale;if(Math.abs(s.scale-s.minScale)<0.001){s.panX=0;s.panY=0}updateCanvasTransform(type)}
+function fitView(type){const s=state[type];s.minScale=calculateMinScale(type);s.scale=s.minScale;s.panX=0;s.panY=0;updateCanvasTransform(type)}
+document.addEventListener('fullscreenchange',handleFsChange);document.addEventListener('webkitfullscreenchange',handleFsChange);
+function handleFsChange(){setTimeout(()=>{if(state.grid.minScale)fitView('grid');if(state.poster.minScale)fitView('poster')},200)}
+// === 1. 网格起型功能区 ===
+const gridImageInput=document.createElement('input');gridImageInput.type='file';gridImageInput.id='gridImageInput';gridImageInput.accept='image/*';gridImageInput.style.display='none';document.body.appendChild(gridImageInput);
+const posterImageInput=document.createElement('input');posterImageInput.type='file';posterImageInput.id='posterImageInput';posterImageInput.accept='image/*';posterImageInput.style.display='none';document.body.appendChild(posterImageInput);
+document.querySelector('.btn-upload:not(.orange)').addEventListener('click',()=>gridImageInput.click());document.querySelector('.btn-upload.orange').addEventListener('click',()=>posterImageInput.click());
+const gridCanvas=document.getElementById('gridCanvas');const gridCtx=gridCanvas.getContext('2d');let gridOriginalImg=null;let gridOffsetX=0;let gridOffsetY=0;gridImageInput.addEventListener('change',(e)=>handleImageUpload(e,'grid'));
+function handleImageUpload(e,type){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=function(event){const img=new Image();img.onload=function(){if(type==='grid'){gridOriginalImg=img;document.getElementById('gridPlaceholder').style.display='none';gridCanvas.style.display='block';gridOffsetX=0;gridOffsetY=0;drawGrid();setTimeout(()=>fitView('grid'),50)}else{posterOriginalImg=img;document.getElementById('posterPlaceholder').style.display='none';posterCanvas.style.display='block';processPoster();setTimeout(()=>fitView('poster'),50)}};img.src=event.target.result};reader.readAsDataURL(file)}
+function adjustGridSize(delta){const slider=document.getElementById('gridSize');let newVal=parseFloat(slider.value)+delta;if(newVal<2)newVal=2;if(newVal>15)newVal=15;slider.value=newVal;drawGrid()}
+function resetGridOffset(){gridOffsetX=0;gridOffsetY=0;document.getElementById('gridSize').value=3;drawGrid()}
+function drawGrid(){if(!gridOriginalImg)return;const size=parseFloat(document.getElementById('gridSize').value);const color=document.getElementById('gridColor').value;document.getElementById('gridSizeVal').textContent=size.toFixed(1);gridCanvas.width=gridOriginalImg.width;gridCanvas.height=gridOriginalImg.height;gridCtx.drawImage(gridOriginalImg,0,0);gridCtx.strokeStyle=color;gridCtx.lineWidth=Math.max(1.5,gridOriginalImg.width/400);gridCtx.beginPath();if(state.grid.isSquareGrid){const shortSide=Math.min(gridCanvas.width,gridCanvas.height);const squareSize=shortSide/size;const isWidthShort=gridCanvas.width<=gridCanvas.height;if(isWidthShort){const stepX=gridCanvas.width/size;const stepY=squareSize;let startX=gridOffsetX%stepX;if(startX>0)startX-=stepX;for(let x=startX;x<gridCanvas.width;x+=stepX){gridCtx.moveTo(x,0);gridCtx.lineTo(x,gridCanvas.height)}let startY=gridOffsetY%stepY;if(startY>0)startY-=stepY;for(let y=startY;y<gridCanvas.height;y+=stepY){gridCtx.moveTo(0,y);gridCtx.lineTo(gridCanvas.width,y)}}else{const stepX=squareSize;const stepY=gridCanvas.height/size;let startX=gridOffsetX%stepX;if(startX>0)startX-=stepX;for(let x=startX;x<gridCanvas.width;x+=stepX){gridCtx.moveTo(x,0);gridCtx.lineTo(x,gridCanvas.height)}let startY=gridOffsetY%stepY;if(startY>0)startY-=stepY;for(let y=startY;y<gridCanvas.height;y+=stepY){gridCtx.moveTo(0,y);gridCtx.lineTo(gridCanvas.width,y)}}}else{const stepX=gridCanvas.width/size;const stepY=gridCanvas.height/size;let startX=gridOffsetX%stepX;if(startX>0)startX-=stepX;for(let x=startX;x<gridCanvas.width;x+=stepX){gridCtx.moveTo(x,0);gridCtx.lineTo(x,gridCanvas.height)}let startY=gridOffsetY%stepY;if(startY>0)startY-=stepY;for(let y=startY;y<gridCanvas.height;y+=stepY){gridCtx.moveTo(0,y);gridCtx.lineTo(gridCanvas.width,y)}}gridCtx.stroke()}
+function toggleSquareGrid(){const checkbox=document.getElementById('squareGridCheck');state.grid.isSquareGrid=checkbox.checked;drawGrid()}
+document.getElementById('squareGridCheck').addEventListener('change',toggleSquareGrid);
+// 触摸与手势逻辑
+function getCenter(touches){return{x:(touches[0].clientX+touches[1].clientX)/2,y:(touches[0].clientY+touches[1].clientY)/2}}
+function getDistance(touches){return Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY)}
+function handleStart(e,type){if(!e.touches){if(type==='grid'&&!gridOriginalImg)return;if(type==='poster'&&!posterOriginalImg)return;state[type].startX=e.clientX;state[type].startY=e.clientY;state[type].isDraggingImg=(type==='poster'||state.currentGridMode==='move');state[type].isDraggingGrid=(type==='grid'&&state.currentGridMode==='grid');return}if(e.touches.length===2){if(type==='grid'&&!gridOriginalImg)return;if(type==='poster'&&!posterOriginalImg)return;const s=state[type];s.lastDist=getDistance(e.touches);s.lastCenter=getCenter(e.touches);s.isDraggingImg=(type==='poster'||state.currentGridMode==='move');s.isDraggingGrid=(type==='grid'&&state.currentGridMode==='grid')}}
+function handleMove(e,type){if(!e.touches){const s=state[type];if(s.isDraggingGrid){updateGridOffset(e.clientX-s.startX,e.clientY-s.startY);s.startX=e.clientX;s.startY=e.clientY}else if(s.isDraggingImg){updateImgPan(type,e.clientX-s.startX,e.clientY-s.startY);s.startX=e.clientX;s.startY=e.clientY}return}if(e.touches.length===2){e.preventDefault();const s=state[type];if(s.isDraggingGrid){const currentCenter=getCenter(e.touches);const deltaX=currentCenter.x-s.lastCenter.x;const deltaY=currentCenter.y-s.lastCenter.y;updateGridOffset(deltaX,deltaY);s.lastCenter=currentCenter;return}const currentDist=getDistance(e.touches);const scaleRatio=currentDist/s.lastDist;const newScale=s.scale*scaleRatio;updateZoom(type,newScale,true);s.lastDist=currentDist;const currentCenter=getCenter(e.touches);const deltaX=currentCenter.x-s.lastCenter.x;const deltaY=currentCenter.y-s.lastCenter.y;if(s.isDraggingImg){updateImgPan(type,deltaX,deltaY)}s.lastCenter=currentCenter}}
+function updateGridOffset(dx,dy){const rect=gridCanvas.getBoundingClientRect();const scaleX=gridCanvas.width/rect.width;const scaleY=gridCanvas.height/rect.height;gridOffsetX+=dx*scaleX;gridOffsetY+=dy*scaleY;drawGrid()}
+function updateImgPan(type,dx,dy){const s=state[type];s.panX+=dx;s.panY+=dy;updateCanvasTransform(type)}
+function handleEnd(e){state.grid.isDraggingImg=false;state.grid.isDraggingGrid=false;state.poster.isDraggingImg=false}
+const gridWin=document.getElementById('gridWindow');const posterWin=document.getElementById('posterWindow');const oldGridHandler=gridWin._touchmoveHandler;const oldPosterHandler=posterWin._touchmoveHandler;
+gridWin.addEventListener('mousedown',(e)=>handleStart(e,'grid'));gridWin.addEventListener('mousemove',(e)=>handleMove(e,'grid'));gridWin.addEventListener('touchstart',(e)=>handleStart(e,'grid'),{passive:false});gridWin.addEventListener('touchmove',(e)=>handleMove(e,'grid'),{passive:false});
+posterWin.addEventListener('mousedown',(e)=>handleStart(e,'poster'));posterWin.addEventListener('mousemove',(e)=>handleMove(e,'poster'));posterWin.addEventListener('touchstart',(e)=>handleStart(e,'poster'),{passive:false});posterWin.addEventListener('touchmove',(e)=>handleMove(e,'poster'),{passive:false});
+window.addEventListener('mouseup',handleEnd);window.addEventListener('touchend',handleEnd);document.addEventListener('dblclick',function(event){event.preventDefault()},{passive:false});
+// === 2. 色阶图生成功能区 ===
+const posterCanvas=document.getElementById('posterCanvas');const posterCtx=posterCanvas.getContext('2d');let posterOriginalImg=null;posterImageInput.addEventListener('change',(e)=>handleImageUpload(e,'poster'));
+function adjustPosterLevel(delta){const slider=document.getElementById('posterLevel');let val=parseInt(slider.value)+delta;if(val<2)val=2;if(val>20)val=20;slider.value=val;processPoster()}
+let posterSliderTimeout=null;function handlePosterSliderInput(slider){if(posterSliderTimeout){clearTimeout(posterSliderTimeout)}posterSliderTimeout=setTimeout(()=>{processPoster()},100)}
+function processPoster(){if(!posterOriginalImg)return;const levels=parseInt(document.getElementById('posterLevel').value);const isGray=document.getElementById('grayscaleCheck').checked;document.getElementById('posterLevelVal').textContent=levels;posterCanvas.width=posterOriginalImg.width;posterCanvas.height=posterOriginalImg.height;posterCtx.drawImage(posterOriginalImg,0,0);const imageData=posterCtx.getImageData(0,0,posterCanvas.width,posterCanvas.height);const data=imageData.data;const step=255/(levels-1);for(let i=0;i<data.length;i+=4){let r=data[i],g=data[i+1],b=data[i+2];if(isGray){const avg=0.299*r+0.587*g+0.114*b;r=g=b=avg}r=Math.floor(r/step)*step;g=Math.floor(g/step)*step;b=Math.floor(b/step)*step;data[i]=r;data[i+1]=g;data[i+2]=b}posterCtx.putImageData(imageData,0,0)}
+// 动态加载 Loading 样式
+const style=document.createElement('style');style.textContent=`.loading-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.85);backdrop-filter:blur(5px);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:2147483650;font-size:14px;letter-spacing:0.1em;font-weight:300;color:var(--text-main)}.loading-spinner{width:40px;height:40px;border:2px solid rgba(0,0,0,0.1);border-top:2px solid var(--primary-black);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:15px}@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}`;document.head.appendChild(style);
+function showLoading(message='正在生成4联对比图...'){let overlay=document.getElementById('loadingOverlay');if(!overlay){overlay=document.createElement('div');overlay.id='loadingOverlay';overlay.className='loading-overlay';overlay.innerHTML=`<div class="loading-spinner"></div><div>${message}</div>`;document.body.appendChild(overlay)}overlay.style.display='flex'}
+function hideLoading(){const overlay=document.getElementById('loadingOverlay');if(overlay)overlay.style.display='none'}
+function processWithLevel(sourceCanvas,level,isGray){const canvas=document.createElement('canvas');canvas.width=sourceCanvas.width;canvas.height=sourceCanvas.height;const ctx=canvas.getContext('2d');ctx.drawImage(sourceCanvas,0,0);if(level===0){if(isGray){const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);const data=imageData.data;for(let i=0;i<data.length;i+=4){const r=data[i],g=data[i+1],b=data[i+2];const avg=0.299*r+0.587*g+0.114*b;data[i]=data[i+1]=data[i+2]=avg}ctx.putImageData(imageData,0,0)}return canvas}const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);const data=imageData.data;const step=255/(level-1);for(let i=0;i<data.length;i+=4){let r=data[i],g=data[i+1],b=data[i+2];if(isGray){const avg=0.299*r+0.587*g+0.114*b;r=g=b=avg}r=Math.floor(r/step)*step;g=Math.floor(g/step)*step;b=Math.floor(b/step)*step;data[i]=r;data[i+1]=g;data[i+2]=b}ctx.putImageData(imageData,0,0);return canvas}
+function getExportCanvas(sourceCanvas,type){const stage=document.getElementById(type+'Window');const s=state[type];const scaledWidth=sourceCanvas.width*s.scale;const scaledHeight=sourceCanvas.height*s.scale;const imgLeft=(stage.clientWidth/2)-(scaledWidth/2)+s.panX;const imgTop=(stage.clientHeight/2)-(scaledHeight/2)+s.panY;const isFullyCovered=imgLeft<=0&&imgTop<=0&&imgLeft+scaledWidth>=stage.clientWidth&&imgTop+scaledHeight>=stage.clientHeight;const exportCanvas=document.createElement('canvas');if(isFullyCovered){exportCanvas.width=stage.clientWidth;exportCanvas.height=stage.clientHeight;const ctx=exportCanvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,exportCanvas.width,exportCanvas.height);ctx.save();ctx.translate(exportCanvas.width/2,exportCanvas.height/2);ctx.translate(s.panX,s.panY);ctx.scale(s.scale,s.scale);ctx.translate(-sourceCanvas.width/2,-sourceCanvas.height/2);ctx.drawImage(sourceCanvas,0,0);ctx.restore()}else{exportCanvas.width=sourceCanvas.width;exportCanvas.height=sourceCanvas.height;const ctx=exportCanvas.getContext('2d');ctx.drawImage(sourceCanvas,0,0)}return limitCanvasSize(exportCanvas)}
+// 生成4联对比图
+function generateFourPanelComparison(){if(!posterOriginalImg){showToast('请先上传图片！');return null}const isGray=document.getElementById('grayscaleCheck').checked;const originalCanvas=document.createElement('canvas');originalCanvas.width=posterOriginalImg.width;originalCanvas.height=posterOriginalImg.height;const originalCtx=originalCanvas.getContext('2d');originalCtx.drawImage(posterOriginalImg,0,0);const levels=[0,12,9,15];const processedCanvases=[];for(let i=0;i<4;i++){const processedCanvas=processWithLevel(originalCanvas,levels[i],isGray);const exportCanvas=getExportCanvas(processedCanvas,'poster');processedCanvases.push(exportCanvas)}const singleWidth=processedCanvases[0].width;const singleHeight=processedCanvases[0].height;const fourPanelCanvas=document.createElement('canvas');fourPanelCanvas.width=singleWidth*2;fourPanelCanvas.height=singleHeight*2;const fourPanelCtx=fourPanelCanvas.getContext('2d');fourPanelCtx.fillStyle='#ffffff';fourPanelCtx.fillRect(0,0,fourPanelCanvas.width,fourPanelCanvas.height);fourPanelCtx.drawImage(processedCanvases[0],0,0);fourPanelCtx.drawImage(processedCanvases[1],singleWidth,0);fourPanelCtx.drawImage(processedCanvases[2],0,singleHeight);fourPanelCtx.drawImage(processedCanvases[3],singleWidth,singleHeight);return limitCanvasSize(fourPanelCanvas,2560,2560)}
+function saveFourPanelComparison(){if(!posterOriginalImg){showToast('请先上传图片！');return}showLoading();setTimeout(()=>{try{const fourPanelCanvas=generateFourPanelComparison();if(!fourPanelCanvas){hideLoading();return}const filename=generateTimestampFilename('4联对比图');const previewImage=document.getElementById('previewImage');const previewPlaceholder=document.querySelector('.preview-placeholder');previewImage.src=fourPanelCanvas.toDataURL('image/jpeg',0.95);previewImage.alt=filename;previewImage.style.display='block';if(previewPlaceholder)previewPlaceholder.style.display='none';toggleModal('previewModal',true)}catch(error){showToast('生成失败：'+error.message);console.error(error)}finally{hideLoading()}},10)}
+// === 3. 微信兼容与分享 ===
+function isWeChatBrowser(){const ua=navigator.userAgent.toLowerCase();return ua.includes('micromessenger')}
+function shouldShowWeChatGuide(){return isWeChatBrowser()}
+const WeChatGuide={init:function(){if(shouldShowWeChatGuide()){this.showGuide()}else{this.hideGuide()}},showGuide:function(){const overlay=document.getElementById('wechatGuide');if(overlay){overlay.style.display='flex';document.body.style.overflow='hidden'}},hideGuide:function(){const overlay=document.getElementById('wechatGuide');if(overlay){overlay.style.display='none';document.body.style.overflow=''}},copyUrl:function(){const url=window.location.href;copyToClipboard(url,'链接已复制！把这份爱传递给画友们吧')}};
+document.addEventListener('DOMContentLoaded',function(){WeChatGuide.init();const gridWin=document.getElementById('gridWindow');const posterWin=document.getElementById('posterWindow');const oldGridHandler=gridWin._touchmoveHandler;const oldPosterHandler=posterWin._touchmoveHandler;gridWin.addEventListener('mousedown',(e)=>handleStart(e,'grid'));gridWin.addEventListener('mousemove',(e)=>handleMove(e,'grid'));gridWin.addEventListener('touchstart',(e)=>handleStart(e,'grid'),{passive:false});gridWin.addEventListener('touchmove',(e)=>handleMove(e,'grid'),{passive:false});posterWin.addEventListener('mousedown',(e)=>handleStart(e,'poster'));posterWin.addEventListener('mousemove',(e)=>handleMove(e,'poster'));posterWin.addEventListener('touchstart',(e)=>handleStart(e,'poster'),{passive:false});posterWin.addEventListener('touchmove',(e)=>handleMove(e,'poster'),{passive:false});window.addEventListener('mouseup',handleEnd);window.addEventListener('touchend',handleEnd);document.addEventListener('dblclick',function(event){event.preventDefault()},{passive:false})});
+// === 4. UI 交互与工具函数 ===
+let ticking=false;function onSliderInput(input){if(!ticking){window.requestAnimationFrame(()=>{updateSliderVisual(input);ticking=false});ticking=true}}
+function updateSliderVisual(input){const min=input.min||0;const max=input.max||100;const val=input.value;const percent=(val-min)/(max-min)*100;input.style.setProperty('--percent',percent+'%')}
+function adjustSlider(id,delta){const el=document.getElementById(id);el.value=parseInt(el.value)+(delta*10);updateSliderVisual(el);if(id==='gridSize'){drawGrid()}else if(id==='posterLevel'){processPoster()}}
+document.getElementById('gridColor').addEventListener('input',function(){drawGrid()});
+// 修改toggleModal函数以支持预览框界面调整
+const originalToggleModal = toggleModal;
+function toggleModal(id,s){const m=document.getElementById(id),b=document.getElementById('menu-trigger');if(s){m.style.display='flex';void m.offsetWidth;m.classList.add('active');if(b)b.style.display='none';if(id==='previewModal')setTimeout(adjustPreviewInterface,50)}else{m.classList.remove('active');if(b)b.style.display='flex';setTimeout(()=>m.style.display='none',300)}}function copyToClipboard(text,successMsg){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>{showToast(successMsg)}).catch(err=>{console.warn('Async copy failed, falling back to execCommand',err);fallbackCopy(text,successMsg)})}else{fallbackCopy(text,successMsg)}}
+function fallbackCopy(text,successMsg){const textArea=document.createElement('textarea');textArea.value=text;textArea.style.position='fixed';textArea.style.left='-9999px';textArea.style.top='0';document.body.appendChild(textArea);textArea.focus();textArea.select();try{const successful=document.execCommand('copy');if(successful){showToast(successMsg)}else{showToast('复制失败，请长按手动复制')}}catch(err){showToast('复制失败，请长按手动复制')}document.body.removeChild(textArea)}
+function shareApp(){const url=window.location.href;copyToClipboard(url,'链接已复制！把这份爱传递给画友们吧')}
+function addToFavorites(){showToast('请点击浏览器菜单，选择“添加到主屏幕”永久收藏')}
+function isMobileDevice(){return/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)}
+function adjustPreviewInterface(){const isMobile=isMobileDevice();const mobileHint=document.getElementById('mobileSaveHint');const pcHint=document.getElementById('pcSaveHint');const downloadBtn=document.getElementById('downloadBtn');if(isMobile){if(mobileHint)mobileHint.style.display='block';if(pcHint)pcHint.style.display='none';if(downloadBtn)downloadBtn.style.display='none'}else{if(mobileHint)mobileHint.style.display='none';if(pcHint)pcHint.style.display='block';if(downloadBtn)downloadBtn.style.display='flex'}}
+function downloadPreviewImage(){const previewImage=document.getElementById('previewImage');if(!previewImage.src){showToast('没有可下载的图片');return}const link=document.createElement('a');const filename=previewImage.alt||'绘画工作台图片.jpg';link.download=filename;link.href=previewImage.src;document.body.appendChild(link);link.click();document.body.removeChild(link)}
+// 修改：增加 label 参数以显示定制提示
+function copyText(text,label){let msg='已复制！快去搜索关注吧';if(label==='小红书'){msg='已复制，快去小红书搜索吧'}else if(label==='微信'){msg='已复制，快去微信搜索吧'}copyToClipboard(text,msg)}
+// Toast 提示函数
+function showToast(message){const oldToast=document.querySelector('.toast-container');if(oldToast){document.body.removeChild(oldToast)}const toast=document.createElement('div');toast.className='toast-container';toast.textContent=message;document.body.appendChild(toast);requestAnimationFrame(()=>{toast.classList.add('show')});setTimeout(()=>{toast.classList.remove('show');setTimeout(()=>{if(toast.parentNode){document.body.removeChild(toast)}},300)},3000)}
+</script>
+
+    <!-- ========== SEO隐藏内容区域开始 ========== -->
+    <div style="position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none;">
+        <h1>色阶图生成器 · 网格起型工具 - 童画师吴晓</h1>
+        <h2>我爱你们绘画辅助工具 - 童画师吴晓设计</h2>
+        <p>童画师吴晓设计的“我爱你们”绘画辅助工具，包含色阶图生成和网格起型两大功能，帮助绘画爱好者快速创建颜色参考和构图网格，提升绘画准确度。</p>
+        <p>色阶图生成功能可以将图片转换为色阶参考图，帮助分析颜色层次；网格起型功能提供可调节的网格线，辅助构图和比例把握。</p>
+        <p>所有功能均由童画师吴晓作为产品经理的身份参与设计，且完全免费开放使用。童画师吴晓致力于为绘画社区提供实用的辅助工具。</p>
+        <p>核心关键词：吴晓, 童画师吴晓, 我爱你们工具, 色阶图生成, 网格起型, 绘画辅助工具, 颜色参考, 构图工具, 绘画网格</p>
+        <p>功能关键词：色阶图生成工具, 颜色层次分析, 网格构图辅助, 双指操作, 图片上传处理, 颜色调整, 网格密度调节</p>
+    </div>
+    <!-- ========== SEO隐藏内容区域结束 ========== -->
+</body>
+</html>

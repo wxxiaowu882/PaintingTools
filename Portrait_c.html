@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>3D 交互式解剖画册</title>
+<style>
+  :root { --theme-color: #d4af37; --bg-glass: rgba(15, 16, 20, 0.75); --text-main: #eaeaea; --text-sub: #8a8d93; }
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; overflow: hidden; width: 100vw; height: 100vh; background: #050508; font-family: 'SF Pro Display', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  
+  model-viewer, #ink-overlay { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; outline: none; background: transparent; display: block; transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+  #ink-overlay { z-index: auto; pointer-events: none; }
+
+  /* 巡游模式时，高度收缩为 75vh，完美给底部字幕让位，形成上下分屏感 */
+  model-viewer.tour-active, #ink-overlay.tour-active { height: calc(100vh - 180px); }
+
+  #loading-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #050508; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.8s ease; pointer-events: none; opacity: 0; }
+  .spinner { width: 40px; height: 40px; border: 2px solid rgba(212, 175, 55, 0.2); border-top-color: var(--theme-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  
+  #top-bar { position: absolute; top: 0; left: 0; width: 100%; height: 80px; box-sizing: border-box; z-index: 50; background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%); pointer-events: none; transition: background 0.6s cubic-bezier(0.16, 1, 0.3, 1), height 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease; }
+  #top-bar.init-center { background: transparent; height: 100vh; pointer-events: none; }
+  
+  .brand { position: absolute; top: 20px; left: 30px; transform: translate(0, 0); color: var(--theme-color); font-size: 18px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+  #top-bar.init-center .brand { left: 50%; top: 38%; transform: translate(-50%, -50%); font-size: 28px; text-shadow: 0 4px 20px rgba(212, 175, 55, 0.3); }
+
+  /* 极致扁平化下拉菜单 - 移至标题右侧，腾出右侧空间 */
+  .custom-select-container { position: absolute; top: 14px; left: 130px; pointer-events: auto; z-index: 100; transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+  #top-bar.init-center .custom-select-container { left: 50%; top: 48%; transform: translate(-50%, -50%); width: 280px; }
+  .custom-select-trigger { background: rgba(20, 20, 25, 0.6); backdrop-filter: blur(10px); border: none; color: var(--text-main); padding: 8px 16px; border-radius: 20px; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 20px; transition: all 0.3s; }
+  #top-bar.init-center .custom-select-trigger { padding: 12px 24px; font-size: 16px; background: rgba(30, 30, 35, 0.8); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .custom-select-trigger:hover { background: rgba(40, 40, 45, 0.8); }
+  .custom-select-options { position: absolute; top: 110%; left: 0; width: auto; min-width: 100%; background: rgba(20, 20, 25, 0.95); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); border-radius: 0; overflow: hidden; display: none; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); opacity: 0; transform: translateY(-10px); transition: opacity 0.3s, transform 0.3s; }
+  .custom-select-options.open { display: flex; opacity: 1; transform: translateY(0); }
+  .custom-select-option { padding: 12px 20px; font-size: 14px; color: var(--text-main); cursor: pointer; transition: background 0.2s; border-bottom: 1px dashed rgba(255,255,255,0.05); white-space: nowrap; }
+  .custom-select-option:last-child { border-bottom: none; }
+  .custom-select-option:hover { background: rgba(212, 175, 55, 0.15); color: var(--theme-color); }
+
+  #control-panel { position: absolute; background: var(--bg-glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05); z-index: 40; display: none; flex-direction: column; transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease; }
+  .panel-header { display: flex; flex-direction: column; padding: 0 20px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; touch-action: none; }
+  .drawer-header-trigger { padding: 15px 0 10px 0; width: 100%; display: flex; justify-content: center; align-items: center; }
+  .drawer-handle { display: none; width: 36px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; pointer-events: none; }
+  
+  .tab-container { display: flex; justify-content: space-evenly; width: 100%; }
+  
+  .tab-btn { background: none; border: none; color: var(--text-sub); font-size: 14px; font-weight: 500; cursor: pointer; padding: 0 0 5px 0; transition: 0.3s; border-bottom: 2px solid transparent; letter-spacing: 1px; touch-action: none; position: relative; }
+  .tab-btn.active { color: var(--text-main); border-bottom-color: var(--theme-color); }
+  
+  .auto-tour-btn { position: absolute; right: -52px; top: 0; background: rgba(212,175,55,0.15); border: 1px solid var(--theme-color); color: var(--theme-color); font-size: 10px; border-radius: 4px; padding: 3px 6px; cursor: pointer; white-space: nowrap; touch-action: none; transition: 0.3s; }
+  .auto-tour-btn:hover { background: rgba(212,175,55,0.3); }
+
+  .scroll-area { flex: 1; overflow-y: auto; padding: 15px 20px; scroll-behavior: smooth; touch-action: pan-y; }
+  .scroll-area::-webkit-scrollbar { width: 4px; } .scroll-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+  .list-item { padding: 12px 15px; margin-bottom: 10px; border-radius: 8px; background: rgba(255,255,255,0.03); cursor: pointer; transition: 0.3s; border: 1px solid transparent; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; touch-action: pan-y; }
+  .list-item.active { background: rgba(255,255,255,0.08); border-color: rgba(212, 175, 55, 0.3); box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+  @media (hover: hover) and (pointer: fine) { .list-item:hover { background: rgba(255,255,255,0.08); border-color: rgba(212, 175, 55, 0.3); } }
+  
+  .item-thumb { width: 48px; height: 36px; border-radius: 4px; object-fit: cover; background: #000; border: 1px solid rgba(255,255,255,0.1); }
+  .item-title { font-size: 13px; color: var(--text-main); font-weight: 400; letter-spacing: 0.5px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-index { font-size: 10px; color: var(--theme-color); opacity: 0.7; font-family: monospace; }
+  .item-details { width: 100%; font-size: 11.5px; color: var(--text-sub); line-height: 1.6; margin-top: 2px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.08); display: none; white-space: pre-wrap; font-weight: 300; }
+  .list-item.active .item-details { display: block; animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+ [data-visibility-attribute]:not([visible]), [visible="false"] { pointer-events: none !important; }
+  .preview-hotspot { border: none; border-radius: 50%; width: 14px; height: 14px; cursor: pointer; transition: 0.2s; pointer-events: none !important; position: relative; padding: 0; box-sizing: border-box; touch-action: none; }
+  .preview-hotspot::after { content: ''; position: absolute; top: -25px; left: -25px; right: -25px; bottom: -25px; border-radius: 50%; } 
+  .preview-hotspot:hover, .preview-hotspot.active { z-index: 100; }
+  .preview-hotspot .HotspotAnnotation, .ink-mid .HotspotAnnotation { display: none; background: rgba(20, 22, 28, 0.9); color: var(--text-main); padding: 4px 8px; border-radius: 4px; position: absolute; left: 20px; top: -10px; white-space: nowrap; border: 1px solid rgba(212,175,55,0.3); font-family: sans-serif; font-size: 11px; pointer-events: none; z-index: 100; backdrop-filter: blur(4px); font-weight: normal; }
+  .preview-hotspot.active .HotspotAnnotation, .ink-mid.active .HotspotAnnotation { display: block; }
+  .ink-anchor { position: absolute; width: 2px; height: 2px; background: transparent; transform: translate(-50%, -50%); pointer-events: none; }
+  .ink-mid { position: relative; overflow: visible; z-index: 100; }
+  
+  /* 沉浸式羽化过渡字幕面板 */
+  #subtitle-panel { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 80%; max-width: 700px; background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 50px, rgba(0,0,0,0.8) 100%); padding: 0px 20px 20px 20px; color: var(--text-main); text-align: left; z-index: 60; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; display: flex; flex-direction: column; gap: 8px; text-shadow: 0 2px 5px rgba(0,0,0,0.9); }
+  #subtitle-title { font-size: 20px; font-weight: 500; color: var(--theme-color); letter-spacing: 2px; min-height: 28px; }
+  #subtitle-desc { font-size: 15px; color: #ddd; line-height: 1.8; min-height: 54px; white-space: pre-wrap; font-weight: 300; }
+
+  /* 扁平高端播放控制台 */
+  #tour-controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 70; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; background: rgba(15, 16, 20, 0.85); backdrop-filter: blur(15px); padding: 10px 25px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .tour-ctrl-btn { background: rgba(255,255,255,0.03); border: none; color: var(--text-main); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1); display: flex; align-items: center; justify-content: center; touch-action: none; padding: 0; }
+  .tour-ctrl-btn svg { fill: currentColor; width: 18px; height: 18px; transition: 0.2s; }
+  .tour-ctrl-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--theme-color); transform: scale(1.1); box-shadow: none; }
+  .tour-ctrl-btn.playing { background: rgba(255, 255, 255, 0.08); color: var(--theme-color); }
+
+  .tour-mode-hidden { opacity: 0 !important; pointer-events: none !important; }
+
+  @media (min-width: 769px) {
+    #control-panel { top: 80px; left: 30px; width: 340px; bottom: 30px; border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+    #control-panel.collapsed { transform: none !important; } 
+    .panel-header { cursor: default; padding-top: 20px; }
+    .drawer-header-trigger { display: none; }
+    #subtitle-panel { bottom: 85px; }
+    .tab-container { justify-content: center; gap: 85px; }
+    .auto-tour-btn { right: -60px; }
+  }
+  @media (max-width: 768px) {
+    #top-bar { height: 60px; } 
+    .brand { top: 15px; left: 15px; font-size: 15px; }
+    #top-bar.init-center .brand { left: 50%; top: 38%; font-size: 22px; width: 100%; text-align: center; }
+    .custom-select-container { top: 10px; left: 100px; right: auto; }
+    .custom-select-trigger { padding: 6px 12px; font-size: 13px; }
+    #top-bar.init-center .custom-select-container { left: 50%; right: auto; top: 48%; transform: translate(-50%, -50%); width: 85%; }
+    .drawer-handle { display: block; }
+    #control-panel { top: auto; bottom: 0; left: 0; width: 100%; height: 35vh; border-radius: 16px 16px 0 0; padding-bottom: env(safe-area-inset-bottom); border-bottom: none; box-shadow: 0 -10px 30px rgba(0,0,0,0.6); }
+    #control-panel.collapsed { transform: translateY(calc(100% - 55px)); }
+    model-viewer.drawer-open, #ink-overlay.drawer-open { height: 65vh; }
+    model-viewer.tour-active, #ink-overlay.tour-active { height: calc(100vh - 160px); }
+    .panel-header { padding: 0 15px 8px; }
+    .drawer-header-trigger { padding: 10px 0 8px 0; }
+    .drawer-handle { width: 32px; height: 4px; }
+    .tab-btn { font-size: 13px; }
+    .scroll-area { padding: 10px 15px; }
+    .list-item { padding: 8px 12px; margin-bottom: 8px; gap: 10px; border-radius: 6px; }
+    .item-thumb { width: 40px; height: 30px; border-radius: 3px; }
+    .item-title { font-size: 12px; }
+    .item-index { font-size: 9px; }
+    .item-details { font-size: 11px; padding-top: 8px; }
+    #subtitle-panel { bottom: 80px; width: 95%; padding: 40px 15px 15px 15px; }
+    #subtitle-title { font-size: 16px; }
+    #subtitle-desc { font-size: 13px; }
+    .tour-ctrl-btn { width: 38px; height: 38px; }
+  }
+</style>
+<script type="module" src="./docs/js/model-viewer.min.js"></script>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div style="color:var(--text-sub); font-size:12px; letter-spacing:2px;">构建场景中...</div>
+  <div id="loading-percent" style="color:var(--theme-color); font-size:14px; margin-top:8px; font-weight:bold; font-family:monospace;">0%</div>
+</div>
+
+<div id="top-bar" class="init-center">
+  <div class="brand">童画师吴晓</div>
+  
+  <div id="model-dropdown" class="custom-select-container">
+    <div class="custom-select-trigger"><span id="model-selector-text">选择课程模型...</span><span style="font-size:10px; opacity:0.5;">▼</span></div>
+    <div class="custom-select-options">
+      <div class="custom-select-option" data-value="./docs/json/test01.json">头部肌肉精解</div>
+      <div class="custom-select-option" data-value="./docs/json/test02.json">新的测试</div>
+    </div>
+  </div>
+</div>
+
+<model-viewer id="workbench-viewer" camera-controls disable-tap tone-mapping="neutral" interaction-prompt="none" interpolation-decay="200"></model-viewer>
+<svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true">
+    <defs>
+        <filter id="filter-posterize">
+            <feComponentTransfer id="posterize-transfer">
+                <feFuncR type="discrete" tableValues="0 1"/>
+                <feFuncG type="discrete" tableValues="0 1"/>
+                <feFuncB type="discrete" tableValues="0 1"/>
+            </feComponentTransfer>
+        </filter>
+    </defs>
+</svg>
+<svg id="ink-overlay"></svg>
+
+<div id="control-panel" class="collapsed">
+  <div class="panel-header">
+    <div class="drawer-header-trigger" onclick="window.toggleDrawer(event)">
+      <div class="drawer-handle"></div>
+    </div>
+    <div class="tab-container">
+      <div style="position:relative; display:flex; align-items:center;">
+        <button class="tab-btn active" data-target="pts-list">重要结构</button>
+        <button class="auto-tour-btn" data-mode="pts">▶ 播放</button>
+      </div>
+      <div style="position:relative; display:flex; align-items:center;">
+         <button class="tab-btn" data-target="snap-list">童画师解析</button>
+         <button class="auto-tour-btn" data-mode="snap" style="display:none;">▶ 播放</button>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-area" id="pts-list"></div>
+  <div class="scroll-area" id="snap-list" style="display:none;"></div>
+</div>
+
+<div id="subtitle-panel">
+  <div id="subtitle-title"></div>
+  <div id="subtitle-desc"></div>
+</div>
+
+<div id="tour-controls">
+  <button class="tour-ctrl-btn" id="tour-prev" title="上一个">
+    <svg viewBox="0 0 24 24"><path d="M19 20L9 12l10-8v16z M5 19h2V5H5v14z"/></svg>
+  </button>
+  <button class="tour-ctrl-btn playing" id="tour-pause" title="暂停/继续">
+    <svg id="icon-pause" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    <svg id="icon-play" viewBox="0 0 24 24" style="display:none; margin-left: 2px;"><path d="M8 5v14l11-7z"/></svg>
+  </button>
+  <button class="tour-ctrl-btn" id="tour-stop" title="停止">
+    <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+  </button>
+  <button class="tour-ctrl-btn" id="tour-next" title="下一个">
+    <svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8V4z M19 5h-2v14h2V5z"/></svg>
+  </button>
+</div>
+
+<script>
+  const modelDropdown = document.getElementById('model-dropdown');
+  const dropdownTrigger = modelDropdown.querySelector('.custom-select-trigger');
+  const dropdownOptions = modelDropdown.querySelector('.custom-select-options');
+  const triggerText = document.getElementById('model-selector-text');
+
+  dropdownTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownOptions.classList.toggle('open');
+  });
+
+  document.querySelectorAll('.custom-select-option').forEach(opt => {
+      opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          triggerText.innerText = opt.innerText;
+          dropdownOptions.classList.remove('open');
+          loadSceneData(opt.getAttribute('data-value'));
+      });
+  });
+
+  document.addEventListener('click', () => {
+      dropdownOptions.classList.remove('open');
+  });
+
+  document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+  
+  ['touchstart', 'touchmove'].forEach(ev => {
+    document.addEventListener(ev, function(e) {
+      if (e.touches && e.touches.length > 1 && e.target.closest('#control-panel, #top-bar')) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+  });
+
+  let _globalStartX = 0, _globalStartY = 0, _globalIsDragging = false, _lastTapTime = 0;
+  document.addEventListener('pointerdown', e => {
+    _globalStartX = e.clientX; _globalStartY = e.clientY; _globalIsDragging = false;
+  }, { passive: true });
+  document.addEventListener('pointermove', e => {
+    if (Math.hypot(e.clientX - _globalStartX, e.clientY - _globalStartY) > 5) { _globalIsDragging = true; }
+  }, { passive: true });
+  document.addEventListener('pointerup', e => {
+    if (_globalIsDragging) return;
+    
+    const now = Date.now();
+    const isDoubleTap = (now - _lastTapTime) < 300; 
+    _lastTapTime = now;
+
+    const hotspots = document.querySelectorAll('.preview-hotspot, .svg-hit-path');
+    hotspots.forEach(el => el.style.setProperty('pointer-events', 'auto', 'important'));
+    const elements = document.elementsFromPoint(e.clientX, e.clientY);
+    hotspots.forEach(el => el.style.setProperty('pointer-events', 'none', 'important'));
+    
+    let hitHotspot = false;
+    for (const el of elements) {
+      if (el.classList.contains('preview-hotspot') || el.classList.contains('svg-hit-path')) {
+        const id = el.getAttribute('data-id');
+        if (id && !window.tourState.isActive) { 
+            window.triggerAnnotation(Number(id), false);
+        }
+        hitHotspot = true;
+        break;
+      }
+    }
+
+    if (isDoubleTap && !hitHotspot && !e.target.closest('#control-panel, #top-bar, #tour-controls, .custom-select-container')) {
+        if(window.tourState.isActive) window.stopTour(); 
+        if (currentData) {
+            currentData.pointsData.forEach(p => p.hidden = false); 
+            activePointId = null; window.currentSnapshotShowTextPoints = [];
+            document.querySelectorAll('.list-item').forEach(n => n.classList.remove('active'));
+            viewer.setAttribute('camera-target', 'auto auto auto'); 
+            viewer.setAttribute('camera-orbit', 'auto auto auto'); 
+            updateSVG();
+        }
+    }
+  });
+// ==========================================
+  // 插件管理器基座 (PluginManager) - 消费端只读版
+  // ==========================================
+  window.AnnotationPluginManager = {
+      plugins: {},
+      register: function(plugin) { if(plugin && plugin.id) this.plugins[plugin.id] = plugin; },
+      getPlugin: function(id) { return this.plugins[id]; },
+      dispatchRenderConsumeSVG: function(item, htmlStr, ctx) {
+          const plugin = this.getPlugin(item.type);
+          if (plugin && plugin.renderConsumeSVG) {
+              try { return plugin.renderConsumeSVG(item, htmlStr, ctx); } catch (e) {}
+          } else if (plugin && plugin.renderSVG) { // 降级兼容
+              try { return plugin.renderSVG(item, htmlStr, ctx); } catch (e) {}
+          }
+          return htmlStr;
+      },
+      dispatchMountDOM: function(p, viewer) {
+          const plugin = this.getPlugin(p.type);
+          if (plugin && plugin.mountDOM) { try { plugin.mountDOM(p, viewer); } catch (e) {} }
+      },
+      dispatchGetOcclusionReads: function(p, viewer, checkOccluded, isBackFace) {
+          const plugin = this.getPlugin(p.type);
+          if (plugin && plugin.getOcclusionReads) { return plugin.getOcclusionReads(p, viewer, checkOccluded, isBackFace); }
+          return null;
+      }
+  };
+  const viewer = document.querySelector('#workbench-viewer');
+  const svgOverlay = document.querySelector('#ink-overlay');
+  const snapListEl = document.querySelector('#snap-list');
+  const ptsListEl = document.querySelector('#pts-list');
+  const loading = document.querySelector('#loading-screen');
+  const percentEl = document.getElementById('loading-percent');
+  
+  viewer.addEventListener('progress', (e) => {
+    if (percentEl && e.detail.totalProgress) {
+       percentEl.innerText = Math.round(e.detail.totalProgress * 100) + '%';
+    }
+  });
+
+  let currentData = null;
+  let defaultColor = '#d4af37', defaultOpacity = '0.15';
+  let envSettings = { amb: 0.15, aT: 6500, aX: 0, aY: 90, spt: 0.8, sT: 4500, sX: -45, sY: 45, envRotOffset: 0, shadow: 0.8 };
+  let globalModelOpacity = '1';
+  let defaultPosterize = '0', defaultGrayscale = false;
+  const updateViewFilters = () => {
+      const val = parseInt(defaultPosterize); const isGray = defaultGrayscale;
+      const viewerEl = document.getElementById('workbench-viewer'); const transferEl = document.getElementById('posterize-transfer');
+      let filterStr = '';
+      if (val > 0) {
+          const level = 22 - val;
+          let tableVals = []; for (let i = 0; i < level; i++) { tableVals.push((i / (level - 1)).toFixed(4)); }
+          const tableStr = tableVals.join(' ');
+          if (transferEl) { transferEl.querySelector('feFuncR').setAttribute('tableValues', tableStr); transferEl.querySelector('feFuncG').setAttribute('tableValues', tableStr); transferEl.querySelector('feFuncB').setAttribute('tableValues', tableStr); }
+          filterStr += 'url(#filter-posterize) ';
+      }
+      if (isGray) { filterStr += 'grayscale(1) '; }
+      viewerEl.style.filter = filterStr.trim() || 'none';
+  };
+  const applyModelOpacity = (alpha) => {
+      const val = parseFloat(alpha);
+      if(viewer.model && viewer.model.materials) {
+          viewer.model.materials.forEach(mat => {
+              const c = mat.pbrMetallicRoughness.baseColorFactor;
+              mat.pbrMetallicRoughness.setBaseColorFactor([c[0], c[1], c[2], val]);
+              mat.setAlphaMode(val < 1.0 ? 'BLEND' : 'OPAQUE');
+          });
+      }
+  };
+  viewer.addEventListener('load', () => applyModelOpacity(globalModelOpacity));
+
+  const k2rgb = (k) => { let t=k/100,r,g,b; if(t<=66){r=255; g=Math.max(0,Math.min(255,99.47*Math.log(t)-161.1)); b=t<=19?0:Math.max(0,Math.min(255,138.5*Math.log(t-10)-305));}else{r=Math.max(0,Math.min(255,329.7*Math.pow(t-60,-0.133)));g=Math.max(0,Math.min(255,288.1*Math.pow(t-60,-0.075)));b=255;} return [r,g,b]; };
+  const hexToRgba = (hex, alpha) => { const h = hex || defaultColor; const r = parseInt(h.slice(1, 3), 16) || 212, g = parseInt(h.slice(3, 5), 16) || 175, b = parseInt(h.slice(5, 7), 16) || 55; return `rgba(${r},${g},${b},${alpha})`; };
+
+  const triggerSyncAnim = () => {
+    let start = Date.now();
+    let anim = () => { updateSVG(); if(Date.now() - start < 500) requestAnimationFrame(anim); };
+    anim();
+  };
+
+  window.toggleDrawer = function(e) {
+    if(e) e.stopPropagation();
+    if(window.innerWidth <= 768) {
+      document.getElementById('control-panel').classList.toggle('collapsed');
+      document.getElementById('workbench-viewer').classList.toggle('drawer-open');
+      document.getElementById('ink-overlay').classList.toggle('drawer-open'); 
+      triggerSyncAnim();
+    }
+  };
+
+  let _lightCanvas, _lightCtx;
+  function updateLighting() {
+    if(!_lightCanvas){ _lightCanvas = document.createElement('canvas'); _lightCanvas.width = 512; _lightCanvas.height = 256; _lightCtx = _lightCanvas.getContext('2d'); }
+    const ctx = _lightCtx; ctx.fillStyle = '#050508'; ctx.fillRect(0, 0, 512, 256);
+    const peak = Math.max(1, envSettings.amb, envSettings.spt);
+    
+    const drawLight = (intensity, px, py, radius, r, g, b, isSpot = false) => {
+      const i = parseFloat(intensity) / peak; if(i <= 0) return;
+      if (Math.abs(parseFloat(py)) === 90) px = 0; 
+      const x = ((parseFloat(px) + 180) / 360) * 512; const y = ((-parseFloat(py) + 90) / 180) * 256;
+      const cr = Math.min(255, Math.floor(r * i)), cg = Math.min(255, Math.floor(g * i)), cb = Math.min(255, Math.floor(b * i));
+      const pitchRad = parseFloat(py) * Math.PI / 180; const stretchX = Math.max(1, 1 / Math.max(0.01, Math.cos(pitchRad)));
+      
+      ctx.save();
+      for(let offset of [-512, 0, 512]) {
+        ctx.save(); ctx.translate(x + offset, y); ctx.scale(stretchX, 1);
+        const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+        grd.addColorStop(0, `rgba(${cr},${cg},${cb},1)`); if(isSpot) grd.addColorStop(0.15, `rgba(${cr},${cg},${cb},1)`); grd.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+        ctx.fillStyle = grd; ctx.fillRect(-radius, -radius, radius * 2, radius * 2); ctx.restore();
+      } ctx.restore();
+    };
+
+    const [ar, ag, ab] = k2rgb(envSettings.aT); drawLight(envSettings.amb, envSettings.aX, envSettings.aY, 200, ar, ag, ab);
+    const [sr, sg, sb] = k2rgb(envSettings.sT); drawLight(envSettings.spt, envSettings.sX, envSettings.sY, 80, sr, sg, sb, true); 
+    
+    viewer.setAttribute('environment-image', _lightCanvas.toDataURL('image/jpeg', 0.8));
+    viewer.setAttribute('exposure', peak.toString());
+    viewer.setAttribute('environment-rotation', `0rad ${envSettings.envRotOffset}rad 0rad`);
+    viewer.setAttribute('shadow-intensity', envSettings.shadow);
+  }
+
+  let activePointId = null; 
+  let svgRafId = null; 
+  let _isSvgUpdating = false;
+
+  function updateSVG() {
+    if(!currentData) return;
+    if (svgRafId) cancelAnimationFrame(svgRafId);
+    svgRafId = requestAnimationFrame(() => {
+      _isSvgUpdating = true;
+      svgOverlay.setAttribute('viewBox', `0 0 ${svgOverlay.clientWidth} ${svgOverlay.clientHeight}`);
+      let html = '';
+      const reads = [];
+      
+      // 实时计算摄像机视线向量 (用于背面剔除补偿)
+      let camVec = {x:0, y:0, z:1}; if (viewer.getCameraOrbit) { const o = viewer.getCameraOrbit(); camVec.x = Math.sin(o.phi) * Math.sin(o.theta); camVec.y = Math.cos(o.phi); camVec.z = Math.sin(o.phi) * Math.cos(o.theta); }
+      const isBackFace = (normStr) => { if (!normStr) return false; const [nx, ny, nz] = normStr.replace(/m/g, '').split(' ').map(Number); return (nx * camVec.x + ny * camVec.y + nz * camVec.z) < -0.05; };
+      const checkOccluded = (el) => { return el.style.display === 'none' || !el.hasAttribute('visible') || el.getAttribute('visible') === 'false'; };
+
+      currentData.pointsData.forEach(p => {
+        if (p.hidden) return;
+        const readData = window.AnnotationPluginManager.dispatchGetOcclusionReads(p, viewer, checkOccluded, isBackFace);
+        if (readData) reads.push(readData);
+      });
+
+      currentData.pointsData.forEach(p => {
+        const slotEl = viewer.querySelector(`[slot="${(p.type==='line'||p.type==='spline'||p.type==='contour')&&p.dots?p.dots[p.midIndex||Math.floor(p.dots.length/2)].slot:p.slot}"]`);
+        if (slotEl) slotEl.style.display = p.hidden ? 'none' : '';
+        if ((p.type==='line'||p.type==='spline'||p.type==='polygon'||p.type==='polygon3d'||p.type==='contour')&&p.dots) p.dots.forEach(d => { const del = viewer.querySelector(`[slot="${d.slot}"]`); if(del) del.style.display = p.hidden ? 'none' : ''; });
+        if (p.type==='normal-arrow') { [p.slotEnd, p.slotP1, p.slotP2, p.slotP3].forEach(s => { if(s){ const del = viewer.querySelector(`[slot="${s}"]`); if(del) del.style.display = p.hidden ? 'none' : ''; } }); }
+      });
+
+      const getRenderAlpha = (isOccluded, baseOp) => {
+          if (!isOccluded) return baseOp;
+          const mo = parseFloat(globalModelOpacity);
+          if (mo >= 1.0) return 0;
+          return (1 - mo) * 0.9;
+      };
+
+      const lightData = { amb: envSettings.amb, spt: envSettings.spt, sX: envSettings.sX, sY: envSettings.sY, envRot: envSettings.envRotOffset };
+      reads.forEach(item => {
+        const p = item.p;
+        const isHighlight = p.id === activePointId || (window.currentSnapshotShowTextPoints && window.currentSnapshotShowTextPoints.includes(p.id));
+        const color = p.color || defaultColor;
+        
+        html = window.AnnotationPluginManager.dispatchRenderConsumeSVG(item, html, { 
+            defaultOpacity, hexToRgba, color, isHighlight, getRenderAlpha, lightData 
+        });
+      });
+      svgOverlay.innerHTML = html;
+      requestAnimationFrame(() => { _isSvgUpdating = false; });
+    });
+  }
+
+  window.triggerAnnotation = function(id, fromList = true) {
+    window.currentSnapshotShowTextPoints = []; // 清除快照多选状态
+    if (fromList) {
+      activePointId = id;
+      document.querySelectorAll('.list-item').forEach(n => n.classList.remove('active'));
+      const targetEl = document.getElementById(`list-item-pt-${id}`);
+      if (targetEl) { targetEl.classList.add('active'); targetEl.scrollIntoView({behavior: 'auto', block: 'nearest'}); }
+    } else {
+      activePointId = activePointId === id ? null : id; 
+    }
+    
+    if(activePointId) {
+      const p = currentData.pointsData.find(x => x.id === activePointId);
+      if(p && p.pos && p.norm) {
+        const [nx, ny, nz] = p.norm.replace(/m/g, '').split(' ').map(Number);
+        viewer.setAttribute('camera-target', p.pos); 
+        viewer.setAttribute('camera-orbit', `${Math.atan2(nx, nz)*180/Math.PI}deg ${Math.acos(ny)*180/Math.PI}deg auto`);
+      }
+    }
+    updateSVG();
+  };
+
+ window.applySnapshot = function(s) {
+      activePointId = null; window.currentSnapshotShowTextPoints = s.showTextPoints || [];
+      if(s.camera) { viewer.setAttribute('camera-target', s.camera.target); viewer.setAttribute('camera-orbit', s.camera.orbit); viewer.setAttribute('field-of-view', s.camera.fov); }      if(s.settings) {
+        if(s.settings.ambient!==undefined) envSettings.amb = s.settings.ambient; 
+        if(s.settings.ambientTemp!==undefined) envSettings.aT = s.settings.ambientTemp;
+        if(s.settings.ambientX!==undefined) envSettings.aX = s.settings.ambientX; 
+        if(s.settings.ambientY!==undefined) envSettings.aY = s.settings.ambientY;
+        if(s.settings.spot!==undefined) envSettings.spt = s.settings.spot; 
+        else if(s.settings.exposure!==undefined) envSettings.spt = s.settings.exposure;
+        if(s.settings.spotTemp!==undefined) envSettings.sT = s.settings.spotTemp;
+        if(s.settings.spotX!==undefined) envSettings.sX = s.settings.spotX; 
+        else if(s.settings.lightX!==undefined) envSettings.sX = s.settings.lightX; 
+        else if(s.settings.lightRot!==undefined) envSettings.sX = s.settings.lightRot;
+        if(s.settings.spotY!==undefined) envSettings.sY = s.settings.spotY; 
+        else if(s.settings.lightY!==undefined) envSettings.sY = s.settings.lightY;
+        if(s.settings.shadowIntensity!==undefined) envSettings.shadow = s.settings.shadowIntensity;
+        if(s.settings.modelOpacity!==undefined) { globalModelOpacity = s.settings.modelOpacity; applyModelOpacity(globalModelOpacity); }
+        envSettings.envRotOffset = s.settings.envRotOffset !== undefined ? s.settings.envRotOffset : 0;
+        if(s.settings.posterize!==undefined) defaultPosterize = s.settings.posterize;
+        if(s.settings.grayscale!==undefined) defaultGrayscale = s.settings.grayscale;
+        updateViewFilters();
+        updateLighting();
+      }
+      if(s.visiblePoints) { currentData.pointsData.forEach(p => p.hidden = !s.visiblePoints.includes(p.id)); updateSVG(); } else { updateSVG(); }
+  };
+
+  window.tourState = {
+      isActive: false,
+      mode: 'pts', 
+      currentIndex: 0,
+      isPaused: false,
+      timeoutId: null,
+      playId: 0,
+      list: []
+  };
+
+  const titleEl = document.getElementById('subtitle-title');
+  const descEl = document.getElementById('subtitle-desc');
+  const panelEl = document.getElementById('subtitle-panel');
+  const topBarEl = document.getElementById('top-bar');
+  const controlPanelEl = document.getElementById('control-panel');
+  const tourControlsEl = document.getElementById('tour-controls');
+  const btnPause = document.getElementById('tour-pause');
+  const iconPause = document.getElementById('icon-pause');
+  const iconPlay = document.getElementById('icon-play');
+
+  function typeWriter(element, text, playId, speed = 50) {
+      return new Promise(async resolve => {
+          element.innerText = '';
+          if (!text) { resolve(); return; }
+          
+          const chars = Array.from(text);
+          for (let i = 0; i < chars.length; i++) {
+              if (!window.tourState.isActive || window.tourState.playId !== playId) {
+                  resolve();
+                  return;
+              }
+              element.innerText += chars[i];
+              await new Promise(r => setTimeout(r, speed));
+          }
+          resolve();
+      });
+  }
+
+  window.startTour = function(mode) {
+      if(!currentData) return;
+      window.tourState.mode = mode;
+      window.tourState.list = mode === 'pts' ? 
+          currentData.pointsData.filter(p => p.text && !p.hideInList) : 
+          (currentData.snapshots || []);
+      
+      if(window.tourState.list.length === 0) return;
+
+      window.tourState.isActive = true;
+      window.tourState.isPaused = false;
+      window.tourState.currentIndex = 0;
+      
+      topBarEl.classList.add('tour-mode-hidden');
+      controlPanelEl.classList.add('tour-mode-hidden');
+      viewer.classList.add('tour-active');
+      svgOverlay.classList.add('tour-active');
+      
+      panelEl.style.opacity = '1';
+      panelEl.style.pointerEvents = 'auto';
+      tourControlsEl.style.opacity = '1';
+      tourControlsEl.style.pointerEvents = 'auto';
+      
+      iconPause.style.display = 'block';
+      iconPlay.style.display = 'none';
+      btnPause.classList.add('playing');
+
+      playCurrentNode();
+  };
+
+  window.stopTour = function() {
+      window.tourState.isActive = false;
+      window.tourState.playId++; 
+      clearTimeout(window.tourState.timeoutId);
+      
+      topBarEl.classList.remove('tour-mode-hidden');
+      controlPanelEl.classList.remove('tour-mode-hidden');
+      viewer.classList.remove('tour-active');
+      svgOverlay.classList.remove('tour-active');
+      
+      panelEl.style.opacity = '0';
+      panelEl.style.pointerEvents = 'none';
+      tourControlsEl.style.opacity = '0';
+      tourControlsEl.style.pointerEvents = 'none';
+      
+      viewer.querySelectorAll('.active').forEach(el => {
+          if(el.classList.contains('preview-hotspot') || el.classList.contains('ink-mid')) el.classList.remove('active');
+      });
+  };
+
+  async function playCurrentNode() {
+      if (!window.tourState.isActive) return;
+      
+      window.tourState.playId++;
+      const currentPlayId = window.tourState.playId;
+      
+      clearTimeout(window.tourState.timeoutId); 
+      
+      const node = window.tourState.list[window.tourState.currentIndex];
+      const minPlayTime = 8000; 
+      const startTime = Date.now();
+
+      if (window.tourState.mode === 'pts') {
+          window.triggerAnnotation(node.id, false); 
+      } else {
+          window.applySnapshot(node);
+      }
+
+      const titleText = window.tourState.mode === 'pts' ? node.text : node.name;
+      const descText = node.desc || (window.tourState.mode === 'pts' ? '暂无详细解剖说明。' : '暂无详细说明。');
+
+      titleEl.innerText = '';
+      descEl.innerText = '';
+
+      await typeWriter(titleEl, titleText, currentPlayId, 400);
+      if (window.tourState.playId !== currentPlayId) return; 
+
+      await typeWriter(descEl, descText, currentPlayId, 200); 
+      if (window.tourState.playId !== currentPlayId) return;
+
+      if (!window.tourState.isPaused) {
+          const elapsedTime = Date.now() - startTime;
+          const waitTime = Math.max(3000, minPlayTime - elapsedTime);
+
+          window.tourState.timeoutId = setTimeout(() => {
+              if (!window.tourState.isActive || window.tourState.isPaused || window.tourState.playId !== currentPlayId) return;
+              window.tourState.currentIndex = (window.tourState.currentIndex + 1) % window.tourState.list.length;
+              playCurrentNode();
+          }, waitTime);
+      }
+  }
+
+  document.querySelectorAll('.auto-tour-btn').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          window.startTour(this.getAttribute('data-mode'));
+      });
+  });
+
+  document.getElementById('tour-stop').addEventListener('click', window.stopTour);
+  
+  btnPause.addEventListener('click', () => {
+      if (window.tourState.isPaused) {
+          window.tourState.isPaused = false;
+          iconPause.style.display = 'block';
+          iconPlay.style.display = 'none';
+          btnPause.classList.add('playing');
+          playCurrentNode(); 
+      } else {
+          window.tourState.isPaused = true;
+          clearTimeout(window.tourState.timeoutId); 
+          iconPause.style.display = 'none';
+          iconPlay.style.display = 'block';
+          btnPause.classList.remove('playing');
+      }
+  });
+
+  document.getElementById('tour-prev').addEventListener('click', () => {
+      window.tourState.currentIndex = (window.tourState.currentIndex - 1 + window.tourState.list.length) % window.tourState.list.length;
+      playCurrentNode();
+  });
+
+  document.getElementById('tour-next').addEventListener('click', () => {
+      window.tourState.currentIndex = (window.tourState.currentIndex + 1) % window.tourState.list.length;
+      playCurrentNode();
+  });
+
+  async function loadSceneData(url) {
+    if(!url) return;
+    document.getElementById('top-bar').classList.remove('init-center');
+    loading.style.opacity = '1'; loading.style.pointerEvents = 'auto';
+    if(percentEl) percentEl.innerText = '0%'; 
+    if(window.tourState.isActive) window.stopTour();
+    
+    try {
+      const res = await fetch(url); const data = await res.json(); currentData = data;
+      const isSameSrc = viewer.getAttribute('src') === data.modelSrc;
+      viewer.setAttribute('src', data.modelSrc);
+      
+      if(data.settings) {
+        defaultColor = data.settings.defaultColor || defaultColor; defaultOpacity = data.settings.defaultOpacity || defaultOpacity;
+        envSettings.amb = data.settings.ambient ?? envSettings.amb; envSettings.aT = data.settings.ambientTemp ?? envSettings.aT;
+        envSettings.aX = data.settings.ambientX ?? envSettings.aX; envSettings.aY = data.settings.ambientY ?? envSettings.aY;
+        envSettings.spt = data.settings.spot ?? data.settings.exposure ?? envSettings.spt; 
+        envSettings.sT = data.settings.spotTemp ?? envSettings.sT;
+        envSettings.sX = data.settings.spotX ?? data.settings.lightX ?? data.settings.lightRot ?? envSettings.sX; 
+        envSettings.sY = data.settings.spotY ?? data.settings.lightY ?? envSettings.sY;
+        envSettings.envRotOffset = data.settings.envRotOffset ?? envSettings.envRotOffset; 
+        envSettings.shadow = data.settings.shadowIntensity ?? envSettings.shadow;
+        if(data.settings.modelOpacity !== undefined) { globalModelOpacity = data.settings.modelOpacity; applyModelOpacity(globalModelOpacity); }
+        if(data.settings.posterize !== undefined) defaultPosterize = data.settings.posterize;
+        if(data.settings.grayscale !== undefined) defaultGrayscale = data.settings.grayscale;
+      }
+      updateViewFilters();
+      updateLighting();
+      if(data.camera) { 
+        if(data.camera.target) viewer.setAttribute('camera-target', data.camera.target); 
+        if(data.camera.orbit) viewer.setAttribute('camera-orbit', data.camera.orbit); 
+        if(data.camera.fov) viewer.setAttribute('field-of-view', data.camera.fov); 
+      }
+
+      viewer.querySelectorAll('.preview-hotspot, .ink-anchor').forEach(el => el.remove());
+      data.pointsData.forEach(p => {
+        p.hidden = false;
+        window.AnnotationPluginManager.dispatchMountDOM(p, viewer);
+      });
+
+      renderLists();
+      
+      const hideLoading = () => { 
+          setTimeout(() => { 
+              loading.style.opacity = '0'; 
+              loading.style.pointerEvents = 'none'; 
+              document.getElementById('control-panel').style.display = 'flex';
+              updateSVG(); 
+          }, 500); 
+      };
+      
+      if(isSameSrc) { hideLoading(); } 
+      else { viewer.addEventListener('load', hideLoading, {once: true}); setTimeout(hideLoading, 8000); }
+      
+    } catch(err) {
+      console.error("数据加载失败:", err); alert("课程数据获取失败，请检查网络或路径。");
+      loading.style.opacity = '0'; loading.style.pointerEvents = 'none';
+      document.getElementById('top-bar').classList.add('init-center');
+      document.getElementById('control-panel').style.display = 'none';
+    }
+  }
+
+  function renderLists() {
+    snapListEl.innerHTML = '';
+    (currentData.snapshots || []).forEach((s, i) => {
+      const el = document.createElement('div'); el.className = 'list-item';
+      el.id = `list-item-snap-${s.id}`;
+      el.innerHTML = `<img src="${s.thumb||''}" class="item-thumb" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiMxYTFhMWEiLz48L3N2Zz4='"><div class="item-title">${s.name}</div><div class="item-index">0${i+1}</div><div class="item-details">${s.desc || '暂无详细说明。'}</div>`;
+      el.addEventListener('pointerdown', e => { el.dataset.startX = e.clientX; el.dataset.startY = e.clientY; });
+      el.addEventListener('pointerup', (e) => {
+        if(Math.hypot(e.clientX - (el.dataset.startX||0), e.clientY - (el.dataset.startY||0)) < 10) {
+          e.stopPropagation(); 
+          document.querySelectorAll('#snap-list .list-item').forEach(n => n.classList.remove('active')); 
+          el.classList.add('active');
+          window.applySnapshot(s);
+        }
+      });
+      snapListEl.appendChild(el);
+    });
+
+    ptsListEl.innerHTML = '';
+    let displayIdx = 1;
+    (currentData.pointsData || []).forEach((p) => {
+      if(!p.text || p.hideInList) return; 
+      const el = document.createElement('div'); el.className = 'list-item';
+      el.id = `list-item-pt-${p.id}`;
+      el.innerHTML = `<div class="item-title">${p.text}</div><div class="item-index">P${displayIdx++}</div><div class="item-details">${p.desc || '暂无详细解剖说明。'}</div>`;
+      el.addEventListener('pointerdown', e => { el.dataset.startX = e.clientX; el.dataset.startY = e.clientY; });
+      el.addEventListener('pointerup', (e) => { 
+        if(Math.hypot(e.clientX - (el.dataset.startX||0), e.clientY - (el.dataset.startY||0)) < 10) {
+          e.stopPropagation(); window.triggerAnnotation(p.id, true); 
+        }
+      });
+      ptsListEl.appendChild(el);
+    });
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('pointerdown', e => { btn.dataset.startX = e.clientX; btn.dataset.startY = e.clientY; });
+    btn.addEventListener('pointerup', (e) => {
+      if(Math.hypot(e.clientX - (btn.dataset.startX||0), e.clientY - (btn.dataset.startY||0)) < 10) {
+        e.stopPropagation(); 
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); e.target.classList.add('active');
+        document.querySelectorAll('.scroll-area').forEach(el => el.style.display = 'none');
+        
+        const targetId = e.target.getAttribute('data-target');
+        document.getElementById(targetId).style.display = 'block';
+        
+        document.querySelectorAll('.auto-tour-btn').forEach(b => b.style.display = 'none');
+        const activeTourBtn = document.querySelector(`.auto-tour-btn[data-mode="${targetId === 'pts-list' ? 'pts' : 'snap'}"]`);
+        if(activeTourBtn) activeTourBtn.style.display = 'block';
+        
+        if(targetId === 'pts-list' && currentData) {
+            currentData.pointsData.forEach(p => p.hidden = false);
+            updateSVG();
+        }
+        
+        if(window.innerWidth <= 768 && document.getElementById('control-panel').classList.contains('collapsed')) { 
+           document.getElementById('control-panel').classList.remove('collapsed'); 
+           document.getElementById('workbench-viewer').classList.add('drawer-open');
+           document.getElementById('ink-overlay').classList.add('drawer-open');
+           triggerSyncAnim();
+        } 
+      }
+    });
+  });
+  
+  window.addEventListener('resize', updateSVG);
+viewer.addEventListener('camera-change', updateSVG); 
+  new MutationObserver(() => { if(!_isSvgUpdating) updateSVG(); }).observe(viewer, { attributes: true, subtree: true, attributeFilter: ['visible', 'style'] });
+  if (window.ResizeObserver) new ResizeObserver(() => updateSVG()).observe(viewer);
+
+</script>
+<!-- 引入外挂插件系统 -->
+<script src="./plugins_01/plugin-point.js"></script>
+<script src="./plugins_01/plugin-arrow.js"></script>
+<script src="./plugins_01/plugin-line.js"></script>
+<script src="./plugins_01/plugin-contour.js"></script>
+<script src="./plugins_01/plugin-polygon.js"></script>
+<script src="./plugins_01/plugin-leader.js"></script>
+<script src="./plugins_01/plugin-polygon3d.js"></script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>晓色 · 调色助手 使用说明 - 童画师吴晓的绘画工具集</title>
+<!-- 针对国内用户的SEO优化 -->
+<meta name="description" content="晓色·调色助手使用说明 - 童画师吴晓开发的智能调色工具，支持水彩和油画/丙烯模式，提供精准的色彩匹配和颜料配方。免费在线绘画辅助工具。">
+<meta name="keywords" content="吴晓,童画师吴晓,晓色调色助手,智能调色,水彩调色,油画调色,颜料管理,色彩匹配,绘画工具,视觉维度">
+<meta name="author" content="童画师吴晓">
+<meta name="robots" content="index, follow">
+<meta name="baidu-site-verification" content="code-xxxx">
+
+<!-- Open Graph 社交媒体优化 -->
+<meta property="og:title" content="晓色 · 调色助手 使用说明 - 童画师吴晓的绘画工具集">
+<meta property="og:description" content="童画师吴晓开发的智能调色工具，支持水彩和油画/丙烯模式，提供精准的色彩匹配和颜料配方。">
+<meta property="og:image" content="../img/wuxiao_s.jpg">
+<meta property="og:url" content="https://paintingtools.wxxiaowu882.com/docs/AboutXStudio.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="视觉维度绘画工具集">
+
+<!-- Twitter Card 优化 -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="晓色 · 调色助手 使用说明">
+<meta name="twitter:description" content="童画师吴晓开发的智能调色工具，支持水彩和油画/丙烯模式，提供精准的色彩匹配和颜料配方。">
+<meta name="twitter:image" content="../img/wuxiao_s.jpg">
+
+<!-- 结构化数据 JSON-LD -->
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "晓色 · 调色助手 使用说明",
+    "description": "童画师吴晓开发的智能调色工具，支持水彩和油画/丙烯模式，提供精准的色彩匹配和颜料配方",
+    "url": "https://paintingtools.wxxiaowu882.com/docs/AboutXStudio.html",
+    "author": {
+        "@type": "Person",
+        "name": "童画师吴晓",
+        "url": "https://paintingtools.wxxiaowu882.com"
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "视觉维度绘画工具集",
+        "logo": {
+            "@type": "ImageObject",
+            "url": "https://paintingtools.wxxiaowu882.com/docs/img/wuxiao_s.jpg"
+        }
+    },
+    "datePublished": "2026-02-08",
+    "dateModified": "2026-02-08",
+    "articleSection": "绘画工具教程",
+    "keywords": "绘画工具,调色助手,色彩匹配,颜料管理"
+}
+</script>
+<style>
+:root { --accent: #5E5CE6; --text: #1C1C1E; --secondary: #8E8E93; --bg: #F2F2F7; --card: #FFFFFF; --border: rgba(0,0,0,0.06); }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; padding: 0; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; color: var(--text); line-height: 1.6; }
+.container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+header { text-align: center; margin-bottom: 60px; }
+.hero-tag { display: inline-block; padding: 4px 12px; background: var(--accent); color: white; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 16px; }
+h1 { font-size: 32px; font-weight: 800; margin: 0 0 16px; letter-spacing: -0.5px; }
+.intro-p { text-align: left; font-size: 17px; color: var(--text); background: var(--card); padding: 24px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); border: 1px solid var(--border); }
+h2 { font-size: 24px; font-weight: 700; margin: 48px 0 24px; display: flex; align-items: center; gap: 10px; }
+h3 { font-size: 20px; font-weight: 700; margin: 32px 0 16px; border-left: 4px solid var(--accent); padding-left: 12px; }
+h4 { font-size: 17px; font-weight: 700; margin: 24px 0 12px; color: var(--accent); }
+p { margin: 0 0 16px; }
+.card { background: var(--card); padding: 24px; border-radius: 20px; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+ul { padding-left: 20px; margin: 0 0 16px; }
+li { margin-bottom: 12px; }
+li strong { color: var(--text); }
+blockquote { margin: 32px 0; padding: 24px; background: rgba(94,92,230,0.05); border-radius: 20px; border-left: 0; position: relative; }
+blockquote p { margin: 0; font-style: italic; color: var(--accent); font-weight: 500; }
+.delta-item { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; padding: 12px; border-radius: 12px; background: var(--bg); }
+.delta-tag { font-weight: 700; white-space: nowrap; padding: 2px 8px; border-radius: 6px; background: var(--text); color: white; font-size: 13px; }
+footer { margin-top: 80px; text-align: center; padding: 40px; border-top: 1px solid var(--border); color: var(--secondary); font-size: 14px; }
+.contact-tag { color: var(--accent); font-weight: 700; text-decoration: none; }
+@media (max-width: 600px) { h1 { font-size: 26px; } .container { padding: 20px 16px; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="hero-tag">【晓色·调色助手】的多场景应用</div>
+    <h1>🎨 晓色 · 调色助手：找回画笔下的纯净色彩</h1>
+    <div class="intro-p">
+      您好，我是<strong>童画师吴晓</strong>。<br><br>
+      色彩的精准直觉来源于对颜料特性的理解和正确的练习。为了让大家能高效创作，不再因为“废废的调色”而心生挫败，我出资出力开发了这个工具。它并不局限于我的学员使用，它更面向所有喜欢画画的人开放，它既是你的<strong>辅助大脑</strong>，也是你的<strong>色彩私教</strong>。它更是条<strong>捷径</strong>。
+    </div>
+  </header>
+
+  <section>
+    <h2>🌟 它能为你带来什么？</h2>
+    <div class="card">
+      <ul>
+        <li><strong>提质增效</strong>：告别“盲目乱试”，快速锁定最接近目标色的极简配方。</li>
+        <li><strong>定制私属方案</strong>：基于你现有的颜料盒品种，通过颜料盒配置功能，量身打造专属于你的“调色秘方”，让每一支颜料都能在你的创作中物尽其用。</li>
+        <li><strong>物理颜料数字化</strong>：无需查找复杂的色值参数，直接对着你刚挤出的颜料拍张照，就能将其精确录入系统。不仅方便快捷，更能确保软件里的“它”和你手边的“它”在色相上完全一致，建立真正的“数字孪生”颜料库。</li>
+        <li><strong>省时省力省钱</strong>：每一次加色都有据可依，不仅能避免昂贵颜料在调色盘上的反复试错与浪费，更能节省下漫长的推敲时间，让创作流程变得更加高效、从容。</li>
+        <li><strong>科学反馈建立色感</strong>：通过数值反馈（ΔE）练习，让你在实操中慢慢长出一双对色彩敏感的眼睛。</li>
+        <li><strong>内化色彩直觉</strong>：让你从懵懂的尝试乱撞，蜕变为“本该如此”的自信直觉。通过高频的反馈练习，这种技能将跨越复杂的逻辑思考，内化为你的心智本能。</li>
+        <li><strong>看清色域边界</strong>：打破“三原色能调出万物”的迷思。它能帮你一眼看清现有颜料盒的极限，对超出能力的色彩不再盲目死磕。</li>
+        <li><strong>碎片时间深度进阶</strong>：无论是在通勤路上还是闲暇碎片时间，你都能随时开启练习。它的逻辑与真实的调色思维完全契合。</li>
+        <li><strong>专业创作的色彩支点</strong>：<strong>晓色 · 调色助手</strong>能为你提供一个冷静、客观的色彩参考，帮助你在感性的艺术表达中稳住理性的色彩准度。</li>
+        <li><strong>无负担的轻量化体验</strong>：不占手机空间。所有颜料盒配置均会自动保存，支持跨端操作，且我承诺将<strong>永久免费</strong>开放给所有画友使用。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>🎬 典型场景与操作流程</h2>
+    
+    <h3>场景一：临摹创作——“这张照片里的颜色怎么调？”</h3>
+    <div class="card">
+      <ol>
+        <li><strong>打开图片</strong>：点击顶部按钮，上传你的参考图。</li>
+        <li><strong>配置色盘</strong>：点击下方的【设置（齿轮）】按钮，在弹窗中选择与你手头颜料最接近的预设方案。</li>
+        <li><strong>准心取色</strong>：单指拖动十字准心，将它对准你想要获取的颜色。</li>
+        <li><strong>模式切换</strong>：根据画种切换“水彩”或“油画/丙烯”模式。</li>
+        <li><strong>自动调色</strong>：点击【自动调色】。</li>
+        <li><strong>查看配方</strong>：下方弹出具体的颜料比例，直接按照比例在物理色盘上操作即可。</li>
+      </ol>
+    </div>
+
+    <h3>场景二：限制练习——“我手头只有这几种颜色，能调出来吗？”</h3>
+    <div class="card">
+      <ol>
+        <li><strong>战术调整</strong>：在主界面下方的颜料条中，找到你想禁用的颜料。</li>
+        <li><strong>长按排除</strong>：<strong>长按</strong>该颜料块。当它们变暗并出现红色划线时，说明它们已被“暂停使用”。</li>
+        <li><strong>重新计算</strong>：再次点击【自动调色】，软件的算法会立即避开被禁用的颜色。</li>
+      </ol>
+    </div>
+
+    <h3>场景三：装备扩充——“我新买了一支特殊的颜料，怎么加进去？”</h3>
+    <div class="card">
+      <ol>
+        <li><strong>进入配置</strong>：点击齿轮图标，切换到“自定义”标签。</li>
+        <li><strong>拍照录入</strong>：点击“+”号，在弹窗中点击【📷 拍照/上传图片取色】。</li>
+        <li><strong>实物取色</strong>：对着挤在调色盘上的颜料拍一张照片。</li>
+        <li><strong>精准定位</strong>：在全屏取色界面中拖动图片，让准心对准颜料的中心位置。</li>
+      </ol>
+    </div>
+
+    <h3>场景四：随时随地的“无实物”修行——“通勤路上的色感进阶”</h3>
+    <div class="card">
+      <ol>
+        <li><strong>取色定位</strong>：随便选个图片，选一个目标色，但不要点自动调色。</li>
+        <li><strong>开启练习</strong>：点击【调色练习】进入挑战模式。</li>
+        <li><strong>心智模拟</strong>：在大脑中模拟实操思维，点击下方颜料块进行手动配比。</li>
+        <li><strong>复盘提升</strong>：实时观察 ΔE 数值。</li>
+      </ol>
+    </div>
+
+    <h3>场景五：专业创作的“防干扰”校验</h3>
+    <div class="card">
+      <ol>
+        <li><strong>建立参考点</strong>：在画面色彩对比极其强烈时，用软件对参考图取色。</li>
+        <li><strong>锁定数值</strong>：通过软件给出的绝对值配方，为调色提供一个不受画布邻近色干扰的“绝对支点”。</li>
+        <li><strong>稳住质量</strong>：在保持艺术感性的同时，利用理性反馈稳住画面色彩结构的准度。</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <h2>🛠 主要功能一览</h2>
+    <blockquote>
+      <p>设计哲学：极简背后的极致<br>“把复杂留给代码，把简单留给画者。”</p>
+    </blockquote>
+    <div class="card">
+      <h4>高精度智能取色系统</h4>
+      <ul>
+        <li>支持双指自由缩放和移动图片，单指高灵敏度微调十字准心。</li>
+        <li>软件会自动计算准心周围区域的加权平均色值，确保提取出的“目标色”最符合人眼视觉印象。</li>
+      </ul>
+      
+      <h4>双重混色物理模型</h4>
+      <ul>
+        <li><strong>水彩模式 (Watercolor)</strong>：基于减法混色原理，不使用白色颜料。</li>
+        <li><strong>油画/丙烯模式 (Opaque)</strong>：模拟不透明料混色，引入“钛白”覆盖力模型。</li>
+      </ul>
+
+      <h4>动态可视化对比 (同心圆与ΔE)</h4>
+      <ul>
+        <li><strong>直观对比展示</strong>：内圆显示目标色（图片上的采样色），外环显示当前调合色。</li>
+        <li><strong>“小眼睛”模式</strong>：点击左上角的<strong>灰色小眼睛图标</strong>，所有辅助信息便会优雅浮现。</li>
+        <li><strong>按住隐藏分界线</strong>：用手指<strong>按住圆环</strong>，边框会瞬间消失，让两个颜色实现“零距离”接触便于比对。</li>
+        <li><strong>卫星圆环配方展示</strong>：通过面积大小不一的“卫星圆球”来直观表达用量。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>🔬 科学度量--调合色和目标色的色差</h2>
+    <div class="card">
+      <p>引入了国际标准的 <strong>ΔE (CIEDE2000 色差公式)</strong>：</p>
+      <div class="delta-item">
+        <div class="delta-tag">ΔE ≤ 1.0</div>
+        <div><strong>完美匹配</strong>：极高的准确度，肉眼几乎无法分辨色差。</div>
+      </div>
+      <div class="delta-item">
+        <div class="delta-tag">1.0 < ΔE ≤ 2.0</div>
+        <div><strong>大致匹配</strong>：色差微小，属于高质量还原。</div>
+      </div>
+      <div class="delta-item">
+        <div class="delta-tag">2.0 < ΔE ≤ 5.0</div>
+        <div><strong>接近</strong>：存在可感知的偏差。</div>
+      </div>
+      <div class="delta-item">
+        <div class="delta-tag">ΔE > 5.0</div>
+        <div><strong>超出色域</strong>：存在明显色差。</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>💡 智能色域匹配引擎 (Gamut Analysis)</h2>
+    <div class="card">
+      <ul>
+        <li><strong>匹配提示</strong>：实时监测当前颜料盒的覆盖能力。提供“完美匹配、大致匹配、接近、超出”四个等级提示。</li>
+        <li><strong>辅助决策</strong>：帮你理性决定哪些是你必须增补的颜料。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>注意事项</h2>
+    <div class="card" style="font-size: 15px; color: var(--text-secondary);">
+      <ol>
+        <li>屏幕与光线：手机屏幕本身存在色差，调色结果仅供参考。</li>
+        <li>品牌差异与标准：本工具中使用的各种颜料颜色值和名称均为标准定义。</li>
+        <li>关于白色颜料和水：水彩模式默认使用“水”；油画模式使用白色颜料。</li>
+        <li>关于黑色颜料：建议尝试用普蓝、佩恩灰、凡戴克棕等调配出更具呼吸感的重色。</li>
+        <li>自定义颜料的光线环境：请务必在<strong>你平时作画的光线环境</strong>下进行拍摄。</li>
+      </ol>
+    </div>
+  </section>
+
+  <footer>
+    <p><strong>“愿你的每一笔，都画出心中的浪漫与天真。”</strong></p>
+    <p>欢迎来小红书找我 <span class="contact-tag">@童画师吴晓</span> 或微信 <span class="contact-tag">lightouches</span> 找我交流一切。</p>
+    <p style="margin-top:20px; font-size:12px;">© 2026 童画师吴晓——晓色 · 调色助手 | 保留所有权利</p>
+  </footer>
+</div>
+</body>
+</html>

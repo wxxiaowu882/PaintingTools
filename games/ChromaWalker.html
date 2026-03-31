@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>光谱行者 PRO - Chroma Walker</title>
+<style>
+  :root { --bg: #080808; --ui: #fff; }
+  
+  /* 修复2：全局暴力禁止选择和长按菜单，适配所有 iOS/Android */
+  * {
+    -webkit-touch-callout: none; /* 禁止 iOS 长按菜单 */
+    -webkit-user-select: none;   /* Chrome/Safari/Opera */
+    -moz-user-select: none;      /* Firefox */
+    -ms-user-select: none;       /* IE/Edge */
+    user-select: none;           /* 标准语法 */
+    -webkit-tap-highlight-color: transparent; /* 去除点击高亮 */
+  }
+
+  body { 
+    margin: 0; overflow: hidden; background: var(--bg); 
+    font-family: 'Segoe UI', Roboto, "Microsoft YaHei", sans-serif; 
+    touch-action: none; /* 禁止浏览器默认手势 */
+    color: var(--ui); transition: background 0.5s ease; 
+  }
+  
+  /* 噪点层 */
+  #noise-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; opacity: 0.05; }
+
+  #game-stage { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+  
+  /* 核心色彩圆盘 */
+  #disc-container { position: relative; width: 280px; height: 280px; margin-bottom: 30px; border-radius: 50%; box-shadow: 0 0 60px rgba(0,0,0,0.8); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  #disc-container.pulse { transform: scale(1.05); }
+  canvas { display: block; border-radius: 50%; cursor: pointer; }
+  
+  /* 颜色名称 */
+  .color-title { font-size: 18px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 30px; opacity: 0.8; text-shadow: 0 2px 10px rgba(0,0,0,0.5); min-height: 32px; text-align: center; line-height: 1.5; }
+
+  /* 控制器区域 */
+  .controls { width: 85%; max-width: 400px; display: flex; flex-direction: column; gap: 20px; opacity: 0; transform: translateY(20px); transition: 0.5s; pointer-events: none; background: rgba(0,0,0,0.3); padding: 20px; border-radius: 16px; backdrop-filter: blur(5px); }
+  .controls.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  
+  /* 修复3：优化滑块触摸区域 */
+  .slider-group { position: relative; height: 40px; display: flex; align-items: center; } /* 增加高度 */
+  .slider-label { position: absolute; left: -25px; font-size: 12px; font-weight: bold; color: rgba(255,255,255,0.5); width: 20px; text-align: right; }
+  
+  .track { 
+    flex: 1; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; 
+    position: relative; overflow: visible; touch-action: none; cursor: ew-resize; 
+  }
+  /* 关键修复：使用伪元素增加上下点击热区，方便手指拖动 */
+  .track::after {
+    content: ''; position: absolute; top: -20px; bottom: -20px; left: -10px; right: -10px; z-index: 2;
+  }
+
+  .fill { height: 100%; background: #fff; border-radius: 2px; width: 100%; pointer-events: none; }
+  .knob { width: 24px; height: 24px; background: #fff; border-radius: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); box-shadow: 0 2px 8px rgba(0,0,0,0.5); cursor: grab; z-index: 10; transition: transform 0.1s, background 0.2s; pointer-events: none; /* 让事件穿透到 track 的热区上 */ }
+  .knob:active { transform: translate(-50%, -50%) scale(1.3); cursor: grabbing; background: #eee; }
+
+  /* UI 文本 */
+  .hud { position: absolute; top: 0; left: 0; width: 100%; padding: 20px; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; letter-spacing: 1px; color: rgba(255,255,255,0.6); pointer-events: none; z-index: 20; }
+  .hud-left { display: flex; gap: 15px; pointer-events: auto; }
+  
+  .hud-item { cursor: pointer; opacity: 0.8; transition: 0.2s; padding: 5px 10px; background: rgba(0,0,0,0.2); border-radius: 4px; display: flex; align-items: center; gap: 6px; }
+  .hud-item:hover { opacity: 1; background: rgba(255,255,255,0.1); text-shadow: 0 0 10px #fff; }
+  
+  #lvl-name-disp { font-weight: 400; opacity: 0.7; font-size: 11px; margin-left: 5px; }
+
+  .score-pop { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; font-weight: 900; color: #fff; text-shadow: 0 5px 30px rgba(0,0,0,0.8); opacity: 0; pointer-events: none; white-space: nowrap; z-index: 100; letter-spacing: 1px; text-align: center; }
+  .score-sub { font-size: 16px; font-weight: 300; display: block; margin-top: 5px; opacity: 0.8; letter-spacing: 4px; }
+  
+  /* 启动屏 */
+  #start-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #050505; z-index: 50; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.6s; }
+  .btn { padding: 16px 48px; border: 1px solid rgba(255,255,255,0.3); color: #fff; background: rgba(255,255,255,0.05); font-size: 16px; cursor: pointer; margin-top: 40px; transition: 0.3s; letter-spacing: 4px; text-transform: uppercase; font-weight: 600; border-radius: 30px; }
+  .btn:hover { background: #fff; color: #000; box-shadow: 0 0 40px rgba(255,255,255,0.4); border-color: #fff; }
+
+  /* 难度选择菜单 */
+  #level-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); z-index: 40; display: flex; flex-direction: column; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: 0.3s; }
+  #level-menu.visible { opacity: 1; pointer-events: auto; }
+  .menu-grid { display: grid; grid-template-columns: 1fr; gap: 8px; width: 320px; max-height: 80vh; overflow-y: auto; padding: 20px; }
+  .menu-btn { 
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #aaa; 
+    padding: 12px 15px; text-align: left; cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; align-items: center;
+  }
+  .menu-btn:hover { background: rgba(255,255,255,0.15); color: #fff; border-color: rgba(255,255,255,0.5); transform: translateX(5px); }
+  .menu-btn span { font-size: 12px; letter-spacing: 1px; opacity: 0.5; }
+  .menu-btn b { font-weight: 400; letter-spacing: 2px; font-size: 14px; }
+  .menu-btn.hard { border-left: 3px solid #a33; }
+  .menu-btn.hard:hover { border-color: #f00; box-shadow: 0 0 20px rgba(255,0,0,0.2); }
+
+  .hidden { opacity: 0; pointer-events: none; }
+  #particles { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 15; }
+</style>
+</head>
+<body>
+
+<canvas id="noise-layer"></canvas>
+
+<!-- 难度选择菜单 -->
+<div id="level-menu">
+  <h2 style="font-weight: 300; letter-spacing: 4px; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px;">LEVEL SELECT</h2>
+  <div class="menu-grid" id="menu-list">
+    <!-- JS 生成按钮 -->
+  </div>
+  <button class="btn" onclick="game.toggleMenu()" style="margin-top: 20px; padding: 10px 30px; font-size: 12px;">CLOSE / 返回</button>
+</div>
+
+<div id="game-stage">
+  <div class="hud">
+    <div class="hud-left">
+      <!-- 难度选择 -->
+      <div class="hud-item" onclick="game.toggleMenu()">
+        LVL <span id="lvl-num">1</span> <span id="lvl-name-disp">原初</span> ▼
+      </div>
+      <!-- 声音开关 -->
+      <div class="hud-item" onclick="game.toggleSound()" id="btn-sound">🔊</div>
+    </div>
+    <div>SCORE <span id="score-num">0</span></div>
+  </div>
+
+  <div id="disc-container">
+    <canvas id="main-canvas" width="560" height="560" style="width:280px; height:280px;"></canvas>
+  </div>
+  
+  <div class="color-title" id="color-name"></div>
+
+  <div class="controls" id="controls">
+    <div class="slider-group">
+      <div class="slider-label">H</div>
+      <div class="track" id="track-h">
+        <div class="fill" id="fill-h" style="background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);"></div>
+        <div class="knob" id="knob-h"></div>
+      </div>
+    </div>
+    <div class="slider-group">
+      <div class="slider-label">S</div>
+      <div class="track" id="track-s">
+        <div class="fill" id="fill-s" style="background: linear-gradient(to right, #444, #f00);"></div>
+        <div class="knob" id="knob-s"></div>
+      </div>
+    </div>
+    <div class="slider-group">
+      <div class="slider-label">L</div>
+      <div class="track" id="track-l">
+        <div class="fill" id="fill-l" style="background: linear-gradient(to right, #000, #fff);"></div>
+        <div class="knob" id="knob-l"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="score-pop" id="score-pop">PERFECT<span class="score-sub">完美同步</span></div>
+</div>
+
+<canvas id="particles"></canvas>
+
+<!-- 简洁启动页 -->
+<div id="start-screen">
+  <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #0ff, #f0f); margin-bottom: 20px; box-shadow: 0 0 30px rgba(255,255,255,0.2);"></div>
+  <h1 style="font-size: 32px; letter-spacing: 6px; margin: 0; font-weight: 300; text-align: center;">CHROMA WALKER<br><span style="font-size:16px; letter-spacing: 8px; opacity: 0.6; display:block; margin-top:10px;">光谱行者</span></h1>
+  <p style="color:#666; font-size: 12px; letter-spacing: 2px; margin-top: 15px;">SPECTRA RESONANCE // 光谱共鸣计划</p>
+  <button class="btn" onclick="game.start()">LAUNCH / 启动</button>
+</div>
+
+<script>
+/**
+ * AUDIO ENGINE - 修复版 (增强 iOS 兼容性)
+ */
+class AudioEngine {
+  constructor() {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    this.ctx = new AudioContext();
+    this.master = this.ctx.createGain();
+    this.master.connect(this.ctx.destination);
+    this.master.gain.value = 0.3;
+    this.voices = [];
+    this.enabled = true;
+    
+    // 修复1：被动尝试唤醒，防止部分情况下的静音
+    const passiveUnlock = () => {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        // 移除监听避免性能浪费
+        window.removeEventListener('touchstart', passiveUnlock);
+        window.removeEventListener('click', passiveUnlock);
+    };
+    window.addEventListener('touchstart', passiveUnlock, {passive: true});
+    window.addEventListener('click', passiveUnlock);
+  }
+  
+  // 核心修复：在点击事件中同步调用此方法
+  unlock() {
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+    // 强制播放一段静音，彻底激活 iOS 音频线程
+    try {
+      const buffer = this.ctx.createBuffer(1, 1, 22050);
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(this.ctx.destination);
+      source.start(0);
+    } catch(e) { console.warn(e); }
+  }
+
+  toggle(on) {
+    this.enabled = on;
+    if(!on) {
+        this.stopDragTone();
+        this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+    } else {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        this.master.gain.setTargetAtTime(0.3, this.ctx.currentTime, 0.1);
+    }
+  }
+
+  playTone(freq, type, duration, vol = 0.5) {
+    if(!this.enabled) return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+    g.gain.setValueAtTime(0, this.ctx.currentTime);
+    g.gain.linearRampToValueAtTime(vol, this.ctx.currentTime + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+    osc.connect(g);
+    g.connect(this.master);
+    osc.start();
+    osc.stop(this.ctx.currentTime + duration);
+  }
+
+  playChord(baseFreq) {
+    if(!this.enabled) return;
+    this.playTone(baseFreq, 'sine', 0.8, 0.4);
+    setTimeout(() => this.playTone(baseFreq * 1.25, 'sine', 0.8, 0.3), 100); 
+    setTimeout(() => this.playTone(baseFreq * 1.5, 'sine', 1.0, 0.2), 200);  
+  }
+
+  startDragTone(diff) {
+    if(!this.enabled) return;
+    if(this.voices.length > 0) return;
+    const now = this.ctx.currentTime;
+    const freqs = [174.61, 261.63, 440.00]; 
+    
+    this.voices = freqs.map(f => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      gain.gain.setValueAtTime(0, now);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start();
+      return { osc, gain };
+    });
+    this.updateDragTone(diff);
+  }
+
+  updateDragTone(diff) {
+    if(!this.enabled || this.voices.length === 0) return;
+    const now = this.ctx.currentTime;
+    const similarity = 1 - diff; 
+    const baseVol = 0.15;
+    
+    this.voices[0].gain.gain.setTargetAtTime(baseVol * (0.3 + similarity * 0.7), now, 0.1);
+    const vol2 = similarity > 0.5 ? baseVol * ((similarity - 0.5) * 2) : 0;
+    this.voices[1].gain.gain.setTargetAtTime(vol2, now, 0.1);
+    const vol3 = similarity > 0.85 ? baseVol * ((similarity - 0.85) * 6.6) : 0;
+    this.voices[2].gain.gain.setTargetAtTime(vol3, now, 0.1);
+  }
+
+  stopDragTone() {
+    if(this.voices.length === 0) return;
+    const now = this.ctx.currentTime;
+    this.voices.forEach(v => {
+      v.gain.gain.setTargetAtTime(0, now, 0.15);
+      v.osc.stop(now + 0.2);
+    });
+    this.voices = [];
+  }
+}
+
+class ParticleSystem {
+  constructor() {
+    this.c = document.getElementById('particles');
+    this.ctx = this.c.getContext('2d');
+    this.particles = [];
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+  }
+  
+  resize() {
+    this.c.width = window.innerWidth;
+    this.c.height = window.innerHeight;
+  }
+  
+  explode(x, y, color) {
+    for(let i=0; i<40; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 8 + 2;
+      this.particles.push({
+        x: x, y: y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1.0,
+        color: color,
+        size: Math.random() * 4 + 2
+      });
+    }
+  }
+  
+  update() {
+    this.ctx.clearRect(0, 0, this.c.width, this.c.height);
+    for(let i=this.particles.length-1; i>=0; i--) {
+      let p = this.particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.1; 
+      p.life -= 0.015;
+      p.size *= 0.95;
+      
+      this.ctx.globalAlpha = p.life;
+      this.ctx.fillStyle = p.color;
+      this.ctx.beginPath();
+      this.ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+      this.ctx.fill();
+      
+      if(p.life <= 0) this.particles.splice(i, 1);
+    }
+    this.ctx.globalAlpha = 1;
+  }
+}
+
+class Game {
+  constructor() {
+    this.canvas = document.getElementById('main-canvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.audio = new AudioEngine();
+    this.particles = new ParticleSystem();
+    
+    this.targetColor = {h:0, s:50, l:50};
+    this.playerColor = {h:0, s:50, l:50};
+    
+    // 读取本地存储
+    this.level = parseInt(localStorage.getItem('chroma_level')) || 1;
+    this.score = 0;
+    this.state = 'IDLE'; 
+    this.lastDiff = 1; 
+    
+    // 恢复声音状态
+    const savedSound = localStorage.getItem('chroma_sound');
+    this.audio.enabled = savedSound !== 'off'; 
+    this.updateSoundIcon();
+
+    // 难度名称配置 (10级)
+    this.levelNames = [
+        "原初之色 / PRIME HUE",
+        "纯度试炼 / PURITY TEST",
+        "明暗交界 / SHADOW LINE",
+        "全谱共鸣 / RESONANCE",
+        "混沌理论 / CHAOS",
+        "灰度迷雾 / GRAY FOG",
+        "深渊凝视 / ABYSS GAZE",
+        "虚空行者 / VOID WALKER",
+        "单色界限 / MONOCHROME EDGE",
+        "事件视界 / EVENT HORIZON"
+    ];
+
+    this.sliders = {
+      h: this.initSlider('h', 0, 360),
+      s: this.initSlider('s', 0, 100),
+      l: this.initSlider('l', 0, 100)
+    };
+    
+    this.initNoise();
+    this.initMenu();
+    window.addEventListener('resize', () => this.initNoise());
+
+    this.loop();
+    this.canvas.addEventListener('click', () => this.submit());
+    this.canvas.addEventListener('touchend', (e) => { e.preventDefault(); this.submit(); });
+  }
+
+  initNoise() {
+    const c = document.getElementById('noise-layer');
+    const w = Math.max(1, window.innerWidth);
+    const h = Math.max(1, window.innerHeight);
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    try {
+        const idata = ctx.createImageData(w, h);
+        const buffer = new Uint32Array(idata.data.buffer);
+        for(let i=0; i<buffer.length; i++) {
+            if(Math.random() < 0.1) buffer[i] = 0x11ffffff;
+        }
+        ctx.putImageData(idata, 0, 0);
+    } catch (e) { console.warn("Noise gen error:", e); }
+  }
+
+  initMenu() {
+    const list = document.getElementById('menu-list');
+    list.innerHTML = ''; 
+    this.levelNames.forEach((name, idx) => {
+        const lvl = idx + 1;
+        const btn = document.createElement('div');
+        btn.className = 'menu-btn' + (lvl >= 6 ? ' hard' : '');
+        btn.innerHTML = `<b>LVL ${lvl}</b> <span>${name}</span>`;
+        btn.onclick = () => {
+            this.start(lvl);
+            this.toggleMenu();
+        };
+        list.appendChild(btn);
+    });
+  }
+
+  toggleMenu() {
+    const el = document.getElementById('level-menu');
+    el.classList.toggle('visible');
+  }
+  
+  toggleSound() {
+      this.audio.toggle(!this.audio.enabled);
+      this.updateSoundIcon();
+      localStorage.setItem('chroma_sound', this.audio.enabled ? 'on' : 'off');
+  }
+  
+  updateSoundIcon() {
+      const btn = document.getElementById('btn-sound');
+      btn.innerText = this.audio.enabled ? '🔊' : '🔇';
+      btn.style.opacity = this.audio.enabled ? 1 : 0.5;
+  }
+
+  getColorName(h, s, l) {
+    if (l < 15) return "VOID DARKNESS / 虚空深暗";
+    if (l > 85) return "BLINDING LIGHT / 极昼之光";
+    if (s < 10) return "CONCRETE GRAY / 混凝土灰";
+    
+    if (h < 15 || h > 345) return s > 80 ? "CRIMSON FURY / 猩红狂怒" : "ROSE DUST / 蔷薇尘埃";
+    if (h < 45) return s > 80 ? "NEON ORANGE / 霓虹橙" : "DESERT SAND / 沙漠流沙";
+    if (h < 70) return "CYBER YELLOW / 赛博黄";
+    if (h < 150) return s > 60 ? "TOXIC GREEN / 剧毒绿" : "MOSS FOREST / 苔藓森林";
+    if (h < 190) return "CYAN PULSE / 青色脉冲";
+    if (h < 260) return l < 40 ? "DEEP OCEAN / 深海幽蓝" : "ELECTRIC BLUE / 电光蓝";
+    if (h < 300) return "ROYAL VIOLET / 皇家紫罗兰";
+    return "MAGENTA NEBULA / 品红星云";
+  }
+
+  initSlider(type, min, max) {
+    const track = document.getElementById(`track-${type}`);
+    const knob = document.getElementById(`knob-${type}`);
+    const fill = document.getElementById(`fill-${type}`);
+    let isDragging = false;
+
+    if (type === 'h') fill.style.width = '100%';
+
+    const updateVal = (clientX) => {
+      const rect = track.getBoundingClientRect();
+      let x = clientX - rect.left;
+      x = Math.max(0, Math.min(x, rect.width));
+      const pct = x / rect.width;
+      
+      knob.style.left = `${pct * 100}%`;
+      if(type !== 'h') fill.style.width = `${pct * 100}%`;
+      
+      const val = min + pct * (max - min);
+      this.playerColor[type] = val;
+      this.updateVisuals();
+      if (isDragging) this.audio.updateDragTone(this.calculateDiff());
+    };
+
+    const start = (e) => {
+      if(this.state !== 'PLAYING') return;
+      isDragging = true;
+      const x = e.touches ? e.touches[0].clientX : e.clientX;
+      updateVal(x);
+      knob.style.background = '#eee';
+      this.audio.startDragTone(this.calculateDiff());
+    };
+
+    const move = (e) => {
+      if(!isDragging) return;
+      const x = e.touches ? e.touches[0].clientX : e.clientX;
+      updateVal(x);
+    };
+
+    const end = () => {
+      isDragging = false;
+      knob.style.background = '#fff';
+      this.audio.stopDragTone();
+    };
+
+    track.addEventListener('mousedown', start);
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', end);
+    track.addEventListener('touchstart', start, {passive:false});
+    document.addEventListener('touchmove', move, {passive:false});
+    document.addEventListener('touchend', end);
+
+    return { set: (val) => {
+      const pct = (val - min) / (max - min);
+      knob.style.left = `${pct * 100}%`;
+      if(type !== 'h') fill.style.width = `${pct * 100}%`;
+    }};
+  }
+
+  // 启动或切换难度
+  start(lvl) {
+    this.audio.unlock(); // 关键：点击时解锁音频
+    
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('controls').classList.add('active');
+    
+    if (lvl) this.level = lvl;
+    localStorage.setItem('chroma_level', this.level);
+    
+    this.score = 0;
+    document.getElementById('score-num').innerText = 0;
+    this.nextLevel();
+  }
+
+  nextLevel() {
+    this.state = 'PLAYING';
+    document.getElementById('lvl-num').innerText = this.level;
+    
+    const fullName = this.levelNames[this.level - 1] || "";
+    const zhName = fullName.split('/')[0].trim();
+    document.getElementById('lvl-name-disp').innerText = zhName;
+    
+    // 难度配置
+    if (this.level === 1) {
+        this.targetColor = { h: Math.random() * 360, s: 85, l: 50 };
+    } else if (this.level === 2) {
+        this.targetColor = { h: Math.random() * 360, s: 20 + Math.random() * 70, l: 50 };
+    } else if (this.level === 3) {
+        this.targetColor = { h: Math.random() * 360, s: 60, l: 20 + Math.random() * 60 };
+    } else if (this.level === 4) {
+        this.targetColor = { h: Math.random() * 360, s: 40 + Math.random() * 50, l: 30 + Math.random() * 40 };
+    } else if (this.level === 5) {
+        this.targetColor = { h: Math.random() * 360, s: 20 + Math.random() * 80, l: 15 + Math.random() * 70 };
+    } else if (this.level === 6) {
+        this.targetColor = { h: Math.random() * 360, s: 5 + Math.random() * 20, l: 40 + Math.random() * 30 };
+    } else if (this.level === 7) {
+        this.targetColor = { h: Math.random() * 360, s: 50 + Math.random() * 50, l: 5 + Math.random() * 20 };
+    } else if (this.level === 8) {
+        this.targetColor = { h: Math.random() * 360, s: 5 + Math.random() * 25, l: 10 + Math.random() * 15 };
+    } else if (this.level === 9) {
+        this.targetColor = { h: Math.random() * 360, s: Math.random() * 10, l: 40 + Math.random() * 20 };
+    } else {
+        this.targetColor = { h: Math.random() * 360, s: 5 + Math.random() * 15, l: 5 + Math.random() * 10 };
+    }
+
+    const name = this.getColorName(this.targetColor.h, this.targetColor.s, this.targetColor.l);
+    const titleEl = document.getElementById('color-name');
+    titleEl.style.opacity = 0;
+    setTimeout(() => {
+      titleEl.innerText = name;
+      titleEl.style.color = `hsl(${this.targetColor.h}, ${this.targetColor.s}%, 80%)`;
+      titleEl.style.opacity = 1;
+    }, 200);
+
+    this.playerColor = {
+      h: (this.targetColor.h + 120 + Math.random()*120) % 360,
+      s: this.level >= 2 ? 50 : 85,
+      l: this.level >= 3 ? 50 : 50
+    };
+
+    this.sliders.h.set(this.playerColor.h);
+    this.sliders.s.set(this.playerColor.s);
+    this.sliders.l.set(this.playerColor.l);
+    
+    const enableS = this.level === 2 || this.level >= 4;
+    const enableL = this.level === 3 || this.level >= 4;
+
+    const sRow = document.getElementById('track-s').parentElement;
+    const lRow = document.getElementById('track-l').parentElement;
+
+    sRow.style.opacity = enableS ? 1 : 0.2;
+    sRow.style.pointerEvents = enableS ? 'auto' : 'none';
+    lRow.style.opacity = enableL ? 1 : 0.2;
+    lRow.style.pointerEvents = enableL ? 'auto' : 'none';
+
+    this.updateVisuals();
+  }
+
+  updateVisuals() {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const diff = this.calculateDiff();
+    this.lastDiff = diff; 
+    
+    const bgL = 5 + (1-diff) * 10;
+    document.body.style.backgroundColor = `hsl(${this.targetColor.h}, ${this.targetColor.s*0.5}%, ${bgL}%)`;
+
+    const targetStr = `hsl(${this.targetColor.h}, ${this.targetColor.s}%, ${this.targetColor.l}%)`;
+    const playerStr = `hsl(${this.playerColor.h}, ${this.playerColor.s}%, ${this.playerColor.l}%)`;
+    
+    this.ctx.clearRect(0,0,w,h);
+    this.ctx.fillStyle = targetStr;
+    this.ctx.fillRect(0,0,w/2,h);
+    this.ctx.fillStyle = playerStr;
+    this.ctx.fillRect(w/2,0,w/2,h);
+    
+    if(diff < 0.25) {
+      const blurSize = Math.pow((1 - diff/0.25), 2) * 120;
+      const grad = this.ctx.createLinearGradient(w/2 - blurSize, 0, w/2 + blurSize, 0);
+      grad.addColorStop(0, targetStr);
+      
+      if(diff < 0.05) {
+        grad.addColorStop(0.45, this.mixColors(this.targetColor, this.playerColor));
+        grad.addColorStop(0.5, '#fff');
+        grad.addColorStop(0.55, this.mixColors(this.targetColor, this.playerColor));
+      } else {
+        grad.addColorStop(0.5, this.mixColors(this.targetColor, this.playerColor));
+      }
+      
+      grad.addColorStop(1, playerStr);
+      this.ctx.fillStyle = grad;
+      this.ctx.fillRect(w/2 - blurSize, 0, blurSize*2, h);
+    }
+  }
+  
+  mixColors(c1, c2) {
+    return `hsl(${(c1.h+c2.h)/2}, ${(c1.s+c2.s)/2}%, ${(c1.l+c2.l)/2}%)`;
+  }
+
+  calculateDiff() {
+    let dh = Math.abs(this.targetColor.h - this.playerColor.h);
+    if(dh > 180) dh = 360 - dh;
+    dh /= 180;
+    
+    let ds = Math.abs(this.targetColor.s - this.playerColor.s) / 100;
+    let dl = Math.abs(this.targetColor.l - this.playerColor.l) / 100;
+    
+    if(this.level === 1) return dh;
+    if(this.level === 2) return (dh + ds) / 2;
+    if(this.level === 3) return (dh + dl) / 2;
+    return (dh + ds + dl) / 3;
+  }
+
+  submit() {
+    if(this.state !== 'PLAYING') return;
+    
+    const diff = this.calculateDiff();
+    const score = Math.max(0, Math.round((1 - diff*2) * 100));
+    
+    this.state = 'RESULT';
+    this.showResult(score);
+    this.score += score;
+    document.getElementById('score-num').innerText = this.score;
+    
+    if(score >= 90) {
+      if(navigator.vibrate) navigator.vibrate([50, 50, 50]);
+      const rect = this.canvas.getBoundingClientRect();
+      const centerX = rect.left + rect.width/2;
+      const centerY = rect.top + rect.height/2;
+      const c = `hsl(${this.targetColor.h}, ${this.targetColor.s}%, 70%)`;
+      this.particles.explode(centerX, centerY, c);
+      this.audio.playChord(440 + this.level*50);
+      
+      const disc = document.getElementById('disc-container');
+      disc.classList.add('pulse');
+      setTimeout(()=>disc.classList.remove('pulse'), 300);
+    } else {
+      if(navigator.vibrate) navigator.vibrate(50);
+      this.audio.playTone(150, 'sawtooth', 0.3);
+    }
+
+    setTimeout(() => {
+      if(score > 85) {
+          this.level = Math.min(this.level + 1, 10);
+          localStorage.setItem('chroma_level', this.level);
+      }
+      this.nextLevel();
+    }, 1800);
+  }
+
+  showResult(score) {
+    const pop = document.getElementById('score-pop');
+    let text = "MISMATCH";
+    let sub = "失谐";
+    let color = "#aaa";
+    
+    if(score >= 98) { text = "SYNCHRONIZED"; sub = "完美同步"; color = "#0ff"; }
+    else if(score >= 90) { text = "EXCELLENT"; sub = "卓越"; color = "#0f0"; }
+    else if(score >= 80) { text = "GOOD"; sub = "良好"; color = "#ff0"; }
+    else if(score >= 60) { text = "CLOSE"; sub = "接近"; color = "#fa0"; }
+    
+    pop.innerHTML = `${text}<span class="score-sub">${sub}</span>`;
+    pop.style.color = color;
+    pop.style.textShadow = `0 0 30px ${color}`;
+    
+    pop.style.transition = 'none';
+    pop.style.opacity = 1;
+    pop.style.transform = 'translate(-50%, -50%) scale(1.2)';
+    
+    requestAnimationFrame(() => {
+      pop.style.transition = 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+      pop.style.opacity = 0;
+      pop.style.transform = 'translate(-50%, -50%) scale(1)';
+    });
+    
+    if(score >= 90) {
+       const w = this.canvas.width;
+       this.ctx.fillStyle = `hsl(${this.targetColor.h}, ${this.targetColor.s}%, ${this.targetColor.l}%)`;
+       this.ctx.fillRect(0,0,w,this.canvas.height);
+    }
+  }
+
+  loop() {
+    this.particles.update();
+    if(this.state === 'PLAYING') {
+        const t = Date.now() * 0.002;
+        const diff = this.lastDiff || 1;
+        const intensity = Math.max(0, 1 - diff * 2); 
+        const breathe = Math.sin(t) * 10 * intensity;
+        const blur = 30 + 30 * intensity + breathe;
+        const color = `hsl(${this.targetColor.h}, ${this.targetColor.s}%, 60%)`;
+        
+        if(intensity > 0.1) {
+            document.getElementById('disc-container').style.boxShadow = `0 0 ${blur}px ${color}`;
+        } else {
+            document.getElementById('disc-container').style.boxShadow = `0 0 50px rgba(0,0,0,0.5)`;
+        }
+    }
+    requestAnimationFrame(() => this.loop());
+  }
+}
+
+const game = new Game();
+</script>
+</body>
+</html>
