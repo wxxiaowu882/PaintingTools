@@ -1,126 +1,34 @@
-window.AnnotationPluginManager.register({
-    id: 'polygon3d', name: '3D光影面片',
-    isDrawing3dPoly: false, lastDrawX: 0, lastDrawY: 0,
-    
-    getOcclusionReads: function(p, viewer, checkOccluded, isBackFace) {
-        const midEl = viewer.querySelector(`[slot="${p.slot || p.dots[p.midIndex || Math.floor(p.dots.length/2)].slot}"]`); const dotReads = [];
-        if (p.dots) { p.dots.forEach(d => { const el = viewer.querySelector(`[slot="${d.slot}"]`); if (el) dotReads.push({ r: el.getBoundingClientRect(), isOccluded: checkOccluded(el) || (isBackFace && isBackFace(d.norm)) }); }); }
-        return { type: p.type, p, midEl, dotReads };
-    },
-    
-    onPointerDown: function(slotName, posStr, normStr) {
-        if(!window._poly3dDots) window._poly3dDots = [];
-        const slotPoly = `hotspot-poly3d-${pointIndex}-${window._poly3dDots.length}`; window._poly3dDots.push({slot: slotPoly, pos: posStr, norm: normStr});
-        const dot = document.createElement('div'); dot.className = 'ink-anchor'; dot.setAttribute('slot', slotPoly); dot.setAttribute('data-position', posStr); dot.setAttribute('data-normal', normStr); dot.setAttribute('data-visibility-attribute', 'visible'); dot.setAttribute('visible', ''); document.querySelector('#workbench-viewer').appendChild(dot); updateSVG(); document.getElementById('status-msg').innerText = `3D光影面片顶点 ${window._poly3dDots.length} 已添加 (按 Enter 闭合)`;
-    },
-    
-    onPointerMove: function(e, viewer) {
-        if (!this.isDrawing3dPoly) {
-            this.isDrawing3dPoly = true;
-            window.isDrawing = true; 
-            this.lastDrawX = e.clientX;
-            this.lastDrawY = e.clientY;
-            if(!window._poly3dDots) window._poly3dDots = [];
-        }
-        
-        const dist = Math.hypot(e.clientX - this.lastDrawX, e.clientY - this.lastDrawY);
-        const drawInterval = 20; 
-        
-        if (dist > drawInterval || window._poly3dDots.length === 0) {
-            const hit = viewer.positionAndNormalFromPoint(e.clientX, e.clientY);
-            if (hit) {
-                const posStr = `${hit.position.x.toFixed(4)}m ${hit.position.y.toFixed(4)}m ${hit.position.z.toFixed(4)}m`;
-                const normStr = `${hit.normal.x.toFixed(4)}m ${hit.normal.y.toFixed(4)}m ${hit.normal.z.toFixed(4)}m`;
-                const slotPoly = `hotspot-poly3d-${pointIndex}-${window._poly3dDots.length}`;
-                window._poly3dDots.push({slot: slotPoly, pos: posStr, norm: normStr});
-                
-                const dot = document.createElement('div'); dot.className = 'ink-anchor';
-                dot.setAttribute('slot', slotPoly); dot.setAttribute('data-position', posStr); dot.setAttribute('data-normal', normStr); dot.setAttribute('data-visibility-attribute', 'visible'); dot.setAttribute('visible', ''); 
-                viewer.appendChild(dot);
-                
-                this.lastDrawX = e.clientX; this.lastDrawY = e.clientY;
-                requestAnimationFrame(() => updateSVG());
-                const statusMsg = document.getElementById('status-msg');
-                if(statusMsg) statusMsg.innerText = `3D面片套索绘制中... 顶点数: ${window._poly3dDots.length} (松开按键闭合)`;
-            }
-        }
-    },
-
-    finish: function() {
-        this.isDrawing3dPoly = false; 
-        window.isDrawing = false; 
-        
-        if(!window._poly3dDots) window._poly3dDots = [];
-        if (window._poly3dDots.length >= 3) { let mx=0, my=0, mz=0, mnx=0, mny=0, mnz=0; window._poly3dDots.forEach(d => { const p = d.pos.replace(/m/g,'').split(' ').map(Number); const n = d.norm.replace(/m/g,'').split(' ').map(Number); mx+=p[0]; my+=p[1]; mz+=p[2]; mnx+=n[0]; mny+=n[1]; mnz+=n[2]; }); const len = window._poly3dDots.length; const nLen = Math.hypot(mnx, mny, mnz); const posStr = `${(mx/len).toFixed(4)}m ${(my/len).toFixed(4)}m ${(mz/len).toFixed(4)}m`; const normStr = `${(mnx/nLen||0).toFixed(4)}m ${(mny/nLen||0).toFixed(4)}m ${(mnz/nLen||0).toFixed(4)}m`; const midSlot = `hotspot-poly3d-mid-${pointIndex}`; pointsData.push({ id: pointIndex, type: 'polygon3d', slot: midSlot, pos: posStr, norm: normStr, text: `3D面片 ${pointIndex}`, dots: window._poly3dDots, color: defaultColor, hidden: false }); this.mountDOM(pointsData[pointsData.length-1], document.querySelector('#workbench-viewer')); renderState(); updateSVG(); document.getElementById('status-msg').innerText = `3D光影面片 ${pointIndex} 创建完成`; pointIndex++; window._poly3dDots = []; } else if (window._poly3dDots.length > 0) { document.getElementById('status-msg').innerText = "顶点不足3个，无法闭合"; window._poly3dDots.forEach(d => { const el = document.querySelector('#workbench-viewer').querySelector(`[slot="${d.slot}"]`); if(el) el.remove(); }); window._poly3dDots = []; updateSVG(); }
-    },
-    
-    renderPreviewSVG: function(htmlStr, ctx) {
-        if (window._poly3dDots && window._poly3dDots.length > 0) { const activeDotReads = []; window._poly3dDots.forEach(d => { const el = document.querySelector(`[slot="${d.slot}"]`); if(!el) return; activeDotReads.push({r: el.getBoundingClientRect(), isOccluded: (el.style.display==='none'||!el.hasAttribute('visible')||el.getAttribute('visible')==='false')}); }); 
-        const occludedCount = activeDotReads.filter(dr => dr.isOccluded).length;
-        const isOccluded = (occludedCount / activeDotReads.length) >= 0.05;
-        const finalSvgAlpha = ctx.getRenderAlpha(isOccluded, 0.8); if (finalSvgAlpha > 0) { const ptsStr = activeDotReads.map(dr => `${dr.r.left + dr.r.width/2},${dr.r.top + dr.r.height/2}`).join(' '); htmlStr += `<polyline points="${ptsStr}" fill="${ctx.hexToRgba(defaultColor, 0.2 * (finalSvgAlpha/0.8))}" stroke="${defaultColor}" stroke-width="2" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`; } } return htmlStr;
-    },
-    
-    renderSVG: function(item, htmlStr, ctx) {
-        const p = item.p; const color = ctx.color; const isActive = item.midEl ? item.midEl.classList.contains('show-text') : false; 
-        const baseOpacity = isActive ? 1 : 0.85; 
-        
-        const occludedCount = item.dotReads.filter(dr => dr.isOccluded).length;
-        const isOccluded = (occludedCount / item.dotReads.length) >= 0.05;
-        const finalSvgAlpha = ctx.getRenderAlpha(isOccluded, baseOpacity);
-        
-        if(item.midEl) { const domAlpha = ctx.getRenderAlpha(item.dotReads[p.midIndex || Math.floor(p.dots.length/2)]?.isOccluded, 1); item.midEl.style.opacity = domAlpha; item.midEl.style.visibility = domAlpha <= 0 ? 'hidden' : 'visible'; }
-        
-        if(finalSvgAlpha > 0 && item.dotReads.length >= 3){
-            const ptsStr = item.dotReads.map(dr => `${dr.r.left + dr.r.width/2},${dr.r.top + dr.r.height/2}`).join(' ');
-            const baseFillOpacity = 0.05; 
-            
-            htmlStr += `<polygon points="${ptsStr}" fill="transparent" stroke="transparent" stroke-width="20" style="pointer-events:auto;cursor:pointer;" onclick="document.querySelector('[slot=${p.slot}]').classList.toggle('show-text'); updateSVG(); if(window.scrollToListItem) window.scrollToListItem(${p.id});" />`;
-            
-            const mo = parseFloat(globalModelOpacity);
-            const useColorBlend = (mo >= 1.0 && !isOccluded); 
-            
-            if (useColorBlend) {
-                htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha * baseFillOpacity}" style="pointer-events:none;" />`;
-                htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha}" style="mix-blend-mode: color; pointer-events:none;" />`;
-                if (isActive) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2" stroke-dasharray="4,4" opacity="${finalSvgAlpha * 0.8}" style="pointer-events:none;" />`;
-            } else {
-                htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha * 0.5}" style="pointer-events:none;" />`;
-                if (isOccluded) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`;
-                if (isActive) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`;
-            }
-        } return htmlStr;
-    },
-    
-    renderConsumeSVG: function(item, htmlStr, ctx) {
-        const p = item.p; const isHighlight = ctx.isHighlight; const color = ctx.color; const baseOpacity = isHighlight ? 1 : 0.85; 
-        
-        const occludedCount = item.dotReads.filter(dr => dr.isOccluded).length;
-        const isOccluded = (occludedCount / item.dotReads.length) >= 0.05;
-        const finalSvgAlpha = ctx.getRenderAlpha(isOccluded, baseOpacity);
-        
-        if(item.midEl) { const domAlpha = ctx.getRenderAlpha(item.dotReads[p.midIndex || Math.floor(p.dots.length/2)]?.isOccluded, 1); item.midEl.style.opacity = domAlpha; item.midEl.style.visibility = domAlpha <= 0 ? 'hidden' : 'visible'; if(isHighlight) item.midEl.classList.add('active'); else item.midEl.classList.remove('active'); }
-        
-        if(finalSvgAlpha > 0 && item.dotReads.length >= 3){
-            const ptsStr = item.dotReads.map(dr => `${dr.r.left + dr.r.width/2},${dr.r.top + dr.r.height/2}`).join(' ');
-            const baseFillOpacity = 0.05;
-
-            htmlStr += `<polygon class="svg-hit-path" data-id="${p.id}" points="${ptsStr}" fill="transparent" stroke="transparent" stroke-width="20" style="pointer-events:none;" />`;
-            
-            const mo = parseFloat(globalModelOpacity);
-            const useColorBlend = (mo >= 1.0 && !isOccluded); 
-            
-            if (useColorBlend) {
-                htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha * baseFillOpacity}" style="pointer-events:none;" />`;
-                htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha}" style="mix-blend-mode: color; pointer-events:none;" />`;
-                if(isHighlight) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2.5" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`;
-            } else {
-                htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha * 0.5}" style="pointer-events:none;" />`;
-                if (isOccluded) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`;
-                if(isHighlight) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2.5" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`;
-            }
-        } return htmlStr;
-    },
+window.AnnotationPluginManager.register({ id: 'polygon3d', name: '3D光影面片', isDrawing3dPoly: false, lastDrawX: 0, lastDrawY: 0, getOcclusionReads: function(p, viewer, checkOccluded, isBackFace) {
+    const midEl = viewer.querySelector(`[slot="${p.slot || p.dots[p.midIndex || Math.floor(p.dots.length/2)].slot}"]`); const dotReads = [];
+    if (p.dots) { p.dots.forEach(d => { const el = viewer.querySelector(`[slot="${d.slot}"]`); if (el) dotReads.push({ r: el.getBoundingClientRect(), isOccluded: checkOccluded(el) || (isBackFace && isBackFace(d.norm)) }); }); }
+    return { type: p.type, p, midEl, dotReads }; }, onPointerDown: function(slotName, posStr, normStr) { if(!window._poly3dDots) window._poly3dDots = [];
+    const slotPoly = `hotspot-poly3d-${pointIndex}-${window._poly3dDots.length}`; window._poly3dDots.push({slot: slotPoly, pos: posStr, norm: normStr});
+    const dot = document.createElement('div'); dot.className = 'ink-anchor'; dot.setAttribute('slot', slotPoly); dot.setAttribute('data-position', posStr); dot.setAttribute('data-normal', normStr); dot.setAttribute('data-visibility-attribute', 'visible'); dot.setAttribute('visible', ''); document.querySelector('#workbench-viewer').appendChild(dot); updateSVG(); document.getElementById('status-msg').innerText = `3D光影面片顶点 ${window._poly3dDots.length} 已添加 (按 Enter 闭合)`;
+    }, onPointerMove: function(e, viewer) { if (!this.isDrawing3dPoly) { this.isDrawing3dPoly = true; window.isDrawing = true; this.lastDrawX = e.clientX; this.lastDrawY = e.clientY; if(!window._poly3dDots) window._poly3dDots = []; }
+    const dist = Math.hypot(e.clientX - this.lastDrawX, e.clientY - this.lastDrawY); const drawInterval = 20; if (dist > drawInterval || window._poly3dDots.length === 0) { const hit = viewer.positionAndNormalFromPoint(e.clientX, e.clientY);
+    if (hit) { const posStr = `${hit.position.x.toFixed(4)}m ${hit.position.y.toFixed(4)}m ${hit.position.z.toFixed(4)}m`; const normStr = `${hit.normal.x.toFixed(4)}m ${hit.normal.y.toFixed(4)}m ${hit.normal.z.toFixed(4)}m`; const slotPoly = `hotspot-poly3d-${pointIndex}-${window._poly3dDots.length}`; window._poly3dDots.push({slot: slotPoly, pos: posStr, norm: normStr});
+    const dot = document.createElement('div'); dot.className = 'ink-anchor';
+    dot.setAttribute('slot', slotPoly); dot.setAttribute('data-position', posStr); dot.setAttribute('data-normal', normStr); dot.setAttribute('data-visibility-attribute', 'visible'); dot.setAttribute('visible', '');
+    viewer.appendChild(dot); this.lastDrawX = e.clientX; this.lastDrawY = e.clientY; requestAnimationFrame(() => updateSVG()); const statusMsg = document.getElementById('status-msg');
+    if(statusMsg) statusMsg.innerText = `3D面片套索绘制中... 顶点数: ${window._poly3dDots.length} (松开按键闭合)`; } } }, finish: function() { this.isDrawing3dPoly = false; window.isDrawing = false; if(!window._poly3dDots) window._poly3dDots = [];
+    if (window._poly3dDots.length >= 3) { let mx=0, my=0, mz=0, mnx=0, mny=0, mnz=0; window._poly3dDots.forEach(d => { const p = d.pos.replace(/m/g,'').split(' ').map(Number); const n = d.norm.replace(/m/g,'').split(' ').map(Number); mx+=p[0]; my+=p[1]; mz+=p[2]; mnx+=n[0]; mny+=n[1]; mnz+=n[2]; }); const len = window._poly3dDots.length; const nLen = Math.hypot(mnx, mny, mnz); const posStr = `${(mx/len).toFixed(4)}m ${(my/len).toFixed(4)}m ${(mz/len).toFixed(4)}m`; const normStr = `${(mnx/nLen||0).toFixed(4)}m ${(mny/nLen||0).toFixed(4)}m ${(mnz/nLen||0).toFixed(4)}m`; const midSlot = `hotspot-poly3d-mid-${pointIndex}`; pointsData.push({ id: pointIndex, type: 'polygon3d', slot: midSlot, pos: posStr, norm: normStr, text: `3D面片 ${pointIndex}`, dots: window._poly3dDots, color: defaultColor, hidden: false }); this.mountDOM(pointsData[pointsData.length-1], document.querySelector('#workbench-viewer')); renderState(); updateSVG(); document.getElementById('status-msg').innerText = `3D光影面片 ${pointIndex} 创建完成`; pointIndex++; window._poly3dDots = []; } else if (window._poly3dDots.length > 0) { document.getElementById('status-msg').innerText = "顶点不足3个，无法闭合"; window._poly3dDots.forEach(d => { const el = document.querySelector('#workbench-viewer').querySelector(`[slot="${d.slot}"]`); if(el) el.remove(); }); window._poly3dDots = []; updateSVG(); }
+    }, renderPreviewSVG: function(htmlStr, ctx) {
+    if (window._poly3dDots && window._poly3dDots.length > 0) { const activeDotReads = []; window._poly3dDots.forEach(d => { const el = document.querySelector(`[slot="${d.slot}"]`); if(!el) return; activeDotReads.push({r: el.getBoundingClientRect(), isOccluded: (el.style.display==='none'||!el.hasAttribute('visible')||el.getAttribute('visible')==='false')}); });
+    const occludedCount = activeDotReads.filter(dr => dr.isOccluded).length; const isOccluded = (occludedCount / activeDotReads.length) >= 0.05;
+    const finalSvgAlpha = ctx.getRenderAlpha(isOccluded, 0.8); if (finalSvgAlpha > 0) { const ptsStr = activeDotReads.map(dr => `${dr.r.left + dr.r.width/2},${dr.r.top + dr.r.height/2}`).join(' '); htmlStr += `<polyline points="${ptsStr}" fill="${ctx.hexToRgba(defaultColor, 0.2 * (finalSvgAlpha/0.8))}" stroke="${defaultColor}" stroke-width="2" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`; } } return htmlStr;
+    }, renderSVG: function(item, htmlStr, ctx) { const p = item.p; const color = ctx.color; const isActive = item.midEl ? item.midEl.classList.contains('show-text') : false; const baseOpacity = isActive ? 1 : 0.85;
+    const occludedCount = item.dotReads.filter(dr => dr.isOccluded).length; const isOccluded = (occludedCount / item.dotReads.length) >= 0.05; const finalSvgAlpha = ctx.getRenderAlpha(isOccluded, baseOpacity);
+    if(item.midEl) { const domAlpha = ctx.getRenderAlpha(item.dotReads[p.midIndex || Math.floor(p.dots.length/2)]?.isOccluded, 1); item.midEl.style.opacity = domAlpha; item.midEl.style.visibility = domAlpha <= 0 ? 'hidden' : 'visible'; }
+    if(finalSvgAlpha > 0 && item.dotReads.length >= 3){ const ptsStr = item.dotReads.map(dr => `${dr.r.left + dr.r.width/2},${dr.r.top + dr.r.height/2}`).join(' '); const baseFillOpacity = 0.05; htmlStr += `<polygon points="${ptsStr}" fill="transparent" stroke="transparent" stroke-width="20" style="pointer-events:auto;cursor:pointer;" onclick="document.querySelector('[slot=${p.slot}]').classList.toggle('show-text'); updateSVG(); if(window.scrollToListItem) window.scrollToListItem(${p.id});" />`;
+    const mo = parseFloat(globalModelOpacity); const useColorBlend = (mo >= 1.0 && !isOccluded); if (useColorBlend) { htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha * baseFillOpacity}" style="pointer-events:none;" />`; htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha}" style="mix-blend-mode: color; pointer-events:none;" />`;
+    if (isActive) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2" stroke-dasharray="4,4" opacity="${finalSvgAlpha * 0.8}" style="pointer-events:none;" />`; } else { htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha * 0.5}" style="pointer-events:none;" />`; if (isOccluded) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`; if (isActive) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`; }
+    } return htmlStr; }, renderConsumeSVG: function(item, htmlStr, ctx) { const p = item.p; const isHighlight = ctx.isHighlight; const color = ctx.color; const baseOpacity = isHighlight ? 1 : 0.85;
+    const occludedCount = item.dotReads.filter(dr => dr.isOccluded).length; const isOccluded = (occludedCount / item.dotReads.length) >= 0.05; const finalSvgAlpha = ctx.getRenderAlpha(isOccluded, baseOpacity);
+    if(item.midEl) { const domAlpha = ctx.getRenderAlpha(item.dotReads[p.midIndex || Math.floor(p.dots.length/2)]?.isOccluded, 1); item.midEl.style.opacity = domAlpha; item.midEl.style.visibility = domAlpha <= 0 ? 'hidden' : 'visible'; if(isHighlight) item.midEl.classList.add('active'); else item.midEl.classList.remove('active'); }
+    if(finalSvgAlpha > 0 && item.dotReads.length >= 3){ const ptsStr = item.dotReads.map(dr => `${dr.r.left + dr.r.width/2},${dr.r.top + dr.r.height/2}`).join(' '); const baseFillOpacity = 0.05; htmlStr += `<polygon class="svg-hit-path" data-id="${p.id}" points="${ptsStr}" fill="transparent" stroke="transparent" stroke-width="20" style="pointer-events:none;" />`;
+    const mo = parseFloat(globalModelOpacity); const useColorBlend = (mo >= 1.0 && !isOccluded); if (useColorBlend) { htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha * baseFillOpacity}" style="pointer-events:none;" />`; htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha}" style="mix-blend-mode: color; pointer-events:none;" />`;
+    if(isHighlight) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2.5" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`; } else { htmlStr += `<polygon points="${ptsStr}" fill="${color}" opacity="${finalSvgAlpha * 0.5}" style="pointer-events:none;" />`; if (isOccluded) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`; if(isHighlight) htmlStr += `<polygon points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2.5" stroke-dasharray="4,4" opacity="${finalSvgAlpha}" style="pointer-events:none;" />`; }
+    } return htmlStr; },
     mountDOM: function(p, viewer) { p.dots.forEach((dot, idx) => { const el = document.createElement('div'); el.className = 'ink-anchor'; el.setAttribute('slot', dot.slot); el.setAttribute('data-position', dot.pos); el.setAttribute('data-normal', dot.norm); el.setAttribute('data-visibility-attribute', 'visible'); el.setAttribute('visible', ''); viewer.appendChild(el); }); const midEl = document.createElement('div'); midEl.className = 'ink-anchor ink-mid'; midEl.setAttribute('slot', p.slot); midEl.setAttribute('data-position', p.pos); midEl.setAttribute('data-normal', p.norm); midEl.setAttribute('data-visibility-attribute', 'visible'); midEl.setAttribute('visible', ''); midEl.innerHTML = `<div class="HotspotAnnotation">${p.text}</div>`; midEl.setAttribute('data-id', p.id); const cid = p.id; midEl.addEventListener('click', function(evt) { if(window.tourState && window.tourState.isActive) return; this.classList.toggle('show-text'); if(typeof updateSVG !== 'undefined') updateSVG(); if(window.scrollToListItem) window.scrollToListItem(cid); }); viewer.appendChild(midEl); },
     unmountDOM: function(p, viewer) { if (p.dots) { p.dots.forEach(d => { const el = viewer.querySelector(`[slot="${d.slot}"]`); if(el) el.remove(); }); } const midEl = viewer.querySelector(`[slot="${p.slot}"]`); if(midEl) midEl.remove(); }
-});
+    });
