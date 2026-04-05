@@ -9,12 +9,12 @@
         { id: '00', text: '首页 · Home', url: 'index.html', color: '#FCD34D' },
         
         { type: 'category', text: '造型基础' },
-        { id: '01', text: '几何体 · 静物', url: 'solid.html', color: '#3B82F6' },
+        { id: '01', text: '几何体 · 静物', url: 'solid.html?sandbox=geometry', color: '#3B82F6' },
         
         { type: 'category', text: '肖像' },
         { id: '02', text: '头骨 · 骨点 · 肌肉', url: 'Portrait_c.html?lib=anatomy', color: '#A855F7' },
         { id: '03', text: '头部造型规律', url: 'Portrait_c.html?lib=form', color: '#D946EF' },
-        { id: '04', text: '肖像光影沙盒', url: 'Portrait.html', color: '#F43F5E' },
+        { id: '04', text: '肖像光影沙盒', url: 'solid.html?sandbox=portrait', color: '#F43F5E' },
         { id: '05', text: '吴晓的作品', url: 'Gallery.html', color: '#EC4899' },
         { id: '06', text: '课程预约', url: '', disabled: true, tag: 'Coming Soon' },
 
@@ -170,7 +170,30 @@
         backArrow.innerHTML = '<svg width="60" height="24" viewBox="0 0 60 24" fill="none" style="display:block;"><path d="M0.5 12L10 1M0.5 12L60 12M0.5 12L10 23" stroke="currentColor" stroke-width="0.5"/></svg>';
         container.appendChild(backArrow);
 
-        const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+        const currentPath = (window.location.pathname.split('/').pop() || 'index.html').toLowerCase();
+        function isMenuItemActive(item) {
+            if (item.disabled || !item.url) return false;
+            const pathPart = item.url.split('?')[0].split('/').pop() || '';
+            const base = pathPart.toLowerCase();
+            const pathOk = base === currentPath || (currentPath === '' && base === 'index.html');
+            if (!pathOk) return false;
+            const qMark = item.url.indexOf('?');
+            const curParams = new URLSearchParams(window.location.search || '');
+            if (qMark < 0) {
+                if (base === 'solid.html') {
+                    const s = (curParams.get('sandbox') || 'geometry').toLowerCase();
+                    return s === 'geometry';
+                }
+                return !window.location.search || window.location.search === '?';
+            }
+            const want = new URLSearchParams(item.url.slice(qMark));
+            for (const [k, v] of want) {
+                let cur = curParams.get(k);
+                if (k === 'sandbox' && (cur == null || cur === '') && v === 'geometry') cur = 'geometry';
+                if ((cur || '') !== v) return false;
+            }
+            return true;
+        }
 
         menuConfig.forEach(item => {
             const el = document.createElement('div');
@@ -186,8 +209,7 @@
                 el.className = 'menu-footer nav-font-hairline';
                 el.innerText = item.text;
             } else {
-                const itemFileName = item.url.split('/').pop();
-                const isActive = !item.disabled && (itemFileName === currentPath || (currentPath === '' && itemFileName === 'index.html'));
+                const isActive = isMenuItemActive(item);
 
                 // 所有菜单项强制使用 nav-font-hairline (100)
                 el.className = `menu-item nav-font-hairline ${isActive ? 'active' : ''} ${item.disabled ? 'disabled' : ''}`;

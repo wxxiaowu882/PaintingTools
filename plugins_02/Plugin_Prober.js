@@ -7,10 +7,10 @@ window.ProberManager = {
     selectedId: null,
 
     getToneData: function(angle) {
-        if (angle <= 20) return { text: `夹角 ${angle.toFixed(0)}°【亮面/高光】`, color: '#ffffff', bg: 'rgba(15,15,20,0.9)' };
-        if (angle <= 75) return { text: `夹角 ${angle.toFixed(0)}°【灰面/侧受光】`, color: '#dddddd', bg: 'rgba(15,15,20,0.9)' };
-        if (angle <= 100) return { text: `夹角 ${angle.toFixed(0)}°【明暗交界线】`, color: '#ff3333', bg: 'rgba(50,10,10,0.95)' };
-        return { text: `夹角 ${angle.toFixed(0)}°【暗部/背光区】`, color: '#66ccff', bg: 'rgba(10,20,35,0.9)' }; 
+        if (angle <= 20) return { text: `夹角 ${angle.toFixed(0)}°【亮面/高光】`, color: '#ffffff', bg: 'rgba(15,15,20,0.7)' };
+        if (angle <= 75) return { text: `夹角 ${angle.toFixed(0)}°【灰面/侧受光】`, color: '#dddddd', bg: 'rgba(15,15,20,0.7)' };
+        if (angle <= 100) return { text: `夹角 ${angle.toFixed(0)}°【明暗交界线】`, color: '#ff3333', bg: 'rgba(50,10,10,0.7)' };
+        return { text: `夹角 ${angle.toFixed(0)}°【暗部/背光区】`, color: '#66ccff', bg: 'rgba(10,20,35,0.7)' }; 
     },
 
     calcArrow: function(px, py, pz, dirX, dirY, dirZ, rayLen, isRefl) {

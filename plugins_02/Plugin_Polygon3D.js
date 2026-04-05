@@ -1,4 +1,7 @@
-import * as THREE from 'three'; window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { selectedId: null, isDrawing: false, activeData: null, lastDrawX: 0, lastDrawY: 0,
+import * as THREE from 'three';
+/** iOS / iPadOS WebKit：SVG 上 mix-blend-mode:color 与 WebGL 画布合成经常失效，面片会像纯色平涂；改用 soft-light + 略调透明度贴近 PC 上「底色+着色」层次 */
+const _poly3dIosLike = typeof navigator !== 'undefined' && (/iPhone|iPad|iPod/i.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { selectedId: null, isDrawing: false, activeData: null, lastDrawX: 0, lastDrawY: 0,
     // 【核心】：利用 onUpdate 钩子白嫖系统的 Camera 和 Scene 引用，供内部射线检测使用
     onUpdate: function(context) { this._cachedCamera = context.camera; this._cachedScene = context.scene; if (window.showAnnotations !== false && context.camera) { this.updateScreenPositions(context.camera);
     const layer = document.getElementById('poly3d-layer'); if (layer) layer.style.display = 'block'; } else { const layer = document.getElementById('poly3d-layer');
@@ -31,7 +34,7 @@ import * as THREE from 'three'; window.poly3dList = []; window.poly3dCounter = 0
     this.highlightSelected(); if (window.showToast) window.showToast("面片已闭合保存！"); } }
     this.activeData = null; window.needsUpdate = true; window.lightMoved = true; }, ensureDOM: function() { if (!document.getElementById('poly3d-layer')) { const layer = document.createElement('div');
     layer.id = 'poly3d-layer'; // 【核心突破】：必须将 SVG 容器挂载到 canvas-container 内部，共享同一个层叠上下文，才能让 mix-blend-mode 完美穿透融合！
-    layer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: auto; overflow: visible;'; layer.innerHTML = '<svg id="poly3d-svg" style="width: 100%; height: 100%; pointer-events: none; overflow: visible;"></svg>'; const canvasContainer = document.getElementById('canvas-container'); if (canvasContainer) {
+    layer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: auto; overflow: visible;' + (_poly3dIosLike ? ' -webkit-transform:translateZ(0); transform:translateZ(0);' : ''); layer.innerHTML = '<svg id="poly3d-svg" style="width: 100%; height: 100%; pointer-events: none; overflow: visible;"></svg>'; const canvasContainer = document.getElementById('canvas-container'); if (canvasContainer) {
     canvasContainer.appendChild(layer); } else { document.body.appendChild(layer); }
     const colorPicker = document.getElementById('obj-color-picker'); if (colorPicker) { colorPicker.addEventListener('input', e => { const id = this.selectedId; if (id !== null) {
     const data = window.poly3dList.find(a => a.id === id); if (data) { data.color = e.target.value; if (data.svgGroup) { data.previewPolyline.setAttribute('stroke', data.color);
@@ -44,7 +47,7 @@ import * as THREE from 'three'; window.poly3dList = []; window.poly3dCounter = 0
     const finalGroup = document.createElementNS(ns, "g"); finalGroup.style.pointerEvents = "auto"; finalGroup.style.cursor = "pointer";
     const hitPath = document.createElementNS(ns, "polygon"); hitPath.setAttribute("fill", "transparent"); hitPath.setAttribute("stroke", "transparent"); hitPath.setAttribute("stroke-width", "20");
     const fillPath = document.createElementNS(ns, "polygon"); fillPath.style.pointerEvents = "none";
-    const blendPath = document.createElementNS(ns, "polygon"); blendPath.setAttribute("style", "mix-blend-mode: color; pointer-events: none;");
+    const blendPath = document.createElementNS(ns, "polygon"); blendPath.setAttribute("style", (_poly3dIosLike ? "mix-blend-mode: soft-light; -webkit-mix-blend-mode: soft-light;" : "mix-blend-mode: color;") + " pointer-events: none;");
     const strokePath = document.createElementNS(ns, "polygon"); strokePath.setAttribute("fill", "none"); strokePath.setAttribute("stroke-linejoin", "round"); strokePath.setAttribute("stroke-dasharray", "4,4"); strokePath.style.pointerEvents = "none";
     finalGroup.appendChild(hitPath); finalGroup.appendChild(fillPath); finalGroup.appendChild(blendPath); finalGroup.appendChild(strokePath); container.appendChild(finalGroup); finalGroup.addEventListener('pointerdown', e => {
     /* 【优化2】：移除模式限制，任何时候点击都能选中面片 */
@@ -80,7 +83,7 @@ import * as THREE from 'three'; window.poly3dList = []; window.poly3dCounter = 0
     data.previewPolyline.setAttribute("points", pts); data.previewPolyline.setAttribute("opacity", finalSvgAlpha); } else { data.previewPolyline.style.display = "none";
     if (finalSvgAlpha > 0) { data.finalGroup.style.display = "block"; data.svgHit.setAttribute("points", pts); data.svgFill.setAttribute("points", pts);
     data.svgBlend.setAttribute("points", pts); data.svgStroke.setAttribute("points", pts); // 【视觉核心突破】：原案的 0.05 在物理光追的深邃阴影下会由于 color 混合导致发灰发黑。这里提升至 0.25，强行注入底色亮度，完美还原旧版的鲜亮质感！
-    data.svgFill.setAttribute("opacity", finalSvgAlpha * 0.25); data.svgBlend.style.display = "block"; data.svgBlend.setAttribute("opacity", finalSvgAlpha); if (data.isSelected) {
+    if (_poly3dIosLike) { data.svgFill.setAttribute("opacity", finalSvgAlpha * 0.18); data.svgBlend.style.display = "block"; data.svgBlend.setAttribute("opacity", finalSvgAlpha * 0.88); } else { data.svgFill.setAttribute("opacity", finalSvgAlpha * 0.25); data.svgBlend.style.display = "block"; data.svgBlend.setAttribute("opacity", finalSvgAlpha); } if (data.isSelected) {
     data.svgStroke.style.display = "block"; data.svgStroke.setAttribute("stroke-width", "2"); data.svgStroke.setAttribute("opacity", finalSvgAlpha * 0.8);
     } else { data.svgStroke.style.display = "none"; } } else { // 遮挡时 finalSvgAlpha 为 0，组整体隐藏
     data.finalGroup.style.display = "none"; } } } } }); }, // --- 标准生命周期与 IO 挂载 ---
@@ -113,9 +116,7 @@ import * as THREE from 'three'; window.poly3dList = []; window.poly3dCounter = 0
     window.poly3dList.forEach(data => { if (data.isOccluded || !data.sPointsStr) return; const ptsArray = data.sPointsStr.trim().split(' '); if (ptsArray.length < 3) return; ctx.beginPath();
     ptsArray.forEach((ptStr, i) => { const [sx, sy] = ptStr.split(',').map(parseFloat); const tx = (sx - rect.left) * scaleX; const ty = (sy - rect.top) * scaleY;
     if (i === 0) ctx.moveTo(tx, ty); else ctx.lineTo(tx, ty); }); ctx.closePath(); // 截屏严格还原叠加算法 (使用 Canvas 全局合成模式)
-    if (!data.isOccluded) { ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = data.color; ctx.globalAlpha = 0.25; // 同步提升截屏时的底色亮度防发黑
-    ctx.fill(); ctx.globalCompositeOperation = 'color'; // 对应 mix-blend-mode: color
-    ctx.globalAlpha = 1.0; ctx.fill(); }
+    if (!data.isOccluded) { if (_poly3dIosLike) { ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = data.color; ctx.globalAlpha = 0.18; ctx.fill(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.88; ctx.fill(); } else { ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = data.color; ctx.globalAlpha = 0.25; ctx.fill(); ctx.globalCompositeOperation = 'color'; ctx.globalAlpha = 1.0; ctx.fill(); } }
     // 【截屏同步对齐】：当转到背面遮挡时，直接彻底跳过渲染，不再绘制多余的实色和虚线
     ctx.globalCompositeOperation = 'source-over'; // 还原全局合成模式
     ctx.globalCompositeOperation = 'source-over'; // 还原全局合成模式

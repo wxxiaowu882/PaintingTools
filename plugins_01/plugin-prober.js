@@ -3,10 +3,22 @@ window.AnnotationPluginManager.register({
     name: '受光探针',
     
     getToneData: function(angle) {
-        if (angle <= 20) return { text: `夹角 ${angle.toFixed(0)}°【亮面/高光】`, color: '#ffffff', bg: 'rgba(15,15,20,0.9)' };
-        if (angle <= 75) return { text: `夹角 ${angle.toFixed(0)}°【灰面/侧受光】`, color: '#dddddd', bg: 'rgba(15,15,20,0.9)' };
-        if (angle <= 100) return { text: `夹角 ${angle.toFixed(0)}°【明暗交界线】`, color: '#ff3333', bg: 'rgba(50,10,10,0.95)' };
-        return { text: `夹角 ${angle.toFixed(0)}°【暗部/背光区】`, color: '#66ccff', bg: 'rgba(10,20,35,0.9)' }; 
+        if (angle <= 20) return { text: `夹角 ${angle.toFixed(0)}°【亮面/高光】`, color: '#ffffff', bg: 'rgba(15,15,20,0.7)' };
+        if (angle <= 75) return { text: `夹角 ${angle.toFixed(0)}°【灰面/侧受光】`, color: '#dddddd', bg: 'rgba(15,15,20,0.7)' };
+        if (angle <= 100) return { text: `夹角 ${angle.toFixed(0)}°【明暗交界线】`, color: '#ff3333', bg: 'rgba(50,10,10,0.7)' };
+        return { text: `夹角 ${angle.toFixed(0)}°【暗部/背光区】`, color: '#66ccff', bg: 'rgba(10,20,35,0.7)' }; 
+    },
+
+    /** 沿法线方向偏移 surface 点，供 Norm 热点与表面主点错开，否则 SVG 法线段长度为 0 */
+    offsetPosAlongNormal: function(posStr, normStr, deltaM) {
+        const pv = posStr.replace(/m/g, '').trim().split(/\s+/).map(Number);
+        const nv = normStr.replace(/m/g, '').trim().split(/\s+/).map(Number);
+        if (pv.length < 3 || nv.length < 3 || isNaN(pv[0]) || isNaN(nv[0])) return posStr;
+        let nx = nv[0], ny = nv[1], nz = nv[2];
+        const ln = Math.hypot(nx, ny, nz);
+        if (ln < 1e-8) return posStr;
+        nx /= ln; ny /= ln; nz /= ln;
+        return `${(pv[0] + nx * deltaM).toFixed(4)}m ${(pv[1] + ny * deltaM).toFixed(4)}m ${(pv[2] + nz * deltaM).toFixed(4)}m`;
     },
 
     calcArrow: function(px, py, pz, dirX, dirY, dirZ, rayLen, isRefl) {
@@ -190,7 +202,7 @@ window.AnnotationPluginManager.register({
             pos: posStr, posNorm: posStr, norm: normStr, baseNorm: [nx, ny, nz], subAnchors: {},
             color: defaultColor || '#ffbb33', hidden: false, hideInList: false,
             text: '分析中...', 
-            probeData: { angle: 0, displayAngle: 0, lastAngleTime: 0, state: 'init', lightDir: [0, 1, 0], toneColor: '#fff', toneBg: 'rgba(0,0,0,0.8)' }
+            probeData: { angle: 0, displayAngle: 0, lastAngleTime: 0, state: 'init', lightDir: [0, 1, 0], toneColor: '#fff', toneBg: 'rgba(15,15,20,0.7)' }
         };
         
         // 调用集中引擎瞬间补齐所有 3D 定位锚点
@@ -261,10 +273,8 @@ window.AnnotationPluginManager.register({
             const tc = p.probeData.toneColor || '#ffffff';
             const angleText = p.probeData.displayAngle !== undefined ? p.probeData.displayAngle + '°' : '';
 
-            // 【消费端适配核心】：添加巨大的 SVG 虚拟隐形碰撞域，让移动端手指能轻松点中探针触发高亮！
-            if (isHighlight !== undefined) {
-                htmlStr += `<circle class="svg-hit-path" data-id="${p.id}" cx="${x0}" cy="${y0}" r="25" fill="transparent" stroke="transparent" style="pointer-events:auto; cursor:pointer;" />`;
-            }
+            // 大号透明碰撞圆：消费端高亮与生产端坐标拾取台均需可点中探针（生产端 renderSVG 不传 isHighlight，故始终输出）
+            htmlStr += `<circle class="svg-hit-path" data-id="${p.id}" cx="${x0}" cy="${y0}" r="28" fill="transparent" stroke="transparent" style="pointer-events:auto; cursor:pointer;" />`;
 
             if (sectorPath) {
                 htmlStr += `<path d="${sectorPath}" fill="${tc}" opacity="${finalSvgAlpha * 0.6}" stroke="none" style="pointer-events: none; transition: fill 0.2s;" />`;
@@ -285,6 +295,7 @@ window.AnnotationPluginManager.register({
             };
 
             htmlStr += `<line x1="${x0}" y1="${y0}" x2="${xn}" y2="${yn}" stroke="${color}" stroke-width="2.5" opacity="${finalSvgAlpha}" style="pointer-events: none; filter: drop-shadow(0 0 2px ${color});" />`;
+            htmlStr += `<line class="svg-prober-norm-hit" data-id="${p.id}" x1="${x0}" y1="${y0}" x2="${xn}" y2="${yn}" stroke="transparent" stroke-width="18" stroke-linecap="round" style="pointer-events: stroke; cursor: pointer;" />`;
             htmlStr += `<circle cx="${xn}" cy="${yn}" r="2" fill="${color}" opacity="${finalSvgAlpha}" style="pointer-events: none;" />`; 
 
             if (pL) {
@@ -340,7 +351,7 @@ window.AnnotationPluginManager.register({
 
     mountDOM: function(p, viewer) {
         const el = document.createElement('div'); 
-        el.className = 'ink-anchor ink-mid show-text'; 
+        el.className = 'ink-anchor ink-mid'; 
         el.setAttribute('slot', p.slot); 
         el.setAttribute('data-position', p.pos); 
         el.setAttribute('data-normal', p.norm); 
@@ -349,13 +360,14 @@ window.AnnotationPluginManager.register({
         el.setAttribute('data-id', p.id); 
         
         const tc = p.probeData.toneColor || '#fff';
-        const tb = p.probeData.toneBg || 'rgba(15,15,20,0.9)';
+        const tb = p.probeData.toneBg || 'rgba(15,15,20,0.7)';
         
-        el.innerHTML = `<div class="HotspotAnnotation prober-label" style="display: block !important; left: 18px !important; top: -12px !important; padding: 4px 8px; background: ${tb}; border-left: 3px solid ${tc}; font-size: 11px; white-space: nowrap; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.5); font-weight: bold; letter-spacing: 0.5px; color: ${tc};">${p.text}</div>`; 
+        el.innerHTML = `<div class="HotspotAnnotation prober-label" style="left: 18px !important; top: -12px !important; padding: 4px 8px; background: ${tb}; border-left: 3px solid ${tc}; font-size: 11px; white-space: nowrap; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.5); font-weight: bold; letter-spacing: 0.5px; color: ${tc};">${p.text}</div>`; 
         
         const cid = p.id; 
         el.addEventListener('click', function(evt) { 
             if(window.tourState && window.tourState.isActive) return; 
+            this.classList.toggle('show-text'); 
             if(typeof updateSVG !== 'undefined') updateSVG(); 
             if(window.scrollToListItem) window.scrollToListItem(cid); 
         }); 
@@ -371,6 +383,7 @@ window.AnnotationPluginManager.register({
             viewer.appendChild(a);
             p.domCache.anchors[key] = a;
         };
+        p.posNorm = this.offsetPosAlongNormal(p.pos, p.norm, 0.06);
         createAnchor(p.slotNorm, p.posNorm, 'Norm');
         if (p.subAnchors) {
             Object.keys(p.subAnchors).forEach(key => { createAnchor(`${p.slot}-${key}`, p.subAnchors[key], key); });

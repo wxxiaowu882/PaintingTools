@@ -1,0 +1,23 @@
+# 3D 模型与二进制文件
+*.glb
+*.gltf
+*.bin
+*.fbx
+*.obj
+
+# 资源与图片目录
+docs/galleryIMG/
+docs/model/
+docs/img/
+
+# 历史备份与压缩包 (如果文件夹名确实是中文，请保持原样)
+历史备份文件/
+历史部署压缩包/
+
+# 系统与编辑器缓存
+.DS_Store
+Thumbs.db
+node_modules/
+
+
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
