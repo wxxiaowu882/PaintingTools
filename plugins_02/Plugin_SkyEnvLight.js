@@ -63,7 +63,7 @@ window.SkyEnvLight = {
         if (!scene) return;
         const hex = window.envSkyColor || '#0d0d0f';
         const sc = window.envSkyLightScale;
-        const scaleRaw = typeof sc === 'number' && !Number.isNaN(sc) ? sc : 1;
+        const scaleRaw = typeof sc === 'number' && !Number.isNaN(sc) ? sc : 0;
         const scale = Math.min(1, Math.max(0, scaleRaw));
         const uiVal = readMainLightUiIntensity();
         const mode = window.skyEnvLightMatchMainRect ? '1' : '0';
@@ -111,7 +111,7 @@ window.SkyEnvLight = {
         const valEl = document.getElementById('env-sky-light-val');
         let v = typeof window.envSkyLightScale === 'number' && !Number.isNaN(window.envSkyLightScale)
             ? window.envSkyLightScale
-            : 1;
+            : 0;
         v = Math.min(1, Math.max(0, v));
         window.envSkyLightScale = v;
         if (slider) slider.value = String(v);
@@ -125,9 +125,9 @@ window.SkyEnvLight = {
         row.className = 'slider-row';
         row.style.cssText = 'flex:1; min-width:0; margin:0; display:flex; align-items:center; gap:4px;';
         row.innerHTML = `
-            <input type="range" id="env-sky-light-scale" min="0" max="1" step="0.02" value="1"
+            <input type="range" id="env-sky-light-scale" min="0" max="1" step="0.02" value="0"
                 oninput="window.setSkyLightScale(this.value)">
-            <span id="env-sky-light-val" class="slider-val" style="width:32px; flex:none; text-align:right;">1.00</span>`;
+            <span id="env-sky-light-val" class="slider-val" style="width:32px; flex:none; text-align:right;">0.00</span>`;
         slot.appendChild(row);
         this.syncUI();
     },

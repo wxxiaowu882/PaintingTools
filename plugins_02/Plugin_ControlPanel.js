@@ -63,7 +63,7 @@ window.ControlPanel = {
                         .module-title { font-size: 11px; color: rgba(255,255,255,0.8); font-weight: bold; display: flex; align-items: center; cursor: pointer; }
                         
                         /* 方形大热区取色器 */
-                        .color-wrapper { flex: none; width: 32px; height: 32px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden; display: flex; }
+                        .color-wrapper { flex: none; width: 32px; height: 32px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.28); border-radius: 6px; overflow: hidden; display: flex; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); }
                         .color-wrapper input[type="color"] { width: 100%; height: 100%; border: none; padding: 0; background: transparent; cursor: pointer; opacity: 1; }
                         .color-wrapper input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
                         .color-wrapper input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
@@ -146,7 +146,7 @@ window.ControlPanel = {
                                     <label class="module-title mb-0" style="margin-right:8px;">
                                         <input type="checkbox" id="fogEnable" onchange="window.toggleFogAdvanced(this.checked)" class="flat-checkbox" style="width:14px; height:14px; margin-right:6px;"> 空气透视
                                     </label>
-                                    <div id="fog-extra-controls" style="display:flex; gap:6px; align-items:center; opacity:0.3; pointer-events:none; transition:opacity 0.2s;">
+                                    <div id="fog-extra-controls" style="display:none; gap:6px; align-items:center;">
                                         <div style="position:relative; flex:none; width:88px;">
                                             <div class="custom-select-trigger" onclick="window.toggleCustomSelect(event, 'fog-type-options')" id="fog-type-trigger" style="padding:2px 6px !important; font-size:11px !important;">基础平流雾</div>
                                             <div class="custom-options" id="fog-type-options" style="min-width:88px;">
@@ -186,17 +186,17 @@ window.ControlPanel = {
                                         <input type="checkbox" id="dofEnable" onchange="window.toggleDoF(this.checked)" class="flat-checkbox" style="width:14px; height:14px; margin-right:6px;"> 景深虚实
                                     </label>
                                 </div>
-                                <div style="display:flex; gap:6px; align-items:center;">
-                                    <div class="slider-row flex-1" style="margin-bottom:0;">
-                                        <span class="slider-label" style="width:28px;">光圈</span>
-                                        <input type="range" id="dofApertureSlider" min="0.1" max="16" step="0.1" value="2.8" oninput="window.updateDoFUI()" disabled style="opacity:0.3;">
-                                        <span id="dofApertureVal" class="slider-val" style="width:30px;">f/2.8</span>
+                                <div style="display:flex; gap:6px; align-items:stretch; width:100%; box-sizing:border-box;">
+                                    <div class="slider-row dof-slider-col" style="margin-bottom:0; flex:1 1 0; min-width:0;">
+                                        <span class="slider-label" style="width:28px; flex:none;">光圈</span>
+                                        <input type="range" id="dofApertureSlider" min="0.1" max="16" step="0.1" value="2.8" oninput="window.updateDoFUI()" disabled style="opacity:0.3; flex:1; min-width:0;">
+                                        <span id="dofApertureVal" class="slider-val" style="width:30px; flex:none;">f/2.8</span>
                                     </div>
-                                    <div id="dof-advanced-panel" style="display:none; flex:1; margin-top:0; padding-top:0; border-top:none;">
-                                        <div class="slider-row flex-1" style="margin-bottom:0;">
-                                            <span class="slider-label" style="width:28px;">焦距</span>
-                                            <input type="range" id="dofFocusSlider" min="0.1" max="40" step="0.1" value="10" oninput="window.updateDoFUI()">
-                                            <span id="dofFocusVal" class="slider-val" style="width:30px;">10.0</span>
+                                    <div id="dof-advanced-panel" style="display:none; flex:1 1 0; min-width:0; margin:0; padding:0; border:none;">
+                                        <div class="slider-row dof-slider-col" style="margin-bottom:0;">
+                                            <span class="slider-label" style="width:28px; flex:none;">焦距</span>
+                                            <input type="range" id="dofFocusSlider" min="0.1" max="40" step="0.1" value="10" oninput="window.updateDoFUI()" style="flex:1; min-width:0;">
+                                            <span id="dofFocusVal" class="slider-val" style="width:30px; flex:none;">10.0</span>
                                         </div>
                                     </div>
                                 </div>
@@ -286,7 +286,10 @@ window.ControlPanel = {
             const extraControls = document.getElementById('fog-extra-controls');
             if(slider) { slider.disabled = !checked; slider.style.opacity = checked ? '1' : '0.3'; }
             if(colorPicker) { colorPicker.disabled = !checked; }
-            if(extraControls) { extraControls.style.opacity = checked ? '1' : '0.3'; extraControls.style.pointerEvents = checked ? 'auto' : 'none'; }
+            if(extraControls) {
+                extraControls.style.display = checked ? 'flex' : 'none';
+                extraControls.style.pointerEvents = checked ? 'auto' : 'none';
+            }
             if(panel) { panel.style.display = checked ? 'flex' : 'none'; }
             window.updateFogUI(); 
         };
@@ -317,7 +320,11 @@ window.ControlPanel = {
             const apertureSlider = document.getElementById('dofApertureSlider');
             const panel = document.getElementById('dof-advanced-panel');
             if(apertureSlider) { apertureSlider.disabled = !checked; apertureSlider.style.opacity = checked ? '1' : '0.3'; }
-            if(panel) { panel.style.display = checked ? 'flex' : 'none'; }
+            if(panel) {
+                panel.style.display = checked ? 'flex' : 'none';
+                panel.style.flex = '1 1 0';
+                panel.style.minWidth = '0';
+            }
             window.updateDoFUI();
         };
 

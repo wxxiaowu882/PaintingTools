@@ -65,6 +65,7 @@
     import './plugins_02/PluginManager.js'; import './plugins_02/Plugin_SkyEnvLight.js'; import './plugins_02/Plugin_ControlPanel.js'; import * as THREE from 'three'; import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'; import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer'; import './plugins_02/Plugin_PerfTest.js';
     import './plugins_02/Plugin_Annotation.js'; // 统一接入外部标注插件
+    import './plugins_02/Plugin_ColorSampleAnnotation.js';
     import './plugins_02/Plugin_NormalArrow.js'; // 同步接入法线箭头插件
     import './plugins_02/Plugin_Polygon3D.js'; // 同步接入面片光影插件
     import './plugins_02/Plugin_Prober.js'; // ⚡ 同步接入全新的受光探针插件
@@ -384,8 +385,8 @@
     container.appendChild(item); }); }
     function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); lightMoved = true; if(window.AtmosphereManager) window.AtmosphereManager.resize(renderer); if (typeof window.syncPosterize2dLayout === 'function') window.syncPosterize2dLayout(); }
     function init() { const container = document.getElementById('canvas-container'); addHwLog("系统初始化开始..."); try { try { window.hwLog("[Init] 尝试实例化最高精度 WebGLRenderer...");
-    renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: isIosPosterizeHost }); } catch(err1) {
-    window.hwLog(`[Init] 高精度实例化异常 (${err1.message})，降级为基础实例...`); renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: isIosPosterizeHost }); }
+    renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: true }); } catch(err1) {
+    window.hwLog(`[Init] 高精度实例化异常 (${err1.message})，降级为基础实例...`); renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true }); }
     if (!renderer || !renderer.getContext()) { throw new Error("当前设备或浏览器完全拒绝创建 WebGL 上下文"); }
     window.hwLog("[Init] WebGLRenderer 实例化完毕"); renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window.hwLog(`Context Lost 崩溃! 原因: ${e.statusMessage || 'GPU运算超时或系统强制回收'}`); triggerUnsupported(); }, false);
     scene = new THREE.Scene(); scene.add(sceneGroup); scene.backgroundRotation = new THREE.Euler(); scene.environmentRotation = new THREE.Euler();
@@ -400,7 +401,7 @@
     if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; window.hwLog("[Init] WebGLPathTracer 实例化完成"); } catch (ptErr) { window.hwLog("[Init] WebGLPathTracer 拒绝启动: " + ptErr.message);
     triggerUnsupported(); return; } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
     if (window.DoFManager) window.DoFManager.init(camera, scene, renderer.domElement);
-    controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 0, 0); camera.lookAt(0, 0, 0); controls.update(); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; controls.enabled = false; controls.addEventListener('change', () => { needsUpdate = true; });
+    controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 0, 0); camera.lookAt(0, 0, 0); controls.update(); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; controls.enabled = false; window._orbitInteracting = false; controls.addEventListener('start', () => { window._orbitInteracting = true; }); controls.addEventListener('end', () => { window._orbitInteracting = false; needsUpdate = true; }); controls.addEventListener('change', () => { needsUpdate = true; });
     gltfLoader = new GLTFLoader(); const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'); gltfLoader.setDRACOLoader(dracoLoader);
     sysMaterials = { plaster: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0 }), flat: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0, flatShading: true }), sphere: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.6, metalness: 0 }) };
     // 【架构重构】：必须在任何读取 UI 状态的函数（如 buildEnvironment）之前，注入 DOM 模具！
@@ -461,12 +462,12 @@
     function animate() { solidAnimRafId = requestAnimationFrame(animate); // 【核心防卡死 1】：如果标签页在后台，绝对冻结一切物理渲染和插件更新，防止 GPU 任务堆积导致切回时死锁
     if (document.hidden) return;
     if (window._solidPerfHardwareT0 && window.PerfTester && window.PerfTester.isTesting) tickSolidPerfHardwareProgress();
-    if (window.isUnsupported || !window.useAdvancedRender) { if (controls && !controls.enabled) controls.enabled = true; if (controls) controls.update(); const _now = performance.now(); const _lastFb = window._solidFallbackRenderAt || 0; if (_now - _lastFb < 400) return; window._solidFallbackRenderAt = _now; if (renderer) { try { renderer.render(scene, camera); } catch(err) {} } return; }
+    if (window.isUnsupported || !window.useAdvancedRender) { if (controls && !controls.enabled) controls.enabled = true; if (controls) controls.update(); const _now = performance.now(); const _lastFb = window._solidFallbackRenderAt || 0; if (_now - _lastFb < 400) return; window._solidFallbackRenderAt = _now; if (renderer) { try { renderer.render(scene, camera); } catch(err) {} if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); } return; }
     const isTesting = window.PerfTester ? window.PerfTester.isTesting : false; if (!isTesting) { if (controls && !controls.enabled) controls.enabled = true; if (controls) controls.update(); }
     // 【统一生命周期总线】：一行代码调度所有插件，彻底解耦
     if (window.PluginManager) { const isInterrupted = window.PluginManager.trigger('onUpdate', { camera, scene, pathTracer, renderer }); if (isInterrupted) return; // 若测试插件要求接管，直接安全 return
     }
-    if (pathTracer) { if (window.isLoadingScene) { try { renderer.render(scene, camera); } catch(err) {} return; }
+    if (pathTracer) { if (window.isLoadingScene) { try { renderer.render(scene, camera); } catch(err) {} if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
     try { // 正式全速渲染核心逻辑
     if (lightMoved || lightPosUpdated || needsUpdate) { camera.updateMatrixWorld(); if (lightMoved) { pathTracer.setScene(scene, camera); }
     else if (lightPosUpdated && pathTracer.updateLights) { pathTracer.updateLights(); }
@@ -478,6 +479,7 @@
     { const _er = _solidPt.expRamp, _elo = _solidPt.expLo, _ehi = _solidPt.expHi; renderer.toneMappingExposure = currentSamples >= _er ? _ehi : _elo + (_ehi - _elo) * (currentSamples / _er); }
     if (currentSamples < targetSamples) { const _uiBlk = window.solidPathTraceUiBlocksSample && window.solidPathTraceUiBlocksSample(); if (!_uiBlk) { const dofOn = window.DoFManager ? window.DoFManager.enabled : false; if (window.AtmosphereManager && (window.isFogEnabled || dofOn)) window.AtmosphereManager.render(pathTracer, renderer, scene, camera); else pathTracer.renderSample(); } }
     if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL();
+    if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
     } catch(e) { triggerUnsupported(); } } }
     
     // 【新增功能】：5秒无交互自动进入沉浸模式

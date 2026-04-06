@@ -19,7 +19,7 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
     // 如果只点了一下没拉开，视为误触，直接无痕销毁
     this.deleteLine(data.id); } else { // 计算中点索引，用于挂载文本标签
     data.midIndex = Math.floor(data.points.length / 2); this.buildDOM(data); }
-    this.currentLine = null; window.needsUpdate = true; }, buildSVG: function(data) { const svg = document.getElementById('dashed-line-svg'); const ns = "http://www.w3.org/2000/svg";
+    this.currentLine = null; window.needsUpdate = true; }, cancelInteractivePlacing: function() { if (this.isDrawing) this.finishLine(); }, buildSVG: function(data) { const svg = document.getElementById('dashed-line-svg'); const ns = "http://www.w3.org/2000/svg";
     const glowPath = document.createElementNS(ns, "path"); glowPath.setAttribute("fill", "none"); glowPath.setAttribute("stroke", data.color);
     glowPath.setAttribute("stroke-width", "5"); glowPath.setAttribute("opacity", "0.2"); glowPath.style.pointerEvents = "none";
     const path = document.createElementNS(ns, "path"); path.setAttribute("fill", "none"); path.setAttribute("stroke", data.color);
@@ -28,8 +28,10 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
     hitPath.setAttribute("fill", "none"); hitPath.setAttribute("stroke", "transparent");
     hitPath.setAttribute("stroke-width", "20"); hitPath.style.pointerEvents = "auto"; hitPath.style.cursor = "pointer";
     hitPath.addEventListener('pointerdown', e => { e.stopPropagation();
-    if (window.currentEditorMode === 'annotate' || window.currentEditorMode === 'normal-arrow' || window.currentEditorMode === 'dashed-line') return; this.selectedId = data.id;
-    this.highlightSelected(); const picker = document.getElementById('obj-color-picker'); if(picker) picker.value = data.color; }); svg.appendChild(glowPath); data.svgGlowPath = glowPath; svg.appendChild(path); data.svgPath = path;
+    if (window.currentEditorMode === 'annotate' || window.currentEditorMode === 'normal-arrow' || window.currentEditorMode === 'dashed-line') return;
+    if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') { window.PluginManager.setExclusiveSelection(this, data.id); }
+    else { this.selectedId = data.id; this.highlightSelected(); }
+    const picker = document.getElementById('obj-color-picker'); if(picker) picker.value = data.color; }); svg.appendChild(glowPath); data.svgGlowPath = glowPath; svg.appendChild(path); data.svgPath = path;
     svg.appendChild(hitPath); data.svgHitPath = hitPath; }, buildDOM: function(data) { const layer = document.getElementById('dashed-line-layer'); const dom = document.createElement('div');
     dom.id = 'dom_' + data.id; dom.className = 'dashed-line-dom'; dom.style.cssText = `
                 position: absolute; pointer-events: auto; cursor: pointer;
@@ -38,14 +40,14 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
                 white-space: nowrap; user-select: none; transition: opacity 0.2s;
                 transform: translate(-50%, -50%); display: none;
             `; dom.innerText = data.text; dom.dataset.color = data.color;
-    dom.addEventListener('pointerdown', e => { e.stopPropagation(); this.selectedId = data.id; this.highlightSelected(); const picker = document.getElementById('obj-color-picker');
-    if(picker) picker.value = data.color; }); layer.appendChild(dom); data.domEl = dom; }, highlightSelected: function() {
+    dom.addEventListener('pointerdown', e => { e.stopPropagation();
+    if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') { window.PluginManager.setExclusiveSelection(this, data.id); }
+    else { this.selectedId = data.id; this.highlightSelected(); }
+    const picker = document.getElementById('obj-color-picker'); if(picker) picker.value = data.color; }); layer.appendChild(dom); data.domEl = dom; }, highlightSelected: function() {
     document.querySelectorAll('.dashed-line-dom').forEach(el => { el.style.boxShadow = 'none'; }); window.dashedLineList.forEach(data => {
     if (data.svgPath) data.svgPath.setAttribute("stroke-width", "2.5"); if (data.svgGlowPath) data.svgGlowPath.setAttribute("opacity", "0.2"); });
-    if (this.selectedId !== null) { if (window.AnnotationManager) { window.AnnotationManager.selectedId = null; window.AnnotationManager.highlightSelected(); }
-    if (window.NormalArrowManager) { window.NormalArrowManager.selectedId = null; window.NormalArrowManager.highlightSelected(); }
     const data = window.dashedLineList.find(a => a.id === this.selectedId); if (data) { if (data.domEl) data.domEl.style.boxShadow = `0 0 10px ${data.color}`;
-    if (data.svgPath) data.svgPath.setAttribute("stroke-width", "4"); if (data.svgGlowPath) data.svgGlowPath.setAttribute("opacity", "0.5"); } } },
+    if (data.svgPath) data.svgPath.setAttribute("stroke-width", "4"); if (data.svgGlowPath) data.svgGlowPath.setAttribute("opacity", "0.5"); } },
     deleteSelected: function() { if (this.selectedId !== null) { this.deleteLine(this.selectedId); this.selectedId = null; } }, deleteLine: function(id) { const idx = window.dashedLineList.findIndex(a => a.id === id); if (idx > -1) {
     const data = window.dashedLineList[idx]; if(data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj); if(data.domEl) data.domEl.remove(); if(data.svgGlowPath) data.svgGlowPath.remove();
     if(data.svgPath) data.svgPath.remove(); if(data.svgHitPath) data.svgHitPath.remove(); window.dashedLineList.splice(idx, 1); window.needsUpdate = true; } }, updateScreenPositions: function(camera) {

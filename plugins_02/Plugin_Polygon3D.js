@@ -18,6 +18,7 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     this.addPoint(hit.point, worldNormal, e.clientX, e.clientY); } } } } },
     onGlobalPointerUp: function(e) { if (e.target && e.target.tagName === 'polygon' && e.target.parentNode && e.target.parentNode.style.cursor === 'pointer') return true; return false; },
     onKeyUp: function(event) { if (this.isDrawing && (event.key === 'Alt' || event.key === 'Shift')) { this.finishDrawing(); } },
+    cancelInteractivePlacing: function() { if (this.isDrawing) this.finishDrawing(); },
     startDrawing: function(targetObj, worldPoint, worldNormal, screenX, screenY) { this.ensureDOM(); window.poly3dCounter++; const id = 'poly3d_' + Date.now() + '_' + window.poly3dCounter;
     // 整个面片只消耗 1 个 3D 锚点
     const anchor = new THREE.Object3D(); targetObj.worldToLocal(anchor.position.copy(worldPoint)); anchor.name = id; anchor.userData.localNormal = targetObj.worldToLocal(worldPoint.clone().add(worldNormal)).sub(anchor.position).normalize();
@@ -49,12 +50,15 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     const fillPath = document.createElementNS(ns, "polygon"); fillPath.style.pointerEvents = "none";
     const blendPath = document.createElementNS(ns, "polygon"); blendPath.setAttribute("style", (_poly3dIosLike ? "mix-blend-mode: soft-light; -webkit-mix-blend-mode: soft-light;" : "mix-blend-mode: color;") + " pointer-events: none;");
     const strokePath = document.createElementNS(ns, "polygon"); strokePath.setAttribute("fill", "none"); strokePath.setAttribute("stroke-linejoin", "round"); strokePath.setAttribute("stroke-dasharray", "4,4"); strokePath.style.pointerEvents = "none";
-    finalGroup.appendChild(hitPath); finalGroup.appendChild(fillPath); finalGroup.appendChild(blendPath); finalGroup.appendChild(strokePath); container.appendChild(finalGroup); finalGroup.addEventListener('pointerdown', e => {
-    /* 【优化2】：移除模式限制，任何时候点击都能选中面片 */
-    /* 【优化3】：移除 e.stopPropagation()，允许事件冒泡穿透到场景控制器，实现拖拽旋转 */
-    if (window.AnnotationManager) { window.AnnotationManager.selectedId = null; window.AnnotationManager.highlightSelected(); }
-    if (window.NormalArrowManager) { window.NormalArrowManager.selectedId = null; window.NormalArrowManager.highlightSelected(); }
-    this.selectedId = data.id; this.highlightSelected(); }); svg.appendChild(container); data.svgGroup = container; data.previewPolyline = previewPolyline; data.finalGroup = finalGroup;
+    finalGroup.appendChild(hitPath); finalGroup.appendChild(fillPath); finalGroup.appendChild(blendPath); finalGroup.appendChild(strokePath); container.appendChild(finalGroup);     finalGroup.addEventListener('pointerdown', e => {
+    /* 【优化2】：移除模式限制；互斥选中由 PluginManager 统一处理 */
+    /* 【优化3】：移除 e.stopPropagation()，允许事件冒泡穿透到场景控制器 */
+    if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+        window.PluginManager.setExclusiveSelection(this, data.id);
+    } else {
+        this.selectedId = data.id;
+        this.highlightSelected();
+    } }); svg.appendChild(container); data.svgGroup = container; data.previewPolyline = previewPolyline; data.finalGroup = finalGroup;
     data.svgHit = hitPath; data.svgFill = fillPath; data.svgBlend = blendPath; data.svgStroke = strokePath; // 分配各自的颜色与透明度
     previewPolyline.setAttribute("stroke", data.color); previewPolyline.setAttribute("fill", this.hexToRgba(data.color, 0.2));
     fillPath.setAttribute("fill", data.color); blendPath.setAttribute("fill", data.color); strokePath.setAttribute("stroke", data.color); }, // 【算法修复】：还原原案所需的 rgba 转换器
@@ -87,7 +91,7 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     data.svgStroke.style.display = "block"; data.svgStroke.setAttribute("stroke-width", "2"); data.svgStroke.setAttribute("opacity", finalSvgAlpha * 0.8);
     } else { data.svgStroke.style.display = "none"; } } else { // 遮挡时 finalSvgAlpha 为 0，组整体隐藏
     data.finalGroup.style.display = "none"; } } } } }); }, // --- 标准生命周期与 IO 挂载 ---
-    onClearScene: function() { window.poly3dList.forEach(data => { if(data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj); if(data.svgGroup) data.svgGroup.remove(); });
+    onClearScene: function() { this.cancelInteractivePlacing(); window.poly3dList.forEach(data => { if(data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj); if(data.svgGroup) data.svgGroup.remove(); });
     window.poly3dList = []; this.selectedId = null; this.isDrawing = false; this.activeData = null; }, onSaveItemData: function(context) { const polys = this.extractSaveData(context.obj);
     if (polys.length > 0) context.itemData.polygon3ds = polys; }, onSaveGroundData: function(context) { const polys = this.extractSaveData(context.obj); if (polys.length > 0) context.sceneData.groundPolygon3ds = polys; },
     extractSaveData: function(obj) { const polyData = []; if (!obj) return polyData; 

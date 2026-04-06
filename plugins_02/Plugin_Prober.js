@@ -9,7 +9,7 @@ window.ProberManager = {
     getToneData: function(angle) {
         if (angle <= 20) return { text: `夹角 ${angle.toFixed(0)}°【亮面/高光】`, color: '#ffffff', bg: 'rgba(15,15,20,0.7)' };
         if (angle <= 75) return { text: `夹角 ${angle.toFixed(0)}°【灰面/侧受光】`, color: '#dddddd', bg: 'rgba(15,15,20,0.7)' };
-        if (angle <= 100) return { text: `夹角 ${angle.toFixed(0)}°【明暗交界线】`, color: '#ff3333', bg: 'rgba(50,10,10,0.7)' };
+        if (angle <= 100) return { text: `夹角 ${angle.toFixed(0)}°【明暗交界区域】`, color: '#ff3333', bg: 'rgba(50,10,10,0.7)' };
         return { text: `夹角 ${angle.toFixed(0)}°【暗部/背光区】`, color: '#66ccff', bg: 'rgba(10,20,35,0.7)' }; 
     },
 
@@ -42,8 +42,12 @@ window.ProberManager = {
             layer.id = 'prober-html-layer';
             layer.style.position = 'absolute'; layer.style.top = '0'; layer.style.left = '0';
             layer.style.width = '100vw'; layer.style.height = '100vh';
-            layer.style.pointerEvents = 'none'; layer.style.zIndex = '40'; // 【修复】：降低主层级，严格沉入控制面板(100)之下
+            layer.style.pointerEvents = 'none';
+            /* 须高于经典标注层(50)与取色标注层(52)，否则标签点击会被其它 SVG 抢走；层本身 none 不挡穿透 */
+            layer.style.zIndex = '53';
             document.body.appendChild(layer);
+        } else {
+            layer.style.zIndex = '53';
         }
 
         let svgLayer = document.getElementById('prober-svg-layer');
@@ -77,20 +81,25 @@ window.ProberManager = {
 
         const label = document.createElement('div');
         label.className = 'prober-label';
-        label.style.position = 'absolute'; label.style.transform = 'translate(18px, -12px)'; 
+        label.style.position = 'absolute';
+        label.style.transform = 'translate(-50%, -50%)';
         label.style.padding = '4px 8px'; label.style.fontSize = '11px'; label.style.fontWeight = 'bold';
-        label.style.whiteSpace = 'nowrap'; label.style.boxShadow = '0 4px 10px rgba(0,0,0,0.5)';
+        label.style.whiteSpace = 'pre-wrap';
+        label.style.maxWidth = '260px';
+        label.style.boxShadow = '0 4px 10px rgba(0,0,0,0.5)';
         label.style.pointerEvents = 'auto'; label.style.transition = 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
         label.style.cursor = 'pointer';
         label.style.outline = 'none'; // 去掉输入时的外发光框
         label.innerText = data.text;
         
+        const PM = window.ProberManager;
         label.addEventListener('pointerdown', e => {
-            if (window.AnnotationManager) window.AnnotationManager.selectedId = null;
-            if (window.NormalArrowManager) window.NormalArrowManager.selectedId = null;
-            if (window.Polygon3DManager) window.Polygon3DManager.selectedId = null;
-            this.selectedId = data.id;
-            this.highlightSelected();
+            if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+                window.PluginManager.setExclusiveSelection(PM, data.id);
+            } else {
+                PM.selectedId = data.id;
+                PM.highlightSelected();
+            }
             e.stopPropagation();
         });
 
@@ -124,32 +133,58 @@ window.ProberManager = {
         // 【核心交互】：打字按回车保存，并阻拦所有的快捷键冲突
         label.addEventListener('keydown', e => {
             e.stopPropagation();
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                label.blur();
-            }
+            // 允许 Enter 换行；用失焦保存（与经典引线一致）
         });
 
         this.layer.appendChild(label);
 
+        // 透明命中条：用于点击“法线线段”也能选中整条探针（svgGroup 每帧 innerHTML 重建，不适合直接绑事件）
+        const hit = document.createElement('div');
+        hit.className = 'prober-hit-normal';
+        hit.style.position = 'absolute';
+        hit.style.height = '16px';
+        hit.style.background = 'transparent';
+        hit.style.pointerEvents = 'auto';
+        hit.style.cursor = 'pointer';
+        hit.style.transformOrigin = '0 50%';
+        hit.style.zIndex = '54';
+        hit.addEventListener('pointerdown', e => {
+            if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+                window.PluginManager.setExclusiveSelection(PM, data.id);
+            } else {
+                PM.selectedId = data.id;
+                PM.highlightSelected();
+            }
+            e.stopPropagation();
+        });
+        hit.addEventListener('dblclick', e => {
+            e.stopPropagation();
+            data.labelVisible = data.labelVisible === false ? true : false;
+            if (data.dom && data.dom.label) data.dom.label.style.display = data.labelVisible ? 'block' : 'none';
+            if (typeof window.needsUpdate !== 'undefined') window.needsUpdate = true;
+        });
+        this.layer.appendChild(hit);
+
         const svgGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         svgGroup.style.transition = 'opacity 0.2s';
+        svgGroup.style.pointerEvents = 'none';
         this.svgLayer.appendChild(svgGroup);
 
-        data.dom = { label, svgGroup };
+        data.dom = { label, svgGroup, hit };
+        label.style.display = data.labelVisible === false ? 'none' : 'block';
     },
 
     highlightSelected: function() {
         window.proberList.forEach(data => {
             if (data.dom && data.dom.label) {
                 if (this.selectedId === data.id) {
-                    data.dom.label.style.transform = 'translate(18px, -12px) scale(1.15)';
+                    data.dom.label.style.transform = 'translate(-50%, -50%) scale(1.15)';
                     data.dom.label.style.boxShadow = `0 0 15px ${data.toneColor || '#fff'}, 0 4px 10px rgba(0,0,0,0.5)`;
-                    data.dom.label.style.zIndex = '50'; // 【修复】：选中状态下浮起，但依然低于控制面板
+                    data.dom.label.style.zIndex = '55';
                 } else {
-                    data.dom.label.style.transform = 'translate(18px, -12px) scale(1)';
+                    data.dom.label.style.transform = 'translate(-50%, -50%) scale(1)';
                     data.dom.label.style.boxShadow = '0 4px 10px rgba(0,0,0,0.5)';
-                    data.dom.label.style.zIndex = '40'; // 【修复】：未选中状态恢复基础层级
+                    data.dom.label.style.zIndex = '54';
                 }
             }
         });
@@ -193,6 +228,7 @@ window.ProberManager = {
             anchorObj: anchor,
             text: '分析中...',
             isCustomText: false, // 初始化为系统托管状态
+            labelVisible: true,
             color: document.getElementById('obj-color-picker')?.value || '#00ccff', 
             lastAngleTime: 0,
             displayAngle: 0,
@@ -203,8 +239,12 @@ window.ProberManager = {
         window.proberList.push(probeData);
         this.buildDOM(probeData);
         
-        this.selectedId = id;
-        this.highlightSelected();
+        if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+            window.PluginManager.setExclusiveSelection(window.ProberManager, id);
+        } else {
+            window.ProberManager.selectedId = id;
+            window.ProberManager.highlightSelected();
+        }
         window.needsUpdate = true; 
     },
 
@@ -326,8 +366,34 @@ window.ProberManager = {
             const arrL = this.calcArrow(this._tempOrigin.x, this._tempOrigin.y, this._tempOrigin.z, lx, ly, lz, rayLen, false);
             const arrR = this.calcArrow(this._tempOrigin.x, this._tempOrigin.y, this._tempOrigin.z, R[0], R[1], R[2], rayLen, true);
 
-            p.dom.label.style.left = `${P0.x}px`;
-            p.dom.label.style.top = `${P0.y}px`;
+            // 标签移动到“入射光虚线”的外侧起始顶端（PL 端附近），并沿法向向上偏移，避免压线
+            let lx2 = PL.x - P0.x, ly2 = PL.y - P0.y;
+            let llen = Math.hypot(lx2, ly2);
+            if (llen < 1e-3) llen = 1;
+            lx2 /= llen; ly2 /= llen;
+            let nx2 = -ly2, ny2 = lx2; // 2D 法向
+            // 取屏幕“上方”法向（y 更小）
+            if (ny2 > 0) { nx2 = -nx2; ny2 = -ny2; }
+            const labelPadAlong = 22;
+            const labelPadNorm = 20;
+            const labelX = PL.x + lx2 * labelPadAlong + nx2 * labelPadNorm;
+            const labelY = PL.y + ly2 * labelPadAlong + ny2 * labelPadNorm;
+            p.dom.label.style.left = `${labelX}px`;
+            p.dom.label.style.top = `${labelY}px`;
+            p.dom.label.style.display = p.labelVisible === false ? 'none' : 'block';
+
+            // 更新法线命中条：覆盖 P0->PN 线段，便于点击选中
+            if (p.dom.hit) {
+                const dx = PN.x - P0.x, dy = PN.y - P0.y;
+                const len = Math.hypot(dx, dy);
+                const ang = Math.atan2(dy, dx);
+                p.dom.hit.style.left = `${P0.x}px`;
+                p.dom.hit.style.top = `${P0.y}px`;
+                p.dom.hit.style.width = `${Math.max(0, len)}px`;
+                p.dom.hit.style.opacity = '1';
+                p.dom.hit.style.pointerEvents = 'auto';
+                p.dom.hit.style.transform = `translate(0, -50%) rotate(${ang}rad)`;
+            }
 
             p.dom.svgGroup.style.opacity = '1';
             let htmlStr = '';
@@ -425,6 +491,7 @@ window.ProberManager = {
                         color: pData.color,
                         text: pData.text, // 序列化自定义文本
                         isCustomText: pData.isCustomText, // 序列化接管状态
+                        labelVisible: pData.labelVisible !== false,
                         localPos: [parseFloat(c.position.x.toFixed(4)), parseFloat(c.position.y.toFixed(4)), parseFloat(c.position.z.toFixed(4))],
                         localNormal: norm,
                         rayLen: pData.rayLen
@@ -458,6 +525,7 @@ window.ProberManager = {
                 anchorObj: anchor,
                 text: a.text || '分析中...',
                 isCustomText: a.isCustomText || false,
+                labelVisible: a.labelVisible !== false,
                 color: a.color || '#00ccff',
                 lastAngleTime: 0,
                 displayAngle: 0,
