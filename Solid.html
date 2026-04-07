@@ -421,8 +421,28 @@
     triggerUnsupported(); return; } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
     if (window.DoFManager) window.DoFManager.init(camera, scene, renderer.domElement);
     controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 0, 0); camera.lookAt(0, 0, 0); controls.update(); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; controls.enabled = false; window._orbitInteracting = false; window._solidLastInteractAt = 0;
-    controls.addEventListener('start', () => { window._orbitInteracting = true; window._solidLastInteractAt = performance.now(); });
-    controls.addEventListener('end', () => { window._orbitInteracting = false; window._solidLastInteractAt = performance.now(); needsUpdate = true; });
+    let _orbitStartPos = null, _orbitStartTarget = null, _orbitStartQuat = null, _orbitStartZoom = 0;
+    controls.addEventListener('start', () => {
+        window._orbitInteracting = true;
+        window._solidLastInteractAt = performance.now();
+        _orbitStartPos = camera.position.clone();
+        _orbitStartTarget = controls.target.clone();
+        _orbitStartQuat = camera.quaternion.clone();
+        _orbitStartZoom = camera.zoom;
+    });
+    controls.addEventListener('end', () => {
+        window._orbitInteracting = false;
+        window._solidLastInteractAt = performance.now();
+        // 若只是点击未产生视角变化，则不触发 needsUpdate（避免重置光追/重渲染）
+        const eps = 1e-6;
+        const moved = !_orbitStartPos || !_orbitStartTarget || !_orbitStartQuat
+            ? true
+            : (camera.position.distanceToSquared(_orbitStartPos) > eps
+                || controls.target.distanceToSquared(_orbitStartTarget) > eps
+                || (1 - Math.abs(camera.quaternion.dot(_orbitStartQuat))) > eps
+                || Math.abs((camera.zoom || 0) - (_orbitStartZoom || 0)) > 1e-6);
+        if (moved) needsUpdate = true;
+    });
     controls.addEventListener('change', () => { window._solidLastInteractAt = performance.now(); needsUpdate = true; });
     gltfLoader = new GLTFLoader(); const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'); gltfLoader.setDRACOLoader(dracoLoader);
     sysMaterials = { plaster: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0 }), flat: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0, flatShading: true }), sphere: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.6, metalness: 0 }) };
