@@ -383,6 +383,7 @@ window.ColorSampleAnnotationManager = {
             }
         });
         endC.addEventListener('dblclick', e => {
+            if (window.__SOLID_CONSUMER__) return;
             e.stopPropagation();
             data.labelVisible = !data.labelVisible;
             if (data.domLabel) data.domLabel.style.display = data.labelVisible ? 'block' : 'none';
@@ -439,6 +440,7 @@ window.ColorSampleAnnotationManager = {
 
             // 经典引线同款：双击同一文本框进入编辑（contentEditable + editing），失焦保存，回车结束编辑
             label.addEventListener('dblclick', e => {
+                if (window.__SOLID_CONSUMER__) return;
                 e.stopPropagation();
                 if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
                     window.PluginManager.setExclusiveSelection(this, data.id);
@@ -685,14 +687,15 @@ window.ColorSampleAnnotationManager = {
         if (this._samplingDisabled) return;
         // 刷新/切后台/回收 WebGL 时禁止 readPixels：部分驱动会直接卡死
         if (typeof document !== 'undefined' && (document.hidden || document.visibilityState === 'hidden')) return;
-        if (window.__isPageUnloading || window.useAdvancedRender === false) return;
+        if (window.__isPageUnloading) return;
         // 轨道拖动期间禁止 readPixels：与每帧 WebGL 合成叠加时部分驱动会长时间阻塞甚至卡死整页
         if (window._orbitInteracting) return;
         try {
             const gl = context.renderer.getContext && context.renderer.getContext();
             if (gl && typeof gl.isContextLost === 'function' && gl.isContextLost()) return;
         } catch (_e) {}
-        const vis = window.colorSampleAnnoList.filter(d => !d.isBehind && !d.isOccluded);
+        // 屏幕取色是 readPixels 的屏幕采样：不应因法线朝向(isOccluded)跳过，否则会长期停留在初始灰色
+        const vis = window.colorSampleAnnoList.filter(d => !d.isBehind && d.anchorObj);
         if (!vis.length) return;
         const now = performance.now();
         if (now - this._lastBatchSampleAt < SAMPLE_MIN_INTERVAL_MS) return;

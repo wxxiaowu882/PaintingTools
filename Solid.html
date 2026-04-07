@@ -36,7 +36,8 @@
     .scene-thumb { width:100%; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; background:#111; flex-shrink:0; }
     .scene-name { padding:10px 8px; font-size:11px; text-align:center; color:#ddd; font-weight:300; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .scene-item.active::after { content:''; position:absolute; inset:0; border:2px solid #2ecc71; border-radius:10px; pointer-events:none; }
-    /* 消费端专属：强制禁用所有标注的交互，变为纯展示模式 */ .anno-dom { pointer-events: none !important; cursor: default !important; } .anno-leader-label { pointer-events: none !important; user-select: none !important; }
+    /* 消费端专属：强制禁用所有标注的交互，变为纯展示模式 */
+    .anno-dom, .anno-leader-label, .anno-cs-label, .prober-label, .norm-arrow-label { pointer-events: none !important; cursor: default !important; user-select: none !important; }
     #norm-arrow-layer * { pointer-events: none !important; cursor: default !important; }
     #poly3d-layer * { pointer-events: none !important; cursor: default !important; } /* 强制禁用光影面片的点击响应 */ 
     
@@ -255,8 +256,26 @@
     function getTempColor(t) { const stops = [[3000,255,160,87],[4000,255,200,140],[5000,255,239,223],[6000,255,255,255],[7500,225,235,255],[9000,190,210,255]]; let c1 = stops[0], c2 = stops[stops.length-1]; for(let i=0; i<stops.length-1; i++) { if(t>=stops[i][0] && t<=stops[i+1][0]){ c1=stops[i]; c2=stops[i+1]; break; } } const f = (t-c1[0])/(c2[0]-c1[0]||1); return new THREE.Color((c1[1]+f*(c2[1]-c1[1]))/255, (c1[2]+f*(c2[2]-c1[2]))/255, (c1[3]+f*(c2[3]-c1[3]))/255); }
     window.toggleCustomSelect = function(e, id) { e.stopPropagation(); document.querySelectorAll('.custom-options').forEach(el => { if (el.id !== id) el.classList.remove('show'); }); document.getElementById(id).classList.toggle('show'); };
     window.toggleWall = function() { window.hasWall = !window.hasWall; const btn = document.getElementById('wall-btn'); const wchk = document.getElementById('wall-btn-checkbox'); if (wchk) wchk.checked = !!window.hasWall; if (btn) { btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; } setTimeout(() => { buildEnvironment(); lightMoved = true; }, 100); };
+    // 消费端标记：插件在该标记下禁用编辑/显隐切换
+    window.__SOLID_CONSUMER__ = true;
     window.showAnnotations = true;
-    window.toggleAnnotations = function() { window.showAnnotations = !window.showAnnotations; const btn = document.getElementById('anno-toggle-btn'); btn.classList.toggle('active', window.showAnnotations); btn.innerText = window.showAnnotations ? '☑ 标注' : '☐ 标注'; const layer = document.getElementById('anno-layer'); if (layer) layer.style.display = window.showAnnotations ? 'block' : 'none'; const svg = document.getElementById('anno-svg'); if (svg) svg.style.display = window.showAnnotations ? 'block' : 'none'; };
+    window.toggleAnnotations = function() {
+        window.showAnnotations = !window.showAnnotations;
+        const btn = document.getElementById('anno-toggle-btn');
+        btn.classList.toggle('active', window.showAnnotations);
+        btn.innerText = window.showAnnotations ? '☑ 标注' : '☐ 标注';
+        // 经典引线
+        const layer = document.getElementById('anno-layer'); if (layer) layer.style.display = window.showAnnotations ? 'block' : 'none';
+        const svg = document.getElementById('anno-svg'); if (svg) svg.style.display = window.showAnnotations ? 'block' : 'none';
+        // 取色引线
+        const csLayer = document.getElementById('anno-cs-layer'); if (csLayer) csLayer.style.display = window.showAnnotations ? 'block' : 'none';
+        const csSvg = document.getElementById('anno-cs-svg'); if (csSvg) csSvg.style.display = window.showAnnotations ? 'block' : 'none';
+        // 法线箭头 / 面片 / 探针等插件各自也会读取 showAnnotations；这里额外兜底隐藏其根层
+        const naLayer = document.getElementById('norm-arrow-layer'); if (naLayer) naLayer.style.display = window.showAnnotations ? 'block' : 'none';
+        const proberLayer = document.getElementById('prober-html-layer'); if (proberLayer) proberLayer.style.display = window.showAnnotations ? 'block' : 'none';
+        const polyLayer = document.getElementById('polygon3d-layer'); if (polyLayer) polyLayer.style.display = window.showAnnotations ? 'block' : 'none';
+        const dlLayer = document.getElementById('dashed-line-layer'); if (dlLayer) dlLayer.style.display = window.showAnnotations ? 'block' : 'none';
+    };
     document.addEventListener('click', () => { document.querySelectorAll('.custom-options').forEach(el => el.classList.remove('show')); });
     window.solidPathTraceUiBlocksSample = function() { const m = document.getElementById('scene-grid-modal'); const modalOpen = m && (m.style.display === 'flex' || (typeof getComputedStyle === 'function' && getComputedStyle(m).display === 'flex')); const go = document.getElementById('global-menu-overlay'); const menuOpen = (typeof location !== 'undefined' && location.hash === '#menu') || (go && go.classList.contains('active')); return !!(modalOpen || menuOpen); };
     window.closeSceneGridModal = function() {
@@ -401,7 +420,10 @@
     if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; window.hwLog("[Init] WebGLPathTracer 实例化完成"); } catch (ptErr) { window.hwLog("[Init] WebGLPathTracer 拒绝启动: " + ptErr.message);
     triggerUnsupported(); return; } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
     if (window.DoFManager) window.DoFManager.init(camera, scene, renderer.domElement);
-    controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 0, 0); camera.lookAt(0, 0, 0); controls.update(); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; controls.enabled = false; window._orbitInteracting = false; controls.addEventListener('start', () => { window._orbitInteracting = true; }); controls.addEventListener('end', () => { window._orbitInteracting = false; needsUpdate = true; }); controls.addEventListener('change', () => { needsUpdate = true; });
+    controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 0, 0); camera.lookAt(0, 0, 0); controls.update(); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; controls.enabled = false; window._orbitInteracting = false; window._solidLastInteractAt = 0;
+    controls.addEventListener('start', () => { window._orbitInteracting = true; window._solidLastInteractAt = performance.now(); });
+    controls.addEventListener('end', () => { window._orbitInteracting = false; window._solidLastInteractAt = performance.now(); needsUpdate = true; });
+    controls.addEventListener('change', () => { window._solidLastInteractAt = performance.now(); needsUpdate = true; });
     gltfLoader = new GLTFLoader(); const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'); gltfLoader.setDRACOLoader(dracoLoader);
     sysMaterials = { plaster: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0 }), flat: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0, flatShading: true }), sphere: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.6, metalness: 0 }) };
     // 【架构重构】：必须在任何读取 UI 状态的函数（如 buildEnvironment）之前，注入 DOM 模具！
@@ -462,7 +484,21 @@
     function animate() { solidAnimRafId = requestAnimationFrame(animate); // 【核心防卡死 1】：如果标签页在后台，绝对冻结一切物理渲染和插件更新，防止 GPU 任务堆积导致切回时死锁
     if (document.hidden) return;
     if (window._solidPerfHardwareT0 && window.PerfTester && window.PerfTester.isTesting) tickSolidPerfHardwareProgress();
-    if (window.isUnsupported || !window.useAdvancedRender) { if (controls && !controls.enabled) controls.enabled = true; if (controls) controls.update(); const _now = performance.now(); const _lastFb = window._solidFallbackRenderAt || 0; if (_now - _lastFb < 400) return; window._solidFallbackRenderAt = _now; if (renderer) { try { renderer.render(scene, camera); } catch(err) {} if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); } return; }
+    if (window.isUnsupported || !window.useAdvancedRender) {
+    if (controls && !controls.enabled) controls.enabled = true;
+    if (controls) controls.update();
+    // 停止物理渲染后仍需更新标注投影，否则转动模型时标注不会跟随
+    if (window.PluginManager) { try { window.PluginManager.trigger('onUpdate', { camera, scene, renderer, pathTracer: null }); } catch(_e) {} }
+    const _now = performance.now();
+    const _lastInteract = window._solidLastInteractAt || 0;
+    const _isInteracting = !!window._orbitInteracting || (_now - _lastInteract) < 160;
+    // 交互时每帧 render，静止时才节流，兼顾流畅与省电
+    const _minInterval = _isInteracting ? 0 : 400;
+    const _lastFb = window._solidFallbackRenderAt || 0;
+    if (_minInterval > 0 && (_now - _lastFb) < _minInterval) return;
+    window._solidFallbackRenderAt = _now;
+    if (renderer) { try { renderer.render(scene, camera); } catch(err) {} if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); }
+    return; }
     const isTesting = window.PerfTester ? window.PerfTester.isTesting : false; if (!isTesting) { if (controls && !controls.enabled) controls.enabled = true; if (controls) controls.update(); }
     // 【统一生命周期总线】：一行代码调度所有插件，彻底解耦
     if (window.PluginManager) { const isInterrupted = window.PluginManager.trigger('onUpdate', { camera, scene, pathTracer, renderer }); if (isInterrupted) return; // 若测试插件要求接管，直接安全 return

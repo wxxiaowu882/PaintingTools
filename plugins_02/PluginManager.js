@@ -1,6 +1,14 @@
 window.PluginManager = { plugins: [], // 【1. 核心状态隔离区 Core.State】统一接管 window.currentEditorMode 等零散状态
     State: { currentMode: 'translate', activePlugin: null }, // 【2. 集中事件路由区 Core.Input】代替 HTML 里的各种 window.addEventListener
-    Input: { init: function() { if (this._initialized) return; window.addEventListener('keydown', e => window.PluginManager.triggerEvent('onKeyDown', e));
+    Input: { init: function() { if (this._initialized) return; window.addEventListener('keydown', e => {
+        // 消费端：禁止任何标注被 Delete/Backspace 删除（统一总闸，避免逐插件打补丁）
+        if (window.__SOLID_CONSUMER__ && (e.key === 'Delete' || e.key === 'Backspace' || e.keyCode === 46 || e.keyCode === 8)) {
+            try { e.preventDefault(); } catch(_e) {}
+            try { e.stopImmediatePropagation(); } catch(_e) { try { e.stopPropagation(); } catch(__e) {} }
+            return true;
+        }
+        return window.PluginManager.triggerEvent('onKeyDown', e);
+    });
     window.addEventListener('keyup', e => window.PluginManager.triggerEvent('onKeyUp', e)); // 我们暂不立刻绑定 pointer 事件，以免与目前 HTML 里的监听直接重复。
     // 待下一步 HTML 瘦身时，我们再开启这里的 pointer 监听。
     this._initialized = true; } }, // 【3. 内存管理池 Core.Memory】统一接管 3D 对象的彻底销毁，杜绝 WebGL 显存泄漏

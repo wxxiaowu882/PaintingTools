@@ -279,6 +279,7 @@ window.AnnotationManager = {
         });
         div.addEventListener('click', e => { e.stopPropagation(); });
         div.addEventListener('dblclick', e => {
+            if (window.__SOLID_CONSUMER__) return;
             e.stopPropagation();
             if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
                 window.PluginManager.setExclusiveSelection(window.AnnotationManager, data.id);

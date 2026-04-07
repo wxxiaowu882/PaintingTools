@@ -5,6 +5,16 @@ window.proberCounter = 0;
 
 window.ProberManager = {
     selectedId: null,
+    getDarkBg: function (hex) {
+        try {
+            if (!hex || !hex.startsWith('#')) return 'rgba(0,0,0,0.65)';
+            let c = hex.replace('#', '');
+            if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+            const r = parseInt(c.substring(0, 2), 16), g = parseInt(c.substring(2, 4), 16), b = parseInt(c.substring(4, 6), 16);
+            if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return 'rgba(0,0,0,0.65)';
+            return `rgba(${(r * 0.2) | 0}, ${(g * 0.2) | 0}, ${(b * 0.2) | 0}, 0.85)`;
+        } catch (_e) { return 'rgba(0,0,0,0.65)'; }
+    },
 
     getToneData: function(angle) {
         if (angle <= 20) return { text: `夹角 ${angle.toFixed(0)}°【亮面/高光】`, color: '#ffffff', bg: 'rgba(15,15,20,0.7)' };
@@ -90,6 +100,9 @@ window.ProberManager = {
         label.style.pointerEvents = 'auto'; label.style.transition = 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
         label.style.cursor = 'pointer';
         label.style.outline = 'none'; // 去掉输入时的外发光框
+        label.style.border = `1px solid ${data.color || '#00ccff'}`;
+        label.style.borderRadius = '2px';
+        label.style.background = window.ProberManager.getDarkBg(data.color || '#00ccff');
         label.innerText = data.text;
         
         const PM = window.ProberManager;
@@ -105,6 +118,7 @@ window.ProberManager = {
 
         // 【核心交互】：双击进入编辑模式
         label.addEventListener('dblclick', e => {
+            if (window.__SOLID_CONSUMER__) return;
             e.stopPropagation();
             label.contentEditable = "true";
             label.focus();
@@ -158,6 +172,7 @@ window.ProberManager = {
             e.stopPropagation();
         });
         hit.addEventListener('dblclick', e => {
+            if (window.__SOLID_CONSUMER__) return;
             e.stopPropagation();
             data.labelVisible = data.labelVisible === false ? true : false;
             if (data.dom && data.dom.label) data.dom.label.style.display = data.labelVisible ? 'block' : 'none';
@@ -344,8 +359,9 @@ window.ProberManager = {
             p.dom.label.style.opacity = '1';
             p.dom.label.style.pointerEvents = 'auto';
             p.dom.label.style.color = tone.color;
-            p.dom.label.style.borderLeftColor = tone.color;
-            p.dom.label.style.background = tone.bg;
+            // 文本框效果与取色一致：边框=自身颜色；背景=自身颜色加深加暗
+            p.dom.label.style.borderColor = p.color || '#00ccff';
+            p.dom.label.style.background = this.getDarkBg(p.color || '#00ccff');
 
             // 【核心文本托管策略】：如果用户没接管，就自动更新定性文本
             if (!p.isCustomText) {
