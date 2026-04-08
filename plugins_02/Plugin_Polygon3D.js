@@ -22,7 +22,7 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     startDrawing: function(targetObj, worldPoint, worldNormal, screenX, screenY) { this.ensureDOM(); window.poly3dCounter++; const id = 'poly3d_' + Date.now() + '_' + window.poly3dCounter;
     // 整个面片只消耗 1 个 3D 锚点
     const anchor = new THREE.Object3D(); targetObj.worldToLocal(anchor.position.copy(worldPoint)); anchor.name = id; anchor.userData.localNormal = targetObj.worldToLocal(worldPoint.clone().add(worldNormal)).sub(anchor.position).normalize();
-    targetObj.add(anchor); const color = document.getElementById('obj-color-picker')?.value || '#2ecc71'; this.activeData = { id: id, anchorObj: anchor, color: color, points: [], // 用于存储相对内部坐标的阵列
+    targetObj.add(anchor); const color = document.getElementById('obj-color-picker')?.value || '#2ecc71'; this.activeData = { id: id, anchorObj: anchor, color: color, detailText: '', points: [], // 用于存储相对内部坐标的阵列
     isOccluded: false, isFinished: false // 【状态修复】：新增绘制完成状态标识
     }; window.poly3dList.push(this.activeData); this.buildDOM(this.activeData); this.isDrawing = true; this.lastDrawX = screenX; this.lastDrawY = screenY; this.addPoint(worldPoint, worldNormal, screenX, screenY);
     if (window.showToast) window.showToast("正在绘制光影面片，松开按键自动闭合..."); }, addPoint: function(worldPoint, worldNormal, screenX, screenY) { if (!this.activeData || !this.activeData.anchorObj.parent) return; // 将世界坐标降维转换为挂载模型的本地坐标系，永远锁死物理关联
@@ -51,6 +51,14 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     const blendPath = document.createElementNS(ns, "polygon"); blendPath.setAttribute("style", (_poly3dIosLike ? "mix-blend-mode: soft-light; -webkit-mix-blend-mode: soft-light;" : "mix-blend-mode: color;") + " pointer-events: none;");
     const strokePath = document.createElementNS(ns, "polygon"); strokePath.setAttribute("fill", "none"); strokePath.setAttribute("stroke-linejoin", "round"); strokePath.setAttribute("stroke-dasharray", "4,4"); strokePath.style.pointerEvents = "none";
     finalGroup.appendChild(hitPath); finalGroup.appendChild(fillPath); finalGroup.appendChild(blendPath); finalGroup.appendChild(strokePath); container.appendChild(finalGroup);     finalGroup.addEventListener('pointerdown', e => {
+    if (window.__SOLID_CONSUMER__) {
+        e.stopPropagation();
+        if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+            if (this.selectedId === data.id) window.PluginManager.setExclusiveSelection(this, null);
+            else window.PluginManager.setExclusiveSelection(this, data.id);
+        }
+        return;
+    }
     /* 【优化2】：移除模式限制；互斥选中由 PluginManager 统一处理 */
     /* 【优化3】：移除 e.stopPropagation()，允许事件冒泡穿透到场景控制器 */
     if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
@@ -91,6 +99,7 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     data.svgStroke.style.display = "block"; data.svgStroke.setAttribute("stroke-width", "2"); data.svgStroke.setAttribute("opacity", finalSvgAlpha * 0.8);
     } else { data.svgStroke.style.display = "none"; } } else { // 遮挡时 finalSvgAlpha 为 0，组整体隐藏
     data.finalGroup.style.display = "none"; } } } } }); }, // --- 标准生命周期与 IO 挂载 ---
+    getDetailText: function(id) { const d = window.poly3dList.find(a => a.id === id); return d ? (d.detailText || '') : ''; },
     onClearScene: function() { this.cancelInteractivePlacing(); window.poly3dList.forEach(data => { if(data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj); if(data.svgGroup) data.svgGroup.remove(); });
     window.poly3dList = []; this.selectedId = null; this.isDrawing = false; this.activeData = null; }, onSaveItemData: function(context) { const polys = this.extractSaveData(context.obj);
     if (polys.length > 0) context.itemData.polygon3ds = polys; }, onSaveGroundData: function(context) { const polys = this.extractSaveData(context.obj); if (polys.length > 0) context.sceneData.groundPolygon3ds = polys; },
@@ -103,7 +112,7 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     const anchorLocalPos = wPos.clone(); obj.worldToLocal(anchorLocalPos);
     let norm = [0,1,0]; if(c.userData.localNormal) { const worldNorm = c.userData.localNormal.clone().transformDirection(c.parent.matrixWorld).normalize(); const objInvMat = new THREE.Matrix4().copy(obj.matrixWorld).invert(); const rootLocalNorm = worldNorm.transformDirection(objInvMat).normalize(); norm = [parseFloat(rootLocalNorm.x.toFixed(3)), parseFloat(rootLocalNorm.y.toFixed(3)), parseFloat(rootLocalNorm.z.toFixed(3))]; }
     const ptsArray = d.points.map(p => { const ptWorld = p.localPos.clone().applyMatrix4(c.parent.matrixWorld); obj.worldToLocal(ptWorld); return [parseFloat(ptWorld.x.toFixed(4)), parseFloat(ptWorld.y.toFixed(4)), parseFloat(ptWorld.z.toFixed(4))]; });
-    polyData.push({ id: d.id, color: d.color, localPos: [parseFloat(anchorLocalPos.x.toFixed(4)), parseFloat(anchorLocalPos.y.toFixed(4)), parseFloat(anchorLocalPos.z.toFixed(4))], localNormal: norm, points: ptsArray });
+    polyData.push({ id: d.id, color: d.color, detailText: d.detailText != null ? String(d.detailText) : '', localPos: [parseFloat(anchorLocalPos.x.toFixed(4)), parseFloat(anchorLocalPos.y.toFixed(4)), parseFloat(anchorLocalPos.z.toFixed(4))], localNormal: norm, points: ptsArray });
     window.hwLog(`[Poly-Extract] 数据全维度映射完成，点数: ${ptsArray.length}`); } else { window.hwLog(`[Poly-Extract] 警告: 找到锚点但 poly3dList 中无对应数据!`); } } }); return polyData; },
     onLoadItem: function(ctx) { if(ctx.itemData.polygon3ds) this.restorePolygons(ctx.obj, ctx.itemData.polygon3ds); }, onLoadGround: function(ctx) {
     if(ctx.sceneData.groundPolygon3ds) this.restorePolygons(ctx.obj, ctx.sceneData.groundPolygon3ds); }, restorePolygons: function(obj, polys) { 
@@ -114,7 +123,7 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     const anchor = new THREE.Object3D(); anchor.position.set(a.localPos[0], a.localPos[1], a.localPos[2]); anchor.name = a.id;
     anchor.userData.localNormal = a.localNormal ? new THREE.Vector3(a.localNormal[0], a.localNormal[1], a.localNormal[2]) : new THREE.Vector3(0,1,0); obj.add(anchor);
     const pts = a.points.map(p => ({ localPos: new THREE.Vector3(p[0], p[1], p[2]) }));
-    const data = { id: a.id, anchorObj: anchor, color: a.color || '#2ecc71', points: pts, isOccluded: false, isFinished: true };
+    const data = { id: a.id, anchorObj: anchor, color: a.color || '#2ecc71', detailText: a.detailText != null ? String(a.detailText) : '', points: pts, isOccluded: false, isFinished: true };
     window.poly3dList.push(data); this.buildDOM(data); window.hwLog(` -> 面片 ${a.id} 已还原到 3D 空间`); }); 
     window.needsUpdate = true; window.lightMoved = true; }, onDrawSnapshot: function(context) { if (!window.poly3dList) return; const ctx = context.ctx, rect = context.rect; const scaleX = 256 / rect.width, scaleY = 256 / rect.height;
     window.poly3dList.forEach(data => { if (data.isOccluded || !data.sPointsStr) return; const ptsArray = data.sPointsStr.trim().split(' '); if (ptsArray.length < 3) return; ctx.beginPath();

@@ -22,8 +22,23 @@ window.AnnotationManager = {
     onGlobalPointerMove: function (context) {
         if (window.currentEditorMode !== 'annotate') return;
         if (this.isPlacing && this.activeData) {
+            const vw = Math.max(1, window.__solidAnnoViewportW || window.innerWidth || 1);
+            const vh = Math.max(1, window.__solidAnnoViewportH || window.innerHeight || 1);
             this.activeData.dx = context.event.clientX - context.startX;
             this.activeData.dy = context.event.clientY - context.startY;
+            this.activeData.dxN = this.activeData.dx / vw;
+            this.activeData.dyN = this.activeData.dy / vh;
+            // 同时记录“跟模型走”的长度：确保 PC/手机形态一致（不随屏幕宽窄变短/变长）
+            try {
+                const cam = this._cachedCamera;
+                if (cam && this.activeData.anchorObj) {
+                    const px = this._pxPerWorldAtAnchor(cam, this.activeData.anchorObj);
+                    if (px && px.pxPerWorldX > 1e-6 && px.pxPerWorldY > 1e-6) {
+                        this.activeData.dxW = this.activeData.dx / px.pxPerWorldX;
+                        this.activeData.dyW = this.activeData.dy / px.pxPerWorldY;
+                    }
+                }
+            } catch (_e) {}
             window.needsUpdate = true;
         }
     },
@@ -109,6 +124,8 @@ window.AnnotationManager = {
             if (!c.name || !c.name.startsWith('anno_')) return;
             const aData = window.annoDataList.find(a => a.id === c.name);
             if (!aData) return;
+            const vw = Math.max(1, window.__solidAnnoViewportW || window.innerWidth || 1);
+            const vh = Math.max(1, window.__solidAnnoViewportH || window.innerHeight || 1);
             let norm = [0, 1, 0];
             if (c.userData.localNormal) {
                 norm = [
@@ -121,9 +138,14 @@ window.AnnotationManager = {
                 id: aData.id,
                 annotationKind: 'leader',
                 text: aData.text,
+                detailText: aData.detailText != null ? String(aData.detailText) : '',
                 color: aData.color,
                 dx: aData.dx,
                 dy: aData.dy,
+                dxN: typeof aData.dxN === 'number' ? parseFloat(aData.dxN.toFixed(6)) : (typeof aData.dx === 'number' ? parseFloat((aData.dx / vw).toFixed(6)) : 0),
+                dyN: typeof aData.dyN === 'number' ? parseFloat(aData.dyN.toFixed(6)) : (typeof aData.dy === 'number' ? parseFloat((aData.dy / vh).toFixed(6)) : 0),
+                dxW: typeof aData.dxW === 'number' ? parseFloat(aData.dxW.toFixed(6)) : undefined,
+                dyW: typeof aData.dyW === 'number' ? parseFloat(aData.dyW.toFixed(6)) : undefined,
                 localPos: [
                     parseFloat(c.position.x.toFixed(4)),
                     parseFloat(c.position.y.toFixed(4)),
@@ -241,7 +263,7 @@ window.AnnotationManager = {
             const color = document.getElementById('obj-color-picker')?.value || '#00d2ff';
             const annoData = {
                 id, targetUUID: targetObj.uuid, anchorObj: anchor,
-                text: '引线 ' + window.annoCounter, color, dx: 0, dy: 0, isOccluded: false
+                text: '引线 ' + window.annoCounter, detailText: '', color, dx: 0, dy: 0, dxN: 0, dyN: 0, dxW: 0, dyW: 0, isOccluded: false
             };
             window.annoDataList.push(annoData);
             this.buildDOM(annoData);
@@ -268,6 +290,16 @@ window.AnnotationManager = {
         div.dataset.color = data.color;
         div.addEventListener('pointerdown', e => {
             e.stopPropagation();
+            if (window.__SOLID_CONSUMER__) {
+                if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+                    if (window.AnnotationManager.selectedId === data.id) {
+                        window.PluginManager.setExclusiveSelection(window.AnnotationManager, null);
+                    } else {
+                        window.PluginManager.setExclusiveSelection(window.AnnotationManager, data.id);
+                    }
+                }
+                return;
+            }
             if (!div.isContentEditable) {
                 if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
                     window.PluginManager.setExclusiveSelection(window.AnnotationManager, data.id);
@@ -320,9 +352,23 @@ window.AnnotationManager = {
             if (!isDragging) return;
             if (Math.abs(e.clientX - startX) > 3 || Math.abs(e.clientY - startY) > 3) isMoved = true;
             if (!isMoved) return;
-            const curS = data.currentScale || 1;
-            data.dx = startDx + (e.clientX - startX) / curS;
-            data.dy = startDy + (e.clientY - startY) / curS;
+            const vw = Math.max(1, window.__solidAnnoViewportW || window.innerWidth || 1);
+            const vh = Math.max(1, window.__solidAnnoViewportH || window.innerHeight || 1);
+            // 这里用“像素拖拽”更符合手感；同时换算出 dxW/dyW 以保证跨端形态一致
+            data.dx = startDx + (e.clientX - startX);
+            data.dy = startDy + (e.clientY - startY);
+            data.dxN = data.dx / vw;
+            data.dyN = data.dy / vh;
+            try {
+                const cam = window.AnnotationManager._cachedCamera;
+                if (cam && data.anchorObj) {
+                    const px = window.AnnotationManager._pxPerWorldAtAnchor(cam, data.anchorObj);
+                    if (px && px.pxPerWorldX > 1e-6 && px.pxPerWorldY > 1e-6) {
+                        data.dxW = data.dx / px.pxPerWorldX;
+                        data.dyW = data.dy / px.pxPerWorldY;
+                    }
+                }
+            } catch (_e) {}
             window.needsUpdate = true;
         };
         const onMouseUp = () => { isDragging = false; };
@@ -357,11 +403,15 @@ window.AnnotationManager = {
 
     updateScreenPositions: function (camera) {
         if (window.annoDataList.length === 0) return;
+        this._cachedCamera = camera;
         if (!this._poolInit) {
             this._tempV = new THREE.Vector3();
             this._normalMatrix = new THREE.Matrix3();
             this._viewDir = new THREE.Vector3();
             this._currentWorldNormal = new THREE.Vector3();
+            this._rightW = new THREE.Vector3();
+            this._upW = new THREE.Vector3();
+            this._scratchW = new THREE.Vector3();
             this._poolInit = true;
         }
         window.annoDataList.forEach(data => {
@@ -392,13 +442,19 @@ window.AnnotationManager = {
             const y = (-(this._tempV.y * 0.5) + 0.5) * window.innerHeight;
             const opacity = isBehind ? '0' : (data.isOccluded ? '0.2' : '1');
             const pointerEvents = (isBehind || data.isOccluded) ? 'none' : 'auto';
-            const scaledDx = data.dx * lineScale;
-            const scaledDy = data.dy * lineScale;
+            // 形态一致：优先用“跟模型走”的长度（dxW/dyW），让 PC/手机看到的相对比例一致
+            const px = this._pxPerWorldAtAnchor(camera, data.anchorObj);
+            const hasWorld = (typeof data.dxW === 'number') || (typeof data.dyW === 'number');
+            const scaledDx = hasWorld && px ? (Number(data.dxW || 0) * px.pxPerWorldX) : ((typeof data.dx === 'number' ? data.dx : 0) * lineScale);
+            const scaledDy = hasWorld && px ? (Number(data.dyW || 0) * px.pxPerWorldY) : ((typeof data.dy === 'number' ? data.dy : 0) * lineScale);
             data.screenX = x;
             data.screenY = y;
             data.scaledDx = scaledDx;
             data.scaledDy = scaledDy;
             data.isBehind = isBehind;
+            // 同步回像素缓存，保证后续拖拽以当前视图为基准
+            data.dx = scaledDx;
+            data.dy = scaledDy;
             if (data.domEl) {
                 data.domEl.style.left = (x + scaledDx) + 'px';
                 data.domEl.style.top = (y + scaledDy) + 'px';
@@ -448,6 +504,12 @@ window.AnnotationManager = {
         this.ensureDOM();
         annos.forEach(a => {
             window.annoCounter++;
+            const vw = Math.max(1, window.__solidAnnoViewportW || window.innerWidth || 1);
+            const vh = Math.max(1, window.__solidAnnoViewportH || window.innerHeight || 1);
+            const _dxN = (typeof a.dxN === 'number') ? a.dxN : null;
+            const _dyN = (typeof a.dyN === 'number') ? a.dyN : null;
+            const _dx = (_dxN !== null) ? (_dxN * vw) : (a.dx || 0);
+            const _dy = (_dyN !== null) ? (_dyN * vh) : (a.dy || 0);
             const anchor = new THREE.Object3D();
             anchor.position.set(a.localPos[0], a.localPos[1], a.localPos[2]);
             anchor.name = a.id;
@@ -457,14 +519,52 @@ window.AnnotationManager = {
             obj.add(anchor);
             const annoData = {
                 id: a.id, targetUUID: obj.uuid, anchorObj: anchor,
-                text: a.text || '引线', color: a.color || '#00d2ff', dx: a.dx, dy: a.dy, isOccluded: false
+                text: a.text || '引线',
+                detailText: a.detailText != null ? String(a.detailText) : '',
+                color: a.color || '#00d2ff',
+                dx: _dx,
+                dy: _dy,
+                dxN: (_dxN !== null) ? _dxN : (typeof _dx === 'number' ? (_dx / vw) : 0),
+                dyN: (_dyN !== null) ? _dyN : (typeof _dy === 'number' ? (_dy / vh) : 0),
+                dxW: (typeof a.dxW === 'number') ? a.dxW : 0,
+                dyW: (typeof a.dyW === 'number') ? a.dyW : 0,
+                isOccluded: false
             };
             if (a.baseDist) annoData.baseDist = a.baseDist;
             if (a.baseScale) annoData.baseScale = a.baseScale;
             window.annoDataList.push(annoData);
             this.buildDOM(annoData);
         });
+    },
+
+    getDetailText: function (id) {
+        const data = window.annoDataList.find(a => a.id === id);
+        return data ? (data.detailText || '') : '';
     }
+};
+
+// 以锚点处的“1个世界单位”换算成多少像素：用于让引线长度跟模型保持一致
+window.AnnotationManager._pxPerWorldAtAnchor = function(camera, anchorObj) {
+    try {
+        if (!camera || !anchorObj) return null;
+        if (!this._scratchW) this._scratchW = new THREE.Vector3();
+        if (!this._rightW) this._rightW = new THREE.Vector3();
+        if (!this._upW) this._upW = new THREE.Vector3();
+        const p0 = this._tempV || new THREE.Vector3();
+        anchorObj.getWorldPosition(p0);
+        this._rightW.set(1, 0, 0).applyQuaternion(camera.quaternion).normalize();
+        this._upW.set(0, 1, 0).applyQuaternion(camera.quaternion).normalize();
+        const toPx = (w) => {
+            const v = this._scratchW.copy(w).project(camera);
+            return { x: (v.x * 0.5 + 0.5) * window.innerWidth, y: (-(v.y * 0.5) + 0.5) * window.innerHeight };
+        };
+        const a = toPx(p0);
+        const b = toPx(p0.clone().add(this._rightW));
+        const c = toPx(p0.clone().add(this._upW));
+        const pxPerWorldX = Math.max(1e-6, Math.hypot(b.x - a.x, b.y - a.y));
+        const pxPerWorldY = Math.max(1e-6, Math.hypot(c.x - a.x, c.y - a.y));
+        return { pxPerWorldX, pxPerWorldY };
+    } catch (_e) { return null; }
 };
 
 window.addEventListener('keydown', e => {

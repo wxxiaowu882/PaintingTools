@@ -107,6 +107,14 @@ window.ProberManager = {
         
         const PM = window.ProberManager;
         label.addEventListener('pointerdown', e => {
+            if (window.__SOLID_CONSUMER__) {
+                if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+                    if (PM.selectedId === data.id) window.PluginManager.setExclusiveSelection(PM, null);
+                    else window.PluginManager.setExclusiveSelection(PM, data.id);
+                }
+                e.stopPropagation();
+                return;
+            }
             if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
                 window.PluginManager.setExclusiveSelection(PM, data.id);
             } else {
@@ -163,6 +171,14 @@ window.ProberManager = {
         hit.style.transformOrigin = '0 50%';
         hit.style.zIndex = '54';
         hit.addEventListener('pointerdown', e => {
+            if (window.__SOLID_CONSUMER__) {
+                if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+                    if (PM.selectedId === data.id) window.PluginManager.setExclusiveSelection(PM, null);
+                    else window.PluginManager.setExclusiveSelection(PM, data.id);
+                }
+                e.stopPropagation();
+                return;
+            }
             if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
                 window.PluginManager.setExclusiveSelection(PM, data.id);
             } else {
@@ -242,6 +258,7 @@ window.ProberManager = {
             targetUUID: context.targetObj.uuid,
             anchorObj: anchor,
             text: '分析中...',
+            detailText: '',
             isCustomText: false, // 初始化为系统托管状态
             labelVisible: true,
             color: document.getElementById('obj-color-picker')?.value || '#00ccff', 
@@ -506,6 +523,7 @@ window.ProberManager = {
                         id: pData.id,
                         color: pData.color,
                         text: pData.text, // 序列化自定义文本
+                        detailText: pData.detailText != null ? String(pData.detailText) : '',
                         isCustomText: pData.isCustomText, // 序列化接管状态
                         labelVisible: pData.labelVisible !== false,
                         localPos: [parseFloat(c.position.x.toFixed(4)), parseFloat(c.position.y.toFixed(4)), parseFloat(c.position.z.toFixed(4))],
@@ -540,6 +558,7 @@ window.ProberManager = {
                 targetUUID: obj.uuid,
                 anchorObj: anchor,
                 text: a.text || '分析中...',
+                detailText: a.detailText != null ? String(a.detailText) : '',
                 isCustomText: a.isCustomText || false,
                 labelVisible: a.labelVisible !== false,
                 color: a.color || '#00ccff',
@@ -589,6 +608,11 @@ window.ProberManager = {
             ctx.arc(sStart.x, sStart.y, 2, 0, Math.PI*2);
             ctx.fill();
         });
+    },
+
+    getDetailText: function(id) {
+        const d = window.proberList.find(a => a.id === id);
+        return d ? (d.detailText || '') : '';
     },
 
     onClearScene: function() {

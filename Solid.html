@@ -36,10 +36,28 @@
     .scene-thumb { width:100%; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; background:#111; flex-shrink:0; }
     .scene-name { padding:10px 8px; font-size:11px; text-align:center; color:#ddd; font-weight:300; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .scene-item.active::after { content:''; position:absolute; inset:0; border:2px solid #2ecc71; border-radius:10px; pointer-events:none; }
-    /* 消费端专属：强制禁用所有标注的交互，变为纯展示模式 */
-    .anno-dom, .anno-leader-label, .anno-cs-label, .prober-label, .norm-arrow-label { pointer-events: none !important; cursor: default !important; user-select: none !important; }
-    #norm-arrow-layer * { pointer-events: none !important; cursor: default !important; }
-    #poly3d-layer * { pointer-events: none !important; cursor: default !important; } /* 强制禁用光影面片的点击响应 */ 
+    /* 消费端默认：禁用标注命中；html.solid-anno-clickable 下由插件内联样式控制遮挡与命中 */
+    html:not(.solid-anno-clickable) .anno-dom, html:not(.solid-anno-clickable) .anno-leader-label, html:not(.solid-anno-clickable) .anno-cs-label, html:not(.solid-anno-clickable) .prober-label, html:not(.solid-anno-clickable) .norm-arrow-label, html:not(.solid-anno-clickable) .dashed-line-dom { pointer-events: none !important; cursor: default !important; user-select: none !important; }
+    html:not(.solid-anno-clickable) #norm-arrow-layer * { pointer-events: none !important; cursor: default !important; }
+    html:not(.solid-anno-clickable) #poly3d-layer * { pointer-events: none !important; cursor: default !important; }
+    html:not(.solid-anno-clickable) #dashed-line-layer svg *, html:not(.solid-anno-clickable) #dashed-line-layer .dashed-line-dom { pointer-events: none !important; cursor: default !important; }
+    /* 标注层须高于底栏主控 (z-index:100)，否则手机端触控被面板挡住；仍低于左上角/汉堡 (5000+) */
+    html.solid-anno-clickable #anno-layer,
+    html.solid-anno-clickable #anno-cs-layer,
+    html.solid-anno-clickable #norm-arrow-layer,
+    html.solid-anno-clickable #poly3d-layer,
+    html.solid-anno-clickable #prober-html-layer,
+    html.solid-anno-clickable #dashed-line-layer { z-index: 4800 !important; }
+    /* 底栏 z-index:100 会盖住画布区域；poly3d 须在 canvas-container 内。父级不拦截，仅顶栏条与展开内容区接收触控 */
+    html.solid-anno-clickable #main-panel { pointer-events: none; }
+    html.solid-anno-clickable #main-panel > div:nth-child(3),
+    html.solid-anno-clickable #main-panel > .panel-content { pointer-events: auto; }
+    /* 说明条：叠在标注之上、顶栏之下；弱对比、小字号、少「弹窗」感；沉浸模式不隐藏（仅顶栏/底栏淡出） */
+    #solid-anno-detail-panel { position: fixed; left: 50%; top: max(56px, env(safe-area-inset-top, 0px) + 48px); transform: translateX(-50%); max-width: min(88vw, 360px); width: 100%; z-index: 4850; pointer-events: none; opacity: 0; transition: opacity 0.3s ease; }
+    #solid-anno-detail-panel.solid-anno-detail-visible { opacity: 1; pointer-events: auto; }
+    #solid-anno-detail-panel .solid-anno-detail-inner { position: relative; margin: 0; padding: 6px 26px 8px 10px; background: transparent; border: none; border-radius: 0; box-shadow: none; font-size: 10px; line-height: 1.5; font-weight: 300; letter-spacing: 0.02em; }
+    #solid-anno-detail-panel .solid-anno-detail-close { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; padding: 0; margin: 0; cursor: pointer; border: none; border-radius: 4px; background: rgba(0,0,0,0.25); color: rgba(255,255,255,0.35); font-size: 14px; line-height: 22px; text-align: center; -webkit-tap-highlight-color: transparent; }
+    #solid-anno-detail-panel .solid-anno-detail-body { white-space: pre-wrap; word-break: break-word; max-height: min(32vh, 180px); overflow-y: auto; color: rgba(175,178,186,0.88); text-shadow: 0 1px 2px rgba(0,0,0,0.75); -webkit-font-smoothing: antialiased; }
     
     /* 沉浸模式：10s无交互隐藏顶部/底部UI */
     #top-left-scene-btn, #menu-trigger-overlay, #main-panel { transition: opacity 0.4s cubic-bezier(0.4,0,0.2,1); }
@@ -70,6 +88,7 @@
     import './plugins_02/Plugin_NormalArrow.js'; // 同步接入法线箭头插件
     import './plugins_02/Plugin_Polygon3D.js'; // 同步接入面片光影插件
     import './plugins_02/Plugin_Prober.js'; // ⚡ 同步接入全新的受光探针插件
+    import './plugins_02/Plugin_DashedLine.js'; // 虚线连续标注（与生产端 JSON 一致）
     import './plugins_02/Plugin_Atmosphere.js'; // ☁️ 同步接入大气透视插件
     import './plugins_02/Plugin_DepthOfField.js'; // 📷 同步接入景深虚实插件
     window.skyEnvLightMatchMainRect = true;
@@ -258,13 +277,65 @@
     window.toggleWall = function() { window.hasWall = !window.hasWall; const btn = document.getElementById('wall-btn'); const wchk = document.getElementById('wall-btn-checkbox'); if (wchk) wchk.checked = !!window.hasWall; if (btn) { btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; } setTimeout(() => { buildEnvironment(); lightMoved = true; }, 100); };
     // 消费端标记：插件在该标记下禁用编辑/显隐切换
     window.__SOLID_CONSUMER__ = true;
+    try { document.documentElement.classList.add('solid-anno-clickable'); } catch (_e) {}
     window.showAnnotations = true;
+    window.SolidAnnotationDetail = {
+        _panel: null,
+        _bodyEl: null,
+        _lastOwner: null,
+        _lastId: null,
+        init: function() {
+            if (this._panel) return;
+            const el = document.createElement('div');
+            el.id = 'solid-anno-detail-panel';
+            el.setAttribute('aria-live', 'polite');
+            el.innerHTML = '<div class="solid-anno-detail-inner"><button type="button" class="solid-anno-detail-close" aria-label="关闭">×</button><div class="solid-anno-detail-body"></div></div>';
+            document.body.appendChild(el);
+            this._panel = el;
+            this._bodyEl = el.querySelector('.solid-anno-detail-body');
+            const btn = el.querySelector('.solid-anno-detail-close');
+            if (btn) btn.addEventListener('click', function() { window.SolidAnnotationDetail.close(); });
+            el.addEventListener('pointerdown', function(e) {
+                e.stopPropagation();
+                try { if (typeof window.resetImmersiveTimer === 'function') window.resetImmersiveTimer(); } catch (_t) {}
+            });
+        },
+        syncFromSelection: function(owner, id, text) {
+            this.init();
+            this._lastOwner = owner || null;
+            this._lastId = id;
+            const t = (text != null && String(text).trim() !== '') ? String(text) : '';
+            if (id == null || !t) {
+                this.clear();
+                return;
+            }
+            if (this._bodyEl) this._bodyEl.textContent = t;
+            this._panel.classList.add('solid-anno-detail-visible');
+        },
+        clear: function() {
+            this._lastOwner = null;
+            this._lastId = null;
+            if (this._panel) this._panel.classList.remove('solid-anno-detail-visible');
+            if (this._bodyEl) this._bodyEl.textContent = '';
+        },
+        close: function() {
+            if (window.PluginManager && typeof window.PluginManager.clearAllSelections === 'function') {
+                window.PluginManager.clearAllSelections();
+            } else {
+                this.clear();
+            }
+        },
+        clearForAnnotationsOff: function() {
+            this.clear();
+        }
+    };
     /** 与 Plugin_Annotation / ColorSample / NormalArrow / Prober / Polygon3D 等序列化字段对齐，用于判断是否展示「小眼睛」 */
     window.sceneJsonHasOverlayAnnotations = function(sceneData) {
         if (!sceneData || typeof sceneData !== 'object') return false;
         const ne = function(a) { return Array.isArray(a) && a.length > 0; };
         if (ne(sceneData.groundAnnotations) || ne(sceneData.groundColorSampleAnnotations)
-            || ne(sceneData.groundNormArrows) || ne(sceneData.groundProbers) || ne(sceneData.groundPolygon3ds))
+            || ne(sceneData.groundNormArrows) || ne(sceneData.groundProbers) || ne(sceneData.groundPolygon3ds)
+            || ne(sceneData.groundDashedLines))
             return true;
         const items = sceneData.items;
         if (!Array.isArray(items)) return false;
@@ -272,7 +343,7 @@
             const it = items[i];
             if (!it || typeof it !== 'object') continue;
             if (ne(it.annotations) || ne(it.colorSampleAnnotations) || ne(it.normalArrows) || ne(it.normArrows)
-                || ne(it.probers) || ne(it.polygon3ds))
+                || ne(it.probers) || ne(it.polygon3ds) || ne(it.dashedLines))
                 return true;
         }
         return false;
@@ -317,6 +388,10 @@
         window.showAnnotations = !window.showAnnotations;
         syncAnnoEyeButton();
         applySolidAnnotationOverlayLayers(window.showAnnotations);
+        if (!window.showAnnotations) {
+            if (window.PluginManager && typeof window.PluginManager.clearAllSelections === 'function') window.PluginManager.clearAllSelections();
+            else if (window.SolidAnnotationDetail && typeof window.SolidAnnotationDetail.clearForAnnotationsOff === 'function') window.SolidAnnotationDetail.clearForAnnotationsOff();
+        }
     };
     document.addEventListener('click', () => { document.querySelectorAll('.custom-options').forEach(el => el.classList.remove('show')); });
     window.solidPathTraceUiBlocksSample = function() { const m = document.getElementById('scene-grid-modal'); const modalOpen = m && (m.style.display === 'flex' || (typeof getComputedStyle === 'function' && getComputedStyle(m).display === 'flex')); const go = document.getElementById('global-menu-overlay'); const menuOpen = (typeof location !== 'undefined' && location.hash === '#menu') || (go && go.classList.contains('active')); return !!(modalOpen || menuOpen); };
@@ -447,6 +522,22 @@
     const item = document.createElement('div'); item.className = 'scene-item'; item.onclick = () => { window.switchScene(idx); window.closeSceneGridModal(); }; item.innerHTML = `<img src="${sceneData.thumbnail || ''}" class="scene-thumb" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\'/%3E'"><div class="scene-name">${sceneData.name || '未命名场景'}</div>`;
     container.appendChild(item); }); }
     function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); lightMoved = true; if(window.AtmosphereManager) window.AtmosphereManager.resize(renderer); if (typeof window.syncPosterize2dLayout === 'function') window.syncPosterize2dLayout(); }
+
+    // 统一“引线长度”口径：以实际画布大小为准（解决生产端/消费端、PC/手机比例不一致）
+    window.__solidSyncAnnoViewport = function() {
+        try {
+            const c = document.getElementById('canvas-container');
+            const cv = c ? c.querySelector('canvas:not(#posterize-2d-overlay)') : null;
+            const rect = cv ? cv.getBoundingClientRect() : (c ? c.getBoundingClientRect() : null);
+            const w = rect ? rect.width : window.innerWidth;
+            const h = rect ? rect.height : window.innerHeight;
+            window.__solidAnnoViewportW = Math.max(1, Math.round(w || 1));
+            window.__solidAnnoViewportH = Math.max(1, Math.round(h || 1));
+        } catch (_e) {
+            window.__solidAnnoViewportW = Math.max(1, Math.round(window.innerWidth || 1));
+            window.__solidAnnoViewportH = Math.max(1, Math.round(window.innerHeight || 1));
+        }
+    };
     function init() { const container = document.getElementById('canvas-container'); addHwLog("系统初始化开始..."); try { try { window.hwLog("[Init] 尝试实例化最高精度 WebGLRenderer...");
     renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: true }); } catch(err1) {
     window.hwLog(`[Init] 高精度实例化异常 (${err1.message})，降级为基础实例...`); renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true }); }
@@ -457,6 +548,7 @@
     renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.2) : Math.min(window.devicePixelRatio, 1.5)); renderer.setSize(window.innerWidth, window.innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = _solidPt.toneMappingExposureBase;
     RectAreaLightUniformsLib.init();
     container.appendChild(renderer.domElement);
+    if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport();
     } catch (e) { window.hwLog("[Init] 发生致命级初始化异常: " + e.message); triggerUnsupported(); return; }
     requestAnimationFrame(() => { try { window.hwLog("[Init] 推迟一帧再启动光追（先让加载层绘制，略缩短首屏等待）");
     try { window.hwLog("[Init] 准备实例化 WebGLPathTracer...");
@@ -509,7 +601,7 @@
     const wchk = document.getElementById('wall-btn-checkbox'); if (wchk) wchk.checked = !!window.hasWall;
     if (window.SkyEnvLight && window.SkyEnvLight.syncUI) window.SkyEnvLight.syncUI(); };
     buildEnvironment(); window.syncEnvColorPickers();
-    setupUIControls(); window.addEventListener('resize', onWindowResize); setLoaderText("首次加载，硬件检测中…");
+    setupUIControls(); window.addEventListener('resize', function() { onWindowResize(); if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); }); setLoaderText("首次加载，硬件检测中…");
     startSolidPerfHardwareProgress(isMobile); window.PerfTester.onProgress = function (ph) { applySolidPerfHardwarePhase(ph); };
     document.getElementById('perf-test-overlay').style.display = 'flex'; // 【架构重构】：将耗时极高的性能测试交由独立插件管理，释放主线程
     window.PerfTester.start(scene, camera, pathTracer, isMobile, () => { // 测试成功后的回调（原有的通过逻辑）

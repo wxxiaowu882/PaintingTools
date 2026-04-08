@@ -11,7 +11,7 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
     if (data.svgPath) data.svgPath.setAttribute("stroke", data.color); if (data.svgGlowPath) data.svgGlowPath.setAttribute("stroke", data.color); window.needsUpdate = true; } } }); } } },
     startLine: function(anchorParent, worldPos, worldNormal) { this.ensureDOM(); this.isDrawing = true; const id = 'dash_line_' + Date.now(); const anchorObj = new THREE.Object3D(); anchorObj.name = id;
     anchorParent.add(anchorObj); // 绑定唯一基站到模型，极大降低 DOM 树深度
-    const data = { id: id, anchorObj: anchorObj, color: '#00d2ff', text: "线段 " + (++window.dashedLineCounter), points: [], // 纯内存数据阵列: { localPos, localNormal }
+    const data = { id: id, anchorObj: anchorObj, color: '#00d2ff', text: "线段 " + (++window.dashedLineCounter), detailText: '', points: [], // 纯内存数据阵列: { localPos, localNormal }
     midIndex: 0, isOccluded: false, lastDStr: '' }; this.currentLine = data; window.dashedLineList.push(data); this._lastAddPos.copy(worldPos); this.addPoint(worldPos, worldNormal, true); this.buildSVG(data);
     return data; }, addPoint: function(worldPos, worldNormal, force = false) { if (!this.isDrawing || !this.currentLine || !this.currentLine.anchorObj) return; // 【距离检测防刷屏】：世界距离大于 0.015 (1.5厘米) 才记录，防止点位过于密集挤爆内存
     if (!force && this._lastAddPos.distanceTo(worldPos) < 0.015) return; this._lastAddPos.copy(worldPos); const localPos = this.currentLine.anchorObj.worldToLocal(worldPos.clone()); this.currentLine.points.push({ localPos: localPos,
@@ -29,6 +29,13 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
     hitPath.setAttribute("stroke-width", "20"); hitPath.style.pointerEvents = "auto"; hitPath.style.cursor = "pointer";
     hitPath.addEventListener('pointerdown', e => { e.stopPropagation();
     if (window.currentEditorMode === 'annotate' || window.currentEditorMode === 'normal-arrow' || window.currentEditorMode === 'dashed-line') return;
+    if (window.__SOLID_CONSUMER__) {
+        if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+            if (this.selectedId === data.id) window.PluginManager.setExclusiveSelection(this, null);
+            else window.PluginManager.setExclusiveSelection(this, data.id);
+        }
+        return;
+    }
     if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') { window.PluginManager.setExclusiveSelection(this, data.id); }
     else { this.selectedId = data.id; this.highlightSelected(); }
     const picker = document.getElementById('obj-color-picker'); if(picker) picker.value = data.color; }); svg.appendChild(glowPath); data.svgGlowPath = glowPath; svg.appendChild(path); data.svgPath = path;
@@ -41,6 +48,13 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
                 transform: translate(-50%, -50%); display: none;
             `; dom.innerText = data.text; dom.dataset.color = data.color;
     dom.addEventListener('pointerdown', e => { e.stopPropagation();
+    if (window.__SOLID_CONSUMER__) {
+        if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+            if (this.selectedId === data.id) window.PluginManager.setExclusiveSelection(this, null);
+            else window.PluginManager.setExclusiveSelection(this, data.id);
+        }
+        return;
+    }
     if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') { window.PluginManager.setExclusiveSelection(this, data.id); }
     else { this.selectedId = data.id; this.highlightSelected(); }
     const picker = document.getElementById('obj-color-picker'); if(picker) picker.value = data.color; }); layer.appendChild(dom); data.domEl = dom; }, highlightSelected: function() {
@@ -68,10 +82,56 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
     if (data.domEl) { if (midVisible) { data.domEl.style.display = 'block'; data.domEl.style.left = midX + 'px'; data.domEl.style.top = (midY - 15) + 'px'; } else {
     data.domEl.style.display = 'none'; } } }); }, clearAll: function() { window.dashedLineList.forEach(data => { if(data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj);
     if(data.domEl) data.domEl.remove(); }); window.dashedLineList = []; const svg = document.getElementById('dashed-line-svg'); if(svg) svg.innerHTML = ''; this.selectedId = null; },
-    restoreLines: function(parentObj, lines) { if (!lines) return; this.ensureDOM(); lines.forEach(line => { const id = line.id || ('dash_line_' + Date.now() + Math.random()); const anchorObj = new THREE.Object3D();
-    anchorObj.name = id; parentObj.add(anchorObj); const data = { id: id, anchorObj: anchorObj, color: line.color || '#00d2ff', text: line.text || "线段", points: line.points.map(p => ({
-    localPos: new THREE.Vector3(p.pos[0], p.pos[1], p.pos[2]), localNormal: new THREE.Vector3(p.norm[0], p.norm[1], p.norm[2]) })), midIndex: Math.floor(line.points.length / 2), isOccluded: false, lastDStr: '' };
-    window.dashedLineList.push(data); this.buildSVG(data); this.buildDOM(data); }); } }; // 挂载到主引擎
+    onClearScene: function() { this.clearAll(); },
+    extractSaveData: function(obj) {
+        const lines = [];
+        if (!obj) return lines;
+        obj.updateMatrixWorld(true);
+        obj.traverse(ch => {
+            if (!ch.name || !ch.name.startsWith('dash_line_')) return;
+            const d = window.dashedLineList.find(a => a.id === ch.name);
+            if (!d || !d.points || d.points.length < 2) return;
+            const pts = d.points.map(p => ({
+                pos: [parseFloat(p.localPos.x.toFixed(4)), parseFloat(p.localPos.y.toFixed(4)), parseFloat(p.localPos.z.toFixed(4))],
+                norm: [parseFloat(p.localNormal.x.toFixed(3)), parseFloat(p.localNormal.y.toFixed(3)), parseFloat(p.localNormal.z.toFixed(3))]
+            }));
+            lines.push({ id: d.id, color: d.color, text: d.text != null ? String(d.text) : '', detailText: d.detailText != null ? String(d.detailText) : '', points: pts });
+        });
+        return lines;
+    },
+    onSaveItemData: function(context) { const lines = this.extractSaveData(context.obj); if (lines.length > 0) context.itemData.dashedLines = lines; },
+    onSaveGroundData: function(context) { const lines = this.extractSaveData(context.obj); if (lines.length > 0) context.sceneData.groundDashedLines = lines; },
+    onLoadItem: function(ctx) { if (ctx.itemData.dashedLines) this.restoreLines(ctx.obj, ctx.itemData.dashedLines); },
+    onLoadGround: function(ctx) { if (ctx.sceneData.groundDashedLines) this.restoreLines(ctx.obj, ctx.sceneData.groundDashedLines); },
+    getDetailText: function(id) { const d = window.dashedLineList.find(a => a.id === id); return d ? (d.detailText || '') : ''; },
+    restoreLines: function(parentObj, lines) {
+        if (!lines || !lines.length) return;
+        this.ensureDOM();
+        lines.forEach(line => {
+            if (!line.points || line.points.length < 2) return;
+            const id = line.id || ('dash_line_' + Date.now() + Math.random());
+            const anchorObj = new THREE.Object3D();
+            anchorObj.name = id;
+            parentObj.add(anchorObj);
+            const data = {
+                id: id,
+                anchorObj: anchorObj,
+                color: line.color || '#00d2ff',
+                text: line.text != null ? String(line.text) : '线段',
+                detailText: line.detailText != null ? String(line.detailText) : '',
+                points: line.points.map(p => ({
+                    localPos: new THREE.Vector3(p.pos[0], p.pos[1], p.pos[2]),
+                    localNormal: new THREE.Vector3(p.norm[0], p.norm[1], p.norm[2])
+                })),
+                midIndex: Math.floor(line.points.length / 2),
+                isOccluded: false,
+                lastDStr: ''
+            };
+            window.dashedLineList.push(data);
+            this.buildSVG(data);
+            this.buildDOM(data);
+        });
+    } }; // 挂载到主引擎
     if (window.PluginManager) { window.PluginManager.register('DashedLine', window.DashedLineManager); }
     window.DashedLineManager.onUpdate = function(context) { if (window.showAnnotations !== false && context.camera) { this.updateScreenPositions(context.camera); const layer = document.getElementById('dashed-line-layer');
     if (layer) layer.style.display = 'block'; } else { const layer = document.getElementById('dashed-line-layer'); if (layer) layer.style.display = 'none'; } };

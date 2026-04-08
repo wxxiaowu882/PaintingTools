@@ -42,6 +42,15 @@ window.PluginManager = { plugins: [], // 【1. 核心状态隔离区 Core.State�
         if (window.hwLog) window.hwLog(`[Core] 模式已切换为: ${mode}`);
     },
 
+    _syncSolidConsumerDetail: function(ownerInstance, id) {
+        if (!window.__SOLID_CONSUMER__ || !window.SolidAnnotationDetail || typeof window.SolidAnnotationDetail.syncFromSelection !== 'function') return;
+        let text = '';
+        if (id != null && ownerInstance && typeof ownerInstance.getDetailText === 'function') {
+            try { text = ownerInstance.getDetailText(id) || ''; } catch (_e) {}
+        }
+        try { window.SolidAnnotationDetail.syncFromSelection(ownerInstance, id, text); } catch (_e2) {}
+    },
+
     /** 互斥选中：清空其它已注册且带 selectedId 的插件，再让 owner 选中 id（可为 null）。新增可选中插件时无需再枚举其它 Manager。 */
     setExclusiveSelection: function(ownerInstance, id) {
         if (!ownerInstance || ownerInstance.selectedId === undefined) return;
@@ -54,6 +63,7 @@ window.PluginManager = { plugins: [], // 【1. 核心状态隔离区 Core.State�
         ownerInstance.selectedId = id;
         if (typeof ownerInstance.highlightSelected === 'function') ownerInstance.highlightSelected();
         if (window.needsUpdate !== undefined) window.needsUpdate = true;
+        this._syncSolidConsumerDetail(ownerInstance, id);
     },
     
     // 【新增】统一的全局标注反选接口。彻底解耦，由主程序统一调用。
@@ -69,5 +79,8 @@ window.PluginManager = { plugins: [], // 【1. 核心状态隔离区 Core.State�
             }
         });
         if (cleared && window.needsUpdate !== undefined) window.needsUpdate = true;
+        if (window.__SOLID_CONSUMER__ && window.SolidAnnotationDetail && typeof window.SolidAnnotationDetail.clear === 'function') {
+            try { window.SolidAnnotationDetail.clear(); } catch (_e) {}
+        }
     }
 };
