@@ -29,13 +29,60 @@
     #scene-grid-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9000; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); flex-direction:column; padding:30px 20px; }
     .modal-header { display:flex; justify-content:space-between; align-items:center; color:#fff; margin-bottom:20px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.1); }
     .modal-title { font-size:16px; font-weight:300; letter-spacing:2px; }
-    .modal-close { cursor:pointer; padding:5px 10px; background:rgba(255,255,255,0.1); border-radius:6px; font-size:12px; position:relative; z-index:9001; pointer-events:auto; }
+    .modal-close { cursor:pointer; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.08); border-radius:10px; font-size:18px; line-height:32px; position:relative; z-index:9001; pointer-events:auto; color:rgba(255,255,255,0.7); user-select:none; }
+    .modal-close:hover { background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.9); }
     .scene-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows:max-content; gap:15px; overflow-y:auto; flex:1; align-content:start; padding-bottom:30px; min-height:0; -webkit-overflow-scrolling:touch; }
     .scene-item { background:rgba(20,20,20,0.8); border:1px solid rgba(255,255,255,0.05); border-radius:10px; cursor:pointer; transition:all 0.3s cubic-bezier(0.4,0,0.2,1); overflow:hidden; position:relative; display:flex; flex-direction:column; box-shadow:0 4px 15px rgba(0,0,0,0.5); align-self:start; }
     .scene-item:hover, .scene-item.active { border-color:#fff; background:rgba(40,40,40,1); transform:translateY(-2px); box-shadow:0 8px 25px rgba(0,0,0,0.8); }
     .scene-thumb { width:100%; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; background:#111; flex-shrink:0; }
     .scene-name { padding:10px 8px; font-size:11px; text-align:center; color:#ddd; font-weight:300; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .scene-item.active::after { content:''; position:absolute; inset:0; border:2px solid #2ecc71; border-radius:10px; pointer-events:none; }
+    /* 场景选择：左图右文列表（v2，demo/新数据用） */
+    html.solid-scene-list-v2 .scene-grid { display:flex; flex-direction:column; gap:10px; padding-top:2px; }
+    html.solid-scene-list-v2 .scene-item { display:flex; flex-direction:row; align-items:flex-start; gap:12px; padding:10px; }
+    /* 手机端略加大缩略图 */
+    html.solid-scene-list-v2 .scene-thumb { width:132px; height:132px; aspect-ratio:auto; border-radius:10px; opacity:0.95; background:#111; }
+    .scene-meta { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; padding:0; }
+    .scene-title { font-size:13px; font-weight:300; color:rgba(255,255,255,0.92); letter-spacing:0.06em; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .scene-detail { font-size:11px; color:rgba(175,178,186,0.92); line-height:1.55; white-space:normal; word-break:break-word; }
+    .scene-detail b { color:rgba(255,255,255,0.92); font-weight:500; }
+    .scene-fav-btn { width:28px; height:28px; flex:none; display:inline-flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.35); cursor:pointer; user-select:none; -webkit-tap-highlight-color: transparent; }
+    .scene-fav-btn:hover { background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.55); }
+    .scene-fav-btn.is-fav { background:rgba(46, 204, 113, 0.16); border-color:rgba(46, 204, 113, 0.35); color:rgba(46, 204, 113, 0.95); }
+    .scene-fav-btn:active { transform: translateY(1px); }
+    .scene-tabbar { display:flex; gap:8px; margin: 0 0 12px 0; }
+    .scene-tab { flex:none; display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.55); font-size:11px; cursor:pointer; user-select:none; }
+    .scene-tab:hover { background:rgba(255,255,255,0.08); }
+    .scene-tab.active { background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.90); border-color:rgba(255,255,255,0.16); }
+    .scene-empty { padding:18px 10px; color:rgba(255,255,255,0.45); font-size:11px; line-height:1.6; text-align:center; border:1px dashed rgba(255,255,255,0.10); border-radius:12px; }
+
+    /* v2：避免卡片上移导致顶部描边被遮挡 */
+    html.solid-scene-list-v2 .scene-item:hover,
+    html.solid-scene-list-v2 .scene-item.active { transform:none; }
+    html.solid-scene-list-v2 .scene-item.active::after { inset:1px; }
+
+    /* PC 端：两列居中 + 字号稍大 + 缩略图更大 */
+    @media (min-width: 900px) {
+      html.solid-scene-list-v2 .scene-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(620px, 1fr));
+        gap: 14px;
+        max-width: 1440px;
+        margin: 0 auto;
+      }
+      /* 单列卡片宽度：占列宽 90%，居中对齐 */
+      html.solid-scene-list-v2 .scene-item { padding: 12px; width: 90%; margin: 0 auto; }
+      html.solid-scene-list-v2 .scene-thumb { width:200px; height:200px; }
+      html.solid-scene-list-v2 .scene-title { font-size:14px; }
+      html.solid-scene-list-v2 .scene-detail { font-size:12px; }
+      html.solid-scene-list-v2 .scene-empty { font-size:13px; }
+      .scene-fav-btn { width:30px; height:30px; }
+    }
+
+    /* 写生练习模式提示（隐藏标注后触发）：贴近控制面板上方，柔和渐显/渐隐 */
+    #solid-sketch-toast { position: fixed; left: 50%; bottom: 168px; transform: translateX(-50%) translateY(10px); z-index: 7000; pointer-events: none; opacity: 0; transition: opacity 0.65s ease, transform 0.65s ease; max-width: min(88vw, 420px); }
+    #solid-sketch-toast.solid-toast-visible { opacity: 1; transform: translateX(-50%) translateY(0px); }
+    #solid-sketch-toast .solid-toast-inner { background: rgba(0,0,0,0.26); border: 1px solid rgba(255,255,255,0.10); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 999px; padding: 10px 14px; color: rgba(255,255,255,0.80); font-size: 11px; letter-spacing: 0.10em; font-weight: 300; text-align: center; }
     /* 消费端默认：禁用标注命中；html.solid-anno-clickable 下由插件内联样式控制遮挡与命中 */
     html:not(.solid-anno-clickable) .anno-dom, html:not(.solid-anno-clickable) .anno-leader-label, html:not(.solid-anno-clickable) .anno-cs-label, html:not(.solid-anno-clickable) .prober-label, html:not(.solid-anno-clickable) .norm-arrow-label, html:not(.solid-anno-clickable) .dashed-line-dom { pointer-events: none !important; cursor: default !important; user-select: none !important; }
     html:not(.solid-anno-clickable) #norm-arrow-layer * { pointer-events: none !important; cursor: default !important; }
@@ -79,7 +126,7 @@
     <span id="scene-trigger-top" style="color:#fff; font-size:14px; font-weight:normal; max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">点击选择...</span> <span style="color:#666; font-size:10px;">▼</span> </div>
     <div id="menu-trigger-overlay" onclick="toggleMenu()"><span class="menu-line line-1"></span><span class="menu-line line-2"></span><span class="menu-line line-3"></span></div>
     <div id="scene-grid-modal">
-    <div class="modal-header"> <span class="modal-title">学习场景</span> <span class="modal-close" onclick="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()" ontouchstart="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()">关闭 ✕</span> </div>
+    <div class="modal-header"> <span class="modal-title">学习场景</span> <span class="modal-close" aria-label="关闭" title="关闭" onclick="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()" ontouchstart="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()">×</span> </div>
     <div class="scene-grid" id="scene-grid-container"></div> </div> <div id="canvas-container" class="fixed inset-0 z-0"></div> <script type="module">
     import './plugins_02/PluginManager.js'; import './plugins_02/Plugin_SkyEnvLight.js'; import './plugins_02/Plugin_ControlPanel.js'; import * as THREE from 'three'; import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'; import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer'; import './plugins_02/Plugin_PerfTest.js';
@@ -384,6 +431,26 @@
         syncAnnoEyeButton();
         applySolidAnnotationOverlayLayers(window.showAnnotations);
     };
+    function showSolidSketchModeToast() {
+        let el = document.getElementById('solid-sketch-toast');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'solid-sketch-toast';
+            el.setAttribute('aria-live', 'polite');
+            el.innerHTML = '<div class="solid-toast-inner">已进入写生练习模式</div>';
+            document.body.appendChild(el);
+        }
+        if (el.__hideTimer) clearTimeout(el.__hideTimer);
+        if (el.__fadeTimer) clearTimeout(el.__fadeTimer);
+        el.classList.add('solid-toast-visible');
+        // 渐显后停留 2 秒，再渐隐（动作更柔和）
+        el.__fadeTimer = setTimeout(() => {
+            el.classList.remove('solid-toast-visible');
+        }, 2800);
+        el.__hideTimer = setTimeout(() => {
+            // 保持 DOM 以便下次复用
+        }, 3600);
+    }
     window.toggleAnnotations = function() {
         window.showAnnotations = !window.showAnnotations;
         syncAnnoEyeButton();
@@ -391,13 +458,14 @@
         if (!window.showAnnotations) {
             if (window.PluginManager && typeof window.PluginManager.clearAllSelections === 'function') window.PluginManager.clearAllSelections();
             else if (window.SolidAnnotationDetail && typeof window.SolidAnnotationDetail.clearForAnnotationsOff === 'function') window.SolidAnnotationDetail.clearForAnnotationsOff();
+            try { showSolidSketchModeToast(); } catch (_e) {}
         }
     };
     document.addEventListener('click', () => { document.querySelectorAll('.custom-options').forEach(el => el.classList.remove('show')); });
     window.solidPathTraceUiBlocksSample = function() { const m = document.getElementById('scene-grid-modal'); const modalOpen = m && (m.style.display === 'flex' || (typeof getComputedStyle === 'function' && getComputedStyle(m).display === 'flex')); const go = document.getElementById('global-menu-overlay'); const menuOpen = (typeof location !== 'undefined' && location.hash === '#menu') || (go && go.classList.contains('active')); return !!(modalOpen || menuOpen); };
     window.closeSceneGridModal = function() {
-    // 双重保险：如果没有加载任何场景，绝对不允许关闭面板
-    if(window.currentSceneIndex === -1) return; document.getElementById('scene-grid-modal').style.display='none'; };
+    // 若尚未选择场景，也允许关闭：用户仍可从左上角“学习场景”再次打开
+    document.getElementById('scene-grid-modal').style.display='none'; };
     window.togglePanel = function() { const panel = document.getElementById('main-panel'); panel.classList.toggle('minimized'); document.getElementById('toggle-icon').innerText = panel.classList.contains('minimized') ? '▲' : '✕'; };
     window.changeMat = function(val) { window.isLoadingScene = true; window.matType = val; const roughs = [0.95, 0.15, 0.3, 0.05, 0.4]; const metals = [0.0, 0.0, 0.85, 0.0, 0.0]; const trans = [0.0, 0.0, 0.0, 1.0, 1.0];
     sceneGroup.traverse(child => { if (child.isMesh) {
@@ -504,9 +572,17 @@
     window.isLoadingScene = false; // [解锁] 资产与BVH就绪，放行渲染
     setLoaderProgress(100); document.getElementById('scene-loader').style.opacity = '0'; setTimeout(() => document.getElementById('scene-loader').style.display = 'none', 600); });
     }); }).catch(err => { window.isLoadingScene = false; setLoaderProgress(0); // 异常兜底解锁
-    window.hwLog("场景加载致命异常: " + err.message); }); }; window.loadJSONData = function() { setLoaderText("获取场景配置数据...");
+    window.hwLog("场景加载致命异常: " + err.message); }); };
+
+    function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    window.loadJSONData = function() { setLoaderText("获取场景配置数据...");
     document.getElementById('scene-loader').style.display = 'flex'; document.getElementById('scene-loader').style.opacity = '1';
-    const _sandboxKey = (new URLSearchParams(window.location.search || '').get('sandbox') || 'geometry').toLowerCase();
+    const _qs = new URLSearchParams(window.location.search || '');
+    // 默认启用 v2（demo）列表样式；如需回退旧网格：?sceneListV2=0
+    const _forceV2 = (_qs.get('sceneListV2') || '') !== '0';
+    if (_forceV2) { try { document.documentElement.classList.add('solid-scene-list-v2'); } catch(_e) {} }
+    const _sandboxKey = (_qs.get('sandbox') || 'geometry').toLowerCase();
     const _solidJsonBySandbox = { geometry: './docs/json/沙盒_几何体静物/沙盒_几何体静物.json', portrait: './docs/json/沙盒_肖像光影沙盒/沙盒_肖像光影沙盒.json' };
     const _sceneJsonUrl = _solidJsonBySandbox[_sandboxKey] || _solidJsonBySandbox.geometry;
     fetch(_sceneJsonUrl).then(res => res.text()).then(text => { let data = []; try { let parsed = JSON.parse(text); data = Array.isArray(parsed) ? parsed : [parsed]; } catch(e) {
@@ -515,12 +591,110 @@
     if(data.length === 0) throw new Error("文本中未找到有效的数据节点"); }
     window.customScenes = data; buildSceneGridUI(data); if(data.length > 0) { // [拦截点] 不再自动进入场景0，而是关掉加载提示，强制弹出场景选择网格
     document.getElementById('scene-loader').style.display = 'none'; document.getElementById('scene-grid-modal').style.display = 'flex';
-    // [UX防呆] 首次选择时，隐藏右上角的“关闭”按钮，防止用户面对黑屏
-    document.querySelector('.modal-close').style.display = 'none'; } else { setLoaderText("场景库为空..."); window.isUnsupported=true; }
+    // 关闭按钮始终可见；若未选择场景则 closeSceneGridModal 会拦截，避免黑屏
+    document.querySelector('.modal-close').style.display = 'inline-flex'; } else { setLoaderText("场景库为空..."); window.isUnsupported=true; }
     }).catch(err => { addHwLog("JSON请求或解析失败: " + err.message); document.getElementById('scene-loader').style.display='none'; }); };
-    function buildSceneGridUI(dataArr) { const container = document.getElementById('scene-grid-container'); container.innerHTML = ''; dataArr.forEach((sceneData, idx) => {
-    const item = document.createElement('div'); item.className = 'scene-item'; item.onclick = () => { window.switchScene(idx); window.closeSceneGridModal(); }; item.innerHTML = `<img src="${sceneData.thumbnail || ''}" class="scene-thumb" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\'/%3E'"><div class="scene-name">${sceneData.name || '未命名场景'}</div>`;
-    container.appendChild(item); }); }
+    const SOLID_FAV_STORAGE_KEY = 'SolidConsumer_Favorites_v1';
+    const SOLID_FAV_VIEW_KEY = 'SolidConsumer_FavoritesView_v1';
+    function solidSceneKey(sceneData, idx) {
+        if (sceneData && typeof sceneData === 'object') {
+            if (sceneData.id != null && String(sceneData.id).trim() !== '') return 'id:' + String(sceneData.id).trim();
+            if (sceneData.key != null && String(sceneData.key).trim() !== '') return 'key:' + String(sceneData.key).trim();
+            if (sceneData.name != null && String(sceneData.name).trim() !== '') return 'name:' + String(sceneData.name).trim();
+        }
+        return 'idx:' + String(idx);
+    }
+    function solidLoadFavSet() {
+        try {
+            const raw = localStorage.getItem(SOLID_FAV_STORAGE_KEY);
+            if (!raw) return new Set();
+            const arr = JSON.parse(raw);
+            if (!Array.isArray(arr)) return new Set();
+            return new Set(arr.map(String));
+        } catch (_e) { return new Set(); }
+    }
+    function solidSaveFavSet(set) {
+        try { localStorage.setItem(SOLID_FAV_STORAGE_KEY, JSON.stringify(Array.from(set))); } catch (_e) {}
+    }
+    function solidGetFavViewMode() {
+        try {
+            const v = localStorage.getItem(SOLID_FAV_VIEW_KEY);
+            return (v === 'fav' || v === 'all') ? v : 'all';
+        } catch (_e) { return 'all'; }
+    }
+    function solidSetFavViewMode(v) {
+        try { localStorage.setItem(SOLID_FAV_VIEW_KEY, v); } catch (_e) {}
+    }
+    function buildSceneGridUI(dataArr) {
+    const container = document.getElementById('scene-grid-container'); container.innerHTML = '';
+    const favSet = solidLoadFavSet();
+    const all = (dataArr || []).map((sceneData, i) => ({ sceneData, i, k: solidSceneKey(sceneData, i) }));
+    const favCount = all.reduce((n, it) => n + (favSet.has(it.k) ? 1 : 0), 0);
+
+    // Tabbar（收藏夹是一个视图，不改变“全部”的排序）
+    const wrap = container.parentElement;
+    if (wrap) {
+        let tab = document.getElementById('scene-tabbar');
+        if (!tab) {
+            tab = document.createElement('div');
+            tab.id = 'scene-tabbar';
+            tab.className = 'scene-tabbar';
+            wrap.insertBefore(tab, container);
+        }
+        const mode = solidGetFavViewMode();
+        tab.innerHTML =
+            `<button type="button" class="scene-tab ${mode === 'all' ? 'active' : ''}" data-mode="all">全部</button>` +
+            `<button type="button" class="scene-tab ${mode === 'fav' ? 'active' : ''}" data-mode="fav">收藏夹（${favCount}）</button>`;
+        Array.from(tab.querySelectorAll('.scene-tab')).forEach(btn => {
+            btn.onclick = function(e) {
+                e.preventDefault(); e.stopPropagation();
+                const m = this.getAttribute('data-mode') || 'all';
+                solidSetFavViewMode(m);
+                buildSceneGridUI(dataArr);
+            };
+        });
+    }
+
+    const mode = solidGetFavViewMode();
+    const list = (mode === 'fav')
+        ? all.filter(it => favSet.has(it.k))
+        : all; // 全部：保持原顺序
+
+    if (mode === 'fav' && list.length === 0) {
+        container.innerHTML = `<div class="scene-empty">这里是你的收藏夹。<br>在“全部”里点右侧的 ★ 收藏场景。</div>`;
+        return;
+    }
+
+    list.forEach(({ sceneData, i, k }) => {
+    const meta = (sceneData && typeof sceneData === 'object' ? sceneData.meta : null) || {};
+    const title = (sceneData && sceneData.name) ? String(sceneData.name) : '未命名场景';
+    const thumb = (sceneData && sceneData.thumbnail) ? String(sceneData.thumbnail) : '';
+    const detailRaw = meta.detail != null ? String(meta.detail) : (meta.description != null ? String(meta.description) : '');
+    // 生产端 textarea 在 Windows 下通常是 \r\n；这里统一转 <br>
+    const detailEsc = escapeHtml(detailRaw).replace(/\r?\n/g, '<br>');
+    // 仅允许 <b></b> 作为轻量强调，其它 HTML 依然保持转义，避免注入
+    const detailSafe = detailEsc.replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>');
+    const item = document.createElement('div'); item.className = 'scene-item'; item.onclick = () => { window.switchScene(i); window.closeSceneGridModal(); };
+    item.innerHTML =
+    `<img src="${escapeHtml(thumb)}" class="scene-thumb" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Crect width=\\'100%25\\' height=\\'100%25\\' fill=\\'%23111\\'/%3E%3C/svg%3E'">` +
+    `<div class="scene-meta">` +
+      `<div class="scene-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>` +
+      (detailSafe ? `<div class="scene-detail">${detailSafe}</div>` : ``) +
+    `</div>` +
+    `<button type="button" class="scene-fav-btn ${favSet.has(k) ? 'is-fav' : ''}" aria-label="收藏" title="收藏">★</button>`;
+    const favBtn = item.querySelector('.scene-fav-btn');
+    if (favBtn) {
+        favBtn.addEventListener('click', function (e) {
+            e.preventDefault(); e.stopPropagation();
+            const nowFav = !favSet.has(k);
+            if (nowFav) favSet.add(k); else favSet.delete(k);
+            solidSaveFavSet(favSet);
+            buildSceneGridUI(dataArr);
+        });
+    }
+    container.appendChild(item);
+    });
+    }
     function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); lightMoved = true; if(window.AtmosphereManager) window.AtmosphereManager.resize(renderer); if (typeof window.syncPosterize2dLayout === 'function') window.syncPosterize2dLayout(); }
 
     // 统一“引线长度”口径：以实际画布大小为准（解决生产端/消费端、PC/手机比例不一致）
