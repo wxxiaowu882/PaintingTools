@@ -7,7 +7,8 @@ window.ControlPanel = {
         const htmlString = `
             <div id="main-panel" class="control-panel ${isProducer ? '' : 'minimized'}" style="overflow:visible; padding: 10px 12px; margin: 0 !important; bottom: 10px !important; width: 98% !important; max-width: 400px;">
                 
-                <div id="render-progress-bar" style="position:absolute;top:0;left:0;height:1.5px;background:rgba(255,255,255,0.7);width:0%;transition:width 0.1s linear, opacity 0.3s;pointer-events:none;border-radius:12px 0 0 0;"></div> 
+                <div id="render-progress-bar" style="position:absolute;top:0;left:0;height:2px;background:rgba(255,255,255,0.45);width:0%;transition:width 0.12s linear, opacity 0.25s;pointer-events:none;border-radius:12px 12px 0 0;"></div>
+                <div id="render-toast" style="position:absolute; top:-34px; left:8px; padding:6px 10px; border-radius:999px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.85); font-size:10px; letter-spacing:1px; opacity:0; transform:translateY(6px); pointer-events:none; transition:opacity .25s ease, transform .25s ease;">渲染中…</div>
                 
                 <div class="flex justify-between items-center select-none" style="padding:0px 2px; margin:0px; cursor:pointer;" onclick="window.togglePanel()">
                     <div class="flex gap-2" style="position:relative; z-index:1;"> 
@@ -15,9 +16,13 @@ window.ControlPanel = {
                         <button id="btn-stoprender" style="display:${isProducer ? 'inline-block' : 'none'}; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#fff; padding:3px 6px; border-radius:4px; font-size:10px; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); if(window.stopRender)window.stopRender()" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">□ 停止渲染</button> 
                     </div>
                     <div class="flex items-center gap-2 flex-1 justify-end">
-                        <div id="render-status" class="flex items-center gap-1.5 transition-opacity" style="opacity:1;"> 
-                            <span id="render-status-text" class="text-[10px] text-white/60 tracking-wider">未渲染</span> 
+                        <div id="render-status" style="display:none;">
+                            <span id="render-status-text" style="display:none;">未渲染</span>
                         </div>
+                        <button type="button" id="btn-anno-eye" title="隐藏标注" aria-pressed="true" style="display:${isProducer ? 'none' : 'inline-flex'}; align-items:center; justify-content:center; width:26px; height:26px; margin:0; padding:0; border:none; background:transparent; color:rgba(255,255,255,0.72); cursor:pointer; border-radius:6px; flex-shrink:0; transition:color .15s, background .15s, opacity .15s;" onclick="event.stopPropagation(); if(window.toggleAnnotations) window.toggleAnnotations();" onmouseover="this.style.color='rgba(255,255,255,0.95)'; this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.color='rgba(255,255,255,0.72)'; this.style.background='transparent'">
+                            <span class="anno-eye-on" style="display:inline-flex; line-height:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                            <span class="anno-eye-off" style="display:none; line-height:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></span>
+                        </button>
                         <span onclick="event.stopPropagation(); window.resetAll()" class="text-[11px] text-white/70 hover:text-white cursor-pointer transition-colors px-1" style="font-weight:500;">↺ 重置</span>
                         <div id="toggle-icon" class="text-white/80 flex items-center justify-center cursor-pointer" style="width:24px; height:24px; font-size:12px; margin-left:4px;">${isProducer ? '✕' : '▲'}</div> 
                     </div>
@@ -220,15 +225,6 @@ window.ControlPanel = {
                                     </div>
                                 </div>
                                 
-                                <div style="display:${isProducer ? 'none' : 'flex'}; align-items:center;">
-                                    <label class="flex items-center cursor-pointer" style="margin-bottom:0;">
-                                        <input type="checkbox" class="flat-checkbox" style="width:14px; height:14px; margin-right:6px;" checked onchange="if(window.toggleAnnotations) window.toggleAnnotations();">
-                                        <span style="color:rgba(255,255,255,0.8); font-size:11px; font-weight:bold; white-space:nowrap;">显示标注</span>
-                                        <span style="color:rgba(255,255,255,0.65); font-size:10px; margin-left:6px; line-height:1.2;">(显示童画师吴晓为大家设置的标注记号和文字标签)</span>
-                                    </label>
-                                    <span id="anno-toggle-btn" style="display:none;"></span>
-                                </div>
-                                
                                 <div class="slider-row mb-0" style="align-items:center;">
                                     <label class="flex items-center cursor-pointer mb-0" style="width:auto; margin-right:4px;">
                                         <input type="checkbox" id="posterizeEnable" onchange="window.togglePosterize(this.checked)" class="flat-checkbox" style="width:14px; height:14px; margin-right:6px;"> 
@@ -244,6 +240,27 @@ window.ControlPanel = {
             </div>`; 
             
         const container = document.createElement('div'); container.innerHTML = htmlString; document.body.appendChild(container.firstElementChild); 
+
+        // C2：短提示（仅点击“重新渲染”时出现）
+        function showRenderToast(text) {
+            const t = document.getElementById('render-toast');
+            if (!t) return;
+            t.textContent = text || '渲染中…';
+            t.style.opacity = '1';
+            t.style.transform = 'translateY(0px)';
+            if (t.__hideTimer) clearTimeout(t.__hideTimer);
+            t.__hideTimer = setTimeout(() => {
+                t.style.opacity = '0';
+                t.style.transform = 'translateY(6px)';
+            }, 3000);
+        }
+
+        // 若宿主后续再定义 forceReRender，此处依然能兜底 toast（按钮调用的是 window.forceReRender）
+        const _origForceReRender = window.forceReRender;
+        window.forceReRender = function() {
+            showRenderToast('渲染中…');
+            if (typeof _origForceReRender === 'function') return _origForceReRender.apply(this, arguments);
+        };
 
         window.switchTab = function(tabName) {
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
