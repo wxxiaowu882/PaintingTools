@@ -139,8 +139,10 @@
     import './plugins_02/Plugin_Atmosphere.js'; // ☁️ 同步接入大气透视插件
     import './plugins_02/Plugin_DepthOfField.js'; // 📷 同步接入景深虚实插件
     window.skyEnvLightMatchMainRect = true;
-    // 【试验·抗黑点噪点】设为 false 即恢复原版光追参数（回滚零成本）,即true是高质量，false是低质量
-    const SOLID_PT_ANTI_SPECKLE_TEST = false;   
+    // 【试验·抗黑点噪点】true=更干净（更慢），false=更快（更噪）
+    const SOLID_PT_ANTI_SPECKLE_TEST = true;
+    // 方案C（完成时降噪）效果不稳，默认关闭；若要再试，改为 true
+    const SOLID_MOBILE_DENOISE = false;
     const _solidPt = SOLID_PT_ANTI_SPECKLE_TEST
     ? { targetSamples: 380, renderScaleMobile: 0.45, renderScaleDesktop: 0.82, filterGlossyFactor: 0.78, expRamp: 28, expLo: 0.63, expHi: 0.74, toneMappingExposureBase: 0.72 }
     : { targetSamples: 200, renderScaleMobile: 0.42, renderScaleDesktop: 0.75, filterGlossyFactor: 1, expRamp: 24, expLo: 0.55, expHi: 0.7, toneMappingExposureBase: 0.7 };
