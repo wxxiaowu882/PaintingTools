@@ -42,6 +42,7 @@
     html.solid-scene-list-v2 .scene-item { display:flex; flex-direction:row; align-items:flex-start; gap:12px; padding:10px; }
     /* 手机端略加大缩略图 */
     html.solid-scene-list-v2 .scene-thumb { width:132px; height:132px; aspect-ratio:auto; border-radius:10px; opacity:0.95; background:#111; }
+    /* 移动端/默认：保持紧凑（不要被 PC 调整影响） */
     .scene-meta { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; padding:0; }
     .scene-title { font-size:13px; font-weight:300; color:rgba(255,255,255,0.92); letter-spacing:0.06em; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .scene-detail { font-size:11px; color:rgba(175,178,186,0.92); line-height:1.55; white-space:normal; word-break:break-word; }
@@ -73,8 +74,10 @@
       /* 单列卡片宽度：占列宽 90%，居中对齐 */
       html.solid-scene-list-v2 .scene-item { padding: 12px; width: 90%; margin: 0 auto; }
       html.solid-scene-list-v2 .scene-thumb { width:200px; height:200px; }
-      html.solid-scene-list-v2 .scene-title { font-size:14px; }
-      html.solid-scene-list-v2 .scene-detail { font-size:12px; }
+      /* PC 端：字号更大，标题与描述间距更大 */
+      html.solid-scene-list-v2 .scene-meta { gap: 14px; }
+      html.solid-scene-list-v2 .scene-title { font-size:17px; }
+      html.solid-scene-list-v2 .scene-detail { font-size:12.5px; line-height: 1.62; }
       html.solid-scene-list-v2 .scene-empty { font-size:13px; }
       .scene-fav-btn { width:30px; height:30px; }
     }
