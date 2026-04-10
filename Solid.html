@@ -294,25 +294,29 @@
     window.addEventListener('error', e => { window.hwLog('WinErr: ' + e.message); });
     window.addEventListener('unhandledrejection', e => { window.hwLog('PromiseRej: ' + e.reason); }); const originalConsoleError = console.error; console.error = function(...args) {
     originalConsoleError.apply(console, args); const msg = args.join(' ').toLowerCase(); window.hwLog('[ConsoleError] ' + args.join(' '));
-    if (msg.includes('context lost')) { window._solidContextLost = true; window.useAdvancedRender = false; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('console_context_lost'); return; }
+    if (msg.includes('context lost') && !/recover|restore/i.test(msg)) { window._solidContextLost = true; window.useAdvancedRender = false; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('console_context_lost'); return; }
     if (msg.includes('could not compile shader') || msg.includes('gl_invalid_operation') || msg.includes('failed to create') || msg.includes('framebuffer incomplete') || msg.includes('feedback loop')) {
     if (typeof triggerUnsupported === 'function') triggerUnsupported(); } }; function safeDispose(obj) { if (!obj) return; if (Array.isArray(obj)) { obj.forEach(m => safeDispose(m)); return; }
     try { if (typeof obj.dispose === 'function') obj.dispose(); } catch(e) { /* 彻底静默，忽略第三方底层库的销毁瑕疵 */ } }
-    window._solidContextLost = false; window._solidRecovering = false; window.__solidRecoverSeq = 0;
+    window._solidContextLost = false; window._solidRecovering = false; window.__solidRecoverSeq = 0; window.__solidLastScheduleAt = 0;
     window.__solidTryRecoverPathTracer = function(reason) { if (window._solidRecovering) return false; if (!renderer || !scene || !camera) return false; window._solidRecovering = true; let recovered = false; try {
     const gl = renderer.getContext ? renderer.getContext() : null; if (!gl) throw new Error('WebGL 上下文为空');
     if (typeof gl.isContextLost === 'function' && gl.isContextLost()) throw new Error('WebGL 上下文尚未恢复');
     if (!pathTracer) { pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? _solidPt.renderScaleMobile : _solidPt.renderScaleDesktop; if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; }
     if (pathTracer.setScene) pathTracer.setScene(scene, camera);
-    if (pathTracer.updateMaterials) pathTracer.updateMaterials();
-    if (pathTracer.updateLights) pathTracer.updateLights();
     pathTracer.reset(); lightMoved = true; needsUpdate = true; window.sumDuration = 0; window.lastRenderTime = 0; window.isUnsupported = false; window._solidContextLost = false; window.useAdvancedRender = true;
-    const msg = document.getElementById('fallback-msg'); if (msg) msg.style.display = 'none'; const cc = document.getElementById('canvas-container'); if (cc) cc.style.opacity = '1'; const mp = document.getElementById('main-panel'); if (mp) { mp.style.opacity = '1'; mp.style.pointerEvents = 'auto'; }
+    const msg = document.getElementById('fallback-msg'); if (msg) msg.style.display = 'none'; const pw = document.getElementById('persistent-warning'); if (pw) pw.style.display = 'none'; const cc = document.getElementById('canvas-container'); if (cc) cc.style.opacity = '1'; const mp = document.getElementById('main-panel'); if (mp) { mp.style.opacity = '1'; mp.style.pointerEvents = 'auto'; }
     const br = document.getElementById('btn-rerender'); if(br) { br.style.display = ''; br.style.opacity = '0.4'; br.style.borderColor = 'rgba(255,255,255,0.15)'; br.style.boxShadow = 'none'; }
     const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.display = ''; bs.style.opacity = '0.8'; bs.style.borderColor = 'rgba(255,255,255,0.3)'; bs.style.boxShadow = 'none'; }
     if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene }); window.hwLog(`[Recover] 光追恢复成功：${reason || 'unknown'}`); recovered = true;
+    (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '光追已恢复'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 1500); } })();
     } catch (e) { window.hwLog(`[Recover] 光追恢复失败：${reason || 'unknown'} / ${e.message}`); recovered = false; } window._solidRecovering = false; return recovered; };
-    window.__solidScheduleRecover = function(reason) { const seq = ++window.__solidRecoverSeq; const delays = [80, 420, 1200];
+    window.__solidScheduleRecover = function(reason) {
+    if (window._solidRecovering) return;
+    const now = performance.now(); if (window.__solidLastScheduleAt && (now - window.__solidLastScheduleAt) < 1500) return; window.__solidLastScheduleAt = now;
+    const seq = ++window.__solidRecoverSeq;
+    const _delayMap = { 'event_context_restored': [50, 200, 600], 'visibility_visible': [200, 800, 2000] }; const delays = _delayMap[reason] || [80, 420, 1200];
+    (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '渲染中断，正在恢复…'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); } })();
     const run = function(i) { if (window.__solidRecoverSeq !== seq) return; if (document.hidden) return; const needRecover = !pathTracer || window.isUnsupported || window._solidContextLost; if (!needRecover) return;
     const ok = window.__solidTryRecoverPathTracer((reason || 'unknown') + '#' + (i + 1)); if (ok) return;
     if (i < delays.length - 1) { setTimeout(function() { run(i + 1); }, delays[i + 1]); return; }
@@ -323,7 +327,7 @@
     const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0';
     const br = document.getElementById('btn-rerender'); if(br) { br.style.opacity = '0.8'; br.style.borderColor = 'rgba(255,255,255,0.3)'; br.style.boxShadow = 'none'; }
     const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.opacity = '0.4'; bs.style.borderColor = 'rgba(255,255,255,0.15)'; bs.style.boxShadow = 'none'; }
-    }; window.forceReRender = function() { window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none';
+    }; window.forceReRender = function() { window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none'; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
     document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1';
     document.getElementById('main-panel').style.pointerEvents = 'auto'; window.isLoadingScene = false; if (!pathTracer && renderer) { try {
     pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? _solidPt.renderScaleMobile : _solidPt.renderScaleDesktop;
@@ -340,6 +344,7 @@
     const bs = document.getElementById('btn-stoprender'); if(bs) bs.style.display = 'none';
     hwLog('Essential_Intercept: 触发渲染降级保护并安全释放显存。'); }
     window.acknowledgeFallback = function() { document.getElementById('fallback-msg').style.display = 'none'; document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1'; document.getElementById('main-panel').style.pointerEvents = 'auto'; const pw = document.getElementById('persistent-warning'); if(pw) pw.style.display = 'block';
+    const _abr = document.getElementById('btn-rerender'); if(_abr) { _abr.style.display = ''; _abr.style.opacity = '0.8'; _abr.style.borderColor = 'rgba(255,255,255,0.3)'; _abr.style.boxShadow = 'none'; }
     // 【核心修复】：降级后，如果还未成功加载过场景数据，必须强制拉取数据！
     // 否则场景列表为空，且会触发防呆机制导致右上角 X 按钮无法关闭。
     if (!window.customScenes || window.customScenes.length === 0) { sceneGroup.clear(); window.loadJSONData(); } };
@@ -761,7 +766,7 @@
     window.hwLog(`[Init] 高精度实例化异常 (${err1.message})，降级为基础实例...`); renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true }); }
     if (!renderer || !renderer.getContext()) { throw new Error("当前设备或浏览器完全拒绝创建 WebGL 上下文"); }
     window.hwLog("[Init] WebGLRenderer 实例化完毕"); renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window._solidContextLost = true; window.useAdvancedRender = false; window.hwLog(`Context Lost 事件: ${e.statusMessage || 'GPU运算超时或系统强制回收'}`); if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); } if (!document.hidden && typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('event_context_lost'); }, false);
-    renderer.domElement.addEventListener('webglcontextrestored', () => { window.hwLog('Context Restored 事件: 准备恢复光追'); window._solidContextLost = false; window.useAdvancedRender = true; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('event_context_restored'); }, false);
+    renderer.domElement.addEventListener('webglcontextrestored', () => { window.hwLog('Context Restored 事件: 准备恢复光追'); window._solidContextLost = false; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('event_context_restored'); }, false);
     scene = new THREE.Scene(); scene.add(sceneGroup); scene.backgroundRotation = new THREE.Euler(); scene.environmentRotation = new THREE.Euler();
     camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix();
     renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.2) : Math.min(window.devicePixelRatio, 1.5)); renderer.setSize(window.innerWidth, window.innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = _solidPt.toneMappingExposureBase;
@@ -972,9 +977,10 @@
     })();
     { const _er = _solidPt.expRamp, _elo = _solidPt.expLo, _ehi = _solidPt.expHi; renderer.toneMappingExposure = currentSamples >= _er ? _ehi : _elo + (_ehi - _elo) * (currentSamples / _er); }
     if (currentSamples < targetSamples) { const _uiBlk = window.solidPathTraceUiBlocksSample && window.solidPathTraceUiBlocksSample(); if (!_uiBlk) { const dofOn = window.DoFManager ? window.DoFManager.enabled : false; if (window.AtmosphereManager && (window.isFogEnabled || dofOn)) window.AtmosphereManager.render(pathTracer, renderer, scene, camera); else pathTracer.renderSample(); } }
+    window._solidAnimErrCount = 0;
     if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL();
     if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
-    } catch(e) { triggerUnsupported(); } } }
+    } catch(e) { window.hwLog('[animate] 渲染异常: ' + (e.message || e)); const _fatal = /context|shader|framebuffer|gl_invalid|feedback/i.test(e.message || ''); if (_fatal) { triggerUnsupported(); } else { window._solidAnimErrCount = (window._solidAnimErrCount || 0) + 1; if (window._solidAnimErrCount >= 3) triggerUnsupported(); } } } }
     init(); // 关页时禁止同步 dispose WebGL：GPU 队列卡住时 renderer.dispose/forceContextLoss 会让主线程与关 Tab 一起假死；页面卸载后进程会回收上下文。
     // 沉浸模式计时器只初始化一次（必须在 init() 之后执行，且不能放在 animate() 内部，否则可能被早退分支跳过）
     if (!window.__solidImmersiveInitDone) {
