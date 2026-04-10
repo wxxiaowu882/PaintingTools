@@ -4,11 +4,19 @@
     <script type="importmap">{ "imports": { "three": "./docs/js/three_164/three.module.js", "three/addons/controls/OrbitControls.js": "./docs/js/three_164/OrbitControls.js",
     "three/addons/loaders/GLTFLoader.js": "./docs/js/three_164/examples/jsm/loaders/GLTFLoader.js", "three/addons/loaders/DRACOLoader.js": "./docs/js/three_164/examples/jsm/loaders/DRACOLoader.js", "three/addons/": "./docs/js/three_164/examples/jsm/",
     "three/examples/jsm/": "./docs/js/three_164/examples/jsm/", "three/": "./docs/js/three_164/", "three-mesh-bvh": "./docs/js/three-mesh-bvh.js",
-    "three-gpu-pathtracer": "./docs/js/three-gpu-pathtracer.js" } }</script> <script src="docs/js/GlobalMenu.js"></script> <style>
+    "three-gpu-pathtracer": "./docs/js/three-gpu-pathtracer.js" } }</script> <script src="docs/js/GlobalMenu.js"></script> <script src="docs/js/SolidHelp.js"></script> <style>
     body{margin:0;overflow:hidden;background-color:#050505;font-family:'Inter',-apple-system,sans-serif;-webkit-user-select:none;user-select:none;} .font-hairline{font-weight:100;}.font-thin{font-weight:200;}
-    #menu-trigger-overlay{position:fixed;top:20px;right:20px;width:44px;height:44px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;cursor:pointer;z-index:5001;background:transparent;}
-    .menu-line{height:1.5px;background-color:#fff;transition:all 0.3s ease;margin:3px 0;border-radius:1px;} .line-1{width:22px;transform-origin:right center;}.line-2{width:14px;}.line-3{width:22px;transform-origin:right center;}
-    .menu-open .line-1{transform:rotate(45deg) translateY(-2px);background-color:#fff;} .menu-open .line-2{opacity:0;} .menu-open .line-3{transform:rotate(-45deg) translateY(2px);background-color:#fff;}
+    /* 顶栏按钮只做“视觉上移”，不影响画布/模型区 */
+    #menu-trigger-overlay{position:fixed;top:20px;right:20px;width:44px;height:44px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;cursor:pointer;z-index:7002;background:transparent;opacity:0.82;transform:translateY(calc(env(safe-area-inset-top, 0px) - 16px));}
+    .menu-line{height:1.5px;background-color:rgba(255,255,255,0.72);transition:all 0.3s ease;margin:3px 0;border-radius:1px;} .line-1{width:22px;transform-origin:right center;}.line-2{width:14px;}.line-3{width:22px;transform-origin:right center;}
+    .menu-open .line-1{transform:rotate(45deg) translateY(-2px);background-color:rgba(255,255,255,0.72);} .menu-open .line-2{opacity:0;} .menu-open .line-3{transform:rotate(-45deg) translateY(2px);background-color:rgba(255,255,255,0.72);}
+
+    /* 顶栏按钮（左上场景选择 + 右上菜单）：弱化亮度 + 上移，兼容刘海安全区 */
+    #top-left-scene-btn{top:20px !important; opacity:0.82; transform:translateY(calc(env(safe-area-inset-top, 0px) - 16px)); z-index:7001 !important;}
+
+    /* 防回归：模型画布区域保持固定铺满，不受顶栏位移影响 */
+    #canvas-container{top:0 !important; right:0 !important; bottom:0 !important; left:0 !important;}
+    #top-left-scene-btn span{color:rgba(255,255,255,0.78) !important;}
     .control-panel{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:96%;max-width:380px;background:rgba(15,15,15,0.7);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:10px 14px;z-index:100;color:#fff;touch-action:none;transition:all 0.4s cubic-bezier(0.4,0,0.2,1);box-shadow:0 10px 40px rgba(0,0,0,0.8);}
     .control-panel input[type=range]{touch-action:pan-x;}
     .control-panel.minimized { bottom: 15px; padding-bottom: 6px; } .control-panel.minimized .panel-content { display: none; }
@@ -286,20 +294,41 @@
     window.addEventListener('error', e => { window.hwLog('WinErr: ' + e.message); });
     window.addEventListener('unhandledrejection', e => { window.hwLog('PromiseRej: ' + e.reason); }); const originalConsoleError = console.error; console.error = function(...args) {
     originalConsoleError.apply(console, args); const msg = args.join(' ').toLowerCase(); window.hwLog('[ConsoleError] ' + args.join(' '));
-    if (msg.includes('could not compile shader') || msg.includes('gl_invalid_operation') || msg.includes('context lost') || msg.includes('failed to create') || msg.includes('framebuffer incomplete') || msg.includes('feedback loop')) {
+    if (msg.includes('context lost')) { window._solidContextLost = true; window.useAdvancedRender = false; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('console_context_lost'); return; }
+    if (msg.includes('could not compile shader') || msg.includes('gl_invalid_operation') || msg.includes('failed to create') || msg.includes('framebuffer incomplete') || msg.includes('feedback loop')) {
     if (typeof triggerUnsupported === 'function') triggerUnsupported(); } }; function safeDispose(obj) { if (!obj) return; if (Array.isArray(obj)) { obj.forEach(m => safeDispose(m)); return; }
     try { if (typeof obj.dispose === 'function') obj.dispose(); } catch(e) { /* 彻底静默，忽略第三方底层库的销毁瑕疵 */ } }
+    window._solidContextLost = false; window._solidRecovering = false; window.__solidRecoverSeq = 0;
+    window.__solidTryRecoverPathTracer = function(reason) { if (window._solidRecovering) return false; if (!renderer || !scene || !camera) return false; window._solidRecovering = true; let recovered = false; try {
+    const gl = renderer.getContext ? renderer.getContext() : null; if (!gl) throw new Error('WebGL 上下文为空');
+    if (typeof gl.isContextLost === 'function' && gl.isContextLost()) throw new Error('WebGL 上下文尚未恢复');
+    if (!pathTracer) { pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? _solidPt.renderScaleMobile : _solidPt.renderScaleDesktop; if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; }
+    if (pathTracer.setScene) pathTracer.setScene(scene, camera);
+    if (pathTracer.updateMaterials) pathTracer.updateMaterials();
+    if (pathTracer.updateLights) pathTracer.updateLights();
+    pathTracer.reset(); lightMoved = true; needsUpdate = true; window.sumDuration = 0; window.lastRenderTime = 0; window.isUnsupported = false; window._solidContextLost = false; window.useAdvancedRender = true;
+    const msg = document.getElementById('fallback-msg'); if (msg) msg.style.display = 'none'; const cc = document.getElementById('canvas-container'); if (cc) cc.style.opacity = '1'; const mp = document.getElementById('main-panel'); if (mp) { mp.style.opacity = '1'; mp.style.pointerEvents = 'auto'; }
+    const br = document.getElementById('btn-rerender'); if(br) { br.style.display = ''; br.style.opacity = '0.4'; br.style.borderColor = 'rgba(255,255,255,0.15)'; br.style.boxShadow = 'none'; }
+    const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.display = ''; bs.style.opacity = '0.8'; bs.style.borderColor = 'rgba(255,255,255,0.3)'; bs.style.boxShadow = 'none'; }
+    if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene }); window.hwLog(`[Recover] 光追恢复成功：${reason || 'unknown'}`); recovered = true;
+    } catch (e) { window.hwLog(`[Recover] 光追恢复失败：${reason || 'unknown'} / ${e.message}`); recovered = false; } window._solidRecovering = false; return recovered; };
+    window.__solidScheduleRecover = function(reason) { const seq = ++window.__solidRecoverSeq; const delays = [80, 420, 1200];
+    const run = function(i) { if (window.__solidRecoverSeq !== seq) return; if (document.hidden) return; const needRecover = !pathTracer || window.isUnsupported || window._solidContextLost; if (!needRecover) return;
+    const ok = window.__solidTryRecoverPathTracer((reason || 'unknown') + '#' + (i + 1)); if (ok) return;
+    if (i < delays.length - 1) { setTimeout(function() { run(i + 1); }, delays[i + 1]); return; }
+    if (window._solidContextLost || window.isUnsupported) triggerUnsupported(); };
+    setTimeout(function() { run(0); }, delays[0]); };
     window.stopRender = function() { window.useAdvancedRender = false; window.isLoadingScene = false; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
     if (renderer) renderer.render(scene, camera); hwLog("已停止物理渲染，释放显存与内存缓存。点击“重新渲染”可恢复光追引擎。");
     const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0';
     const br = document.getElementById('btn-rerender'); if(br) { br.style.opacity = '0.8'; br.style.borderColor = 'rgba(255,255,255,0.3)'; br.style.boxShadow = 'none'; }
     const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.opacity = '0.4'; bs.style.borderColor = 'rgba(255,255,255,0.15)'; bs.style.boxShadow = 'none'; }
-    }; window.forceReRender = function() { if (window.isUnsupported) return; window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none';
+    }; window.forceReRender = function() { window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none';
     document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1';
     document.getElementById('main-panel').style.pointerEvents = 'auto'; window.isLoadingScene = false; if (!pathTracer && renderer) { try {
     pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? _solidPt.renderScaleMobile : _solidPt.renderScaleDesktop;
     if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; } catch(e) { triggerUnsupported(); return; } }
-    if(pathTracer) { needsUpdate = true; lightMoved = true; window.sumDuration = 0; window.lastRenderTime = 0; pathTracer.updateMaterials(); pathTracer.updateLights(); pathTracer.reset();
+    if(pathTracer) { needsUpdate = true; lightMoved = true; window.sumDuration = 0; window.lastRenderTime = 0; pathTracer.updateMaterials(); pathTracer.updateLights(); pathTracer.reset(); window.isUnsupported = false; window._solidContextLost = false;
     if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene }); }
     const br = document.getElementById('btn-rerender'); if(br) { br.style.opacity = '0.4'; br.style.borderColor = 'rgba(255,255,255,0.15)'; br.style.boxShadow = 'none'; }
     const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.opacity = '0.8'; bs.style.borderColor = 'rgba(255,255,255,0.3)'; bs.style.boxShadow = 'none'; }
@@ -515,6 +544,16 @@
     document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedOpt.classList.add('selected'); }
     buildEnvironment(); window.changeMat(window.matType); window.changePosterize(window.posterizeLevel); window.changeAtmosphere(window.isFogEnabled, window.fogDensity); const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.disabled = !window.isFogEnabled; fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); } const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.disabled = !(window.posterizeLevel > 0); pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } lightMoved = true; }; window.switchScene = function(index) { if(index === window.currentSceneIndex) return; window.isLoadingScene = true; // [锁定] 安全锁启动
     window.currentSceneIndex = index; const data = window.customScenes[index]; window.currentSceneData = data;
+    // 修复首帧视角跳变：先应用目标场景的相机参数，再开始资产加载，避免先看到上一个场景视角
+    if (data && data.camera) {
+        camera.position.set(...data.camera.pos);
+        controls.target.set(...data.camera.target);
+        camera.zoom = data.camera.zoom;
+        camera.updateProjectionMatrix();
+        controls.update();
+        needsUpdate = true;
+        lightMoved = true;
+    }
     if (typeof window.updateAnnotationEyeButtonVisibility === 'function') window.updateAnnotationEyeButtonVisibility();
     document.getElementById('scene-grid-modal').style.display = 'none';
     // [解除防呆] 用户已经成功选择了一个场景，以后再打开面板时可以正常关闭了
@@ -721,7 +760,8 @@
     renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: true }); } catch(err1) {
     window.hwLog(`[Init] 高精度实例化异常 (${err1.message})，降级为基础实例...`); renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true }); }
     if (!renderer || !renderer.getContext()) { throw new Error("当前设备或浏览器完全拒绝创建 WebGL 上下文"); }
-    window.hwLog("[Init] WebGLRenderer 实例化完毕"); renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window.hwLog(`Context Lost 崩溃! 原因: ${e.statusMessage || 'GPU运算超时或系统强制回收'}`); triggerUnsupported(); }, false);
+    window.hwLog("[Init] WebGLRenderer 实例化完毕"); renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window._solidContextLost = true; window.useAdvancedRender = false; window.hwLog(`Context Lost 事件: ${e.statusMessage || 'GPU运算超时或系统强制回收'}`); if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); } if (!document.hidden && typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('event_context_lost'); }, false);
+    renderer.domElement.addEventListener('webglcontextrestored', () => { window.hwLog('Context Restored 事件: 准备恢复光追'); window._solidContextLost = false; window.useAdvancedRender = true; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('event_context_restored'); }, false);
     scene = new THREE.Scene(); scene.add(sceneGroup); scene.backgroundRotation = new THREE.Euler(); scene.environmentRotation = new THREE.Euler();
     camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix();
     renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.2) : Math.min(window.devicePixelRatio, 1.5)); renderer.setSize(window.innerWidth, window.innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = _solidPt.toneMappingExposureBase;
@@ -782,23 +822,42 @@
     buildEnvironment(); window.syncEnvColorPickers();
     setupUIControls(); window.addEventListener('resize', function() { onWindowResize(); if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); }); setLoaderText("首次加载，硬件检测中…");
     startSolidPerfHardwareProgress(isMobile); window.PerfTester.onProgress = function (ph) { applySolidPerfHardwarePhase(ph); };
-    document.getElementById('perf-test-overlay').style.display = 'flex'; // 【架构重构】：将耗时极高的性能测试交由独立插件管理，释放主线程
-    window.PerfTester.start(scene, camera, pathTracer, isMobile, () => { // 测试成功后的回调（原有的通过逻辑）
-    resetSolidPerfHardwareProgress(); setLoaderProgress(100);
-    const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none';
-    const br = document.getElementById('btn-rerender'); if(br) { br.style.display = ''; br.style.opacity = '0.4'; br.style.borderColor = 'rgba(255,255,255,0.15)'; br.style.boxShadow = 'none'; }
-    const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.display = ''; bs.style.opacity = '0.8'; bs.style.borderColor = 'rgba(255,255,255,0.3)'; bs.style.boxShadow = 'none'; }
-    window.loadJSONData(); // 启动正式数据加载
-    }, () => { // 测试失败后的回调
-    resetSolidPerfHardwareProgress(); triggerUnsupported(); } ); animate(); } catch (e) { window.hwLog("[Init] 光追/后续初始化异常: " + e.message); triggerUnsupported(); } }); }
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { window.hwLog("👀 页面切回前台，恢复安全渲染状态");
-    requestAnimationFrame(() => { requestAnimationFrame(() => {
+    const skipPerfTest = new URLSearchParams(window.location.search).get('skipPerf') === '1';
+    if (skipPerfTest) {
+        window.hwLog("[Init] 通过URL参数跳过性能测试");
+        resetSolidPerfHardwareProgress(); setLoaderProgress(100);
+        const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none';
+        const br = document.getElementById('btn-rerender'); if(br) { br.style.display = ''; br.style.opacity = '0.4'; br.style.borderColor = 'rgba(255,255,255,0.15)'; br.style.boxShadow = 'none'; }
+        const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.display = ''; bs.style.opacity = '0.8'; bs.style.borderColor = 'rgba(255,255,255,0.3)'; bs.style.boxShadow = 'none'; }
+        window.perfTestDone = true; window.isTestingPerformance = false;
+        window.loadJSONData(); animate();
+    } else {
+        document.getElementById('perf-test-overlay').style.display = 'flex'; // 【架构重构】：将耗时极高的性能测试交由独立插件管理，释放主线程
+        window.PerfTester.start(scene, camera, pathTracer, isMobile, () => { // 测试成功后的回调（原有的通过逻辑）
+        resetSolidPerfHardwareProgress(); setLoaderProgress(100);
+        const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none';
+        const br = document.getElementById('btn-rerender'); if(br) { br.style.display = ''; br.style.opacity = '0.4'; br.style.borderColor = 'rgba(255,255,255,0.15)'; br.style.boxShadow = 'none'; }
+        const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.display = ''; bs.style.opacity = '0.8'; bs.style.borderColor = 'rgba(255,255,255,0.3)'; bs.style.boxShadow = 'none'; }
+        window.loadJSONData(); // 启动正式数据加载
+        }, () => { // 测试失败后的回调
+        resetSolidPerfHardwareProgress(); triggerUnsupported(); } ); animate();
+    } } catch (e) { window.hwLog("[Init] 光追/后续初始化异常: " + e.message); triggerUnsupported(); } }); }
+    document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+    window.hwLog("👀 页面切回前台，恢复安全渲染状态");
+    requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
     if (window.SkyEnvLight && typeof window.SkyEnvLight.invalidateSyncCache === 'function') window.SkyEnvLight.invalidateSyncCache();
-    if (pathTracer) {
     lightMoved = true; needsUpdate = true; window.sumDuration = 0;
-    if(window.isUnsupported){ const msg = document.getElementById('fallback-msg'); if (msg) msg.style.display = 'none'; document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1'; document.getElementById('main-panel').style.pointerEvents = 'auto'; window.isUnsupported = false; }
+    const needRecover = !pathTracer || window.isUnsupported || window._solidContextLost;
+    if (needRecover && typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('visibility_visible');
     // 【核心修复】：绝对禁止在此处调用 requestAnimationFrame(animate)，彻底切断后台裂变的死亡螺旋！
-    } }); }); } else { window.hwLog("💤 页面进入后台，安全挂起资源"); window.sumDuration = 0; } }); function buildEnvironment() { if (mainLight) { scene.remove(mainLight); if (mainLight.target) scene.remove(mainLight.target); }
+    });
+    });
+    } else {
+    window.hwLog("💤 页面进入后台，安全挂起资源"); window.sumDuration = 0;
+    }
+    }); function buildEnvironment() { if (mainLight) { scene.remove(mainLight); if (mainLight.target) scene.remove(mainLight.target); }
     const val = parseFloat(document.getElementById('lightIntensity').value); const lSize = state.lightSize; const col = getTempColor(state.lightTemp * 100);
     if (lightType === 'spot') { mainLight = new THREE.SpotLight(col, val * 300); mainLight.angle = Math.PI/5.5; mainLight.penumbra = 0.5; mainLight.radius = lSize; scene.add(mainLight.target); } else if (lightType === 'point') { mainLight = new THREE.PointLight(col, val * 250); mainLight.radius = lSize; } else if (lightType === 'dir') { mainLight = new THREE.DirectionalLight(col, val * 2.8); mainLight.radius = lSize; } else if (lightType === 'rect') { mainLight = new THREE.RectAreaLight(col.getHex(), val * 18, 8 * (lSize/2 + 0.1), 8 * (lSize/2 + 0.1)); }
     scene.add(mainLight); const gCol = new THREE.Color(window.envGroundColor || '#cccccc');
