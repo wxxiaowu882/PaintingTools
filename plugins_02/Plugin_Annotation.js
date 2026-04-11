@@ -232,7 +232,7 @@ window.AnnotationManager = {
                     #anno-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 50 !important; overflow: hidden; }
                     #anno-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
                     .anno-dom { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; font-family: 'Inter', sans-serif; }
-                    .anno-leader-label { border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; white-space: nowrap; cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; }
+                    .anno-leader-label { border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.35; box-sizing: border-box; white-space: nowrap; cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-flex; align-items: center; justify-content: center; }
                     .anno-leader-label.editing { background: #fff !important; color: #000; outline: none; border-color: #fff !important; box-shadow: 0 0 10px rgba(0,210,255,0.5) !important; user-select: text !important; cursor: text !important; }
                 `;
             document.head.appendChild(style);

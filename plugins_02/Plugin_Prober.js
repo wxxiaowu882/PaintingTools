@@ -93,7 +93,8 @@ window.ProberManager = {
         label.className = 'prober-label';
         label.style.position = 'absolute';
         label.style.transform = 'translate(-50%, -50%)';
-        label.style.padding = '4px 8px'; label.style.fontSize = '11px'; label.style.fontWeight = 'bold';
+        label.style.padding = '4px 8px'; label.style.fontSize = '11px'; label.style.lineHeight = '1.45'; label.style.boxSizing = 'border-box';
+        label.style.fontWeight = 'bold'; label.style.display = 'inline-flex'; label.style.alignItems = 'center'; label.style.justifyContent = 'flex-start';
         label.style.whiteSpace = 'pre-wrap';
         label.style.maxWidth = '260px';
         label.style.boxShadow = '0 4px 10px rgba(0,0,0,0.5)';
@@ -191,7 +192,7 @@ window.ProberManager = {
             if (window.__SOLID_CONSUMER__) return;
             e.stopPropagation();
             data.labelVisible = data.labelVisible === false ? true : false;
-            if (data.dom && data.dom.label) data.dom.label.style.display = data.labelVisible ? 'block' : 'none';
+            if (data.dom && data.dom.label) data.dom.label.style.display = data.labelVisible ? 'inline-flex' : 'none';
             if (typeof window.needsUpdate !== 'undefined') window.needsUpdate = true;
         });
         this.layer.appendChild(hit);
@@ -202,7 +203,7 @@ window.ProberManager = {
         this.svgLayer.appendChild(svgGroup);
 
         data.dom = { label, svgGroup, hit };
-        label.style.display = data.labelVisible === false ? 'none' : 'block';
+        label.style.display = data.labelVisible === false ? 'none' : 'inline-flex';
     },
 
     highlightSelected: function() {

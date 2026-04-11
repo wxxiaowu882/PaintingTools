@@ -48,14 +48,15 @@ background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.0
 border-color: rgba(255,255,255,0.6); } .avatar-emoji { font-size: 20px; opacity: 0.95; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); } .avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; opacity: 0.5;
 transition: opacity 0.3s ease, transform 0.3s ease, filter 0.3s ease; } .avatar-o:hover .avatar-img { opacity: 0.8; filter: brightness(1.2); animation: pulse-white 3s infinite; }
 /* 画布容器样式 - 增加位置下移 */
-#canvas-container { width: 100%; height: 100%; fixed: top-0; left: 0; z-index: 0; /* 核心修改：整体下移 5% */
+#canvas-container { width: 100%; height: 100%; position: fixed; top: 0; left: 0; z-index: 0; /* 核心修改：整体下移 5% */
 transform: translateY(5vh); }
 @media (min-width: 640px) { .site-title { top: 7vh; } .title-line { font-size: 48px; letter-spacing: 0.3em; line-height: 1.4; } .subtitle { font-size: 12px; letter-spacing: 0.8em; margin-top: 20px; }
-.avatar-o { width: 58px; height: 58px; margin: 0 0.2em; border-width: 1.5px; } .avatar-emoji { font-size: 32px; } } </style> <script> (function(){ // 微信引导层开关 - 设置为 false 即可禁用
-/* 配合 GlobalMenu.js，只在菜单打开时变为 X */
+.avatar-o { width: 58px; height: 58px; margin: 0 0.2em; border-width: 1.5px; } .avatar-emoji { font-size: 32px; } }
+/* 配合 GlobalMenu.js：菜单打开时汉堡变为 X */
 .menu-open .line-1 { transform: rotate(45deg) translateY(-1.5px); }
 .menu-open .line-2 { opacity: 0; }
 .menu-open .line-3 { transform: rotate(-45deg) translateY(1.5px); }
+</style> <script> (function(){ // 微信引导层开关 - 设置为 false 即可禁用
 var SHOW_WECHAT_GUIDE = false; // true: 显示引导层, false: 不显示
 var ua = navigator.userAgent.toLowerCase(); if(ua.match(/MicroMessenger/i)=="micromessenger" && SHOW_WECHAT_GUIDE){ document.write('<style>.wechat-guide{display:flex !important;}</style>'); } })(); </script> </head>
 <body class="text-white selection:bg-white/10"> <!-- 微信引导 --> <div class="wechat-guide" onclick="this.style.display='none'"> <div class="arrow">↗</div>

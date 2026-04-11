@@ -35,7 +35,7 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     this.highlightSelected(); if (window.showToast) window.showToast("面片已闭合保存！"); } }
     this.activeData = null; window.needsUpdate = true; window.lightMoved = true; }, ensureDOM: function() { if (!document.getElementById('poly3d-layer')) { const layer = document.createElement('div');
     layer.id = 'poly3d-layer'; // 【核心突破】：必须将 SVG 容器挂载到 canvas-container 内部，共享同一个层叠上下文，才能让 mix-blend-mode 完美穿透融合！
-    layer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: auto; overflow: visible;' + (_poly3dIosLike ? ' -webkit-transform:translateZ(0); transform:translateZ(0);' : ''); layer.innerHTML = '<svg id="poly3d-svg" style="width: 100%; height: 100%; pointer-events: none; overflow: visible;"></svg>'; const canvasContainer = document.getElementById('canvas-container'); if (canvasContainer) {
+    layer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: auto; overflow: visible;'; layer.innerHTML = '<svg id="poly3d-svg" style="width: 100%; height: 100%; pointer-events: none; overflow: visible;"></svg>'; const canvasContainer = document.getElementById('canvas-container'); if (canvasContainer) {
     canvasContainer.appendChild(layer); } else { document.body.appendChild(layer); }
     const colorPicker = document.getElementById('obj-color-picker'); if (colorPicker) { colorPicker.addEventListener('input', e => { const id = this.selectedId; if (id !== null) {
     const data = window.poly3dList.find(a => a.id === id); if (data) { data.color = e.target.value; if (data.svgGroup) { data.previewPolyline.setAttribute('stroke', data.color);
@@ -133,7 +133,10 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     // 【截屏同步对齐】：当转到背面遮挡时，直接彻底跳过渲染，不再绘制多余的实色和虚线
     ctx.globalCompositeOperation = 'source-over'; // 还原全局合成模式
     ctx.globalCompositeOperation = 'source-over'; // 还原全局合成模式
-    }); } }; window.addEventListener('keydown', e => { if (e.key === 'Delete' || e.key === 'Backspace') {
+    });
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    } }; window.addEventListener('keydown', e => { if (e.key === 'Delete' || e.key === 'Backspace') {
     if (document.activeElement && document.activeElement.tagName === 'INPUT') return; const id = window.Polygon3DManager.selectedId; if (id !== null) { const idx = window.poly3dList.findIndex(a => a.id === id);
     if (idx > -1) { const data = window.poly3dList[idx]; if(data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj); if(data.svgGroup) data.svgGroup.remove(); window.poly3dList.splice(idx, 1);
     window.needsUpdate = true; window.lightMoved = true; }

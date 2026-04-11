@@ -34,7 +34,7 @@
     #scene-grid-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9000; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); flex-direction:column; padding:30px 20px; }
     .modal-header { display:flex; justify-content:space-between; align-items:center; color:#fff; margin-bottom:20px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.1); }
     .modal-title { font-size:16px; font-weight:300; letter-spacing:2px; }
-    .modal-close { cursor:pointer; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.08); border-radius:10px; font-size:18px; line-height:32px; position:relative; z-index:9001; pointer-events:auto; color:rgba(255,255,255,0.7); user-select:none; }
+    .modal-close { cursor:pointer; width:32px; height:32px; flex-shrink:0; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.08); border:none; border-radius:10px; font-size:18px; line-height:1; position:relative; z-index:9001; pointer-events:auto; color:rgba(255,255,255,0.7); user-select:none; -webkit-tap-highlight-color:transparent; }
     .modal-close:hover { background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.9); }
     .scene-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows:max-content; gap:15px; overflow-y:auto; flex:1; align-content:start; padding-bottom:30px; min-height:0; -webkit-overflow-scrolling:touch; }
     .scene-item { background:rgba(20,20,20,0.8); border:1px solid rgba(255,255,255,0.05); border-radius:10px; cursor:pointer; transition:all 0.3s cubic-bezier(0.4,0,0.2,1); overflow:hidden; position:relative; display:flex; flex-direction:column; box-shadow:0 4px 15px rgba(0,0,0,0.5); align-self:start; }
@@ -83,7 +83,10 @@
     html:not(.solid-anno-clickable) #poly3d-layer * { pointer-events: none !important; cursor: default !important; }
     html:not(.solid-anno-clickable) #dashed-line-layer svg *, html:not(.solid-anno-clickable) #dashed-line-layer .dashed-line-dom { pointer-events: none !important; cursor: default !important; }
     /* 标注层须高于底栏主控 (z-index:100)，否则手机端触控被面板挡住；仍低于左上角/汉堡 (5000+) */
-    html.solid-anno-clickable #anno-layer, html.solid-anno-clickable #anno-cs-layer, html.solid-anno-clickable #norm-arrow-layer, html.solid-anno-clickable #poly3d-layer, html.solid-anno-clickable #prober-html-layer,
+    /* #poly3d-layer 故意从此规则中移除：它始终挂在 #canvas-container 内，DOM 顺序已在 WebGL 画布之上。
+       若给它设 z-index（position:absolute + z-index），会创建独立 stacking context，
+       导致内部 SVG 的 mix-blend-mode:color 无法与 WebGL 画布合成，面片变成纯色平涂。 */
+    html.solid-anno-clickable #anno-layer, html.solid-anno-clickable #anno-cs-layer, html.solid-anno-clickable #norm-arrow-layer, html.solid-anno-clickable #prober-html-layer,
     html.solid-anno-clickable #dashed-line-layer { z-index: 4800 !important; }
     /* 底栏 z-index:100 会盖住画布区域；poly3d 须在 canvas-container 内。父级不拦截，仅顶栏条与展开内容区接收触控 */
     html.solid-anno-clickable #main-panel { pointer-events: none; }
@@ -94,9 +97,10 @@
     #solid-anno-detail-panel.solid-anno-detail-visible { opacity: 1; pointer-events: auto; animation: solid-anno-detail-fade-in 0.3s ease-out both; }
     #solid-anno-detail-panel .solid-anno-detail-inner { position: relative; margin: 0; padding: 6px 26px 8px 10px; background: transparent; border: none; border-radius: 0; box-shadow: none; font-size: 13px; line-height: 1.5; font-weight: 300; letter-spacing: 0.02em; }
     #solid-anno-detail-panel .solid-anno-detail-close { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; padding: 0; margin: 0; cursor: pointer; border: none; border-radius: 4px; background: rgba(0,0,0,0.25); color: rgba(255,255,255,0.35); font-size: 14px; line-height: 22px; text-align: center; -webkit-tap-highlight-color: transparent; }
-    /* 滚动在 scroll：负 margin + 等量 padding 保持正文相对 inner 位置不变；环须 ≥ 最大 text-shadow 模糊半径，否则仍会被裁成硬边 */
-    #solid-anno-detail-panel .solid-anno-detail-scroll { box-sizing: border-box; max-height: min(32vh, 180px); overflow-y: auto; overflow-x: hidden; margin: -8px -22px -8px -22px; padding: 8px 22px 8px 22px; width: calc(100% + 44px); -webkit-overflow-scrolling: touch; }
-    #solid-anno-detail-panel .solid-anno-detail-body { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-word; overflow: visible; max-height: none; color: rgba(175,178,186,0.88); text-shadow: 0 1px 1px rgba(0,0,0,1), 0 1px 1px rgba(0,0,0,1), 0 0 0px rgba(0,0,0,1); -webkit-font-smoothing: antialiased; }
+    /* 描边延伸远小于大模糊阴影；环略大于描边+极轻晕即可，保持 margin/padding 抵消后正文位置不变 */
+    #solid-anno-detail-panel .solid-anno-detail-scroll { box-sizing: border-box; max-height: min(32vh, 180px); overflow-y: auto; overflow-x: hidden; margin: -4px -8px -4px -8px; padding: 4px 8px 4px 8px; width: calc(100% + 16px); -webkit-overflow-scrolling: touch; }
+    /* 描边：paint-order 让「填充」盖在描边之上，字芯保持 color；深色底靠极淡白晕分离，勿改亮字色本身 */
+    #solid-anno-detail-panel .solid-anno-detail-body { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-word; overflow: visible; max-height: none; color: rgba(175,178,186,0.88); -webkit-text-fill-color: rgba(175,178,186,0.88); paint-order: stroke fill; -webkit-text-stroke: 0.35px rgba(0,0,0,0.48); text-shadow: 0 1px 2px rgba(0,0,0,0.22), 0 0 8px rgba(255,255,255,0.14); -webkit-font-smoothing: antialiased; }
     /* 沉浸模式：10s无交互隐藏顶部/底部UI */
     #top-left-scene-btn, #menu-trigger-overlay, #main-panel { transition: opacity 0.4s cubic-bezier(0.4,0,0.2,1); }
     body.immersive-mode #top-left-scene-btn, body.immersive-mode #menu-trigger-overlay, body.immersive-mode #main-panel { opacity: 0 !important; pointer-events: none !important; }
@@ -110,7 +114,7 @@
     <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div id="scene-loader-inner"> <div id="scene-load-pct">0%</div> <div class="scene-load-bar-track" aria-hidden="true"><div id="scene-load-bar-fill" class="scene-load-bar-fill"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">系统环境初始化中...</div> </div> </div>
     <div id="debug-log-panel" style="display:none; position:fixed; top:10px; left:10px; width:280px; max-height:200px; background:rgba(0,0,0,0.85); border:1px solid #ff4444; border-radius:6px; z-index:9999; padding:10px; font-family:monospace; font-size:10px; color:#fff; overflow-y:auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);"> <div style="display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #333; padding-bottom:3px;"> <span style="color:#ff4444; font-weight:bold;">DEBUG LOG (排错模式)</span> <button onclick="copyDebugLog()" style="background:#444; border:none; color:#fff; padding:2px 6px; border-radius:3px; cursor:pointer; font-size:9px;">复制日志</button> </div> <div id="log-content" style="white-space:pre-wrap; line-height:1.4;"></div> </div>
     <div id="perf-test-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:5550; flex-direction:column; align-items:center; justify-content:center;"> <div class="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin mb-4"></div> <div class="font-hairline text-[10px] tracking-[0.2em] text-white/80">正在测试设备渲染性能...</div> <div class="text-[8px] text-white/40 mt-2">首次进入时安全审计，即将完成</div> </div>
-    <div id="top-left-scene-btn" style="position:fixed; top:20px; left:20px; z-index:5000; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:8px 14px; border-radius:10px; display:flex; align-items:center; gap:10px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="document.getElementById('scene-grid-modal').style.display='flex'"> <span style="color:#fff; font-size:14px; font-weight:400; letter-spacing:1px;">学习场景：</span>
+    <div id="top-left-scene-btn" style="position:fixed; top:20px; left:20px; z-index:5000; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:8px 14px; border-radius:10px; display:flex; align-items:center; gap:10px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="document.getElementById('scene-grid-modal').style.display='flex'"> <span style="color:#fff; font-size:14px; font-weight:400; letter-spacing:1px;">场景：</span>
     <span id="scene-trigger-top" style="color:#fff; font-size:14px; font-weight:normal; max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">点击选择...</span> <span style="color:#666; font-size:10px;">▼</span> </div>
     <div id="menu-trigger-overlay" onclick="toggleMenu()"><span class="menu-line line-1"></span><span class="menu-line line-2"></span><span class="menu-line line-3"></span></div>
     <div id="scene-grid-modal">
@@ -137,37 +141,55 @@
     window.updateDoFUIFromRaycaster = function(focusDist) { const slider = document.getElementById('dofFocusSlider'); if(slider) { slider.value = focusDist; if(window.updateDoFUI) window.updateDoFUI(); } };
     window.syncPosterize2dLayout = function() { const container = document.getElementById('canvas-container'); const ov = document.getElementById('posterize-2d-overlay');
     const glc = container && container.querySelector('canvas:not(#posterize-2d-overlay)'); if (!ov || !glc) return; ov.style.width = glc.clientWidth + 'px';
-    ov.style.height = glc.clientHeight + 'px'; if (window.posterizeLevel > 0) { ov.width = glc.width; ov.height = glc.height; } }; window.ensurePosterize2dOverlay = function() {
+    ov.style.height = glc.clientHeight + 'px'; }; window.ensurePosterize2dOverlay = function() {
     const container = document.getElementById('canvas-container'); if (!container) return null; let ov = document.getElementById('posterize-2d-overlay'); if (ov) return ov;
     const glc = container.querySelector('canvas:not(#posterize-2d-overlay)'); if (!glc) return null; ov = document.createElement('canvas'); ov.id = 'posterize-2d-overlay';
     ov.setAttribute('aria-hidden', 'true'); ov.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:0;display:none'; container.appendChild(ov); window.syncPosterize2dLayout(); return ov; };
-    window.refreshIosPosterizeOverlayFromWebGL = function() { if (!isIosPosterizeHost || !window.posterizeLevel) return; const ov = document.getElementById('posterize-2d-overlay');
+    window.refreshIosPosterizeOverlayFromWebGL = function() { if (!window.posterizeLevel) return; const ov = document.getElementById('posterize-2d-overlay');
     const container = document.getElementById('canvas-container'); const glc = container && container.querySelector('canvas:not(#posterize-2d-overlay)'); if (!ov || !glc || ov.style.display === 'none') return;
-    if (glc.width !== ov.width || glc.height !== ov.height) { ov.width = glc.width; ov.height = glc.height; }
-    const ctx = ov.getContext('2d'); if (ctx) try { ctx.drawImage(glc, 0, 0); } catch (e) { /* 帧缓冲未就绪等 */ } }; window.changePosterize = function(levels) {
+    if (window.__solidPosterizeForceNextIosCopy) { window.__solidPosterizeForceNextIosCopy = false; } else try {
+    if (typeof pathTracer !== 'undefined' && pathTracer && window.useAdvancedRender) {
+    const _ts = (typeof _solidPt !== 'undefined' && _solidPt.targetSamples) ? _solidPt.targetSamples : 200;
+    if (pathTracer.samples < _ts && !window._orbitInteracting) { window.__solidPosterizeAccSkipTick = (window.__solidPosterizeAccSkipTick || 0) + 1;
+    if ((window.__solidPosterizeAccSkipTick % 2) === 0) return; }
+    } } catch (_eSkip) {}
+    var _iosScale = window._orbitInteracting ? 0.56 : 1;
+    var _tw = Math.max(1, Math.floor(glc.width * _iosScale));
+    var _th = Math.max(1, Math.floor(glc.height * _iosScale));
+    if (ov.width !== _tw || ov.height !== _th) { ov.width = _tw; ov.height = _th; ov._solidPosterize2dCtx = null; }
+    let ctx = ov._solidPosterize2dCtx; if (!ctx) { try { ctx = ov.getContext('2d', { alpha: true, desynchronized: true }); } catch (_eCtx) { ctx = ov.getContext('2d'); } ov._solidPosterize2dCtx = ctx; }
+    if (ctx) try {
+    if (_iosScale >= 0.999) ctx.drawImage(glc, 0, 0);
+    else ctx.drawImage(glc, 0, 0, glc.width, glc.height, 0, 0, _tw, _th);
+    } catch (e) { /* 帧缓冲未就绪等 */ } }; window.changePosterize = function(levels) {
     if(window.hwLog) window.hwLog(`[Engine-色阶] 收到指令, levels=${levels}`); window.posterizeLevel = levels; const canvasContainer = document.getElementById('canvas-container');
     const targetCanvas = canvasContainer ? canvasContainer.querySelector('canvas:not(#posterize-2d-overlay)') : null; if (!canvasContainer) return; if (levels === 0) { const po = document.getElementById('posterize-2d-overlay');
-    if (po) { po.style.display = 'none'; po.style.webkitFilter = 'none'; po.style.filter = 'none'; }
+    if (po) { po.style.display = 'none'; po.style.webkitFilter = 'none'; po.style.filter = 'none'; po._solidPosterize2dCtx = null; }
+    window.__solidPosterizeForceNextIosCopy = false; window.__solidPosterizeAccSkipTick = 0;
+    canvasContainer.style.isolation = ''; canvasContainer.style.transform = '';
     canvasContainer.style.webkitFilter = "none"; canvasContainer.style.filter = "none"; if(targetCanvas) { targetCanvas.style.webkitFilter = "none";
     targetCanvas.style.filter = "none"; targetCanvas.style.opacity = ''; targetCanvas.style.position = '';
     targetCanvas.style.zIndex = ''; }
+    const poly3dLayer = document.getElementById('poly3d-layer'); if (poly3dLayer) { poly3dLayer.style.zIndex = ''; }
     if(window.hwLog) window.hwLog(`[Engine-色阶] 已成功重置为空`); } else { let tableArr = []; for (let i = 0; i < levels; i++) { tableArr.push((i / (levels - 1)).toFixed(4)); }
-    // iOS Safari 对 SVG 属性中的空格解析糟糕，必须强制用逗号分隔
-    let tableStr = tableArr.join(','); // 【底层降维】：强制 WebKit 为包裹容器创建独立堆叠上下文，利于 filter 与 WebGL 合成
-    canvasContainer.style.isolation = 'isolate'; canvasContainer.style.transform = 'translateZ(0)'; canvasContainer.style.webkitFilter = 'none';
-    canvasContainer.style.filter = 'none'; if(targetCanvas) { targetCanvas.style.webkitFilter = 'none'; targetCanvas.style.filter = 'none'; }
-    void canvasContainer.offsetWidth; requestAnimationFrame(() => { if (isIosPosterizeHost) { // iOS：CSS filter 不作用于 WebGL 合成层；将帧拷到 2D canvas 再对叠层施加页内 SVG 滤镜（需 preserveDrawingBuffer）
+    let tableStr = tableArr.join(',');
     const xfer = document.getElementById('posterize-transfer'); if (xfer) { ['feFuncR', 'feFuncG', 'feFuncB'].forEach(function(tag) {
     const el = xfer.getElementsByTagName(tag)[0]; if (el) el.setAttribute('tableValues', tableStr); }); }
+    const filterNode = document.getElementById('posterize-filter'); if (filterNode && filterNode.parentNode) { const clone = filterNode.cloneNode(true); filterNode.parentNode.replaceChild(clone, filterNode); }
+    canvasContainer.style.isolation = ''; canvasContainer.style.transform = '';
     canvasContainer.style.webkitFilter = 'none'; canvasContainer.style.filter = 'none';
-    if (targetCanvas) { targetCanvas.style.webkitFilter = 'none'; targetCanvas.style.filter = 'none'; }
-    const fRef = 'url(#posterize-filter)'; const ov = window.ensurePosterize2dOverlay && window.ensurePosterize2dOverlay(); if (ov) { ov.style.zIndex = '0'; ov.style.webkitFilter = fRef;
-    ov.style.filter = fRef; ov.style.display = 'block'; if (targetCanvas) { targetCanvas.style.opacity = '0'; targetCanvas.style.position = 'relative';
-    targetCanvas.style.zIndex = '2'; }
-    window.syncPosterize2dLayout(); if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
-    if(window.hwLog) window.hwLog(`[Engine-色阶] iOS 2D叠层+SVG滤镜, 阶梯: ${tableStr.substring(0, 20)}...`); } else { const svgStr = `<svg xmlns="http://www.w3.org/2000/svg"><defs><filter id="p" color-interpolation-filters="sRGB"><feColorMatrix in="SourceGraphic" type="matrix" values="0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0" result="gray"/><feComponentTransfer in="gray" result="posterizedGray"><feFuncR type="discrete" tableValues="${tableStr}"/><feFuncG type="discrete" tableValues="${tableStr}"/><feFuncB type="discrete" tableValues="${tableStr}"/></feComponentTransfer><feBlend mode="luminosity" in="posterizedGray" in2="SourceGraphic"/></filter></defs></svg>`; const b64 = btoa(svgStr); const url = `url('data:image/svg+xml;base64,${b64}#p')`; canvasContainer.style.webkitFilter = url;
-    canvasContainer.style.filter = url; if(targetCanvas) { targetCanvas.style.webkitFilter = url; targetCanvas.style.filter = url; }
-    if(window.hwLog) window.hwLog(`[Engine-色阶] B64滤镜注入, 阶梯参数: ${tableStr.substring(0, 20)}...`); } }); }
+    if(targetCanvas) { targetCanvas.style.webkitFilter = 'none'; targetCanvas.style.filter = 'none'; }
+    void canvasContainer.offsetWidth; requestAnimationFrame(() => { if (isIosPosterizeHost) {
+    const fRef = 'url(#posterize-filter)'; const ov = window.ensurePosterize2dOverlay && window.ensurePosterize2dOverlay(); if (ov) { ov.style.zIndex = ''; ov.style.webkitFilter = fRef;
+    ov.style.filter = fRef; ov.style.display = 'block'; if (targetCanvas) { targetCanvas.style.opacity = '0'; targetCanvas.style.position = ''; targetCanvas.style.zIndex = ''; }
+    const poly3dLayer = document.getElementById('poly3d-layer'); if (poly3dLayer) { poly3dLayer.style.zIndex = ''; if (poly3dLayer.parentNode === canvasContainer) canvasContainer.appendChild(poly3dLayer); }
+    window.syncPosterize2dLayout(); window.__solidPosterizeForceNextIosCopy = true; window.__solidPosterizeAccSkipTick = 0; if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
+    if(window.hwLog) window.hwLog(`[Engine-色阶] iOS/WebKit：2D叠层 + 页内 CSS url(#posterize-filter), 阶梯: ${tableStr.substring(0, 20)}...`); } else {
+    const po = document.getElementById('posterize-2d-overlay'); if (po) { po.style.display = 'none'; po.style.webkitFilter = 'none'; po.style.filter = 'none'; po._solidPosterize2dCtx = null; }
+    if (targetCanvas) { targetCanvas.style.opacity = ''; targetCanvas.style.position = ''; targetCanvas.style.zIndex = ''; }
+    const poly3dLayer = document.getElementById('poly3d-layer'); if (poly3dLayer) { poly3dLayer.style.zIndex = ''; }
+    const fRef = 'url(#posterize-filter)'; canvasContainer.style.webkitFilter = fRef; canvasContainer.style.filter = fRef;
+    if(window.hwLog) window.hwLog(`[Engine-色阶] PC：#canvas-container + 页内 ${fRef}，阶梯: ${tableStr.substring(0, 20)}...`); } }); }
     const slider = document.getElementById('posterizeSlider'); const valDisp = document.getElementById('posterizeVal'); if (slider && valDisp) { const sliderVal = levels === 0 ? 0 : (21 - levels);
     slider.value = sliderVal; valDisp.innerText = levels === 0 ? "无" : levels + "阶"; } };
     window._logCache = []; window.addHwLog = function(msg) { const panel = document.getElementById('debug-log-panel'); const content = document.getElementById('log-content'); const time = new Date().toLocaleTimeString(); window._logCache.push(`[${time}] ${msg}`); if(window._logCache.length > 50) window._logCache.shift(); if (content) { content.innerText = window._logCache.join('\n'); panel.scrollTop = panel.scrollHeight; } console.log(`[HW-LOG] ${msg}`); };
@@ -201,7 +223,8 @@
     if (window._solidContextLost || window.isUnsupported) triggerUnsupported(); }; setTimeout(function() { run(0); }, delays[0]); };
     function _solidDismissRenderToast() { var t = document.getElementById('render-toast'); if (t) { if (t.__hideTimer) { clearTimeout(t.__hideTimer); t.__hideTimer = 0; } t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; } if (renderer && renderer.domElement) renderer.domElement.style.filter = ''; }
     window.stopRender = function() { window.useAdvancedRender = false; window.isLoadingScene = false; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
-    _solidDismissRenderToast(); if (renderer) renderer.render(scene, camera); hwLog("已停止物理渲染，释放显存与内存缓存。点击“重新渲染”可恢复光追引擎。");
+    _solidDismissRenderToast(); if (renderer) { try { renderer.render(scene, camera); } catch (_eSr) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
+    hwLog("已停止物理渲染，释放显存与内存缓存。点击“重新渲染”可恢复光追引擎。");
     const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0';
     const br = document.getElementById('btn-rerender'); if(br) { br.style.opacity = '0.8'; br.style.borderColor = 'rgba(255,255,255,0.3)'; br.style.boxShadow = 'none'; }
     const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.opacity = '0.4'; bs.style.borderColor = 'rgba(255,255,255,0.15)'; bs.style.boxShadow = 'none'; }
@@ -420,7 +443,7 @@
     if (data && data.camera) { camera.position.set(...data.camera.pos); controls.target.set(...data.camera.target); camera.zoom = data.camera.zoom; camera.updateProjectionMatrix(); controls.update(); needsUpdate = true; lightMoved = true; }
     if (typeof window.updateAnnotationEyeButtonVisibility === 'function') window.updateAnnotationEyeButtonVisibility();
     document.getElementById('scene-grid-modal').style.display = 'none'; // [解除防呆] 用户已经成功选择了一个场景，以后再打开面板时可以正常关闭了
-    document.querySelector('.modal-close').style.display = 'inline-block';
+    document.querySelector('.modal-close').style.display = 'inline-flex';
     document.getElementById('scene-trigger-top').innerText = data.name || `场景 ${index+1}`; // 同步更新左上角文本
     document.getElementById('scene-loader').style.display = 'flex'; document.getElementById('scene-loader').style.opacity = '1'; setLoaderText("读取场景布局..."); setLoaderProgress(2);
     // 【安全清理旧场景】统一交给总线广播，彻底杜绝数据残留
@@ -808,7 +831,7 @@
         const _lastFb = window._solidFallbackRenderAt || 0;
         if (_minInterval > 0 && (_now - _lastFb) < _minInterval) return;
         window._solidFallbackRenderAt = _now;
-        if (renderer) { try { renderer.render(scene, camera); } catch(err) {} if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); }
+        if (renderer) { try { renderer.render(scene, camera); } catch(err) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); }
         return; }
         const isTesting = window.PerfTester ? window.PerfTester.isTesting : false; if (!isTesting) { if (controls && !controls.enabled) controls.enabled = true; if (controls) controls.update(); }
         // 【统一生命周期总线】：一行代码调度所有插件，彻底解耦
@@ -817,10 +840,11 @@
         // 【消费端 UX 修复】：未选择场景前禁止开始光追采样（避免列表页空转烧 GPU）
         if (!isTesting && (!window.currentSceneData || (window.currentSceneIndex == null) || window.currentSceneIndex < 0)) {
             try { if (renderer) renderer.render(scene, camera); } catch(_e) {}
+            if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL();
             if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
             return;
         }
-        if (pathTracer) { if (window.isLoadingScene) { try { renderer.render(scene, camera); } catch(err) {} if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
+        if (pathTracer) { if (window.isLoadingScene) { try { renderer.render(scene, camera); } catch(err) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
         try { // 正式全速渲染核心逻辑
         if (lightMoved || lightPosUpdated || needsUpdate) { camera.updateMatrixWorld(); if (lightMoved) { pathTracer.setScene(scene, camera); }
         else if (lightPosUpdated && pathTracer.updateLights) { pathTracer.updateLights(); }
@@ -844,13 +868,27 @@
         (function solidEarlyRenderUX() {
             var _qualityTh = Math.ceil(targetSamples / 3);
             var _canvas = renderer ? renderer.domElement : null;
-            if (_canvas) {
+            var _posterOv = document.getElementById('posterize-2d-overlay');
+            var _usePosterOv = _posterOv && window.posterizeLevel > 0 && _posterOv.style.display === 'block';
+            var _target = _usePosterOv ? _posterOv : _canvas;
+            if (_target) {
                 if (currentSamples < _qualityTh) {
                     var _ratio = (_qualityTh - currentSamples) / _qualityTh;
                     var _blurPx = _ratio * 1;
-                    _canvas.style.filter = 'blur(' + _blurPx.toFixed(1) + 'px)';
-                } else if (_canvas.style.filter) {
-                    _canvas.style.filter = '';
+                    if (_usePosterOv) {
+                        var _pf = 'blur(' + _blurPx.toFixed(1) + 'px) url(#posterize-filter)';
+                        _posterOv.style.webkitFilter = _pf;
+                        _posterOv.style.filter = _pf;
+                    } else {
+                        _canvas.style.filter = 'blur(' + _blurPx.toFixed(1) + 'px)';
+                    }
+                } else if (_target.style.filter) {
+                    if (_usePosterOv) {
+                        _posterOv.style.webkitFilter = 'url(#posterize-filter)';
+                        _posterOv.style.filter = 'url(#posterize-filter)';
+                    } else {
+                        _canvas.style.filter = '';
+                    }
                 }
             }
             var t = document.getElementById('render-toast');

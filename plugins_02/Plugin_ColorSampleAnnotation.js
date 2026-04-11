@@ -66,7 +66,7 @@ window.ColorSampleAnnotationManager = {
                 .anno-cs-end { pointer-events: auto; cursor: grab; }
                 .anno-cs-ring { pointer-events: auto; cursor: pointer; fill: none; }
                 /* 取色标签样式对齐经典引线：矩形文本框（支持内部换行） */
-                .anno-cs-label { position:absolute; pointer-events:auto; cursor:pointer; border:1px solid #0df; color:#fff; padding:4px 8px; font-size:11px; font-weight:700; font-family:'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; white-space:pre-wrap; user-select:none; border-radius:2px; transition:opacity 0.2s; box-shadow:0 4px 10px rgba(0,0,0,0.5); transform:translate(0,-50%); max-width: 260px; }
+                .anno-cs-label { position:absolute; pointer-events:auto; cursor:pointer; border:1px solid #0df; color:#fff; padding:4px 8px; font-size:11px; line-height:1.45; box-sizing:border-box; font-weight:700; font-family:'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; white-space:pre-wrap; user-select:none; border-radius:2px; transition:opacity 0.2s; box-shadow:0 4px 10px rgba(0,0,0,0.5); transform:translate(0,-50%); max-width:260px; display:inline-flex; align-items:center; justify-content:flex-start; }
                 /* 编辑态完全对齐经典引线 */
                 .anno-cs-label.editing { background:#fff !important; color:#000 !important; outline:none; border-color:#fff !important; box-shadow:0 0 10px rgba(0,210,255,0.5) !important; user-select:text !important; cursor:text !important; }
             `;
