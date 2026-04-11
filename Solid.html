@@ -127,6 +127,7 @@
     import './plugins_02/Plugin_Polygon3D.js'; // 同步接入面片光影插件
     import './plugins_02/Plugin_Prober.js'; // ⚡ 同步接入全新的受光探针插件
     import './plugins_02/Plugin_DashedLine.js'; // 虚线连续标注（与生产端 JSON 一致）
+    import './plugins_02/Plugin_PosterizeShared.js'; // 色阶共通逻辑（生产/消费一致）
     import './plugins_02/Plugin_Atmosphere.js'; // ☁️ 同步接入大气透视插件
     import './plugins_02/Plugin_DepthOfField.js'; // 📷 同步接入景深虚实插件
     window.skyEnvLightMatchMainRect = true; // 【试验·抗黑点噪点】true=更干净（更慢），false=更快（更噪）
@@ -135,61 +136,20 @@
     ? { targetSamples: 380, renderScaleMobile: 0.45, renderScaleDesktop: 0.82, filterGlossyFactor: 0.78, expRamp: 28, expLo: 0.63, expHi: 0.74, toneMappingExposureBase: 0.72 }
     : { targetSamples: 200, renderScaleMobile: 0.42, renderScaleDesktop: 0.75, filterGlossyFactor: 1, expRamp: 24, expLo: 0.55, expHi: 0.7, toneMappingExposureBase: 0.7 }; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const isIosPosterizeHost = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false; let solidAnimRafId = 0; window.sumDuration = 0; window.useAdvancedRender = true;
+    let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false; let solidAnimRafId = 0; window.sumDuration = 0; window.useAdvancedRender = true; window._solidUserStoppedRender = false;
     window.perfTestDone = false; window.isTestingPerformance = true; window.isLoadingScene = false; window._solidHardwareUnsupported = false; window._solidPerfSoftFail = false; window._solidSampleTimeout = false; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0; window.changeAtmosphere = function(enabled, density, noise) { window.isFogEnabled = enabled; window.fogDensity = density; if(noise !== undefined) window.fogNoise = noise; if(window.AtmosphereManager) window.AtmosphereManager.updateParams(enabled, density, window.fogNoise); if(typeof needsUpdate !== 'undefined') { needsUpdate = true; lightMoved = true; } };
     window.changeDoF = function(enabled, aperture, focus) { if(window.DoFManager) window.DoFManager.updateParams(enabled, aperture, focus); if(window.AtmosphereManager && window.AtmosphereManager.updateDoFParams) window.AtmosphereManager.updateDoFParams(enabled, aperture, focus); if(typeof needsUpdate !== 'undefined') { needsUpdate = true; lightMoved = true; } };
     window.updateDoFUIFromRaycaster = function(focusDist) { const slider = document.getElementById('dofFocusSlider'); if(slider) { slider.value = focusDist; if(window.updateDoFUI) window.updateDoFUI(); } };
-    window.syncPosterize2dLayout = function() { const container = document.getElementById('canvas-container'); const ov = document.getElementById('posterize-2d-overlay');
-    const glc = container && container.querySelector('canvas:not(#posterize-2d-overlay)'); if (!ov || !glc) return; ov.style.width = glc.clientWidth + 'px';
-    ov.style.height = glc.clientHeight + 'px'; }; window.ensurePosterize2dOverlay = function() {
-    const container = document.getElementById('canvas-container'); if (!container) return null; let ov = document.getElementById('posterize-2d-overlay'); if (ov) return ov;
-    const glc = container.querySelector('canvas:not(#posterize-2d-overlay)'); if (!glc) return null; ov = document.createElement('canvas'); ov.id = 'posterize-2d-overlay';
-    ov.setAttribute('aria-hidden', 'true'); ov.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:0;display:none'; container.appendChild(ov); window.syncPosterize2dLayout(); return ov; };
-    window.refreshIosPosterizeOverlayFromWebGL = function() { if (!window.posterizeLevel) return; const ov = document.getElementById('posterize-2d-overlay');
-    const container = document.getElementById('canvas-container'); const glc = container && container.querySelector('canvas:not(#posterize-2d-overlay)'); if (!ov || !glc || ov.style.display === 'none') return;
-    if (window.__solidPosterizeForceNextIosCopy) { window.__solidPosterizeForceNextIosCopy = false; } else try {
-    if (typeof pathTracer !== 'undefined' && pathTracer && window.useAdvancedRender) {
-    const _ts = (typeof _solidPt !== 'undefined' && _solidPt.targetSamples) ? _solidPt.targetSamples : 200;
-    if (pathTracer.samples < _ts && !window._orbitInteracting) { window.__solidPosterizeAccSkipTick = (window.__solidPosterizeAccSkipTick || 0) + 1;
-    if ((window.__solidPosterizeAccSkipTick % 2) === 0) return; }
-    } } catch (_eSkip) {}
-    var _iosScale = window._orbitInteracting ? 0.56 : 1;
-    var _tw = Math.max(1, Math.floor(glc.width * _iosScale));
-    var _th = Math.max(1, Math.floor(glc.height * _iosScale));
-    if (ov.width !== _tw || ov.height !== _th) { ov.width = _tw; ov.height = _th; ov._solidPosterize2dCtx = null; }
-    let ctx = ov._solidPosterize2dCtx; if (!ctx) { try { ctx = ov.getContext('2d', { alpha: true, desynchronized: true }); } catch (_eCtx) { ctx = ov.getContext('2d'); } ov._solidPosterize2dCtx = ctx; }
-    if (ctx) try {
-    if (_iosScale >= 0.999) ctx.drawImage(glc, 0, 0);
-    else ctx.drawImage(glc, 0, 0, glc.width, glc.height, 0, 0, _tw, _th);
-    } catch (e) { /* 帧缓冲未就绪等 */ } }; window.changePosterize = function(levels) {
-    if(window.hwLog) window.hwLog(`[Engine-色阶] 收到指令, levels=${levels}`); window.posterizeLevel = levels; const canvasContainer = document.getElementById('canvas-container');
-    const targetCanvas = canvasContainer ? canvasContainer.querySelector('canvas:not(#posterize-2d-overlay)') : null; if (!canvasContainer) return; if (levels === 0) { const po = document.getElementById('posterize-2d-overlay');
-    if (po) { po.style.display = 'none'; po.style.webkitFilter = 'none'; po.style.filter = 'none'; po._solidPosterize2dCtx = null; }
-    window.__solidPosterizeForceNextIosCopy = false; window.__solidPosterizeAccSkipTick = 0;
-    canvasContainer.style.isolation = ''; canvasContainer.style.transform = '';
-    canvasContainer.style.webkitFilter = "none"; canvasContainer.style.filter = "none"; if(targetCanvas) { targetCanvas.style.webkitFilter = "none";
-    targetCanvas.style.filter = "none"; targetCanvas.style.opacity = ''; targetCanvas.style.position = '';
-    targetCanvas.style.zIndex = ''; }
-    const poly3dLayer = document.getElementById('poly3d-layer'); if (poly3dLayer) { poly3dLayer.style.zIndex = ''; }
-    if(window.hwLog) window.hwLog(`[Engine-色阶] 已成功重置为空`); } else { let tableArr = []; for (let i = 0; i < levels; i++) { tableArr.push((i / (levels - 1)).toFixed(4)); }
-    let tableStr = tableArr.join(',');
-    const xfer = document.getElementById('posterize-transfer'); if (xfer) { ['feFuncR', 'feFuncG', 'feFuncB'].forEach(function(tag) {
-    const el = xfer.getElementsByTagName(tag)[0]; if (el) el.setAttribute('tableValues', tableStr); }); }
-    const filterNode = document.getElementById('posterize-filter'); if (filterNode && filterNode.parentNode) { const clone = filterNode.cloneNode(true); filterNode.parentNode.replaceChild(clone, filterNode); }
-    canvasContainer.style.isolation = ''; canvasContainer.style.transform = '';
-    canvasContainer.style.webkitFilter = 'none'; canvasContainer.style.filter = 'none';
-    if(targetCanvas) { targetCanvas.style.webkitFilter = 'none'; targetCanvas.style.filter = 'none'; }
-    void canvasContainer.offsetWidth; requestAnimationFrame(() => { if (isIosPosterizeHost) {
-    const fRef = 'url(#posterize-filter)'; const ov = window.ensurePosterize2dOverlay && window.ensurePosterize2dOverlay(); if (ov) { ov.style.zIndex = ''; ov.style.webkitFilter = fRef;
-    ov.style.filter = fRef; ov.style.display = 'block'; if (targetCanvas) { targetCanvas.style.opacity = '0'; targetCanvas.style.position = ''; targetCanvas.style.zIndex = ''; }
-    const poly3dLayer = document.getElementById('poly3d-layer'); if (poly3dLayer) { poly3dLayer.style.zIndex = ''; if (poly3dLayer.parentNode === canvasContainer) canvasContainer.appendChild(poly3dLayer); }
-    window.syncPosterize2dLayout(); window.__solidPosterizeForceNextIosCopy = true; window.__solidPosterizeAccSkipTick = 0; if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
-    if(window.hwLog) window.hwLog(`[Engine-色阶] iOS/WebKit：2D叠层 + 页内 CSS url(#posterize-filter), 阶梯: ${tableStr.substring(0, 20)}...`); } else {
-    const po = document.getElementById('posterize-2d-overlay'); if (po) { po.style.display = 'none'; po.style.webkitFilter = 'none'; po.style.filter = 'none'; po._solidPosterize2dCtx = null; }
-    if (targetCanvas) { targetCanvas.style.opacity = ''; targetCanvas.style.position = ''; targetCanvas.style.zIndex = ''; }
-    const poly3dLayer = document.getElementById('poly3d-layer'); if (poly3dLayer) { poly3dLayer.style.zIndex = ''; }
-    const fRef = 'url(#posterize-filter)'; canvasContainer.style.webkitFilter = fRef; canvasContainer.style.filter = fRef;
-    if(window.hwLog) window.hwLog(`[Engine-色阶] PC：#canvas-container + 页内 ${fRef}，阶梯: ${tableStr.substring(0, 20)}...`); } }); }
+    if (window.PosterizeShared && typeof window.PosterizeShared.init === 'function') {
+    window.PosterizeShared.init({ containerId: 'canvas-container', iosHost: isIosPosterizeHost, getLogger: () => window.hwLog });
+    }
+    window.syncPosterize2dLayout = function() { if (window.PosterizeShared && window.PosterizeShared.syncLayout) window.PosterizeShared.syncLayout(); };
+    window.ensurePosterize2dOverlay = function() { return (window.PosterizeShared && window.PosterizeShared.ensureOverlay) ? window.PosterizeShared.ensureOverlay() : null; };
+    window.refreshIosPosterizeOverlayFromWebGL = function() { if (window.PosterizeShared && window.PosterizeShared.refreshOverlayFromWebGL) window.PosterizeShared.refreshOverlayFromWebGL(); };
+    window.changePosterize = function(levels) {
+    if(window.hwLog) window.hwLog(`[Engine-色阶] 收到指令, levels=${levels}`);
+    if (window.PosterizeShared && typeof window.PosterizeShared.apply === 'function') { window.PosterizeShared.apply(levels); return; }
+    window.posterizeLevel = levels;
     const slider = document.getElementById('posterizeSlider'); const valDisp = document.getElementById('posterizeVal'); if (slider && valDisp) { const sliderVal = levels === 0 ? 0 : (21 - levels);
     slider.value = sliderVal; valDisp.innerText = levels === 0 ? "无" : levels + "阶"; } };
     window._logCache = []; window.addHwLog = function(msg) { const panel = document.getElementById('debug-log-panel'); const content = document.getElementById('log-content'); const time = new Date().toLocaleTimeString(); window._logCache.push(`[${time}] ${msg}`); if(window._logCache.length > 50) window._logCache.shift(); if (content) { content.innerText = window._logCache.join('\n'); panel.scrollTop = panel.scrollHeight; } console.log(`[HW-LOG] ${msg}`); };
@@ -217,18 +177,20 @@
     const now = performance.now(); if (window.__solidLastScheduleAt && (now - window.__solidLastScheduleAt) < 1500) return; window.__solidLastScheduleAt = now; const seq = ++window.__solidRecoverSeq;
     const _delayMap = { 'event_context_restored': [50, 200, 600], 'visibility_visible': [200, 800, 2000] }; const delays = _delayMap[reason] || [80, 420, 1200];
     (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '渲染中断，正在恢复…'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); } })();
-    const run = function(i) { if (window.__solidRecoverSeq !== seq) return; if (document.hidden) return; const needRecover = !pathTracer || window.isUnsupported || window._solidContextLost; if (!needRecover) return;
+    const run = function(i) { if (window.__solidRecoverSeq !== seq) return; if (document.hidden) return; if (window._solidUserStoppedRender) return; const needRecover = !pathTracer || window.isUnsupported || window._solidContextLost; if (!needRecover) return;
     const ok = window.__solidTryRecoverPathTracer((reason || 'unknown') + '#' + (i + 1)); if (ok) return;
     if (i < delays.length - 1) { setTimeout(function() { run(i + 1); }, delays[i + 1]); return; }
     if (window._solidContextLost || window.isUnsupported) triggerUnsupported(); }; setTimeout(function() { run(0); }, delays[0]); };
     function _solidDismissRenderToast() { var t = document.getElementById('render-toast'); if (t) { if (t.__hideTimer) { clearTimeout(t.__hideTimer); t.__hideTimer = 0; } t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; } if (renderer && renderer.domElement) renderer.domElement.style.filter = ''; }
-    window.stopRender = function() { window.useAdvancedRender = false; window.isLoadingScene = false; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
+    window.stopRender = function() { window._solidUserStoppedRender = true; window.useAdvancedRender = false; window.isLoadingScene = false; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
+    // 统一“停渲染态”曝光，避免停在不同采样阶段导致色阶显示不一致
+    if (renderer) renderer.toneMappingExposure = 0.7;
     _solidDismissRenderToast(); if (renderer) { try { renderer.render(scene, camera); } catch (_eSr) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
     hwLog("已停止物理渲染，释放显存与内存缓存。点击“重新渲染”可恢复光追引擎。");
     const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0';
     const br = document.getElementById('btn-rerender'); if(br) { br.style.opacity = '0.8'; br.style.borderColor = 'rgba(255,255,255,0.3)'; br.style.boxShadow = 'none'; }
     const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.opacity = '0.4'; bs.style.borderColor = 'rgba(255,255,255,0.15)'; bs.style.boxShadow = 'none'; }
-    }; window.forceReRender = function() { if (window._solidHardwareUnsupported) { window.hwLog('[forceReRender] 硬件不支持光追，无法重新渲染'); (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '当前设备不支持光追渲染'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 2500); } })(); return; }
+    }; window.forceReRender = function() { window._solidUserStoppedRender = false; if (window._solidHardwareUnsupported) { window.hwLog('[forceReRender] 硬件不支持光追，无法重新渲染'); (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '当前设备不支持光追渲染'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 2500); } })(); return; }
     window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none'; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
     document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1';
     document.getElementById('main-panel').style.pointerEvents = 'auto'; window.isLoadingScene = false; if (!pathTracer && renderer) { try {
@@ -770,7 +732,8 @@
         if (window.SkyEnvLight && typeof window.SkyEnvLight.invalidateSyncCache === 'function') window.SkyEnvLight.invalidateSyncCache();
         lightMoved = true; needsUpdate = true; window.sumDuration = 0;
         const needRecover = !pathTracer || window.isUnsupported || window._solidContextLost;
-        if (needRecover && typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('visibility_visible');
+        const userStopped = !!window._solidUserStoppedRender;
+        if (!userStopped && needRecover && typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('visibility_visible');
         // 【核心修复】：绝对禁止在此处调用 requestAnimationFrame(animate)，彻底切断后台裂变的死亡螺旋！
         });
         });
@@ -819,6 +782,7 @@
         try { __solidEvalImmersiveIdle(); } catch(_e) {}
         if (window._solidPerfHardwareT0 && window.PerfTester && window.PerfTester.isTesting) tickSolidPerfHardwareProgress();
         if (window.isUnsupported || !window.useAdvancedRender) {
+        if (renderer) renderer.toneMappingExposure = 0.7;
         if (renderer && renderer.domElement && renderer.domElement.style.filter) renderer.domElement.style.filter = '';
         if (controls && !controls.enabled) controls.enabled = true;
         if (controls) controls.update();
