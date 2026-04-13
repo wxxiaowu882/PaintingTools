@@ -205,32 +205,35 @@
 
                 if (mainLight.isSpotLight) {
                     sh.mapSize.set(ms, ms);
-                    sh.bias = -0.00006;
-                    sh.normalBias = 0.056;
-                    sh.radius = 3.4;
+                    // 减少“接触面漏光”(peter-panning)：降低 bias / normalBias
+                    sh.bias = -0.000006;
+                    sh.normalBias = 0.008;
+                    // 更紧贴接触面：略收紧基础半径（远端虚化由地面 shader patch 负责）
+                    sh.radius = 2.6;
                     sh.blurSamples = 10;
-                    sh.camera.near = 0.18;
+                    // 提升深度精度，减少接触面漏光（near 越大精度越好，但不要裁切近处）
+                    sh.camera.near = Math.max(0.26, Math.min(0.6, (Number(state && state.radius) || 18) * 0.016));
                     sh.camera.far = range;
                     sh.camera.updateProjectionMatrix();
                 } else if (mainLight.isDirectionalLight) {
                     sh.mapSize.set(ms, ms);
-                    sh.bias = -0.0002;
-                    sh.normalBias = 0.058;
-                    sh.radius = 2.4;
+                    sh.bias = -0.00003;
+                    sh.normalBias = 0.01;
+                    sh.radius = 1.9;
                     sh.blurSamples = 10;
                     const cam = sh.camera;
                     const he = isMobile ? 26 : 32;
-                    cam.near = 0.9;
+                    cam.near = 1.3;
                     cam.far = Math.min(125, (Number(state && state.radius) || 18) * 4.2 + 58);
                     cam.left = -he; cam.right = he; cam.top = he; cam.bottom = -he;
                     cam.updateProjectionMatrix();
                 } else if (mainLight.isPointLight) {
                     const pms = isMobile ? 896 : 1408;
                     sh.mapSize.set(pms, pms);
-                    sh.bias = -0.00004;
-                    sh.normalBias = 0.075;
+                    sh.bias = -0.000006;
+                    sh.normalBias = 0.012;
                     sh.blurSamples = 8;
-                    sh.camera.near = 0.32;
+                    sh.camera.near = 0.5;
                     sh.camera.far = range;
                     sh.camera.updateProjectionMatrix();
                 }
