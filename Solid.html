@@ -171,7 +171,7 @@
     const msg = document.getElementById('fallback-msg'); if (msg) msg.style.display = 'none'; const pw = document.getElementById('persistent-warning'); if (pw) pw.style.display = 'none'; const cc = document.getElementById('canvas-container'); if (cc) cc.style.opacity = '1'; const mp = document.getElementById('main-panel'); if (mp) { mp.style.opacity = '1'; mp.style.pointerEvents = 'auto'; }
     const br = document.getElementById('btn-rerender'); if(br) { br.style.display = ''; br.style.opacity = '0.4'; br.style.borderColor = 'rgba(255,255,255,0.15)'; br.style.boxShadow = 'none'; }
     const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.display = ''; bs.style.opacity = '0.8'; bs.style.borderColor = 'rgba(255,255,255,0.3)'; bs.style.boxShadow = 'none'; }
-    if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene }); window.hwLog(`[Recover] 光追恢复成功：${reason || 'unknown'}`); recovered = true;
+    if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); window.hwLog(`[Recover] 光追恢复成功：${reason || 'unknown'}`); recovered = true;
     (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '光追已恢复'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 1500); } })();
     } catch (e) { window.hwLog(`[Recover] 光追恢复失败：${reason || 'unknown'} / ${e.message}`); recovered = false; } window._solidRecovering = false; return recovered; }; window.__solidScheduleRecover = function(reason) { if (window._solidRecovering) return;
     const now = performance.now(); if (window.__solidLastScheduleAt && (now - window.__solidLastScheduleAt) < 1500) return; window.__solidLastScheduleAt = now; const seq = ++window.__solidRecoverSeq;
@@ -188,17 +188,43 @@
         try {
             if (!renderer || !scene || !mainLight) return;
             if (!renderer.shadowMap) return;
+            const clearGroundSoftPatch = () => {
+                try {
+                    if (!ground || !ground.material) return;
+                    const m0 = ground.material;
+                    if (m0.onBeforeCompile) m0.onBeforeCompile = null;
+                    if (m0.userData) {
+                        delete m0.userData.uSolidShadowAnchor;
+                        delete m0.userData._solidShadowSoftVer;
+                    }
+                    if (m0.customProgramCacheKey) delete m0.customProgramCacheKey;
+                    if (m0.defines) {
+                        delete m0.defines.SOLID_SHADOW_SOFT_GROUND;
+                        delete m0.defines.SOLID_SHADOW_SOFT_GROUND_VER;
+                    }
+                    m0.needsUpdate = true;
+                } catch (_eClr) {}
+            };
+
+            // RectAreaLight：不支持 shadow；只有真正的 RectAreaLight 才需要在光栅态强制关 shadowMap
+            if ((mainLight && mainLight.isRectAreaLight) || !mainLight.shadow) {
+                renderer.shadowMap.enabled = false;
+                renderer.shadowMap.needsUpdate = true;
+                try { mainLight.castShadow = false; } catch(_e) {}
+                clearGroundSoftPatch();
+                return;
+            }
+
             renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            // 关键：PCFSoft 在 r164 的 getShadow() 分支里不使用 shadowRadius（Spot/Dir 远端虚化看不到）
+            // 这里改为 PCF，使 shadowRadius 生效；远端虚化通过 shadowRadius 缩放实现。
+            renderer.shadowMap.type = THREE.PCFShadowMap;
             renderer.shadowMap.needsUpdate = true;
             // 避免光栅分支被节流挡住首帧更新
             window._solidFallbackRenderAt = 0;
 
-            // Light: RectAreaLight 不支持 shadow
-            if (lightType === 'rect' || !mainLight.shadow) {
-                mainLight.castShadow = false;
-            } else {
-                mainLight.castShadow = true;
+            // Light
+            mainLight.castShadow = true;
                 const sh = mainLight.shadow;
                 const ms = isMobile ? 2048 : 4096;
                 const range = Math.min(175, Math.max(96, (Number(state && state.radius) || 18) * 2.75 + 48));
@@ -237,7 +263,6 @@
                     sh.camera.far = range;
                     sh.camera.updateProjectionMatrix();
                 }
-            }
 
             // Receivers / casters
             if (ground) { ground.receiveShadow = true; ground.castShadow = false; }
@@ -251,6 +276,117 @@
                     obj.castShadow = true;
                 });
             }
+
+            // 仅地面：让投影远端更虚（不影响其它物体；只影响光栅态）
+            try {
+                if (ground && ground.material && mainLight && mainLight.castShadow) {
+                    const m = ground.material;
+                    const canPatch = !!(m.isMeshPhysicalMaterial || m.isMeshStandardMaterial);
+                    if (canPatch) {
+                        if (!m.userData) m.userData = {};
+                        if (!m.userData.uSolidShadowAnchor) m.userData.uSolidShadowAnchor = { value: new THREE.Vector3(0, 1, 0) };
+                        // 强制重编译：否则 onBeforeCompile 可能不会再次触发
+                        m.userData._solidShadowSoftVer = (m.userData._solidShadowSoftVer || 0) + 1;
+                        const _ver = m.userData._solidShadowSoftVer;
+                        m.customProgramCacheKey = function() { return 'solid_shadow_soft_ground_v' + _ver; };
+                        if (!m.defines) m.defines = {};
+                        m.defines.SOLID_SHADOW_SOFT_GROUND = 1;
+                        m.defines.SOLID_SHADOW_SOFT_GROUND_VER = _ver;
+                        // anchor：spot/dir 用 target；point 用光源位置
+                        try {
+                            if (mainLight && mainLight.isPointLight) mainLight.getWorldPosition(m.userData.uSolidShadowAnchor.value);
+                            else if (mainLight && mainLight.target) mainLight.target.getWorldPosition(m.userData.uSolidShadowAnchor.value);
+                            else m.userData.uSolidShadowAnchor.value.set(0, 1, 0);
+                        } catch (_eA) {}
+
+                        // 远端更明显虚化：不同光型使用不同距离范围（Spot/Dir 的阴影通常更短，需要更早开始虚化）
+                        const multExpr = (mainLight && (mainLight.isSpotLight || mainLight.isDirectionalLight))
+                            ? '( 1.0 + 12.0 * smoothstep( 0.25, 4.5, length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz ) ) )'
+                            : '( 1.0 + 7.0 * smoothstep( 0.6, 10.0, length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz ) ) )';
+
+                        m.onBeforeCompile = (shader) => {
+                            // debug log: keep minimal (remove later if stable)
+                            try { if (window.hwLog) window.hwLog('[RasterShadowSoft] ground onBeforeCompile hit'); } catch(_eLog) {}
+                            let fs = shader.fragmentShader;
+                            // 直接劫持 getShadow / getPointShadow 的“第4个参数(半径)”——不依赖任何 shadowRadius 字符串
+                            let cnt = 0;
+                            try {
+                                try {
+                                    const c1 = (fs.match(/getShadow\s*\(/g) || []).length;
+                                    const c2 = (fs.match(/getPointShadow\s*\(/g) || []).length;
+                                    const c3 = (fs.match(/getShadowMask\s*\(/g) || []).length;
+                                    if (window.hwLog) window.hwLog('[RasterShadowSoft] fnCount getShadow=' + c1 + ' getPointShadow=' + c2 + ' getShadowMask=' + c3);
+                                    const _mIdx = fs.indexOf('getShadowMask');
+                                    if (_mIdx >= 0 && window.hwLog) window.hwLog('[RasterShadowSoft] getShadowMask ctx=' + fs.slice(Math.max(0, _mIdx - 60), Math.min(fs.length, _mIdx + 160)));
+                                    const _shIdx = fs.toLowerCase().indexOf('shadow');
+                                    if (window.hwLog) window.hwLog('[RasterShadowSoft] fsLen=' + fs.length + ' shadowIdx=' + _shIdx);
+                                    if (_shIdx >= 0 && window.hwLog) window.hwLog('[RasterShadowSoft] shadow ctx=' + fs.slice(Math.max(0, _shIdx - 60), Math.min(fs.length, _shIdx + 220)));
+                                } catch(_eFn) {}
+                            } catch(_eHack) {}
+                            if (cnt <= 0) {
+                                // 标准/物理材质里 shadowmask 不一定存在；改为替换 shadowmap chunk 本体，在 getShadow/getPointShadow 内部乘远端倍率
+                                try {
+                                    const inc = '#include <shadowmap_pars_fragment>';
+                                    if (fs.includes(inc) && typeof THREE !== 'undefined' && THREE.ShaderChunk && THREE.ShaderChunk.shadowmap_pars_fragment) {
+                                        let chunk = THREE.ShaderChunk.shadowmap_pars_fragment;
+
+                                        // 在函数体内计算倍率（可使用 varying/uniform），并缩放 shadowRadius
+                                        chunk = chunk.replace(
+                                            'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {',
+                                            `float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
+                                        );
+                                        chunk = chunk.replace(
+                                            'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {',
+                                            `float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
+                                        );
+
+                                        fs = fs.replace(inc, chunk);
+                                        cnt = 1;
+                                        try { if (window.hwLog) window.hwLog('[RasterShadowSoft] radius replace OK via shadowmap chunk'); } catch(_eOk2) {}
+                                    }
+                                } catch(_eChunk) {}
+                                if (cnt <= 0) {
+                                    try { if (window.hwLog) window.hwLog('[RasterShadowSoft] radius replace MISS'); } catch(_eMiss) {}
+                                    return;
+                                }
+                            }
+                            try { if (window.hwLog) window.hwLog('[RasterShadowSoft] radius replace OK x' + cnt); } catch(_eOk) {}
+
+                            shader.uniforms.uSolidShadowAnchor = m.userData.uSolidShadowAnchor;
+                            shader.fragmentShader = 'varying vec3 vSolidShadowGroundPos;\nuniform vec3 uSolidShadowAnchor;\n' + fs;
+                            shader.vertexShader = 'varying vec3 vSolidShadowGroundPos;\n' + shader.vertexShader;
+                            // 尽量稳地写入 vSolidShadowGroundPos（某些材质变体不一定包含 worldpos_vertex）
+                            if (shader.vertexShader.includes('#include <worldpos_vertex>')) {
+                                shader.vertexShader = shader.vertexShader.replace(
+                                    '#include <worldpos_vertex>',
+                                    '#include <worldpos_vertex>\n\tvSolidShadowGroundPos = worldPosition.xyz;'
+                                );
+                            } else if (shader.vertexShader.includes('#include <begin_vertex>')) {
+                                shader.vertexShader = shader.vertexShader.replace(
+                                    '#include <begin_vertex>',
+                                    '#include <begin_vertex>\n\tvSolidShadowGroundPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;'
+                                );
+                            }
+                        };
+
+                        try { if (window.hwLog) window.hwLog('[RasterShadowSoft] ground patch armed v' + _ver); } catch(_eArm) {}
+                        m.needsUpdate = true;
+                    }
+                } else {
+                    clearGroundSoftPatch();
+                }
+            } catch (_eGs) {}
+
+            // 非面积光或光追恢复时移除兜底灯
+            try {
+                if (window._solidRasterRectEmu && window._solidRasterRectEmu.parent) {
+                    window._solidRasterRectEmu.parent.remove(window._solidRasterRectEmu);
+                }
+                if (window._solidRasterRectEmu && window._solidRasterRectEmu.target && window._solidRasterRectEmu.target.parent) {
+                    window._solidRasterRectEmu.target.parent.remove(window._solidRasterRectEmu.target);
+                }
+                window._solidRasterRectEmu = null;
+            } catch(_eRm) {}
         } catch (_e) {}
     }
 
@@ -272,7 +408,7 @@
     pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? _solidPt.renderScaleMobile : _solidPt.renderScaleDesktop;
     if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; } catch(e) { triggerUnsupported(); return; } }
     if(pathTracer) { needsUpdate = true; lightMoved = true; window.sumDuration = 0; window.lastRenderTime = 0; pathTracer.updateMaterials(); pathTracer.updateLights(); pathTracer.reset(); window.isUnsupported = false; window._solidContextLost = false; window._solidSampleTimeout = false; window.__solidLastResetAt = performance.now(); window._solidPerfSoftFail = false;
-    if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene }); }
+    if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); }
     const br = document.getElementById('btn-rerender'); if(br) { br.style.opacity = '0.4'; br.style.borderColor = 'rgba(255,255,255,0.15)'; br.style.boxShadow = 'none'; }
     const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.opacity = '0.8'; bs.style.borderColor = 'rgba(255,255,255,0.3)'; bs.style.boxShadow = 'none'; }
     hwLog("已强制重建并重启物理光追与状态"); }; window.isUnsupported = false; function triggerUnsupported() { if(window.isUnsupported) return; window.isUnsupported = true; window.useAdvancedRender = false; window.isTestingPerformance = false;
@@ -444,14 +580,48 @@
     } else {
     const idx = parseInt(window.matType); child.material = sysMaterials.plaster.clone(); child.material.color.set(child.userData.customColor || '#e8e8e8'); child.material.roughness = (child.userData.shape==='sphere' && idx===0) ? 0.6 : roughs[idx]; child.material.metalness = metals[idx]; child.material.transmission = trans[idx]; child.material.transparent = trans[idx] > 0; child.material.ior = 1.5; if(child.userData.isFlat) child.material.flatShading = true;
     } } }); if(pathTracer) { lightMoved = true; needsUpdate = true; pathTracer.reset(); window.sumDuration = 0; }
-    window.isLoadingScene = false; }; window.selectCustomOpt = function(type, value, text, el) {
-    el.parentElement.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected')); el.classList.add('selected');
-    if (type === 'light') { document.getElementById('light-trigger').innerText = text; lightType = value; buildEnvironment(); lightMoved = true;
+    window.isLoadingScene = false; };
+    window.selectCustomOpt = function(type, value, text, el) {
+    el.parentElement.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
+    el.classList.add('selected');
+
+    if (type === 'light') {
+    document.getElementById('light-trigger').innerText = text;
+    lightType = value;
+    buildEnvironment();
+    lightMoved = true;
+    needsUpdate = true;
+
     // 光栅模式下切灯：立即重新启用阴影并强制补一帧 render（否则阴影会“消失”直到下一次重建）
-    if (!window.useAdvancedRender) { try { window._solidFallbackRenderAt = 0; } catch(_e) {} try { _solidEnableRasterShadowsOnce(); } catch(_e2) {} try { requestAnimationFrame(() => { if (renderer) { try { renderer.render(scene, camera); } catch(_e3) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); } }); } catch(_e4) {} } }
-    else if (type === 'mat') { document.getElementById('mat-trigger').innerText = text; window.changeMat(value); }
-    else if (type === 'lightDir') { document.getElementById('dir-trigger').innerText = text; const [az, elv] = value.split(','); state.azimuth = parseFloat(az); state.elevation = parseFloat(elv); document.getElementById('lightAzimuth').value = state.azimuth; document.getElementById('azimuthVal').innerText = state.azimuth; document.getElementById('lightElevation').value = state.elevation; document.getElementById('elevationVal').innerText = state.elevation; updateLightPosition(); lightMoved = true; }
-    }; function updateDirTriggerByValues() {
+    if (!window.useAdvancedRender) {
+    try { window._solidFallbackRenderAt = 0; } catch(_e) {}
+    try { _solidEnableRasterShadowsOnce(); } catch(_e2) {}
+    try { requestAnimationFrame(() => { if (renderer) { try { renderer.render(scene, camera); } catch(_e3) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); } }); } catch(_e4) {}
+    } else {
+    // 光追模式下切灯：先给一小段“光栅预览”，避免 reset 后画面瞬间发黑影响体验
+    try { window._solidPtRasterPreviewUntil = performance.now() + 850; } catch(_ePv) { window._solidPtRasterPreviewUntil = Date.now() + 850; }
+    try { if (renderer) { renderer.toneMappingExposure = _solidPt.expHi || renderer.toneMappingExposure; renderer.render(scene, camera); } } catch(_eR0) {}
+    try { requestAnimationFrame(() => { try { if (renderer) renderer.render(scene, camera); } catch(_eR1) {} }); } catch(_eRaf) {}
+    }
+    }
+    else if (type === 'mat') {
+    document.getElementById('mat-trigger').innerText = text;
+    window.changeMat(value);
+    }
+    else if (type === 'lightDir') {
+    document.getElementById('dir-trigger').innerText = text;
+    const [az, elv] = value.split(',');
+    state.azimuth = parseFloat(az);
+    state.elevation = parseFloat(elv);
+    document.getElementById('lightAzimuth').value = state.azimuth;
+    document.getElementById('azimuthVal').innerText = state.azimuth;
+    document.getElementById('lightElevation').value = state.elevation;
+    document.getElementById('elevationVal').innerText = state.elevation;
+    updateLightPosition();
+    lightMoved = true;
+    }
+    };
+    function updateDirTriggerByValues() {
     const presetMap = {'113,45':'默认顶侧', '90,6':'正面光', '0,6':'左侧光', '180,6':'右侧光', '270,6':'背面光', '90,85':'顶面光', '90,-45':'前下底光'};
     const dirKey = `${state.azimuth},${state.elevation}`; const dirName = presetMap[dirKey] || '自定义'; document.getElementById('dir-trigger').innerText = dirName;
     document.querySelectorAll('#dir-options .custom-option').forEach(opt => opt.classList.remove('selected')); const matchedOpt = document.querySelector(`#dir-options .custom-option[onclick*="'${dirKey}'"]`);
@@ -741,10 +911,10 @@
         window.setSkyLightScale = function(v) {
         window.envSkyLightScale = Math.min(1, Math.max(0, parseFloat(v) || 0));
         const el = document.getElementById('env-sky-light-val'); if (el) el.textContent = window.envSkyLightScale.toFixed(2);
-        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
+        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
         needsUpdate = true; lightMoved = true; if (pathTracer) { pathTracer.reset(); window.sumDuration = 0; } };
         window.setEnvColor = function(kind, hex) { if (!hex) return; if (kind === 'wall') window.envWallColor = hex; else if (kind === 'ground') window.envGroundColor = hex; else if (kind === 'sky') window.envSkyColor = hex;
-        if (kind === 'sky' && window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
+        if (kind === 'sky' && window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
         else if (kind === 'sky') { scene.background = new THREE.Color(hex); scene.backgroundIntensity = 1; }
         if (kind === 'ground' && ground && ground.material) ground.material.color.set(hex); if (kind === 'wall' && window.walls) window.walls.forEach(w => { if (w.material) w.material.color.set(hex); });
         needsUpdate = true; lightMoved = true; if (pathTracer) { pathTracer.reset(); window.sumDuration = 0; } };
@@ -819,14 +989,26 @@
         }
         }); function buildEnvironment() { if (mainLight) { scene.remove(mainLight); if (mainLight.target) scene.remove(mainLight.target); }
         const val = parseFloat(document.getElementById('lightIntensity').value); const lSize = state.lightSize; const col = getTempColor(state.lightTemp * 100);
-        if (lightType === 'spot') { mainLight = new THREE.SpotLight(col, val * 300); mainLight.angle = Math.PI/5.5; mainLight.penumbra = 0.5; mainLight.radius = lSize; scene.add(mainLight.target); } else if (lightType === 'point') { mainLight = new THREE.PointLight(col, val * 250); mainLight.radius = lSize; } else if (lightType === 'dir') { mainLight = new THREE.DirectionalLight(col, val * 2.8); mainLight.radius = lSize; } else if (lightType === 'rect') { mainLight = new THREE.RectAreaLight(col.getHex(), val * 18, 8 * (lSize/2 + 0.1), 8 * (lSize/2 + 0.1)); }
+        if (lightType === 'spot') { mainLight = new THREE.SpotLight(col, val * 300); mainLight.angle = Math.PI/5.5; mainLight.penumbra = 0.5; mainLight.radius = lSize; scene.add(mainLight.target); } else if (lightType === 'point') { mainLight = new THREE.PointLight(col, val * 250); mainLight.radius = lSize; } else if (lightType === 'dir') { mainLight = new THREE.DirectionalLight(col, val * 2.8); mainLight.radius = lSize; } else if (lightType === 'rect') {
+        // RectAreaLight 在部分平台的“光栅(WebGL)路径”会完全不生效（导致画面接近全黑）。
+        // 为了保持“面积光”在光栅模式可用，这里做兼容降级：光追用 RectAreaLight，光栅用 SpotLight 近似（支持投影）。
+        if (window.useAdvancedRender) {
+        mainLight = new THREE.RectAreaLight(col.getHex(), val * 18, 8 * (lSize/2 + 0.1), 8 * (lSize/2 + 0.1));
+        } else {
+        mainLight = new THREE.SpotLight(col, val * 300);
+        mainLight.angle = Math.PI / 3.2;
+        mainLight.penumbra = 0.75;
+        mainLight.radius = lSize;
+        scene.add(mainLight.target);
+        }
+        }
         scene.add(mainLight); const gCol = new THREE.Color(window.envGroundColor || '#cccccc');
         if (!ground) { ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhysicalMaterial({ color: gCol, roughness: 1.0, metalness: 0.0 })); ground.rotation.x = -Math.PI / 2; scene.add(ground); }
         else if (ground.material) ground.material.color.copy(gCol);
         if (window.walls) { window.walls.forEach(w => { scene.remove(w); safeDispose(w.geometry); safeDispose(w.material); }); window.walls = null; }
         if (window.hasWall) { const wCol = new THREE.Color(window.envWallColor || '#cccccc'); const wallMat = new THREE.MeshPhysicalMaterial({ color: wCol, roughness: 1.0, metalness: 0.0 }); const wall1 = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), wallMat); wall1.position.set(0, 50, -6); const wall2 = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), wallMat); wall2.rotation.y = Math.PI / 2; wall2.position.set(-8, 50, 0); window.walls = [wall1, wall2]; scene.add(wall1); scene.add(wall2); }
         updateLightPosition();
-        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
+        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
         else { scene.background = new THREE.Color(window.envSkyColor || '#0d0d0f'); scene.backgroundIntensity = 1; }
 
         // 若当前已处于光栅模式（stopRender / 软降级），切灯/重建环境后必须立刻把阴影状态补齐
@@ -835,7 +1017,10 @@
             try { _solidEnableRasterShadowsOnce(); } catch(_e2) {}
         }
         }
-        function updateLightPosition() { const phi = THREE.MathUtils.degToRad(90 - parseFloat(state.elevation)); const theta = THREE.MathUtils.degToRad(parseFloat(state.azimuth)); const x = state.radius * Math.sin(phi) * Math.cos(theta); const y = state.radius * Math.cos(phi); const z = state.radius * Math.sin(phi) * Math.sin(theta); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') mainLight.lookAt(0, 1, 0); mainLight.updateMatrixWorld(); } lightPosUpdated = true; }
+        function updateLightPosition() { const phi = THREE.MathUtils.degToRad(90 - parseFloat(state.elevation)); const theta = THREE.MathUtils.degToRad(parseFloat(state.azimuth)); const x = state.radius * Math.sin(phi) * Math.cos(theta); const y = state.radius * Math.cos(phi); const z = state.radius * Math.sin(phi) * Math.sin(theta); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') { mainLight.lookAt(0, 1, 0); } mainLight.updateMatrixWorld();
+        // 光栅态：更新“远端更虚”锚点，跟随主光/target
+        try { if (!window.useAdvancedRender && ground && ground.material && ground.material.userData && ground.material.userData.uSolidShadowAnchor) { if (mainLight.isPointLight) mainLight.getWorldPosition(ground.material.userData.uSolidShadowAnchor.value); else if (mainLight.target) mainLight.target.getWorldPosition(ground.material.userData.uSolidShadowAnchor.value); } } catch(_eA) {}
+        } lightPosUpdated = true; }
         function setupUIControls() { document.querySelector('.control-panel').addEventListener('pointerdown', e => { if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'LABEL' && !e.target.classList.contains('env-btn')) e.stopPropagation(); });
         document.getElementById('lightAzimuth').addEventListener('input', e => { state.azimuth = e.target.value; document.getElementById('azimuthVal').innerText = state.azimuth; updateDirTriggerByValues(); updateLightPosition(); });
         document.getElementById('lightElevation').addEventListener('input', e => { state.elevation = e.target.value; document.getElementById('elevationVal').innerText = state.elevation; updateDirTriggerByValues(); updateLightPosition(); });
@@ -893,6 +1078,14 @@
             return;
         }
         if (pathTracer) { if (window.isLoadingScene) { try { renderer.render(scene, camera); } catch(err) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
+        // 光追切灯/切环境后的即时体验：短暂显示光栅预览，避免 reset 后画面瞬间发黑
+        try {
+        const _pvUntil = window._solidPtRasterPreviewUntil || 0;
+        if (_pvUntil && performance.now() < _pvUntil) {
+        if (renderer) { try { renderer.render(scene, camera); } catch(_ePvR) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); }
+        return;
+        }
+        } catch(_ePv) {}
         try { // 正式全速渲染核心逻辑
         if (lightMoved || lightPosUpdated || needsUpdate) { camera.updateMatrixWorld(); if (lightMoved) { pathTracer.setScene(scene, camera); }
         else if (lightPosUpdated && pathTracer.updateLights) { pathTracer.updateLights(); }
