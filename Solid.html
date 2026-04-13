@@ -233,9 +233,9 @@
                     sh.mapSize.set(ms, ms);
                     // 减少“接触面漏光”(peter-panning)：降低 bias / normalBias
                     sh.bias = -0.000006;
-                    sh.normalBias = 0.008;
+                    sh.normalBias = 0.0058;
                     // 更紧贴接触面：略收紧基础半径（远端虚化由地面 shader patch 负责）
-                    sh.radius = 2.6;
+                    sh.radius = 2.0;
                     sh.blurSamples = 10;
                     // 提升深度精度，减少接触面漏光（near 越大精度越好，但不要裁切近处）
                     sh.camera.near = Math.max(0.26, Math.min(0.6, (Number(state && state.radius) || 18) * 0.016));
@@ -244,8 +244,8 @@
                 } else if (mainLight.isDirectionalLight) {
                     sh.mapSize.set(ms, ms);
                     sh.bias = -0.00003;
-                    sh.normalBias = 0.01;
-                    sh.radius = 1.9;
+                    sh.normalBias = 0.0075;
+                    sh.radius = 1.4;
                     sh.blurSamples = 10;
                     const cam = sh.camera;
                     const he = isMobile ? 26 : 32;
@@ -301,8 +301,9 @@
 
                         // 远端更明显虚化：不同光型使用不同距离范围（Spot/Dir 的阴影通常更短，需要更早开始虚化）
                         const multExpr = (mainLight && (mainLight.isSpotLight || mainLight.isDirectionalLight))
-                            ? '( 1.0 + 12.0 * smoothstep( 0.25, 4.5, length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz ) ) )'
-                            : '( 1.0 + 7.0 * smoothstep( 0.6, 10.0, length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz ) ) )';
+                            // 推迟启动远端虚化：保证接触处/近端更实，远端再逐步变虚
+                            ? '( 1.0 + 7.0 * smoothstep( 2.2, 14.0, length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz ) ) )'
+                            : '( 1.0 + 5.5 * smoothstep( 1.2, 16.0, length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz ) ) )';
 
                         m.onBeforeCompile = (shader) => {
                             // debug log: keep minimal (remove later if stable)
