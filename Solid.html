@@ -377,17 +377,6 @@
                     clearGroundSoftPatch();
                 }
             } catch (_eGs) {}
-
-            // 非面积光或光追恢复时移除兜底灯
-            try {
-                if (window._solidRasterRectEmu && window._solidRasterRectEmu.parent) {
-                    window._solidRasterRectEmu.parent.remove(window._solidRasterRectEmu);
-                }
-                if (window._solidRasterRectEmu && window._solidRasterRectEmu.target && window._solidRasterRectEmu.target.parent) {
-                    window._solidRasterRectEmu.target.parent.remove(window._solidRasterRectEmu.target);
-                }
-                window._solidRasterRectEmu = null;
-            } catch(_eRm) {}
         } catch (_e) {}
     }
 
@@ -395,6 +384,7 @@
     // 统一“停渲染态”曝光，避免停在不同采样阶段导致色阶显示不一致
     if (renderer) renderer.toneMappingExposure = 0.7;
     _solidEnableRasterShadowsOnce();
+    try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('stop_render'); } catch(_eP) {}
     _solidDismissRenderToast(); if (renderer) { try { renderer.render(scene, camera); } catch (_eSr) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
     // 再补一帧：确保 shadowMap 在 render 前后状态切换完全生效（修复“必须切灯才出投影”）
     try { requestAnimationFrame(() => { if (renderer) { try { renderer.render(scene, camera); } catch (_e2) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); } }); } catch(_eRaf) {}
@@ -403,6 +393,8 @@
     const br = document.getElementById('btn-rerender'); if(br) { br.style.opacity = '0.8'; br.style.borderColor = 'rgba(255,255,255,0.3)'; br.style.boxShadow = 'none'; }
     const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.opacity = '0.4'; bs.style.borderColor = 'rgba(255,255,255,0.15)'; bs.style.boxShadow = 'none'; }
     }; window.forceReRender = function() { window._solidUserStoppedRender = false; if (window._solidHardwareUnsupported) { window.hwLog('[forceReRender] 硬件不支持光追，无法重新渲染'); (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '当前设备不支持光追渲染'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 2500); } })(); return; }
+    try { if (_solidRasterEnvProbeTimer) { clearTimeout(_solidRasterEnvProbeTimer); _solidRasterEnvProbeTimer = 0; } } catch(_eT) {}
+    try { _solidDisposeRasterEnvProbe(); } catch(_eDisp) {}
     window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none'; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
     document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1';
     document.getElementById('main-panel').style.pointerEvents = 'auto'; window.isLoadingScene = false; if (!pathTracer && renderer) { try {
@@ -434,6 +426,109 @@
     window.toggleAdvancedRender = function(val) { window.useAdvancedRender = val; needsUpdate = true; }; const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
     window.hasWall = false; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
     window.matType = 'origin'; window.customScenes = []; window.currentSceneIndex = -1; window.currentSceneData = null; let sceneGroup = new THREE.Group(); let gltfLoader, sysMaterials;
+
+    /** 光栅态：低频环境探针（CubeCapture + PMREM），给所有 MeshStandard/Physical 提供近似“地面回光/环境填充” */
+    let _solidRasterEnvPmremGen = null;
+    let _solidRasterEnvCubeRT = null;
+    let _solidRasterEnvCubeCam = null;
+    let _solidRasterEnvPmremRT = null;
+    let _solidRasterEnvProbeTimer = 0;
+    let _solidRasterEnvLastRunAt = 0;
+    const _solidRasterEnvMinIntervalMs = 2600;
+    const _solidRasterEnvDebounceMs = 220;
+    const _solidRasterEnvCubeSize = isMobile ? 48 : 64;
+
+    function _solidDisposeRasterEnvProbe() {
+        try { if (_solidRasterEnvPmremRT) safeDispose(_solidRasterEnvPmremRT); } catch (_e) {}
+        try { if (_solidRasterEnvCubeRT) safeDispose(_solidRasterEnvCubeRT); } catch (_e2) {}
+        _solidRasterEnvPmremRT = null;
+        _solidRasterEnvCubeRT = null;
+        _solidRasterEnvCubeCam = null;
+        try { if (scene) { scene.environment = null; scene.environmentIntensity = 1; } } catch (_e3) {}
+    }
+
+    function _solidApplyRasterEnvIntensityToSceneGroup() {
+        if (!sceneGroup || !sceneGroup.traverse) return;
+        sceneGroup.traverse((obj) => {
+            if (!obj || !obj.isMesh) return;
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            for (let i = 0; i < mats.length; i++) {
+                const m = mats[i];
+                if (!m) continue;
+                if (!(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial)) continue;
+                const r = Math.min(1, Math.max(0, Number(m.roughness) || 0));
+                const met = Math.min(1, Math.max(0, Number(m.metalness) || 0));
+                // 粗糙表面更需要“填充”，金属略克制避免过曝高光
+                let v = 0.18 + (1.0 - r) * 0.42;
+                if (met > 0.55) v *= 0.72;
+                v = Math.min(0.85, Math.max(0.12, v));
+                m.envMapIntensity = v;
+            }
+        });
+    }
+
+    function _solidUpdateRasterEnvProbeNow(reason) {
+        if (!renderer || !scene || !camera || !sceneGroup) return;
+        if (window.useAdvancedRender) return;
+        if (window.isLoadingScene) return;
+        if (!window.currentSceneData || window.currentSceneIndex == null || window.currentSceneIndex < 0) return;
+
+        const now = performance.now();
+        if (_solidRasterEnvLastRunAt && (now - _solidRasterEnvLastRunAt) < _solidRasterEnvMinIntervalMs) return;
+        _solidRasterEnvLastRunAt = now;
+
+        try {
+            if (!_solidRasterEnvPmremGen) _solidRasterEnvPmremGen = new THREE.PMREMGenerator(renderer);
+            if (!_solidRasterEnvCubeRT) {
+                _solidRasterEnvCubeRT = new THREE.WebGLCubeRenderTarget(_solidRasterEnvCubeSize, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+            }
+            if (!_solidRasterEnvCubeCam) {
+                _solidRasterEnvCubeCam = new THREE.CubeCamera(0.08, 160, _solidRasterEnvCubeRT);
+                _solidRasterEnvCubeCam.renderTarget.texture.name = 'SolidRasterEnvCubeRT';
+            }
+
+            // 避免捕获时采样到旧的 scene.environment（自引用/脏数据）
+            scene.environment = null;
+            scene.environmentIntensity = 1;
+
+            const prevPos = _solidRasterEnvCubeCam.position.clone();
+            // 探针位置：场景中心略抬高，尽量覆盖地面+主体
+            _solidRasterEnvCubeCam.position.set(0, 1.25, 0);
+            _solidRasterEnvCubeCam.updateMatrixWorld(true);
+
+            _solidRasterEnvCubeCam.update(renderer, scene);
+
+            _solidRasterEnvCubeCam.position.copy(prevPos);
+            _solidRasterEnvCubeCam.updateMatrixWorld(true);
+
+            if (_solidRasterEnvPmremRT) {
+                try { safeDispose(_solidRasterEnvPmremRT); } catch (_eD) {}
+                _solidRasterEnvPmremRT = null;
+            }
+            _solidRasterEnvPmremRT = _solidRasterEnvPmremGen.fromCubemap(_solidRasterEnvCubeRT.texture);
+            scene.environment = _solidRasterEnvPmremRT.texture;
+            scene.environmentIntensity = 1;
+
+            _solidApplyRasterEnvIntensityToSceneGroup();
+            try { if (window.hwLog) window.hwLog('[RasterEnvProbe] updated (' + (reason || 'unknown') + '), cube=' + _solidRasterEnvCubeSize); } catch (_eL) {}
+        } catch (e) {
+            try { if (window.hwLog) window.hwLog('[RasterEnvProbe] failed: ' + (e && e.message ? e.message : e)); } catch (_e2) {}
+            _solidDisposeRasterEnvProbe();
+        }
+    }
+
+    window._solidRequestRasterEnvProbe = function(reason) {
+        if (!renderer || !scene || !sceneGroup) return;
+        if (window.useAdvancedRender) return;
+        if (window.isLoadingScene) return;
+        if (!window.currentSceneData || window.currentSceneIndex == null || window.currentSceneIndex < 0) return;
+
+        if (_solidRasterEnvProbeTimer) { clearTimeout(_solidRasterEnvProbeTimer); _solidRasterEnvProbeTimer = 0; }
+        _solidRasterEnvProbeTimer = setTimeout(function() {
+            _solidRasterEnvProbeTimer = 0;
+            _solidUpdateRasterEnvProbeNow(reason);
+        }, _solidRasterEnvDebounceMs);
+    };
     function setLoaderText(msg) { document.getElementById('loader-text').innerText = msg; }
     function setLoaderProgress(p) { p = Math.max(0, Math.min(100, Math.round(Number(p) || 0))); const fill = document.getElementById('scene-load-bar-fill'); const pctEl = document.getElementById('scene-load-pct'); if (fill) fill.style.transform = 'scaleX(' + (p / 100) + ')'; if (pctEl) pctEl.textContent = p + '%'; }
     window._solidPerfHardwareT0 = 0; window._solidPerfHardwareLastP = 0; window._solidPerfHardwareIsMobile = false; window._solidPerfStageLo = 0; window._solidPerfStageHi = 10; window._solidPerfStageT0 = 0; window._solidPerfStageTau = 800;
@@ -443,7 +538,7 @@
     function tickSolidPerfHardwareProgress() { if (!window._solidPerfHardwareT0 || !window.PerfTester || !window.PerfTester.isTesting) return; const lo = window._solidPerfStageLo, hi = window._solidPerfStageHi; if (hi <= lo) return; const t = performance.now() - window._solidPerfStageT0; const span = hi - lo; const tau = Math.max(200, window._solidPerfStageTau || 2000); const eased = 1 - Math.exp(-t / tau); const target = lo + span * Math.min(0.96, eased); const capped = Math.min(hi - 0.02, target); const p = Math.floor(Math.max(window._solidPerfHardwareLastP, capped)); if (p !== window._solidPerfHardwareLastP) { window._solidPerfHardwareLastP = p; setLoaderProgress(p); } }
     function getTempColor(t) { const stops = [[3000,255,160,87],[4000,255,200,140],[5000,255,239,223],[6000,255,255,255],[7500,225,235,255],[9000,190,210,255]]; let c1 = stops[0], c2 = stops[stops.length-1]; for(let i=0; i<stops.length-1; i++) { if(t>=stops[i][0] && t<=stops[i+1][0]){ c1=stops[i]; c2=stops[i+1]; break; } } const f = (t-c1[0])/(c2[0]-c1[0]||1); return new THREE.Color((c1[1]+f*(c2[1]-c1[1]))/255, (c1[2]+f*(c2[2]-c1[2]))/255, (c1[3]+f*(c2[3]-c1[3]))/255); }
     window.toggleCustomSelect = function(e, id) { e.stopPropagation(); document.querySelectorAll('.custom-options').forEach(el => { if (el.id !== id) el.classList.remove('show'); }); document.getElementById(id).classList.toggle('show'); };
-    window.toggleWall = function() { window.hasWall = !window.hasWall; const btn = document.getElementById('wall-btn'); const wchk = document.getElementById('wall-btn-checkbox'); if (wchk) wchk.checked = !!window.hasWall; if (btn) { btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; } setTimeout(() => { buildEnvironment(); lightMoved = true; }, 100); };
+    window.toggleWall = function() { window.hasWall = !window.hasWall; const btn = document.getElementById('wall-btn'); const wchk = document.getElementById('wall-btn-checkbox'); if (wchk) wchk.checked = !!window.hasWall; if (btn) { btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; } setTimeout(() => { buildEnvironment(); lightMoved = true; try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('toggle_wall'); } catch(_eP) {} }, 100); };
     // 消费端标记：插件在该标记下禁用编辑/显隐切换
     window.__SOLID_CONSUMER__ = true; try { document.documentElement.classList.add('solid-anno-clickable'); } catch (_e) {}
     window.showAnnotations = true; window.SolidAnnotationDetail = { _panel: null, _bodyEl: null, _lastOwner: null, _lastId: null, init: function() { if (this._panel) return; const el = document.createElement('div');
@@ -581,6 +676,7 @@
     } else {
     const idx = parseInt(window.matType); child.material = sysMaterials.plaster.clone(); child.material.color.set(child.userData.customColor || '#e8e8e8'); child.material.roughness = (child.userData.shape==='sphere' && idx===0) ? 0.6 : roughs[idx]; child.material.metalness = metals[idx]; child.material.transmission = trans[idx]; child.material.transparent = trans[idx] > 0; child.material.ior = 1.5; if(child.userData.isFlat) child.material.flatShading = true;
     } } }); if(pathTracer) { lightMoved = true; needsUpdate = true; pathTracer.reset(); window.sumDuration = 0; }
+    try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('change_mat'); } catch(_eP) {}
     window.isLoadingScene = false; };
     window.selectCustomOpt = function(type, value, text, el) {
     el.parentElement.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
@@ -597,7 +693,7 @@
     if (!window.useAdvancedRender) {
     try { window._solidFallbackRenderAt = 0; } catch(_e) {}
     try { _solidEnableRasterShadowsOnce(); } catch(_e2) {}
-    try { requestAnimationFrame(() => { if (renderer) { try { renderer.render(scene, camera); } catch(_e3) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); } }); } catch(_e4) {}
+    try { requestAnimationFrame(() => { if (renderer) { try { renderer.render(scene, camera); } catch(_e3) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_type'); } catch(_eP) {} } }); } catch(_e4) {}
     } else {
     // 光追模式下切灯：先给一小段“光栅预览”，避免 reset 后画面瞬间发黑影响体验
     try { window._solidPtRasterPreviewUntil = performance.now() + 850; } catch(_ePv) { window._solidPtRasterPreviewUntil = Date.now() + 850; }
@@ -620,6 +716,7 @@
     document.getElementById('elevationVal').innerText = state.elevation;
     updateLightPosition();
     lightMoved = true;
+    try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_dir'); } catch(_eP) {}
     }
     };
     function updateDirTriggerByValues() {
@@ -648,7 +745,8 @@
     if (window.syncEnvColorPickers) window.syncEnvColorPickers();
     const matchedOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${window.matType}'"]`); if (matchedOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedOpt.innerText;
     document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedOpt.classList.add('selected'); }
-    buildEnvironment(); window.changeMat(window.matType); window.changePosterize(window.posterizeLevel); window.changeAtmosphere(window.isFogEnabled, window.fogDensity); const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.disabled = !window.isFogEnabled; fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); } const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.disabled = !(window.posterizeLevel > 0); pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } lightMoved = true; }; window.switchScene = function(index) { if(index === window.currentSceneIndex) return; window.isLoadingScene = true; // [锁定] 安全锁启动
+    buildEnvironment(); window.changeMat(window.matType); window.changePosterize(window.posterizeLevel); window.changeAtmosphere(window.isFogEnabled, window.fogDensity); const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.disabled = !window.isFogEnabled; fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); } const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.disabled = !(window.posterizeLevel > 0); pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } lightMoved = true; try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('reset_all'); } catch(_eP) {} }; window.switchScene = function(index) { if(index === window.currentSceneIndex) return; window.isLoadingScene = true; // [锁定] 安全锁启动
+    try { _solidDisposeRasterEnvProbe(); } catch(_eDisp) {}
     window.currentSceneIndex = index; const data = window.customScenes[index]; window.currentSceneData = data; // 修复首帧视角跳变：先应用目标场景的相机参数，再开始资产加载，避免先看到上一个场景视角
     if (data && data.camera) { camera.position.set(...data.camera.pos); controls.target.set(...data.camera.target); camera.zoom = data.camera.zoom; camera.updateProjectionMatrix(); controls.update(); needsUpdate = true; lightMoved = true; }
     if (typeof window.updateAnnotationEyeButtonVisibility === 'function') window.updateAnnotationEyeButtonVisibility();
@@ -710,6 +808,7 @@
     Promise.all(promises).then(() => { setLoaderProgress(90); setLoaderText("构建物理光照BVH树..."); requestAnimationFrame(() => { requestAnimationFrame(() => { setLoaderProgress(97); window.resetAll();
     if(pathTracer) { pathTracer.updateMaterials(); lightPosUpdated=true; pathTracer.reset(); window.sumDuration = 0; }
     window.isLoadingScene = false; // [解锁] 资产与BVH就绪，放行渲染
+    try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_loaded'); } catch(_eP) {}
     setLoaderProgress(100); document.getElementById('scene-loader').style.opacity = '0'; setTimeout(() => document.getElementById('scene-loader').style.display = 'none', 600); });
     }); }).catch(err => { window.isLoadingScene = false; setLoaderProgress(0); // 异常兜底解锁
     window.hwLog("场景加载致命异常: " + err.message); }); };
@@ -901,6 +1000,7 @@
                     || (1 - Math.abs(camera.quaternion.dot(_orbitStartQuat))) > eps
                     || Math.abs((camera.zoom || 0) - (_orbitStartZoom || 0)) > 1e-6);
             if (moved) needsUpdate = true;
+            if (moved && !window.useAdvancedRender) { try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('orbit_end'); } catch(_eP) {} }
         });
         controls.addEventListener('change', () => { window._solidLastInteractAt = performance.now(); needsUpdate = true; });
         gltfLoader = new GLTFLoader(); const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'); gltfLoader.setDRACOLoader(dracoLoader);
@@ -913,12 +1013,14 @@
         window.envSkyLightScale = Math.min(1, Math.max(0, parseFloat(v) || 0));
         const el = document.getElementById('env-sky-light-val'); if (el) el.textContent = window.envSkyLightScale.toFixed(2);
         if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
-        needsUpdate = true; lightMoved = true; if (pathTracer) { pathTracer.reset(); window.sumDuration = 0; } };
+        needsUpdate = true; lightMoved = true; if (pathTracer) { pathTracer.reset(); window.sumDuration = 0; }
+        try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('sky_light_scale'); } catch(_eP) {} };
         window.setEnvColor = function(kind, hex) { if (!hex) return; if (kind === 'wall') window.envWallColor = hex; else if (kind === 'ground') window.envGroundColor = hex; else if (kind === 'sky') window.envSkyColor = hex;
         if (kind === 'sky' && window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
         else if (kind === 'sky') { scene.background = new THREE.Color(hex); scene.backgroundIntensity = 1; }
         if (kind === 'ground' && ground && ground.material) ground.material.color.set(hex); if (kind === 'wall' && window.walls) window.walls.forEach(w => { if (w.material) w.material.color.set(hex); });
-        needsUpdate = true; lightMoved = true; if (pathTracer) { pathTracer.reset(); window.sumDuration = 0; } };
+        needsUpdate = true; lightMoved = true; if (pathTracer) { pathTracer.reset(); window.sumDuration = 0; }
+        try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('env_color_' + kind); } catch(_eP) {} };
         window.syncEnvColorPickers = function() { const w = document.getElementById('env-wall-color'); const g = document.getElementById('env-ground-color'); const s = document.getElementById('env-sky-color');
         if (w) w.value = window.envWallColor || '#cccccc'; if (g) g.value = window.envGroundColor || '#cccccc'; if (s) s.value = window.envSkyColor || '#0d0d0f';
         const wchk = document.getElementById('wall-btn-checkbox'); if (wchk) wchk.checked = !!window.hasWall;
@@ -1016,6 +1118,7 @@
         if (!window.useAdvancedRender) {
             try { window._solidFallbackRenderAt = 0; } catch(_e) {}
             try { _solidEnableRasterShadowsOnce(); } catch(_e2) {}
+            try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('build_environment'); } catch(_eP) {}
         }
         }
         function updateLightPosition() { const phi = THREE.MathUtils.degToRad(90 - parseFloat(state.elevation)); const theta = THREE.MathUtils.degToRad(parseFloat(state.azimuth)); const x = state.radius * Math.sin(phi) * Math.cos(theta); const y = state.radius * Math.cos(phi); const z = state.radius * Math.sin(phi) * Math.sin(theta); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') { mainLight.lookAt(0, 1, 0); } mainLight.updateMatrixWorld();
@@ -1024,9 +1127,13 @@
         } lightPosUpdated = true; }
         function setupUIControls() { document.querySelector('.control-panel').addEventListener('pointerdown', e => { if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'LABEL' && !e.target.classList.contains('env-btn')) e.stopPropagation(); });
         document.getElementById('lightAzimuth').addEventListener('input', e => { state.azimuth = e.target.value; document.getElementById('azimuthVal').innerText = state.azimuth; updateDirTriggerByValues(); updateLightPosition(); });
+        document.getElementById('lightAzimuth').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_azimuth'); } catch(_eP) {} });
         document.getElementById('lightElevation').addEventListener('input', e => { state.elevation = e.target.value; document.getElementById('elevationVal').innerText = state.elevation; updateDirTriggerByValues(); updateLightPosition(); });
+        document.getElementById('lightElevation').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_elevation'); } catch(_eP) {} });
         document.getElementById('lightDistance').addEventListener('input', e => { state.radius = parseFloat(e.target.value); document.getElementById('distanceVal').innerText = state.radius; updateLightPosition(); });
+        document.getElementById('lightDistance').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_distance'); } catch(_eP) {} });
         document.getElementById('lightTemp').addEventListener('input', e => { state.lightTemp = parseInt(e.target.value); document.getElementById('tempVal').innerText = state.lightTemp * 100; if (mainLight) { mainLight.color = getTempColor(state.lightTemp * 100); } lightPosUpdated = true; });
+        document.getElementById('lightTemp').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_temp'); } catch(_eP) {} });
         document.getElementById('lightSize').addEventListener('input', e => { state.lightSize = parseFloat(e.target.value); document.getElementById('sizeVal').innerText = state.lightSize; buildEnvironment(); lightMoved = true; });
         document.getElementById('lightIntensity').addEventListener('input', e => { const val = parseFloat(e.target.value); document.getElementById('intensityVal').innerText = val.toFixed(1); buildEnvironment(); lightMoved = true; }); }
         function __solidEvalImmersiveIdle() {
