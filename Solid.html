@@ -183,6 +183,49 @@
     if (window._solidContextLost || window.isUnsupported) triggerUnsupported(); }; setTimeout(function() { run(0); }, delays[0]); };
     function _solidDismissRenderToast() { var t = document.getElementById('render-toast'); if (t) { if (t.__hideTimer) { clearTimeout(t.__hideTimer); t.__hideTimer = 0; } t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; } if (renderer && renderer.domElement) renderer.domElement.style.filter = ''; }
 
+    /** 光栅阴影：按 sceneGroup 包围体收紧 shadow frustum，提高深度精度，降低 normalBias 依赖（根治贴脚亮缝 / peter-panning） */
+    function _solidFitRasterShadowFrustumForSceneGroup() {
+        try {
+            if (!mainLight || !mainLight.shadow || !mainLight.shadow.camera || !sceneGroup) return;
+            const sh = mainLight.shadow;
+            // 只用 sceneGroup（不算 100x100 地面），避免 far 被拉爆
+            const box = new THREE.Box3();
+            box.setFromObject(sceneGroup);
+            if (box.isEmpty()) return;
+            // 轻微扩张：避免边缘裁切
+            try { box.expandByScalar(0.35); } catch (_e) {}
+            const sphere = new THREE.Sphere();
+            box.getBoundingSphere(sphere);
+            if (!(sphere.radius > 1e-4)) return;
+
+            const lp = new THREE.Vector3();
+            mainLight.getWorldPosition(lp);
+            const dist = lp.distanceTo(sphere.center);
+            const margin = 3.2;
+            let desiredFar = Math.max(10, dist + sphere.radius + margin);
+
+            if (mainLight.isSpotLight) {
+                // Spot：far 收紧后可把 near 提高一点点提升精度
+                const cap = Math.min(175, Math.max(70, (Number(state && state.radius) || 18) * 2.75 + 38));
+                sh.camera.far = Math.min(cap, desiredFar * 1.08);
+                const n = Math.max(0.18, Math.min(0.85, sh.camera.far * 0.012));
+                sh.camera.near = Math.min(n, sh.camera.far * 0.06);
+                sh.camera.updateProjectionMatrix();
+            } else if (mainLight.isPointLight) {
+                const cap = Math.min(175, Math.max(70, (Number(state && state.radius) || 18) * 2.75 + 38));
+                sh.camera.far = Math.min(cap, desiredFar * 1.10);
+                sh.camera.near = Math.max(0.22, Math.min(1.2, sh.camera.far * 0.015));
+                sh.camera.updateProjectionMatrix();
+            } else if (mainLight.isDirectionalLight) {
+                // Dir：这里主要问题是 near/far 精度；正交范围保持现有 he
+                const capF = Math.min(125, (Number(state && state.radius) || 18) * 4.2 + 58);
+                sh.camera.far = Math.min(capF, Math.max(22, desiredFar + 14));
+                sh.camera.near = Math.max(0.6, Math.min(2.2, sh.camera.far * 0.03));
+                sh.camera.updateProjectionMatrix();
+            }
+        } catch (_e) {}
+    }
+
     /** stopRender 内立刻启用光栅阴影并强制更新（否则需要“切换光源类型”触发重建才出现投影）。 */
     function _solidEnableRasterShadowsOnce() {
         try {
@@ -231,9 +274,6 @@
 
                 if (mainLight.isSpotLight) {
                     sh.mapSize.set(ms, ms);
-                    // 减少“接触面漏光”(peter-panning)：降低 bias / normalBias
-                    sh.bias = -0.000006;
-                    sh.normalBias = 0.0051;
                     // 更紧贴接触面：略收紧基础半径（远端虚化由地面 shader patch 负责）
                     sh.radius = 2.0;
                     sh.blurSamples = 10;
@@ -243,8 +283,6 @@
                     sh.camera.updateProjectionMatrix();
                 } else if (mainLight.isDirectionalLight) {
                     sh.mapSize.set(ms, ms);
-                    sh.bias = -0.00003;
-                    sh.normalBias = 0.0066;
                     sh.radius = 1.4;
                     sh.blurSamples = 10;
                     const cam = sh.camera;
@@ -256,12 +294,24 @@
                 } else if (mainLight.isPointLight) {
                     const pms = isMobile ? 896 : 1408;
                     sh.mapSize.set(pms, pms);
-                    sh.bias = -0.000006;
-                    sh.normalBias = 0.012;
                     sh.blurSamples = 8;
                     sh.camera.near = 0.5;
                     sh.camera.far = range;
                     sh.camera.updateProjectionMatrix();
+                }
+
+                // 收紧 frustum 后再设 bias/normalBias（根治“影子离地一圈亮缝”）
+                try { if (sceneGroup) sceneGroup.updateMatrixWorld(true); } catch (_eMw) {}
+                _solidFitRasterShadowFrustumForSceneGroup();
+                if (mainLight.isSpotLight) {
+                    sh.bias = -0.000012;
+                    sh.normalBias = 0.0013;
+                } else if (mainLight.isDirectionalLight) {
+                    sh.bias = -0.00005;
+                    sh.normalBias = 0.0018;
+                } else if (mainLight.isPointLight) {
+                    sh.bias = -0.000015;
+                    sh.normalBias = 0.0038;
                 }
 
             // Receivers / casters
@@ -285,6 +335,9 @@
                     if (canPatch) {
                         if (!m.userData) m.userData = {};
                         if (!m.userData.uSolidShadowAnchor) m.userData.uSolidShadowAnchor = { value: new THREE.Vector3(0, 1, 0) };
+                        // 地面接收端“贴脚亮缝”补偿：仅对 ground receiver 拉回深度比较（不影响 caster，不影响其它 receiver）
+                        // receiver pull：正值让地面更容易进入阴影（吃掉贴脚亮缝）
+                        if (!m.userData.uSolidShadowContactPull) m.userData.uSolidShadowContactPull = { value: 0.00065 };
                         // 强制重编译：否则 onBeforeCompile 可能不会再次触发
                         m.userData._solidShadowSoftVer = (m.userData._solidShadowSoftVer || 0) + 1;
                         const _ver = m.userData._solidShadowSoftVer;
@@ -298,13 +351,18 @@
                             else if (mainLight && mainLight.target) mainLight.target.getWorldPosition(m.userData.uSolidShadowAnchor.value);
                             else m.userData.uSolidShadowAnchor.value.set(0, 1, 0);
                         } catch (_eA) {}
+                        // light-type 相关的 pull：point 的 shadow depth 变化更敏感，稍强一点
+                        try {
+                            if (mainLight && mainLight.isPointLight) m.userData.uSolidShadowContactPull.value = 0.00095;
+                            else if (mainLight && mainLight.isDirectionalLight) m.userData.uSolidShadowContactPull.value = 0.00055;
+                            else m.userData.uSolidShadowContactPull.value = 0.00065;
+                        } catch (_ePull) {}
 
                         // 远端更明显虚化：不同光型使用不同距离范围（Spot/Dir 的阴影通常更短，需要更早开始虚化）
                         const multExpr = (mainLight && (mainLight.isSpotLight || mainLight.isDirectionalLight))
-                            // 推迟启动远端虚化：保证接触处/近端更实，远端再逐步变虚
-                            // 近端额外衰减：避免“接触线”因 PCF 半径被放大而发灰（暗部对比下像漏光）
-                            ? '( 1.0 + 7.0 * smoothstep( 2.2, 14.0, dSolidSh ) * smoothstep( 0.35, 1.85, dSolidSh ) )'
-                            : '( 1.0 + 5.5 * smoothstep( 1.2, 16.0, dSolidSh ) * smoothstep( 0.45, 2.15, dSolidSh ) )';
+                            // 近端保持 1.0，远端再逐步放大半径（避免贴脚接触带被 PCF 核“抹亮”）
+                            ? '( 1.0 + 4.0 * smoothstep( 5.0, 20.0, dSolidSh ) * smoothstep( 1.8, 5.0, dSolidSh ) )'
+                            : '( 1.0 + 3.8 * smoothstep( 3.0, 18.0, dSolidSh ) * smoothstep( 1.2, 3.4, dSolidSh ) )';
 
                         m.onBeforeCompile = (shader) => {
                             // debug log: keep minimal (remove later if stable)
@@ -335,11 +393,11 @@
                                         // 在函数体内计算倍率（可使用 varying/uniform），并缩放 shadowRadius
                                         chunk = chunk.replace(
                                             'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {',
-                                            `float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\tfloat dSolidSh = length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz );\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
+                                            `float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\tshadowCoord.z += uSolidShadowContactPull;\n\tfloat dSolidSh = length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz );\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
                                         );
                                         chunk = chunk.replace(
                                             'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {',
-                                            `float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\tfloat dSolidSh = length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz );\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
+                                            `float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\tshadowCoord.z += uSolidShadowContactPull;\n\tfloat dSolidSh = length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz );\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
                                         );
 
                                         fs = fs.replace(inc, chunk);
@@ -355,7 +413,8 @@
                             try { if (window.hwLog) window.hwLog('[RasterShadowSoft] radius replace OK x' + cnt); } catch(_eOk) {}
 
                             shader.uniforms.uSolidShadowAnchor = m.userData.uSolidShadowAnchor;
-                            shader.fragmentShader = 'varying vec3 vSolidShadowGroundPos;\nuniform vec3 uSolidShadowAnchor;\n' + fs;
+                            shader.uniforms.uSolidShadowContactPull = m.userData.uSolidShadowContactPull;
+                            shader.fragmentShader = 'varying vec3 vSolidShadowGroundPos;\nuniform vec3 uSolidShadowAnchor;\nuniform float uSolidShadowContactPull;\n' + fs;
                             shader.vertexShader = 'varying vec3 vSolidShadowGroundPos;\n' + shader.vertexShader;
                             // 尽量稳地写入 vSolidShadowGroundPos（某些材质变体不一定包含 worldpos_vertex）
                             if (shader.vertexShader.includes('#include <worldpos_vertex>')) {
