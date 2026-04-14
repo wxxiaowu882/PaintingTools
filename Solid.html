@@ -233,7 +233,7 @@
                     sh.mapSize.set(ms, ms);
                     // 减少“接触面漏光”(peter-panning)：降低 bias / normalBias
                     sh.bias = -0.000006;
-                    sh.normalBias = 0.0058;
+                    sh.normalBias = 0.0051;
                     // 更紧贴接触面：略收紧基础半径（远端虚化由地面 shader patch 负责）
                     sh.radius = 2.0;
                     sh.blurSamples = 10;
@@ -244,7 +244,7 @@
                 } else if (mainLight.isDirectionalLight) {
                     sh.mapSize.set(ms, ms);
                     sh.bias = -0.00003;
-                    sh.normalBias = 0.0075;
+                    sh.normalBias = 0.0066;
                     sh.radius = 1.4;
                     sh.blurSamples = 10;
                     const cam = sh.camera;
@@ -302,8 +302,9 @@
                         // 远端更明显虚化：不同光型使用不同距离范围（Spot/Dir 的阴影通常更短，需要更早开始虚化）
                         const multExpr = (mainLight && (mainLight.isSpotLight || mainLight.isDirectionalLight))
                             // 推迟启动远端虚化：保证接触处/近端更实，远端再逐步变虚
-                            ? '( 1.0 + 7.0 * smoothstep( 2.2, 14.0, length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz ) ) )'
-                            : '( 1.0 + 5.5 * smoothstep( 1.2, 16.0, length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz ) ) )';
+                            // 近端额外衰减：避免“接触线”因 PCF 半径被放大而发灰（暗部对比下像漏光）
+                            ? '( 1.0 + 7.0 * smoothstep( 2.2, 14.0, dSolidSh ) * smoothstep( 0.35, 1.85, dSolidSh ) )'
+                            : '( 1.0 + 5.5 * smoothstep( 1.2, 16.0, dSolidSh ) * smoothstep( 0.45, 2.15, dSolidSh ) )';
 
                         m.onBeforeCompile = (shader) => {
                             // debug log: keep minimal (remove later if stable)
@@ -334,11 +335,11 @@
                                         // 在函数体内计算倍率（可使用 varying/uniform），并缩放 shadowRadius
                                         chunk = chunk.replace(
                                             'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {',
-                                            `float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
+                                            `float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\tfloat dSolidSh = length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz );\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
                                         );
                                         chunk = chunk.replace(
                                             'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {',
-                                            `float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
+                                            `float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\tfloat dSolidSh = length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz );\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
                                         );
 
                                         fs = fs.replace(inc, chunk);
@@ -431,6 +432,8 @@
     let _solidRasterEnvPmremGen = null;
     let _solidRasterEnvCubeRT = null;
     let _solidRasterEnvCubeCam = null;
+    /** 全局弱底：接近旧版单探针的暗部填充，但强度刻意压低，避免与 per-material envMap 叠加后过亮 */
+    let _solidRasterEnvBasePmremRT = null;
     /** @type {THREE.WebGLRenderTarget[]|null[]} */
     let _solidRasterEnvPmremRTs = [null, null, null];
     /** @type {THREE.Vector3[]} */
@@ -443,6 +446,12 @@
     const _solidRasterEnvProbeCount = 3;
 
     function _solidDisposeRasterEnvProbe() {
+        // base 可能与 probe[0] 共享同一 PMREM RenderTarget 引用：避免 double dispose
+        try {
+            const _sameAs0 = (_solidRasterEnvBasePmremRT && _solidRasterEnvPmremRTs[0] && _solidRasterEnvBasePmremRT === _solidRasterEnvPmremRTs[0]);
+            if (_solidRasterEnvBasePmremRT && !_sameAs0) { try { safeDispose(_solidRasterEnvBasePmremRT); } catch (_e0) {} }
+            _solidRasterEnvBasePmremRT = null;
+        } catch (_e1) { _solidRasterEnvBasePmremRT = null; }
         try {
             for (let i = 0; i < _solidRasterEnvPmremRTs.length; i++) {
                 if (_solidRasterEnvPmremRTs[i]) { try { safeDispose(_solidRasterEnvPmremRTs[i]); } catch (_e) {} _solidRasterEnvPmremRTs[i] = null; }
@@ -473,9 +482,10 @@
         const r = Math.min(1, Math.max(0, Number(m.roughness) || 0));
         const met = Math.min(1, Math.max(0, Number(m.metalness) || 0));
         // 粗糙表面更需要“填充”，金属略克制避免过曝高光
-        let v = 0.18 + (1.0 - r) * 0.42;
+        // 注意：现在额外有 scene.environment 弱底，这里略收敛 per-material envMap，避免整体超过旧版峰值
+        let v = 0.16 + (1.0 - r) * 0.38;
         if (met > 0.55) v *= 0.72;
-        v = Math.min(0.85, Math.max(0.12, v));
+        v = Math.min(0.78, Math.max(0.11, v));
         return v;
     }
 
@@ -592,9 +602,27 @@
             _solidRasterEnvCubeCam.position.copy(prevPos);
             _solidRasterEnvCubeCam.updateMatrixWorld(true);
 
-            // 使用 per-material envMap，而不是 scene.environment（便于“最近探针”局部化）
-            scene.environment = null;
-            scene.environmentIntensity = 1;
+            // 全局弱底：用 0 号探针的 PMREM 作为 scene.environment（强度低），再叠加 per-material 最近探针 envMap
+            try {
+                const baseSrc = _solidRasterEnvPmremRTs[0];
+                if (_solidRasterEnvBasePmremRT && _solidRasterEnvBasePmremRT !== baseSrc) {
+                    try { safeDispose(_solidRasterEnvBasePmremRT); } catch (_eDb) {}
+                }
+                _solidRasterEnvBasePmremRT = null;
+                if (baseSrc && baseSrc.texture) {
+                    // 复用同一张纹理引用即可（避免再跑一遍 PMREM）
+                    _solidRasterEnvBasePmremRT = baseSrc;
+                    scene.environment = baseSrc.texture;
+                    scene.environmentIntensity = isMobile ? 0.22 : 0.26;
+                } else {
+                    scene.environment = null;
+                    scene.environmentIntensity = 1;
+                }
+            } catch (_eB) {
+                scene.environment = null;
+                scene.environmentIntensity = 1;
+            }
+
             _solidApplyRasterMultiEnvProbesToSceneGroup();
             try { if (window.hwLog) window.hwLog('[RasterEnvProbe] multi updated (' + (reason || 'unknown') + '), cube=' + _solidRasterEnvCubeSize + ' x3'); } catch (_eL) {}
         } catch (e) {
