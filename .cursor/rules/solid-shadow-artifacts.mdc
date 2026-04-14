@@ -1,0 +1,22 @@
+---
+description: Solid 光栅态阴影伪影（球体底部亮斑）根因与修复约束
+globs: Solid.html
+alwaysApply: false
+---
+
+# Solid 光栅态：球体底部“亮斑/漏光”排查与修复
+
+## 关键结论（来自取证）
+
+- **当球体与地面几乎贴合（gap≈0）但仍有亮斑**时，根因通常不是几何离地，而是 **iOS/移动端的 shadowmap + PCF 比较链路对接触区漏判**（深度精度/过滤差异导致“本应遮挡却被判为未遮挡”）。
+
+## 正确修复方式（优先级）
+
+- **先取证**：用 `?shadowProbe=1` 在 stopRender 后记录 `gap` / `bias` / `normalBias` / `contactPull`。
+- **若 gap 明显 > 0**：先修几何（贴地吸附/布局对齐），不要只靠 bias/pull 硬扛。
+- **若 gap 已接近 0 仍亮**：在 **ground receiver 的阴影计算**中加入 **解析几何遮挡兜底**（ray-sphere occlusion），并且要用 **ShaderChunk 内注入**保证在不同 three/iOS 变体下仍然命中（不要依赖编译后 shader 文本的脆弱字符串匹配）。
+
+## 禁止事项
+
+- 不要为了消球体亮斑而做“单一参数大幅拉满”（例如过大的 receiver pull / 过大的 normalBias），这会在别的模型或 PC 端引入黑边、窄圈投影等新伪影。
+

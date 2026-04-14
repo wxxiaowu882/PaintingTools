@@ -152,7 +152,23 @@
     window.posterizeLevel = levels;
     const slider = document.getElementById('posterizeSlider'); const valDisp = document.getElementById('posterizeVal'); if (slider && valDisp) { const sliderVal = levels === 0 ? 0 : (21 - levels);
     slider.value = sliderVal; valDisp.innerText = levels === 0 ? "无" : levels + "阶"; } };
-    window._logCache = []; window.addHwLog = function(msg) { const panel = document.getElementById('debug-log-panel'); const content = document.getElementById('log-content'); const time = new Date().toLocaleTimeString(); window._logCache.push(`[${time}] ${msg}`); if(window._logCache.length > 50) window._logCache.shift(); if (content) { content.innerText = window._logCache.join('\n'); panel.scrollTop = panel.scrollHeight; } console.log(`[HW-LOG] ${msg}`); };
+    window._logCache = []; window.addHwLog = function(msg) {
+        const panel = document.getElementById('debug-log-panel');
+        const content = document.getElementById('log-content');
+        const time = new Date().toLocaleTimeString();
+        window._logCache.push(`[${time}] ${msg}`);
+        if(window._logCache.length > 50) window._logCache.shift();
+        if (content) {
+            content.innerText = window._logCache.join('\n');
+            if (panel) panel.scrollTop = panel.scrollHeight;
+        }
+        // shadowProbe/debug 模式：确保面板可见（iOS 很多情况下用户看不到控制台）
+        try {
+            const qs = new URLSearchParams(window.location.search || '');
+            if (panel && (qs.get('shadowProbe') === '1' || qs.get('debugLog') === '1')) panel.style.display = 'block';
+        } catch (_eShow) {}
+        console.log(`[HW-LOG] ${msg}`);
+    };
     window.copyDebugLog = function() { navigator.clipboard.writeText(document.getElementById('log-content').innerText).then(() => { alert("日志已复制到剪贴板"); }); }; window.hwLog = window.addHwLog;
     window.addEventListener('error', e => { window.hwLog('WinErr: ' + e.message); });
     window.addEventListener('unhandledrejection', e => { window.hwLog('PromiseRej: ' + e.reason); }); const originalConsoleError = console.error; console.error = function(...args) {
@@ -350,14 +366,22 @@
                 // iOS（含新 iPad 以桌面 UA 上报）WebGL 精度也弱于桌面，需要按比例放大 normalBias。
                 const _nbBoost = isMobile ? 1.9 : (isIosPosterizeHost ? 1.4 : 1.0);
                 if (mainLight.isSpotLight) {
-                    sh.bias = -0.000012;
+                    // 桌面端：负 bias 容易产生“亮部接地黑边”(shadow acne)，这里收敛到更接近 0
+                    sh.bias = (isMobile || isIosPosterizeHost) ? -0.000012 : -0.000006;
                     sh.normalBias = 0.022 * _nbBoost;
+                    // 证据：iOS 探针显示 normalBias=0.0418，会显著抬起遮挡导致贴地亮斑更明显
+                    // 在“黑边已消失”的前提下，对移动端 spot 做上限钳制，避免 peter-panning
+                    if (isMobile || isIosPosterizeHost) sh.normalBias = Math.min(sh.normalBias, 0.028);
                 } else if (mainLight.isDirectionalLight) {
-                    sh.bias = -0.00005;
+                    sh.bias = (isMobile || isIosPosterizeHost) ? -0.00005 : -0.000025;
                     sh.normalBias = 0.025 * _nbBoost;
                 } else if (mainLight.isPointLight) {
                     sh.bias = -0.000015;
-                    sh.normalBias = 0.042 * _nbBoost;
+                    // PointLight：normalBias 过大会造成 peter-panning（贴地漏盖 => 球体底部亮斑）
+                    // 注意：移动端把 normalBias 按分辨率放大会加剧 peter-panning（尤其球体贴地）。
+                    // PointLight 在移动端单独使用更温和的 boost，优先消灭球体底部亮斑。
+                    const _ptNbBoost = isMobile ? 1.12 : (isIosPosterizeHost ? 1.08 : 1.0);
+                    sh.normalBias = 0.014 * _ptNbBoost;
                 }
 
             // Receivers / casters
@@ -381,6 +405,15 @@
                     if (canPatch) {
                         if (!m.userData) m.userData = {};
                         if (!m.userData.uSolidShadowAnchor) m.userData.uSolidShadowAnchor = { value: new THREE.Vector3(0, 1, 0) };
+                        // 解析遮挡（builtin sphere -> ground）：不依赖 shadowmap，根治贴地亮斑
+                        if (!m.userData.uSolidSphereCount) m.userData.uSolidSphereCount = { value: 0 };
+                        if (!m.userData.uSolidSphereCenters) {
+                            m.userData.uSolidSphereCenters = { value: Array.from({ length: 8 }, () => new THREE.Vector3()) };
+                        }
+                        if (!m.userData.uSolidSphereRadii) m.userData.uSolidSphereRadii = { value: new Float32Array(8) };
+                        if (!m.userData.uSolidMainLightType) m.userData.uSolidMainLightType = { value: 0 }; // 0=dir 1=spot 2=point
+                        if (!m.userData.uSolidMainLightPos) m.userData.uSolidMainLightPos = { value: new THREE.Vector3() };
+                        if (!m.userData.uSolidMainLightDir) m.userData.uSolidMainLightDir = { value: new THREE.Vector3(0, 1, 0) };
                         // 地面接收端“贴脚亮缝”补偿：仅对 ground receiver 拉回深度比较（不影响 caster，不影响其它 receiver）
                         // receiver pull：正值让地面更容易进入阴影（吃掉贴脚亮缝）
                         if (!m.userData.uSolidShadowContactPull) m.userData.uSolidShadowContactPull = { value: 0.00065 };
@@ -399,10 +432,59 @@
                         } catch (_eA) {}
                         // light-type 相关的 pull：point 的 shadow depth 变化更敏感，稍强一点
                         try {
-                            if (mainLight && mainLight.isPointLight) m.userData.uSolidShadowContactPull.value = 0.0016;
-                            else if (mainLight && mainLight.isDirectionalLight) m.userData.uSolidShadowContactPull.value = 0.0010;
-                            else m.userData.uSolidShadowContactPull.value = 0.0012;
+                            // 桌面端优先消除“黑边/窄圈投影”，移动端优先消除“贴地漏光/亮斑”
+                            const mob = (isMobile || isIosPosterizeHost);
+                            if (mainLight && mainLight.isPointLight) m.userData.uSolidShadowContactPull.value = mob ? 0.00175 : 0.00105;
+                            else if (mainLight && mainLight.isDirectionalLight) m.userData.uSolidShadowContactPull.value = mob ? 0.00085 : 0.00065;
+                            else m.userData.uSolidShadowContactPull.value = mob ? 0.00095 : 0.00075;
                         } catch (_ePull) {}
+
+                        // 同步主光信息（供解析遮挡使用）
+                        try {
+                            const lp = new THREE.Vector3();
+                            mainLight.getWorldPosition(lp);
+                            m.userData.uSolidMainLightPos.value.copy(lp);
+                            if (mainLight && mainLight.isPointLight) m.userData.uSolidMainLightType.value = 2;
+                            else if (mainLight && mainLight.isSpotLight) m.userData.uSolidMainLightType.value = 1;
+                            else m.userData.uSolidMainLightType.value = 0;
+                            const d = new THREE.Vector3(0, 1, 0);
+                            if (m.userData.uSolidMainLightType.value === 0) {
+                                // dir：存“点->光”方向（与光线相反）
+                                if (mainLight && mainLight.target) {
+                                    const t = new THREE.Vector3();
+                                    mainLight.target.getWorldPosition(t);
+                                    d.subVectors(lp, t).normalize();
+                                } else {
+                                    d.set(0, 1, 0);
+                                }
+                            } else {
+                                d.set(0, 1, 0);
+                            }
+                            m.userData.uSolidMainLightDir.value.copy(d);
+                        } catch (_eL) {}
+
+                        // 收集 builtin sphere（最多 8 个）作为遮挡体
+                        try {
+                            let n = 0;
+                            const tmpPos = new THREE.Vector3();
+                            const tmpScale = new THREE.Vector3();
+                            if (sceneGroup && sceneGroup.traverse) {
+                                sceneGroup.traverse((obj) => {
+                                    if (n >= 8) return;
+                                    if (!obj || !obj.isMesh) return;
+                                    if (!obj.userData || obj.userData.type !== 'builtin' || obj.userData.shape !== 'sphere') return;
+                                    try {
+                                        obj.getWorldPosition(tmpPos);
+                                        obj.getWorldScale(tmpScale);
+                                        const r = Math.max(0.0001, Math.abs(tmpScale.y) * 2.0); // SphereGeometry 半径=2；用 Y 半径
+                                        m.userData.uSolidSphereCenters.value[n].copy(tmpPos);
+                                        m.userData.uSolidSphereRadii.value[n] = r;
+                                        n++;
+                                    } catch (_eS) {}
+                                });
+                            }
+                            m.userData.uSolidSphereCount.value = n;
+                        } catch (_eSc) { m.userData.uSolidSphereCount.value = 0; }
 
                         // 远端更明显虚化：不同光型使用不同距离范围（Spot/Dir 的阴影通常更短，需要更早开始虚化）
                         const multExpr = (mainLight && (mainLight.isSpotLight || mainLight.isDirectionalLight))
@@ -440,12 +522,29 @@
                                         // 在函数体内计算倍率（可使用 varying/uniform），并缩放 shadowRadius
                                         chunk = chunk.replace(
                                             'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {',
-                                            `float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\tshadowCoord.z += uSolidShadowContactPull;\n\tfloat dSolidSh = length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz );\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
+                                            `float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\tfloat dSolidSh = length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz );\n\t// receiver pull：只允许非常小的、局部的拉回；上限过大必然产生“接地黑边/窄圈投影”\n\tfloat solidPullMult = 1.0 + 0.35 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00035 );\n\tshadowCoord.z += solidPull;\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
                                         );
                                         chunk = chunk.replace(
                                             'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {',
-                                            `float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\tshadowCoord.z += uSolidShadowContactPull;\n\tfloat dSolidSh = length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz );\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
+                                            `float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\t// PointLight：Three 的实现用 lightToPositionLength 计算 dp（不是 shadowCoord.z）。\n\t// 因此必须在 dp 上施加 receiver pull，才能吃掉“接触线漏光”。\n\tfloat dSolidSh = length( vSolidShadowGroundPos.xz - uSolidShadowAnchor.xz );\n\tfloat solidPullMult = 1.0 + 0.55 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00055 );\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
                                         );
+
+                                        // 点光源：真正影响阴影比较的是 dp（归一化深度），不是 shadowCoord.z
+                                        // 把 receiver pull 加到 dp 上：dp 越大越容易进入阴影（更不漏光）
+                                        chunk = chunk.replace(
+                                            'dp += shadowBias;',
+                                            'dp += shadowBias;\t\t\tdp += solidPull;'
+                                        );
+
+                                        // 解析球体遮挡：在 chunk 内部统一注入（比对编译后 shader 字符串更可靠）
+                                        // 所有 getShadow / getPointShadow 最终都会 return shadow; ——在返回前做下限约束
+                                        // 取证结论：当 gap≈0 仍出现“球体底部亮斑/漏光”，根因多为 iOS/移动端 shadowmap+PCF 比较链路漏判。
+                                        // 因此这里用解析几何遮挡（ray-sphere occlusion）作为兜底，不依赖 shadowmap 精度。
+                                        // 重要：必须在 ShaderChunk 内注入（不要依赖编译后 shader 文本的脆弱字符串匹配），否则不同 three/iOS 变体会“看似写了但没生效”。
+                                        try {
+                                            const inj = 'shadow = min( shadow, solidSphereOcclusion( vSolidShadowGroundPos ) );\n\treturn shadow;';
+                                            chunk = chunk.split('return shadow;').join(inj);
+                                        } catch (_eInj) {}
 
                                         fs = fs.replace(inc, chunk);
                                         cnt = 1;
@@ -461,7 +560,54 @@
 
                             shader.uniforms.uSolidShadowAnchor = m.userData.uSolidShadowAnchor;
                             shader.uniforms.uSolidShadowContactPull = m.userData.uSolidShadowContactPull;
-                            shader.fragmentShader = 'varying vec3 vSolidShadowGroundPos;\nuniform vec3 uSolidShadowAnchor;\nuniform float uSolidShadowContactPull;\n' + fs;
+                            shader.uniforms.uSolidSphereCount = m.userData.uSolidSphereCount;
+                            shader.uniforms.uSolidSphereCenters = m.userData.uSolidSphereCenters;
+                            shader.uniforms.uSolidSphereRadii = m.userData.uSolidSphereRadii;
+                            shader.uniforms.uSolidMainLightType = m.userData.uSolidMainLightType;
+                            shader.uniforms.uSolidMainLightPos = m.userData.uSolidMainLightPos;
+                            shader.uniforms.uSolidMainLightDir = m.userData.uSolidMainLightDir;
+                            shader.fragmentShader =
+                                'varying vec3 vSolidShadowGroundPos;\n' +
+                                'uniform vec3 uSolidShadowAnchor;\n' +
+                                'uniform float uSolidShadowContactPull;\n' +
+                                'uniform int uSolidSphereCount;\n' +
+                                'uniform vec3 uSolidSphereCenters[8];\n' +
+                                'uniform float uSolidSphereRadii[8];\n' +
+                                'uniform int uSolidMainLightType;\n' +
+                                'uniform vec3 uSolidMainLightPos;\n' +
+                                'uniform vec3 uSolidMainLightDir;\n' +
+                                'float solidRaySphereOcc( vec3 ro, vec3 rd, float tMax, vec3 c, float r ) {\n' +
+                                '  vec3 oc = ro - c;\n' +
+                                '  float b = dot( oc, rd );\n' +
+                                '  float cc = dot( oc, oc ) - r * r;\n' +
+                                '  float h = b * b - cc;\n' +
+                                '  if ( h < 0.0 ) return 1.0;\n' +
+                                '  float s = sqrt( h );\n' +
+                                '  float t = -b - s;\n' +
+                                '  if ( t < 0.0 ) t = -b + s;\n' +
+                                '  return ( t > -1e-4 && t < tMax ) ? 0.0 : 1.0;\n' +
+                                '}\n' +
+                                'float solidSphereOcclusion( vec3 p ) {\n' +
+                                '  if ( uSolidSphereCount <= 0 ) return 1.0;\n' +
+                                '  float occ = 1.0;\n' +
+                                '  if ( uSolidMainLightType == 0 ) {\n' +
+                                '    vec3 rd = normalize( uSolidMainLightDir );\n' +
+                                '    for ( int i = 0; i < 8; i++ ) {\n' +
+                                '      if ( i >= uSolidSphereCount ) break;\n' +
+                                '      occ = min( occ, solidRaySphereOcc( p, rd, 1e6, uSolidSphereCenters[i], uSolidSphereRadii[i] ) );\n' +
+                                '    }\n' +
+                                '  } else {\n' +
+                                '    vec3 lp = uSolidMainLightPos;\n' +
+                                '    vec3 rd = normalize( lp - p );\n' +
+                                '    float tMax = length( lp - p );\n' +
+                                '    for ( int i = 0; i < 8; i++ ) {\n' +
+                                '      if ( i >= uSolidSphereCount ) break;\n' +
+                                '      occ = min( occ, solidRaySphereOcc( p, rd, tMax, uSolidSphereCenters[i], uSolidSphereRadii[i] ) );\n' +
+                                '    }\n' +
+                                '  }\n' +
+                                '  return occ;\n' +
+                                '}\n' +
+                                fs;
                             shader.vertexShader = 'varying vec3 vSolidShadowGroundPos;\n' + shader.vertexShader;
                             // 尽量稳地写入 vSolidShadowGroundPos（某些材质变体不一定包含 worldpos_vertex）
                             if (shader.vertexShader.includes('#include <worldpos_vertex>')) {
@@ -487,15 +633,161 @@
         } catch (_e) {}
     }
 
+    // 根因修复（取证驱动）：builtin 球体若“几乎贴地但有微小离地(gap)”，阴影必漏光形成底部亮斑。
+    // 只在 gap 很小的情况下做贴地吸附，避免破坏有意悬浮的摆放。
+    function _solidSnapBuiltinSphereToGroundIfNear(sphereMesh) {
+        try {
+            if (!sphereMesh || !sphereMesh.isMesh || !ground) return;
+            // 只处理 builtin sphere
+            if (!sphereMesh.userData || sphereMesh.userData.type !== 'builtin' || sphereMesh.userData.shape !== 'sphere') return;
+            const pos = new THREE.Vector3();
+            const scale = new THREE.Vector3();
+            sphereMesh.getWorldPosition(pos);
+            sphereMesh.getWorldScale(scale);
+            // SphereGeometry 半径=2；底面高度取决于 Y 向缩放（非等比缩放时用 X 会算错 gap）
+            const rY = Math.max(1e-6, Math.abs(scale.y) * 2.0);
+
+            const rc = new THREE.Raycaster();
+            rc.set(new THREE.Vector3(pos.x, pos.y + rY + 5.0, pos.z), new THREE.Vector3(0, -1, 0));
+            const hit = rc.intersectObject(ground, true);
+            if (!hit || !hit[0] || !hit[0].point) return;
+            const gpY = hit[0].point.y;
+            const bottomY = pos.y - rY;
+            const gap = bottomY - gpY;
+            // 只修“微小离地”：比如 0.0002~0.004（你的 iOS 证据是 0.001）
+            if (!(gap > 0.0002 && gap < 0.0042)) return;
+
+            // 把球整体下移，让球底几乎贴地（留一个极小余量避免穿插引发痤疮）
+            const eps = 0.00002;
+            sphereMesh.position.y -= Math.max(0, gap - eps);
+            try { sphereMesh.updateMatrixWorld(true); } catch (_eMw) {}
+        } catch (_e) {}
+    }
+
+    // 取证工具：探测“球体底部亮斑”根因（不改任何渲染参数）
+    // 用法：
+    // - iOS / PC 访问时加 `?shadowProbe=1`，点击“停止渲染”后会自动打印一次
+    // - 或在控制台手动调用 `solidShadowProbeOnce()`
+    window.solidShadowProbeOnce = function() {
+        try {
+            if (!renderer || !sceneGroup || !mainLight || !ground) { console.log('[solidShadowProbe] missing refs'); return; }
+            if (window.useAdvancedRender) { console.log('[solidShadowProbe] advanced render mode (path tracing)'); return; }
+            // 找一个 builtin sphere
+            let sph = null;
+            sceneGroup.traverse(o => {
+                if (sph) return;
+                if (!o || !o.isMesh) return;
+                if (!o.userData || o.userData.type !== 'builtin' || o.userData.shape !== 'sphere') return;
+                sph = o;
+            });
+            if (!sph) { console.log('[solidShadowProbe] no builtin sphere found'); return; }
+
+            const pos = new THREE.Vector3();
+            const scale = new THREE.Vector3();
+            sph.getWorldPosition(pos);
+            sph.getWorldScale(scale);
+            // SphereGeometry 半径=2
+            const r = Math.max(1e-6, Math.abs(scale.x) * 2.0);
+
+            // 用射线得到球体正下方地面点（比假设 ground.y=0 更可靠）
+            const rc = new THREE.Raycaster();
+            rc.set(new THREE.Vector3(pos.x, pos.y + r + 5.0, pos.z), new THREE.Vector3(0, -1, 0));
+            const hit = rc.intersectObject(ground, true);
+            const gp = hit && hit[0] && hit[0].point ? hit[0].point.clone() : new THREE.Vector3(pos.x, 0, pos.z);
+            const gap = (pos.y - r) - gp.y; // >0 表示球底离地，有“漏光/亮斑”风险
+
+            const sh = mainLight.shadow;
+            const dbg = {
+                ua: (navigator && navigator.userAgent) ? navigator.userAgent : '',
+                lightType: mainLight.isPointLight ? 'point' : (mainLight.isDirectionalLight ? 'dir' : (mainLight.isSpotLight ? 'spot' : 'other')),
+                mapSize: sh && sh.mapSize ? { x: sh.mapSize.x, y: sh.mapSize.y } : null,
+                bias: sh ? sh.bias : null,
+                normalBias: sh ? sh.normalBias : null,
+                camNear: sh && sh.camera ? sh.camera.near : null,
+                camFar: sh && sh.camera ? sh.camera.far : null,
+                sphere: { center: { x: pos.x, y: pos.y, z: pos.z }, r },
+                groundPoint: { x: gp.x, y: gp.y, z: gp.z },
+                gapToGround: gap,
+                groundPull: (ground.material && ground.material.userData && ground.material.userData.uSolidShadowContactPull) ? ground.material.userData.uSolidShadowContactPull.value : null
+            };
+
+            // Spot/Dir：尝试读取 shadowmap 像素（作为“比较链路”证据）
+            try {
+                if ((mainLight.isSpotLight || mainLight.isDirectionalLight) && sh && sh.map && sh.matrix) {
+                    const v4 = new THREE.Vector4(gp.x, gp.y, gp.z, 1.0).applyMatrix4(sh.matrix);
+                    const w = v4.w || 1.0;
+                    const sx = v4.x / w, sy = v4.y / w, sz = v4.z / w;
+                    const u = sx * 0.5 + 0.5;
+                    const v = sy * 0.5 + 0.5;
+                    const recvDepth = sz * 0.5 + 0.5;
+                    dbg.shadowCoord = { u, v, recvDepth, clip: { x: sx, y: sy, z: sz } };
+                    const rt = sh.map;
+                    dbg.shadowRT = {
+                        hasDepthTexture: !!rt.depthTexture,
+                        texType: rt.texture && rt.texture.type,
+                        texFormat: rt.texture && rt.texture.format,
+                        width: rt.width,
+                        height: rt.height
+                    };
+                    // 只有在 depth 被 pack 到 RGBA 时，readRenderTargetPixels 才可能读出有效信息；
+                    // 有 depthTexture 的情况下这里也打印“不可读”作为证据。
+                    if (!rt.depthTexture) {
+                        const px = Math.max(0, Math.min(rt.width - 1, Math.floor(u * rt.width)));
+                        const py = Math.max(0, Math.min(rt.height - 1, Math.floor(v * rt.height)));
+                        const buf = new Uint8Array(4);
+                        renderer.readRenderTargetPixels(rt, px, py, 1, 1, buf);
+                        dbg.shadowRGBA = { x: px, y: py, rgba: [buf[0], buf[1], buf[2], buf[3]] };
+                    } else {
+                        dbg.shadowRGBA = { note: 'depthTexture present; RGBA read not meaningful' };
+                    }
+                }
+            } catch (eRead) {
+                dbg.shadowReadError = String(eRead && eRead.message ? eRead.message : eRead);
+            }
+
+            // 兼容 iOS：用户可能看不到控制台，所以同时写到页面可见的调试面板
+            try { window.__solidShadowProbeLast = dbg; } catch (_eCache) {}
+            try {
+                const panel = document.getElementById('debug-log-panel');
+                if (panel) panel.style.display = 'block';
+                const s1 = `[shadowProbe] light=${dbg.lightType} gap=${(dbg.gapToGround||0).toFixed(6)} pull=${dbg.groundPull}`;
+                const s2 = `[shadowProbe] bias=${dbg.bias} normalBias=${dbg.normalBias} map=${dbg.mapSize? (dbg.mapSize.x+'x'+dbg.mapSize.y) : 'n/a'}`;
+                if (typeof window.hwLog === 'function') { window.hwLog(s1); window.hwLog(s2); }
+                else console.log(s1, s2);
+            } catch (_eHw) {}
+            console.log('[solidShadowProbe] result', dbg);
+        } catch (e) {
+            console.log('[solidShadowProbe] fatal', e);
+            try { if (typeof window.hwLog === 'function') window.hwLog('[shadowProbe] fatal: ' + (e && e.message ? e.message : e)); } catch (_eHw2) {}
+        }
+    };
+
     window.stopRender = function() { window._solidUserStoppedRender = true; window.useAdvancedRender = false; window.isLoadingScene = false; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
     // 统一“停渲染态”曝光，避免停在不同采样阶段导致色阶显示不一致
     if (renderer) renderer.toneMappingExposure = 0.7;
+    // 根因修复：停止渲染切到光栅前，再做一次“球体贴地吸附”，抵消后续插件/布局造成的微小离地
+    try {
+        if (sceneGroup && sceneGroup.traverse) {
+            sceneGroup.traverse(o => {
+                if (!o || !o.isMesh) return;
+                if (!o.userData || o.userData.type !== 'builtin' || o.userData.shape !== 'sphere') return;
+                _solidSnapBuiltinSphereToGroundIfNear(o);
+            });
+        }
+    } catch (_eSnap2) {}
     _solidEnableRasterShadowsOnce();
-    try { if (typeof window._solidRebuildSphereContactShadows === 'function') window._solidRebuildSphereContactShadows(); } catch(_eCS) {}
     try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('stop_render'); } catch(_eP) {}
     _solidDismissRenderToast(); if (renderer) { try { renderer.render(scene, camera); } catch (_eSr) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
     // 再补一帧：确保 shadowMap 在 render 前后状态切换完全生效（修复“必须切灯才出投影”）
-    try { requestAnimationFrame(() => { if (renderer) { try { renderer.render(scene, camera); } catch (_e2) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); } }); } catch(_eRaf) {}
+    try { requestAnimationFrame(() => { if (renderer) { try { renderer.render(scene, camera); } catch (_e2) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); } 
+        // 取证：球体底部亮斑 shadow probe（仅在 ?shadowProbe=1 或手动调用时运行）
+        try {
+            const qs = new URLSearchParams(window.location.search || '');
+            if (qs.get('shadowProbe') === '1' && typeof window.solidShadowProbeOnce === 'function') {
+                window.solidShadowProbeOnce();
+            }
+        } catch (_eSp) {}
+    }); } catch(_eRaf) {}
     hwLog("已停止物理渲染，释放显存与内存缓存。点击“重新渲染”可恢复光追引擎。");
     const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0';
     const br = document.getElementById('btn-rerender'); if(br) { br.style.opacity = '0.8'; br.style.borderColor = 'rgba(255,255,255,0.3)'; br.style.boxShadow = 'none'; }
@@ -534,103 +826,6 @@
     window.toggleAdvancedRender = function(val) { window.useAdvancedRender = val; needsUpdate = true; }; const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
     window.hasWall = false; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
     window.matType = 'origin'; window.customScenes = []; window.currentSceneIndex = -1; window.currentSceneData = null; let sceneGroup = new THREE.Group(); let gltfLoader, sysMaterials;
-
-    // ===== 光栅态“球体接触阴影贴片”（专治球体底部亮斑）=====
-    // 说明：
-    // - 仅在 useAdvancedRender=false（停止渲染/降级光栅）时启用
-    // - 只对 builtin sphere（userData.shape==='sphere'）生成一个非常薄的圆片，在 ground 上方极小偏移处乘暗
-    // - 目的不是“真实阴影”，而是保证任何光源下球体接触处绝不漏光（用户需求优先）
-    const _solidSphereContact = {
-        _tag: '__solidSphereContactShadow',
-        _color: 0x000000,
-        _opacityDesktop: 0.24,
-        _opacityMobile: 0.30,
-        _y: 0.0032,
-        _radiusMul: 0.28,          // 阴影半径 ≈ 球体半径 * mul（略小于投影，专补接触亮斑）
-        _extraPad: 0.08,           // 小球额外加一点 padding，防止亮斑漏在外圈
-        _minRadius: 0.12,          // 小球兜底最小半径
-        _mat: null,
-        _ensureMat() {
-            if (this._mat) return this._mat;
-            this._mat = new THREE.MeshBasicMaterial({
-                color: this._color,
-                transparent: true,
-                opacity: isMobile ? this._opacityMobile : this._opacityDesktop,
-                depthWrite: false,
-                depthTest: true,
-                blending: THREE.MultiplyBlending
-            });
-            return this._mat;
-        },
-        _isSphereMesh(obj) {
-            try {
-                if (!obj || !obj.isMesh) return false;
-                if (!obj.userData) return false;
-                if (obj.userData.type === 'builtin' && obj.userData.shape === 'sphere') return true;
-            } catch (_e) {}
-            return false;
-        },
-        clear() {
-            try {
-                if (!sceneGroup || !sceneGroup.traverse) return;
-                const toRemove = [];
-                sceneGroup.traverse((o) => {
-                    if (o && o.userData && o.userData[this._tag]) toRemove.push(o);
-                });
-                toRemove.forEach((o) => {
-                    try { if (o.parent) o.parent.remove(o); } catch (_e) {}
-                    try { if (o.geometry) safeDispose(o.geometry); } catch (_e2) {}
-                });
-            } catch (_e3) {}
-        },
-        rebuild() {
-            try {
-                this.clear();
-                if (window.useAdvancedRender) return;
-                if (!sceneGroup || !sceneGroup.traverse) return;
-
-                const mat = this._ensureMat();
-                const tmpPos = new THREE.Vector3();
-                const tmpScale = new THREE.Vector3();
-
-                sceneGroup.traverse((obj) => {
-                    if (!this._isSphereMesh(obj)) return;
-
-                    // 估球体半径：用 scale.x * 2（SphereGeometry 半径=2），再兜底 boundingSphere
-                    let r = 1.0;
-                    try {
-                        obj.getWorldScale(tmpScale);
-                        r = Math.max(0.0001, Math.abs(tmpScale.x) * 2.0);
-                    } catch (_eS) {}
-                    try {
-                        if (obj.geometry && obj.geometry.boundingSphere) {
-                            r = Math.max(r, (obj.geometry.boundingSphere.radius || 1) * (Math.abs(tmpScale.x) || 1));
-                        }
-                    } catch (_eB) {}
-
-                    const rad = Math.max(this._minRadius, r * this._radiusMul + this._extraPad);
-                    const geo = new THREE.CircleGeometry(rad, isMobile ? 28 : 40);
-                    const mesh = new THREE.Mesh(geo, mat);
-                    mesh.rotation.x = -Math.PI / 2;
-                    mesh.renderOrder = 2; // 稍高于 ground（ground 默认 0）
-                    mesh.userData[this._tag] = 1;
-                    mesh.frustumCulled = false;
-                    try {
-                        obj.getWorldPosition(tmpPos);
-                        mesh.position.set(tmpPos.x, this._y, tmpPos.z);
-                    } catch (_eP) {
-                        mesh.position.set(0, this._y, 0);
-                    }
-                    sceneGroup.add(mesh);
-                });
-            } catch (_e) {}
-        }
-    };
-    window._solidRebuildSphereContactShadows = function() {
-        try { _solidSphereContact.rebuild(); } catch (_e) {}
-    };
-    // 允许在控制台/代码中快速调试贴片大小
-    window._solidSphereContactShadowParams = _solidSphereContact;
 
     /** 光栅态：低频多探针（CubeCapture + PMREM），用“最近探针 envMap”近似局部互反射/地面回光 */
     let _solidRasterEnvPmremGen = null;
@@ -1115,6 +1310,7 @@
     if(s === 'torus') obj3d.rotation.x = -Math.PI/2;
     obj3d.userData = { type: 'builtin', shape: s, isFlat: isFlat, customColor: item.color }; obj3d.material.color.set(item.color); obj3d.traverse(c => { if(c.isMesh) c.userData.customColor = item.color; });
     obj3d.position.set(...item.pos); obj3d.rotation.set(...item.rot); obj3d.scale.set(...item.scale); sceneGroup.add(obj3d);
+    if (s === 'sphere') { try { _solidSnapBuiltinSphereToGroundIfNear(obj3d); } catch(_eSnap) {} }
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj3d, itemData: item }); } }
     // 解析外部导入的 GLB
     else if(item.type === 'glb') { const _slot = _glbSlotI++; promises.push(new Promise((resolve) => { gltfLoader.load(item.url, (gltf) => { glbSlots[_slot].done = true; if (glbSlots[_slot].total <= 0 && glbSlots[_slot].loaded <= 0) { glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1; } updateSceneGlbProgress(); const model = gltf.scene;
@@ -1124,8 +1320,7 @@
     if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data }); // 【安全接管新场景】
     if (glbCount === 0) setLoaderProgress(86);
     Promise.all(promises).then(() => { setLoaderProgress(90); setLoaderText("构建物理光照BVH树..."); requestAnimationFrame(() => { requestAnimationFrame(() => { setLoaderProgress(97); window.resetAll();
-    // 场景首次进入若处于光栅模式（stopRender/软降级），此时才确保球体已加载完成，必须在这里重建接触贴片
-    try { if (!window.useAdvancedRender && typeof window._solidRebuildSphereContactShadows === 'function') window._solidRebuildSphereContactShadows(); } catch(_eCSL) {}
+    
     if(pathTracer) { pathTracer.updateMaterials(); lightPosUpdated=true; pathTracer.reset(); window.sumDuration = 0; }
     window.isLoadingScene = false; // [解锁] 资产与BVH就绪，放行渲染
     try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_loaded'); } catch(_eP) {}
@@ -1438,7 +1633,6 @@
         if (!window.useAdvancedRender) {
             try { window._solidFallbackRenderAt = 0; } catch(_e) {}
             try { _solidEnableRasterShadowsOnce(); } catch(_e2) {}
-            try { if (typeof window._solidRebuildSphereContactShadows === 'function') window._solidRebuildSphereContactShadows(); } catch(_eCS2) {}
             try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('build_environment'); } catch(_eP) {}
         }
         }
