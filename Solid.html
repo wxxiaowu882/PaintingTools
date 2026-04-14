@@ -318,7 +318,7 @@
                     sh.mapSize.set(ms, ms);
                     // 更紧贴接触面：略收紧基础半径（远端虚化由地面 shader patch 负责）
                     sh.radius = 2.0;
-                    sh.blurSamples = 10;
+                    sh.blurSamples = 18;
                     // 提升深度精度，减少接触面漏光（near 越大精度越好，但不要裁切近处）
                     sh.camera.near = Math.max(0.26, Math.min(0.6, (Number(state && state.radius) || 18) * 0.016));
                     sh.camera.far = range;
@@ -326,7 +326,7 @@
                 } else if (mainLight.isDirectionalLight) {
                     sh.mapSize.set(ms, ms);
                     sh.radius = 1.4;
-                    sh.blurSamples = 10;
+                    sh.blurSamples = 18;
                     const cam = sh.camera;
                     const he = isMobile ? 26 : 32;
                     cam.near = 1.3;
@@ -336,7 +336,7 @@
                 } else if (mainLight.isPointLight) {
                     const pms = isMobile ? 896 : 1408;
                     sh.mapSize.set(pms, pms);
-                    sh.blurSamples = 8;
+                    sh.blurSamples = 12;
                     sh.camera.near = 0.5;
                     sh.camera.far = range;
                     sh.camera.updateProjectionMatrix();
@@ -347,13 +347,13 @@
                 _solidFitRasterShadowFrustumForSceneGroup();
                 if (mainLight.isSpotLight) {
                     sh.bias = -0.000012;
-                    sh.normalBias = 0.0013;
+                    sh.normalBias = 0.022;
                 } else if (mainLight.isDirectionalLight) {
                     sh.bias = -0.00005;
-                    sh.normalBias = 0.0018;
+                    sh.normalBias = 0.025;
                 } else if (mainLight.isPointLight) {
                     sh.bias = -0.000015;
-                    sh.normalBias = 0.0038;
+                    sh.normalBias = 0.042;
                 }
 
             // Receivers / casters
