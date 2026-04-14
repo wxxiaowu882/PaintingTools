@@ -317,7 +317,7 @@
                 if (mainLight.isSpotLight) {
                     sh.mapSize.set(ms, ms);
                     // 更紧贴接触面：略收紧基础半径（远端虚化由地面 shader patch 负责）
-                    sh.radius = 2.0;
+                    sh.radius = 1.4;
                     sh.blurSamples = 18;
                     // 提升深度精度，减少接触面漏光（near 越大精度越好，但不要裁切近处）
                     sh.camera.near = Math.max(0.26, Math.min(0.6, (Number(state && state.radius) || 18) * 0.016));
@@ -336,6 +336,7 @@
                 } else if (mainLight.isPointLight) {
                     const pms = isMobile ? 896 : 1408;
                     sh.mapSize.set(pms, pms);
+                    sh.radius = 1.5;
                     sh.blurSamples = 12;
                     sh.camera.near = 0.5;
                     sh.camera.far = range;
@@ -345,15 +346,18 @@
                 // 收紧 frustum 后再设 bias/normalBias（根治“影子离地一圈亮缝”）
                 try { if (sceneGroup) sceneGroup.updateMatrixWorld(true); } catch (_eMw) {}
                 _solidFitRasterShadowFrustumForSceneGroup();
+                // 移动端阴影贴图分辨率较低（2048 vs 4096），每纹素尺寸约为桌面 2 倍，
+                // iOS（含新 iPad 以桌面 UA 上报）WebGL 精度也弱于桌面，需要按比例放大 normalBias。
+                const _nbBoost = isMobile ? 1.9 : (isIosPosterizeHost ? 1.4 : 1.0);
                 if (mainLight.isSpotLight) {
                     sh.bias = -0.000012;
-                    sh.normalBias = 0.022;
+                    sh.normalBias = 0.022 * _nbBoost;
                 } else if (mainLight.isDirectionalLight) {
                     sh.bias = -0.00005;
-                    sh.normalBias = 0.025;
+                    sh.normalBias = 0.025 * _nbBoost;
                 } else if (mainLight.isPointLight) {
                     sh.bias = -0.000015;
-                    sh.normalBias = 0.042;
+                    sh.normalBias = 0.042 * _nbBoost;
                 }
 
             // Receivers / casters
@@ -395,17 +399,17 @@
                         } catch (_eA) {}
                         // light-type 相关的 pull：point 的 shadow depth 变化更敏感，稍强一点
                         try {
-                            if (mainLight && mainLight.isPointLight) m.userData.uSolidShadowContactPull.value = 0.00095;
-                            else if (mainLight && mainLight.isDirectionalLight) m.userData.uSolidShadowContactPull.value = 0.00055;
-                            else m.userData.uSolidShadowContactPull.value = 0.00065;
+                            if (mainLight && mainLight.isPointLight) m.userData.uSolidShadowContactPull.value = 0.0016;
+                            else if (mainLight && mainLight.isDirectionalLight) m.userData.uSolidShadowContactPull.value = 0.0010;
+                            else m.userData.uSolidShadowContactPull.value = 0.0012;
                         } catch (_ePull) {}
 
                         // 远端更明显虚化：不同光型使用不同距离范围（Spot/Dir 的阴影通常更短，需要更早开始虚化）
                         const multExpr = (mainLight && (mainLight.isSpotLight || mainLight.isDirectionalLight))
                             // 近端保持 1.0；远端更虚更糊，且过渡更平滑（减轻锯齿感）
                             // 两段 smoothstep：第一段决定“从哪里开始变虚”，第二段避免刚开始就糊掉贴脚细节
-                            ? '( 1.0 + 8.2 * smoothstep( 7.5, 28.0, dSolidSh ) * smoothstep( 2.8, 7.8, dSolidSh ) )'
-                            : '( 1.0 + 7.6 * smoothstep( 5.0, 26.0, dSolidSh ) * smoothstep( 2.2, 6.8, dSolidSh ) )';
+                            ? '( 1.0 + 16.0 * smoothstep( 7.5, 28.0, dSolidSh ) * smoothstep( 2.8, 7.8, dSolidSh ) )'
+                            : '( 1.0 + 12.0 * smoothstep( 5.0, 26.0, dSolidSh ) * smoothstep( 2.2, 6.8, dSolidSh ) )';
 
                         m.onBeforeCompile = (shader) => {
                             // debug log: keep minimal (remove later if stable)
