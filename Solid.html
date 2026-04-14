@@ -491,6 +491,7 @@
     // 统一“停渲染态”曝光，避免停在不同采样阶段导致色阶显示不一致
     if (renderer) renderer.toneMappingExposure = 0.7;
     _solidEnableRasterShadowsOnce();
+    try { if (typeof window._solidRebuildSphereContactShadows === 'function') window._solidRebuildSphereContactShadows(); } catch(_eCS) {}
     try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('stop_render'); } catch(_eP) {}
     _solidDismissRenderToast(); if (renderer) { try { renderer.render(scene, camera); } catch (_eSr) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
     // 再补一帧：确保 shadowMap 在 render 前后状态切换完全生效（修复“必须切灯才出投影”）
@@ -533,6 +534,103 @@
     window.toggleAdvancedRender = function(val) { window.useAdvancedRender = val; needsUpdate = true; }; const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
     window.hasWall = false; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
     window.matType = 'origin'; window.customScenes = []; window.currentSceneIndex = -1; window.currentSceneData = null; let sceneGroup = new THREE.Group(); let gltfLoader, sysMaterials;
+
+    // ===== 光栅态“球体接触阴影贴片”（专治球体底部亮斑）=====
+    // 说明：
+    // - 仅在 useAdvancedRender=false（停止渲染/降级光栅）时启用
+    // - 只对 builtin sphere（userData.shape==='sphere'）生成一个非常薄的圆片，在 ground 上方极小偏移处乘暗
+    // - 目的不是“真实阴影”，而是保证任何光源下球体接触处绝不漏光（用户需求优先）
+    const _solidSphereContact = {
+        _tag: '__solidSphereContactShadow',
+        _color: 0x000000,
+        _opacityDesktop: 0.24,
+        _opacityMobile: 0.30,
+        _y: 0.0032,
+        _radiusMul: 0.28,          // 阴影半径 ≈ 球体半径 * mul（略小于投影，专补接触亮斑）
+        _extraPad: 0.08,           // 小球额外加一点 padding，防止亮斑漏在外圈
+        _minRadius: 0.12,          // 小球兜底最小半径
+        _mat: null,
+        _ensureMat() {
+            if (this._mat) return this._mat;
+            this._mat = new THREE.MeshBasicMaterial({
+                color: this._color,
+                transparent: true,
+                opacity: isMobile ? this._opacityMobile : this._opacityDesktop,
+                depthWrite: false,
+                depthTest: true,
+                blending: THREE.MultiplyBlending
+            });
+            return this._mat;
+        },
+        _isSphereMesh(obj) {
+            try {
+                if (!obj || !obj.isMesh) return false;
+                if (!obj.userData) return false;
+                if (obj.userData.type === 'builtin' && obj.userData.shape === 'sphere') return true;
+            } catch (_e) {}
+            return false;
+        },
+        clear() {
+            try {
+                if (!sceneGroup || !sceneGroup.traverse) return;
+                const toRemove = [];
+                sceneGroup.traverse((o) => {
+                    if (o && o.userData && o.userData[this._tag]) toRemove.push(o);
+                });
+                toRemove.forEach((o) => {
+                    try { if (o.parent) o.parent.remove(o); } catch (_e) {}
+                    try { if (o.geometry) safeDispose(o.geometry); } catch (_e2) {}
+                });
+            } catch (_e3) {}
+        },
+        rebuild() {
+            try {
+                this.clear();
+                if (window.useAdvancedRender) return;
+                if (!sceneGroup || !sceneGroup.traverse) return;
+
+                const mat = this._ensureMat();
+                const tmpPos = new THREE.Vector3();
+                const tmpScale = new THREE.Vector3();
+
+                sceneGroup.traverse((obj) => {
+                    if (!this._isSphereMesh(obj)) return;
+
+                    // 估球体半径：用 scale.x * 2（SphereGeometry 半径=2），再兜底 boundingSphere
+                    let r = 1.0;
+                    try {
+                        obj.getWorldScale(tmpScale);
+                        r = Math.max(0.0001, Math.abs(tmpScale.x) * 2.0);
+                    } catch (_eS) {}
+                    try {
+                        if (obj.geometry && obj.geometry.boundingSphere) {
+                            r = Math.max(r, (obj.geometry.boundingSphere.radius || 1) * (Math.abs(tmpScale.x) || 1));
+                        }
+                    } catch (_eB) {}
+
+                    const rad = Math.max(this._minRadius, r * this._radiusMul + this._extraPad);
+                    const geo = new THREE.CircleGeometry(rad, isMobile ? 28 : 40);
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.rotation.x = -Math.PI / 2;
+                    mesh.renderOrder = 2; // 稍高于 ground（ground 默认 0）
+                    mesh.userData[this._tag] = 1;
+                    mesh.frustumCulled = false;
+                    try {
+                        obj.getWorldPosition(tmpPos);
+                        mesh.position.set(tmpPos.x, this._y, tmpPos.z);
+                    } catch (_eP) {
+                        mesh.position.set(0, this._y, 0);
+                    }
+                    sceneGroup.add(mesh);
+                });
+            } catch (_e) {}
+        }
+    };
+    window._solidRebuildSphereContactShadows = function() {
+        try { _solidSphereContact.rebuild(); } catch (_e) {}
+    };
+    // 允许在控制台/代码中快速调试贴片大小
+    window._solidSphereContactShadowParams = _solidSphereContact;
 
     /** 光栅态：低频多探针（CubeCapture + PMREM），用“最近探针 envMap”近似局部互反射/地面回光 */
     let _solidRasterEnvPmremGen = null;
@@ -1026,6 +1124,8 @@
     if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data }); // 【安全接管新场景】
     if (glbCount === 0) setLoaderProgress(86);
     Promise.all(promises).then(() => { setLoaderProgress(90); setLoaderText("构建物理光照BVH树..."); requestAnimationFrame(() => { requestAnimationFrame(() => { setLoaderProgress(97); window.resetAll();
+    // 场景首次进入若处于光栅模式（stopRender/软降级），此时才确保球体已加载完成，必须在这里重建接触贴片
+    try { if (!window.useAdvancedRender && typeof window._solidRebuildSphereContactShadows === 'function') window._solidRebuildSphereContactShadows(); } catch(_eCSL) {}
     if(pathTracer) { pathTracer.updateMaterials(); lightPosUpdated=true; pathTracer.reset(); window.sumDuration = 0; }
     window.isLoadingScene = false; // [解锁] 资产与BVH就绪，放行渲染
     try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_loaded'); } catch(_eP) {}
@@ -1338,6 +1438,7 @@
         if (!window.useAdvancedRender) {
             try { window._solidFallbackRenderAt = 0; } catch(_e) {}
             try { _solidEnableRasterShadowsOnce(); } catch(_e2) {}
+            try { if (typeof window._solidRebuildSphereContactShadows === 'function') window._solidRebuildSphereContactShadows(); } catch(_eCS2) {}
             try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('build_environment'); } catch(_eP) {}
         }
         }
