@@ -192,6 +192,8 @@
             const box = new THREE.Box3();
             box.setFromObject(sceneGroup);
             if (box.isEmpty()) return;
+            const size = new THREE.Vector3();
+            box.getSize(size);
             // 轻微扩张：避免边缘裁切
             try { box.expandByScalar(0.35); } catch (_e) {}
             const sphere = new THREE.Sphere();
@@ -204,25 +206,65 @@
             const margin = 3.2;
             let desiredFar = Math.max(10, dist + sphere.radius + margin);
 
+            // 低角度（掠射）时，阴影会被拉得很长；仅按包围球会低估需要的 frustum，导致“投影截断”
+            // 用 1/|dir.y| 扩张系数：|dir.y| 越小，扩张越多（但做上限避免过度放大）
+            let grazeMul = 1.0;
+            try {
+                const dir = new THREE.Vector3();
+                if (mainLight.isDirectionalLight && mainLight.target) {
+                    // dirLight：方向由 light -> target
+                    mainLight.target.getWorldPosition(dir);
+                    dir.sub(lp).normalize();
+                } else if (mainLight.isSpotLight && mainLight.target) {
+                    mainLight.target.getWorldPosition(dir);
+                    dir.sub(lp).normalize();
+                } else {
+                    // point：用 light -> scene center 近似方向
+                    dir.subVectors(sphere.center, lp).normalize();
+                }
+                const ay = Math.max(0.12, Math.min(1.0, Math.abs(dir.y)));
+                grazeMul = Math.min(3.8, Math.max(1.0, 1.0 / ay));
+            } catch (_eG) {}
+            desiredFar *= (0.92 + 0.48 * grazeMul);
+
             if (mainLight.isSpotLight) {
                 // Spot：far 收紧后可把 near 提高一点点提升精度
                 const cap = Math.min(175, Math.max(70, (Number(state && state.radius) || 18) * 2.75 + 38));
-                sh.camera.far = Math.min(cap, desiredFar * 1.08);
+                sh.camera.far = Math.min(cap, Math.max(32, desiredFar * 1.14));
                 const n = Math.max(0.18, Math.min(0.85, sh.camera.far * 0.012));
                 sh.camera.near = Math.min(n, sh.camera.far * 0.06);
                 sh.camera.updateProjectionMatrix();
             } else if (mainLight.isPointLight) {
                 const cap = Math.min(175, Math.max(70, (Number(state && state.radius) || 18) * 2.75 + 38));
-                sh.camera.far = Math.min(cap, desiredFar * 1.10);
+                sh.camera.far = Math.min(cap, Math.max(32, desiredFar * 1.18));
                 sh.camera.near = Math.max(0.22, Math.min(1.2, sh.camera.far * 0.015));
                 sh.camera.updateProjectionMatrix();
             } else if (mainLight.isDirectionalLight) {
                 // Dir：这里主要问题是 near/far 精度；正交范围保持现有 he
                 const capF = Math.min(125, (Number(state && state.radius) || 18) * 4.2 + 58);
-                sh.camera.far = Math.min(capF, Math.max(22, desiredFar + 14));
+                sh.camera.far = Math.min(capF, Math.max(28, desiredFar + 18));
                 sh.camera.near = Math.max(0.6, Math.min(2.2, sh.camera.far * 0.03));
+                // 自适应正交范围：浅角度时阴影更长，固定 he 容易裁切
+                try {
+                    const cam = sh.camera;
+                    const heAuto = (Math.max(size.x, size.z) * 0.72 + 6.5) * Math.min(2.6, Math.max(1.0, 0.75 + 0.35 * grazeMul));
+                    const he = Math.max(18, Math.min(78, heAuto));
+                    cam.left = -he; cam.right = he; cam.top = he; cam.bottom = -he;
+                } catch (_eHe) {}
                 sh.camera.updateProjectionMatrix();
             }
+        } catch (_e) {}
+    }
+
+    /** 光栅态：光源移动后刷新 shadow frustum，避免投影被裁切 */
+    function _solidRefreshRasterShadowAfterLightMove() {
+        try {
+            if (window.useAdvancedRender) return;
+            if (!mainLight || !mainLight.castShadow || !mainLight.shadow) return;
+            if (!renderer || !renderer.shadowMap || !renderer.shadowMap.enabled) return;
+            try { if (sceneGroup) sceneGroup.updateMatrixWorld(true); } catch (_eMw) {}
+            _solidFitRasterShadowFrustumForSceneGroup();
+            try { renderer.shadowMap.needsUpdate = true; } catch (_eSm) {}
         } catch (_e) {}
     }
 
@@ -360,9 +402,10 @@
 
                         // 远端更明显虚化：不同光型使用不同距离范围（Spot/Dir 的阴影通常更短，需要更早开始虚化）
                         const multExpr = (mainLight && (mainLight.isSpotLight || mainLight.isDirectionalLight))
-                            // 近端保持 1.0，远端再逐步放大半径（避免贴脚接触带被 PCF 核“抹亮”）
-                            ? '( 1.0 + 4.0 * smoothstep( 5.0, 20.0, dSolidSh ) * smoothstep( 1.8, 5.0, dSolidSh ) )'
-                            : '( 1.0 + 3.8 * smoothstep( 3.0, 18.0, dSolidSh ) * smoothstep( 1.2, 3.4, dSolidSh ) )';
+                            // 近端保持 1.0；远端更虚更糊，且过渡更平滑（减轻锯齿感）
+                            // 两段 smoothstep：第一段决定“从哪里开始变虚”，第二段避免刚开始就糊掉贴脚细节
+                            ? '( 1.0 + 8.2 * smoothstep( 7.5, 28.0, dSolidSh ) * smoothstep( 2.8, 7.8, dSolidSh ) )'
+                            : '( 1.0 + 7.6 * smoothstep( 5.0, 26.0, dSolidSh ) * smoothstep( 2.2, 6.8, dSolidSh ) )';
 
                         m.onBeforeCompile = (shader) => {
                             // debug log: keep minimal (remove later if stable)
@@ -1295,6 +1338,7 @@
         }
         }
         function updateLightPosition() { const phi = THREE.MathUtils.degToRad(90 - parseFloat(state.elevation)); const theta = THREE.MathUtils.degToRad(parseFloat(state.azimuth)); const x = state.radius * Math.sin(phi) * Math.cos(theta); const y = state.radius * Math.cos(phi); const z = state.radius * Math.sin(phi) * Math.sin(theta); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') { mainLight.lookAt(0, 1, 0); } mainLight.updateMatrixWorld();
+        try { _solidRefreshRasterShadowAfterLightMove(); } catch(_eRf) {}
         // 光栅态：更新“远端更虚”锚点，跟随主光/target
         try { if (!window.useAdvancedRender && ground && ground.material && ground.material.userData && ground.material.userData.uSolidShadowAnchor) { if (mainLight.isPointLight) mainLight.getWorldPosition(ground.material.userData.uSolidShadowAnchor.value); else if (mainLight.target) mainLight.target.getWorldPosition(ground.material.userData.uSolidShadowAnchor.value); } } catch(_eA) {}
         } lightPosUpdated = true; }
