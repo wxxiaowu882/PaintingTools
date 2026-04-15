@@ -23,6 +23,56 @@ export function createSolidPreviewLightingManager(opts) {
 
   let previewEnabled = true;
 
+  // ---------- Raster shadow softening params ----------
+  // Goal: keep contact edge relatively sharp, then progressively blur farther away from the model footprint
+  // (distance in projected ground plane, NOT distance to light).
+  //
+  // Tuning tips:
+  // - Increase `strength` => farther region gets softer (bigger PCF radius multiplier).
+  // - Increase `exp`      => near region stays sharper, far region ramps up faster.
+  // - `startH/endH` are multipliers of model height (sceneGroup bbox size.y); they control where the ramp begins/ends.
+  //   This is more intuitive for typical Solid assets (~20cm–50cm height).
+  const RASTER_SHADOW_SOFT_PARAMS = {
+    // Directional / Spot: usually matches the “reference photo” look better (longer, smoother tail).
+    dirSpot: {
+      // More visible defaults (easy to tune down):
+      // start smaller => blur begins closer to the model footprint
+      // end smaller   => reaches maximum blur sooner (stronger tail)
+      // Aggressive “far end melts away” defaults:
+      // - endH smaller => reaches maximum blur earlier, so the far edge loses the hard contour.
+      // - exp closer to 1 => mid/far region gets blur sooner (less “stuck sharp”).
+      startH: 0.10, // start blur after ~0.10x model height
+      endH: 0.95,   // reach max blur at ~0.95x model height
+      exp: 1.15,
+      strengthDesktop: 140.0,
+      strengthMobile: 85.0,
+    },
+    // Point light cube shadow tends to look “grainier”; keep it slightly more conservative.
+    point: {
+      // Point light: still aggressive, but a bit more conservative than dir/spot.
+      startH: 0.10,
+      endH: 0.85,
+      exp: 1.10,
+      strengthDesktop: 110.0,
+      strengthMobile: 70.0,
+    },
+  };
+
+  // Gaussian-like PCF sampling params.
+  // If you see “rings / slice stacking”, increase `taps` and/or enable `rotate` to break fixed tap patterns.
+  const RASTER_SHADOW_GAUSS_PARAMS = {
+    // Desktop default: smoother penumbra, less ring artifacts.
+    // Note: implementation supports up to 32 taps.
+    desktop: { taps: 24, rotate: 1 },
+    // Mobile: fewer taps to keep it fast.
+    mobile: { taps: 12, rotate: 1 },
+  };
+
+  function _rasterShadowDbgEnabled() {
+    try { return typeof window !== 'undefined' && localStorage.getItem('SolidRasterShadowDbg') === '1'; }
+    catch (_e) { return false; }
+  }
+
   // ---------- Shadow soft ground patch (consumer extracted) ----------
   function _fitRasterShadowFrustumForSceneGroup() {
     try {
@@ -157,16 +207,20 @@ export function createSolidPreviewLightingManager(opts) {
       const isIosHost = !!getIsIosHost();
       const st = getLightState() || {};
 
+      const dbg = _rasterShadowDbgEnabled();
       const clearGroundSoftPatch = () => {
         try {
           if (!ground || !ground.material) return;
           const m0 = ground.material;
-          if (m0.onBeforeCompile) m0.onBeforeCompile = undefined;
+          // three.js built-in `customProgramCacheKey()` may call `onBeforeCompile.toString()`;
+          // never set it to undefined, or MeshPhysicalMaterial may crash at render time.
+          if (m0.onBeforeCompile) m0.onBeforeCompile = function() {};
           if (m0.userData) {
             delete m0.userData.uSolidShadowAnchorCount;
             delete m0.userData.uSolidShadowAnchors;
             delete m0.userData.uSolidShadowSoftRange;
             delete m0.userData.uSolidShadowSoftStrength;
+            delete m0.userData.uSolidShadowSoftExp;
             delete m0.userData._solidShadowSoftVer;
           }
           if (m0.customProgramCacheKey) delete m0.customProgramCacheKey;
@@ -183,10 +237,14 @@ export function createSolidPreviewLightingManager(opts) {
         renderer.shadowMap.needsUpdate = true;
         try { mainLight.castShadow = false; } catch (_e) {}
         clearGroundSoftPatch();
+        if (dbg) log('[RasterShadowSoft] skip: rect/no-shadow light');
         return;
       }
 
       renderer.shadowMap.enabled = true;
+      // IMPORTANT: three r164 `SHADOWMAP_TYPE_PCF_SOFT` ignores `shadowRadius`.
+      // Our “distance-based blur” is implemented by scaling `shadowRadius` inside getShadow/getPointShadow,
+      // so we must use PCFShadowMap here to make the blur visible.
       renderer.shadowMap.type = THREE.PCFShadowMap;
       renderer.shadowMap.needsUpdate = true;
       try { renderer.shadowMap.needsUpdate = true; } catch (_e) {}
@@ -272,6 +330,7 @@ export function createSolidPreviewLightingManager(opts) {
           if (!m.userData.uSolidShadowContactPull) m.userData.uSolidShadowContactPull = { value: 0.00065 };
           if (!m.userData.uSolidShadowSoftRange) m.userData.uSolidShadowSoftRange = { value: new THREE.Vector4(2.8, 28.0, 2.8, 7.8) };
           if (!m.userData.uSolidShadowSoftStrength) m.userData.uSolidShadowSoftStrength = { value: 16.0 };
+          if (!m.userData.uSolidShadowSoftExp) m.userData.uSolidShadowSoftExp = { value: 2.25 };
 
           m.userData._solidShadowSoftVer = (m.userData._solidShadowSoftVer || 0) + 1;
           const _ver = m.userData._solidShadowSoftVer;
@@ -280,6 +339,20 @@ export function createSolidPreviewLightingManager(opts) {
           m.defines.SOLID_SHADOW_SOFT_GROUND = 1;
           m.defines.SOLID_SHADOW_SOFT_GROUND_VER = _ver;
 
+          // bbox metrics (shared by anchors & softening params)
+          let diagXZ = 12.0;
+          let heightY = 2.0;
+          try {
+            if (sceneGroup) {
+              const gbox = new THREE.Box3();
+              const gsz = new THREE.Vector3();
+              gbox.setFromObject(sceneGroup);
+              gbox.getSize(gsz);
+              diagXZ = Math.max(1.0, Math.sqrt(gsz.x * gsz.x + gsz.z * gsz.z));
+              heightY = Math.max(0.25, Number(gsz.y) || 0.25);
+            }
+          } catch (_eGsz) {}
+
           // anchors
           try {
             const anchors = m.userData.uSolidShadowAnchors.value;
@@ -287,17 +360,8 @@ export function createSolidPreviewLightingManager(opts) {
             const c = new THREE.Vector3();
             let nA = 0;
             const groundY = (ground && ground.position) ? ground.position.y : 0;
-            const epsY = 0.006;
-            let diagXZ = 12.0;
-            try {
-              if (sceneGroup) {
-                const gbox = new THREE.Box3();
-                const gsz = new THREE.Vector3();
-                gbox.setFromObject(sceneGroup);
-                gbox.getSize(gsz);
-                diagXZ = Math.max(1.0, Math.sqrt(gsz.x * gsz.x + gsz.z * gsz.z));
-              }
-            } catch (_eG) {}
+            // More tolerant: many assets are not perfectly snapped to ground, but we still want anchors.
+            const epsY = 0.035;
             if (sceneGroup && sceneGroup.traverse) {
               sceneGroup.traverse((obj) => {
                 if (nA >= 8) return;
@@ -305,7 +369,9 @@ export function createSolidPreviewLightingManager(opts) {
                 if (!obj.castShadow) return;
                 try {
                   box.setFromObject(obj);
-                  if (Math.abs((box.min && box.min.y != null ? box.min.y : 1e9) - groundY) > epsY) return;
+                  const minY = (box.min && box.min.y != null) ? box.min.y : 1e9;
+                  // Accept meshes that are touching or slightly above/below the ground plane.
+                  if (Math.abs(minY - groundY) > epsY && (minY > groundY + epsY)) return;
                   box.getCenter(c);
                   anchors[nA].set(c.x, groundY, c.z);
                   nA++;
@@ -313,14 +379,6 @@ export function createSolidPreviewLightingManager(opts) {
               });
             }
             m.userData.uSolidShadowAnchorCount.value = nA;
-            try {
-              const start = diagXZ * 0.08;
-              const end = diagXZ * 0.85;
-              const near0 = diagXZ * 0.02;
-              const near1 = diagXZ * 0.10;
-              m.userData.uSolidShadowSoftRange.value.set(start, end, near0, near1);
-              m.userData.uSolidShadowSoftStrength.value = (isMobile || isIosHost) ? 22.0 : 30.0;
-            } catch (_eSR) {}
           } catch (_eA) { try { m.userData.uSolidShadowAnchorCount.value = 0; } catch (_eA2) {} }
 
           try {
@@ -329,6 +387,36 @@ export function createSolidPreviewLightingManager(opts) {
             else if (mainLight && mainLight.isDirectionalLight) m.userData.uSolidShadowContactPull.value = mob ? 0.00085 : 0.00065;
             else m.userData.uSolidShadowContactPull.value = mob ? 0.00095 : 0.00075;
           } catch (_ePull) {}
+
+          // softening curve parameters (per light type; keep independent)
+          try {
+            const isPoint = !!(mainLight && mainLight.isPointLight);
+            const cfg = isPoint ? RASTER_SHADOW_SOFT_PARAMS.point : RASTER_SHADOW_SOFT_PARAMS.dirSpot;
+            const str = (isMobile || isIosHost) ? cfg.strengthMobile : cfg.strengthDesktop;
+            m.userData.uSolidShadowSoftStrength.value = str;
+            m.userData.uSolidShadowSoftExp.value = cfg.exp;
+            // Keep uSolidShadowSoftRange as the “distance ramp” (x=start, y=end). z/w retained for backward compat.
+            try {
+              // Use model height as baseline (more intuitive than diagXZ for typical 20cm–50cm assets).
+              // start/end are in ground-plane distance units.
+              const start = heightY * (Number(cfg.startH) || 0.25);
+              const end = heightY * (Number(cfg.endH) || 3.0);
+              const near0 = diagXZ * 0.02;
+              const near1 = diagXZ * 0.10;
+              m.userData.uSolidShadowSoftRange.value.set(start, end, near0, near1);
+            } catch (_eSR) {}
+
+            if (dbg) {
+              try {
+                const lt = isPoint ? 'point' : ((mainLight && mainLight.isDirectionalLight) ? 'dir' : 'spot');
+                const r = m.userData.uSolidShadowSoftRange && m.userData.uSolidShadowSoftRange.value ? m.userData.uSolidShadowSoftRange.value : null;
+                const msg = `[RasterShadowSoft][dbg] lt=${lt} anchors=${m.userData.uSolidShadowAnchorCount.value} heightY=${heightY.toFixed(3)} diagXZ=${diagXZ.toFixed(3)} start=${r ? r.x.toFixed(3) : '?'} end=${r ? r.y.toFixed(3) : '?'} exp=${m.userData.uSolidShadowSoftExp.value} strength=${m.userData.uSolidShadowSoftStrength.value}`;
+                try { log(msg); } catch (_eLg) {}
+                try { if (typeof window !== 'undefined' && typeof window.hwLog === 'function') window.hwLog(msg); } catch (_eHw) {}
+                try { if (typeof console !== 'undefined' && console.log) console.log(msg); } catch (_eCon) {}
+              } catch (_eDbg0) {}
+            }
+          } catch (_eSoftCfg) {}
 
           // light info
           try {
@@ -372,11 +460,6 @@ export function createSolidPreviewLightingManager(opts) {
             m.userData.uSolidSphereCount.value = n;
           } catch (_eSc) { try { m.userData.uSolidSphereCount.value = 0; } catch (_e2) {} }
 
-          const multExpr =
-            '( 1.0 + uSolidShadowSoftStrength'
-            + ' * smoothstep( uSolidShadowSoftRange.x, uSolidShadowSoftRange.y, dSolidSh )'
-            + ' * smoothstep( uSolidShadowSoftRange.z, uSolidShadowSoftRange.w, dSolidSh ) )';
-
           m.onBeforeCompile = (shader) => {
             let fs = shader.fragmentShader;
             let cnt = 0;
@@ -385,15 +468,22 @@ export function createSolidPreviewLightingManager(opts) {
                 const inc = '#include <shadowmap_pars_fragment>';
                 if (fs.includes(inc) && THREE.ShaderChunk && THREE.ShaderChunk.shadowmap_pars_fragment) {
                   let chunk = THREE.ShaderChunk.shadowmap_pars_fragment;
+                  // GLSL ES requires all declarations before statements.
+                  // We rename original shadow functions and append wrappers that scale `shadowRadius`
+                  // based on distance-to-model-footprint, then call the originals.
                   chunk = chunk.replace(
                     'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {',
-                    `float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\tfloat dSolidSh = 1e9;\n\tfor ( int i = 0; i < 8; i++ ) {\n\t\tif ( i >= uSolidShadowAnchorCount ) break;\n\t\tdSolidSh = min( dSolidSh, length( vSolidShadowGroundPos.xz - uSolidShadowAnchors[i].xz ) );\n\t}\n\tfloat solidPullMult = 1.0 + 0.35 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00035 );\n\tshadowCoord.z += solidPull;\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
+                    'float getShadow_orig( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {'
                   );
                   chunk = chunk.replace(
                     'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {',
-                    `float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\tfloat dSolidSh = 1e9;\n\tfor ( int i = 0; i < 8; i++ ) {\n\t\tif ( i >= uSolidShadowAnchorCount ) break;\n\t\tdSolidSh = min( dSolidSh, length( vSolidShadowGroundPos.xz - uSolidShadowAnchors[i].xz ) );\n\t}\n\tfloat solidPullMult = 1.0 + 0.55 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00055 );\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
+                    'float getPointShadow_orig( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {'
                   );
-                  chunk = chunk.replace('dp += shadowBias;', 'dp += shadowBias;\t\t\tdp += solidPull;');
+
+                  // Gaussian sampling helpers must live inside this shadow chunk so `texture2DCompare` is in scope.
+                  chunk += `\n\nfloat solidHash12( vec2 p ) { vec3 p3 = fract( vec3( p.xyx ) * 0.1031 ); p3 += dot( p3, p3.yzx + 33.33 ); return fract( ( p3.x + p3.y ) * p3.z ); }\nmat2 solidRot2( float a ) { float s = sin( a ), c = cos( a ); return mat2( c, -s, s, c ); }\nfloat solidGaussianShadow2D( sampler2D shadowMap, vec2 shadowMapSize, vec4 shadowCoord, float shadowRadius ) {\n\tfloat shadow = 1.0;\n\tvec3 sc = shadowCoord.xyz / shadowCoord.w;\n\tbool inFrustum = sc.x >= 0.0 && sc.x <= 1.0 && sc.y >= 0.0 && sc.y <= 1.0;\n\tbool frustumTest = inFrustum && sc.z <= 1.0;\n\tif ( !frustumTest ) return 1.0;\n\tvec2 texel = vec2( 1.0 ) / shadowMapSize;\n\tfloat tapsF = clamp( uSolidShadowGaussTaps, 4.0, 32.0 );\n\tint taps = int( floor( tapsF + 0.5 ) );\n\tfloat ang = ( uSolidShadowGaussRotate > 0.5 ) ? ( 6.2831853 * solidHash12( vSolidShadowGroundPos.xz * 0.071 + sc.xy * 7.1 ) ) : 0.0;\n\tmat2 R = solidRot2( ang );\n\tfloat sum = 0.0;\n\tfloat wsum = 0.0;\n\t// Continuous disk (spiral) sampling + Gaussian weights to avoid ring / slice artifacts.\n\t// r uses sqrt distribution so samples are uniform over area.\n\tfloat rMax = 1.85;\n\tfor ( int i = 0; i < 32; i++ ) {\n\t\tif ( i >= taps ) break;\n\t\tfloat fi = float(i);\n\t\tfloat t = (fi + 0.5) / max( 1.0, float(taps) );\n\t\tfloat r = sqrt( t ) * rMax;\n\t\tfloat a = (fi + 0.5) * 2.3999632;\n\t\tvec2 o = R * vec2( cos(a), sin(a) ) * r;\n\t\tvec2 uv = sc.xy + o * texel * shadowRadius;\n\t\tfloat w = exp( - (r*r) * 1.6 );\n\t\tsum += w * texture2DCompare( shadowMap, uv, sc.z );\n\t\twsum += w;\n\t}\n\tshadow = (wsum > 0.0) ? (sum / wsum) : 1.0;\n\treturn shadow;\n}\n`;
+
+                  chunk += `\n\nfloat getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\tfloat dSolidSh = 1e9;\n\tfor ( int i = 0; i < 8; i++ ) {\n\t\tif ( i >= uSolidShadowAnchorCount ) break;\n\t\tdSolidSh = min( dSolidSh, length( vSolidShadowGroundPos.xz - uSolidShadowAnchors[i].xz ) );\n\t}\n\tfloat solidPullMult = 1.0 + 0.35 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00035 );\n\tshadowCoord.z += solidPull;\n\tfloat tSolidSh = smoothstep( uSolidShadowSoftRange.x, uSolidShadowSoftRange.y, dSolidSh );\n\ttSolidSh = pow( clamp( tSolidSh, 0.0, 1.0 ), max( 0.75, uSolidShadowSoftExp ) );\n\tshadowRadius *= ( 1.0 + uSolidShadowSoftStrength * tSolidSh );\n\treturn solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius );\n}\n\nfloat getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\tfloat dSolidSh = 1e9;\n\tfor ( int i = 0; i < 8; i++ ) {\n\t\tif ( i >= uSolidShadowAnchorCount ) break;\n\t\tdSolidSh = min( dSolidSh, length( vSolidShadowGroundPos.xz - uSolidShadowAnchors[i].xz ) );\n\t}\n\tfloat solidPullMult = 1.0 + 0.55 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00055 );\n\tshadowCoord.z += solidPull;\n\tfloat tSolidSh = smoothstep( uSolidShadowSoftRange.x, uSolidShadowSoftRange.y, dSolidSh );\n\ttSolidSh = pow( clamp( tSolidSh, 0.0, 1.0 ), max( 0.75, uSolidShadowSoftExp ) );\n\tshadowRadius *= ( 1.0 + uSolidShadowSoftStrength * tSolidSh );\n\treturn solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius );\n}\n`;
                   try {
                     const inj = 'shadow = min( shadow, solidSphereOcclusion( vSolidShadowGroundPos ) );\n\treturn shadow;';
                     chunk = chunk.split('return shadow;').join(inj);
@@ -414,6 +504,7 @@ export function createSolidPreviewLightingManager(opts) {
             shader.uniforms.uSolidShadowContactPull = m.userData.uSolidShadowContactPull;
             shader.uniforms.uSolidShadowSoftRange = m.userData.uSolidShadowSoftRange;
             shader.uniforms.uSolidShadowSoftStrength = m.userData.uSolidShadowSoftStrength;
+            shader.uniforms.uSolidShadowSoftExp = m.userData.uSolidShadowSoftExp;
             shader.uniforms.uSolidSphereCount = m.userData.uSolidSphereCount;
             shader.uniforms.uSolidSphereCenters = m.userData.uSolidSphereCenters;
             shader.uniforms.uSolidSphereRadii = m.userData.uSolidSphereRadii;
@@ -428,6 +519,9 @@ export function createSolidPreviewLightingManager(opts) {
               'uniform float uSolidShadowContactPull;\n' +
               'uniform vec4 uSolidShadowSoftRange;\n' +
               'uniform float uSolidShadowSoftStrength;\n' +
+              'uniform float uSolidShadowSoftExp;\n' +
+              'uniform float uSolidShadowGaussTaps;\n' +
+              'uniform float uSolidShadowGaussRotate;\n' +
               'uniform int uSolidSphereCount;\n' +
               'uniform vec3 uSolidSphereCenters[8];\n' +
               'uniform float uSolidSphereRadii[8];\n' +
@@ -466,6 +560,18 @@ export function createSolidPreviewLightingManager(opts) {
               '  return occ;\n' +
               '}\n' +
               fs;
+
+            // gaussian PCF params (constants wrapped as uniforms for easy tuning)
+            try {
+              const mob = (isMobile || isIosHost);
+              const g = mob ? RASTER_SHADOW_GAUSS_PARAMS.mobile : RASTER_SHADOW_GAUSS_PARAMS.desktop;
+              if (!m.userData.uSolidShadowGaussTaps) m.userData.uSolidShadowGaussTaps = { value: 16.0 };
+              if (!m.userData.uSolidShadowGaussRotate) m.userData.uSolidShadowGaussRotate = { value: 1.0 };
+              m.userData.uSolidShadowGaussTaps.value = g.taps;
+              m.userData.uSolidShadowGaussRotate.value = g.rotate ? 1.0 : 0.0;
+              shader.uniforms.uSolidShadowGaussTaps = m.userData.uSolidShadowGaussTaps;
+              shader.uniforms.uSolidShadowGaussRotate = m.userData.uSolidShadowGaussRotate;
+            } catch (_eGpcf) {}
 
             shader.vertexShader = 'varying vec3 vSolidShadowGroundPos;\n' + shader.vertexShader;
             if (shader.vertexShader.includes('#include <worldpos_vertex>')) {
