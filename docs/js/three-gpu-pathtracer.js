@@ -8497,7 +8497,8 @@ class CubeToEquirectGenerator {
 
 function supportsFloatBlending( renderer ) {
 
-	return renderer.extensions.get( 'EXT_float_blend' );
+	// 使用 has() 走 getExtension 缓存，避免 extensions.get(null) 在 Three 里每帧 console.warn（iPad 等不支持 EXT_float_blend 时控制台被刷爆）
+	return renderer.extensions.has( 'EXT_float_blend' );
 
 }
 

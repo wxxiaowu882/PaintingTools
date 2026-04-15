@@ -3,17 +3,18 @@ window.ControlPanel = {
     inject: function(config) {
         const mode = config.mode || 'consumer';
         const isProducer = (mode === 'producer');
+        const showRenderButtons = (typeof config.showRenderButtons === 'boolean') ? config.showRenderButtons : isProducer;
 
         const htmlString = `
             <div id="main-panel" class="control-panel ${isProducer ? '' : 'minimized'}" style="overflow:visible; padding: 10px 12px; margin: 0 !important; bottom: 10px !important; width: 98% !important; max-width: 400px;">
                 
                 <div id="render-progress-bar" style="position:absolute;top:0;left:0;height:2px;background:rgba(255,255,255,0.45);width:0%;transition:width 0.12s linear, opacity 0.25s;pointer-events:none;border-radius:12px 12px 0 0;"></div>
-                <div id="render-toast" style="position:absolute; top:-34px; left:8px; padding:6px 10px; border-radius:999px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.85); font-size:10px; letter-spacing:1px; opacity:0; transform:translateY(6px); pointer-events:none; transition:opacity .25s ease, transform .25s ease;">渲染中…</div>
+                <div id="render-toast" style="position:absolute; top:-34px; left:8px; padding:6px 10px; border-radius:999px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.85); font-size:10px; letter-spacing:1px; opacity:0; transform:translateY(6px); pointer-events:none; transition:opacity .25s ease, transform .25s ease;">正在开启渲染…</div>
                 
                 <div class="flex justify-between items-center select-none" style="padding:0px 2px; margin:0px; cursor:pointer;" onclick="window.togglePanel()">
                     <div class="flex gap-2" style="position:relative; z-index:1;"> 
-                        <button id="btn-rerender" style="display:${isProducer ? 'inline-block' : 'none'}; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#fff; padding:3px 6px; border-radius:4px; font-size:10px; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); if(window.forceReRender)window.forceReRender()" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">▷ 重新渲染</button> 
-                        <button id="btn-stoprender" style="display:${isProducer ? 'inline-block' : 'none'}; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#fff; padding:3px 6px; border-radius:4px; font-size:10px; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); if(window.stopRender)window.stopRender()" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">□ 停止渲染</button> 
+                        <button id="btn-rerender" style="display:${showRenderButtons ? 'inline-block' : 'none'}; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#fff; padding:3px 6px; border-radius:4px; font-size:10px; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); if(window.forceReRender)window.forceReRender()" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">▷ 开启渲染</button> 
+                        <button id="btn-stoprender" style="display:${showRenderButtons ? 'inline-block' : 'none'}; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#fff; padding:3px 6px; border-radius:4px; font-size:10px; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); if(window.stopRender)window.stopRender()" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">□ 停止渲染</button> 
                     </div>
                     <div class="flex items-center gap-2 flex-1 justify-end">
                         <div id="render-status" style="display:none;">
@@ -258,7 +259,7 @@ window.ControlPanel = {
         // 若宿主后续再定义 forceReRender，此处依然能兜底 toast（按钮调用的是 window.forceReRender）
         const _origForceReRender = window.forceReRender;
         window.forceReRender = function() {
-            showRenderToast('渲染中…');
+            showRenderToast('正在开启渲染…');
             if (typeof _origForceReRender === 'function') return _origForceReRender.apply(this, arguments);
         };
 
