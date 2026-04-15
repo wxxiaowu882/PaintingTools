@@ -133,6 +133,11 @@
     const SOLID_MOBILE_DENOISE = false; const _solidPt = SOLID_PT_ANTI_SPECKLE_TEST
     ? { targetSamples: 380, renderScaleMobile: 0.45, renderScaleDesktop: 0.82, filterGlossyFactor: 0.78, expRamp: 28, expLo: 0.63, expHi: 0.74, toneMappingExposureBase: 0.72 }
     : { targetSamples: 200, renderScaleMobile: 0.42, renderScaleDesktop: 0.75, filterGlossyFactor: 1, expRamp: 24, expLo: 0.55, expHi: 0.7, toneMappingExposureBase: 0.7 }; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    /** PC：PathTracer 首帧会触发大量 HLSL 编译，ANGLE/D3D 上易 GL_OUT_OF_MEMORY；桌面端略降内部分辨率换稳定性 */
+    function _solidPathTracerRenderScale() {
+        if (isMobile) return _solidPt.renderScaleMobile;
+        return Math.min(_solidPt.renderScaleDesktop, 0.64);
+    }
     const isIosPosterizeHost = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false; let solidAnimRafId = 0; window.sumDuration = 0;
     // 默认不自动光追：初次进入场景为光栅预览，需用户点击「重新渲染」再启动追光
@@ -148,37 +153,108 @@
     window.ensurePosterize2dOverlay = function() { return (window.PosterizeShared && window.PosterizeShared.ensureOverlay) ? window.PosterizeShared.ensureOverlay() : null; };
     window.refreshIosPosterizeOverlayFromWebGL = function() { if (window.PosterizeShared && window.PosterizeShared.refreshOverlayFromWebGL) window.PosterizeShared.refreshOverlayFromWebGL(); };
     window.changePosterize = function(levels) {
-    if(window.hwLog) window.hwLog(`[Engine-色阶] 收到指令, levels=${levels}`);
+    try { if (window.hwLog) window.hwLog(`[Engine-色阶] 收到指令, levels=${levels}`); } catch (_ePz) {}
     if (window.PosterizeShared && typeof window.PosterizeShared.apply === 'function') { window.PosterizeShared.apply(levels); return; }
     window.posterizeLevel = levels;
     const slider = document.getElementById('posterizeSlider'); const valDisp = document.getElementById('posterizeVal'); if (slider && valDisp) { const sliderVal = levels === 0 ? 0 : (21 - levels);
     slider.value = sliderVal; valDisp.innerText = levels === 0 ? "无" : levels + "阶"; } };
-    window._logCache = []; window.addHwLog = function(msg) {
+    window._logCache = [];
+    window.addHwLog = function(msg) {
         const panel = document.getElementById('debug-log-panel');
         const content = document.getElementById('log-content');
         const time = new Date().toLocaleTimeString();
-        window._logCache.push(`[${time}] ${msg}`);
-        if(window._logCache.length > 50) window._logCache.shift();
+        const s = String(msg);
+        window._logCache.push(`[${time}] ${s}`);
+        if (window._logCache.length > 50) window._logCache.shift();
         if (content) {
             content.innerText = window._logCache.join('\n');
             if (panel) panel.scrollTop = panel.scrollHeight;
         }
-        // 优化：默认隐藏日志面板（不在页面上占用/干扰 UI）
-        console.log(`[HW-LOG] ${msg}`);
+        console.log('[Solid]', s);
     };
     window.copyDebugLog = function() { navigator.clipboard.writeText(document.getElementById('log-content').innerText).then(() => { alert("日志已复制到剪贴板"); }); }; window.hwLog = window.addHwLog;
+    window.__solidGetDiagnostics = function() {
+        const out = { t: Date.now(), visibility: typeof document !== 'undefined' ? document.visibilityState : null, hidden: typeof document !== 'undefined' ? document.hidden : null };
+        try {
+            out.flags = {
+                useAdvancedRender: !!window.useAdvancedRender,
+                _solidUserStoppedRender: !!window._solidUserStoppedRender,
+                isUnsupported: !!window.isUnsupported,
+                _solidContextLost: !!window._solidContextLost,
+                _solidHardwareUnsupported: !!window._solidHardwareUnsupported,
+                _solidSampleTimeout: !!window._solidSampleTimeout,
+                _solidPerfSoftFail: !!window._solidPerfSoftFail,
+                perfTestDone: !!window.perfTestDone,
+                isTestingPerformance: !!window.isTestingPerformance,
+                isLoadingScene: !!window.isLoadingScene
+            };
+            out.lightType = typeof lightType !== 'undefined' ? lightType : null;
+            out.sceneIndex = window.currentSceneIndex;
+            out.pathTracer = null;
+            try {
+                if (typeof pathTracer !== 'undefined' && pathTracer) {
+                    out.pathTracer = {
+                        samples: pathTracer.samples,
+                        renderScale: pathTracer.renderScale,
+                        bounces: pathTracer.bounces
+                    };
+                }
+            } catch (_ePt) {}
+            out.gl = null;
+            try {
+                if (renderer && renderer.getContext) {
+                    const gl = renderer.getContext();
+                    if (gl) {
+                        out.gl = {
+                            isContextLost: typeof gl.isContextLost === 'function' ? gl.isContextLost() : null,
+                            vendor: gl.getParameter ? gl.getParameter(gl.VENDOR) : null,
+                            rendererParam: gl.getParameter ? gl.getParameter(gl.RENDERER) : null,
+                            version: gl.getParameter ? gl.getParameter(gl.VERSION) : null,
+                            shadingLanguage: gl.getParameter ? gl.getParameter(gl.SHADING_LANGUAGE_VERSION) : null,
+                            maxTextureSize: gl.getParameter ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : null
+                        };
+                        try {
+                            out.gl.EXT_color_buffer_float = !!gl.getExtension('EXT_color_buffer_float');
+                            out.gl.OES_texture_float_linear = !!gl.getExtension('OES_texture_float_linear');
+                        } catch (_eEx) {}
+                    }
+                }
+            } catch (_eGl) {}
+            try {
+                if (renderer && renderer.domElement) {
+                    out.canvasSize = { width: renderer.domElement.width, height: renderer.domElement.height };
+                    out.pixelRatio = renderer.getPixelRatio ? renderer.getPixelRatio() : null;
+                }
+            } catch (_eSz) {}
+            try {
+                const sp = window.__solidShadowProbeLast;
+                out.shadowProbeSummary = sp ? { lightType: sp.lightType, gapToGround: sp.gapToGround, bias: sp.bias, normalBias: sp.normalBias } : null;
+            } catch (_eSp) {}
+            try { out.lastDegradeReason = window.__solidLastDegradeReason; } catch (_eLd) {}
+            try { out.glContextLost = _solidIsGlContextLost(); } catch (_eCl) {}
+        } catch (e) {
+            out.error = e && e.message ? e.message : String(e);
+        }
+        return out;
+    };
+    window.__solidLogDiagnostics = function() {
+        const d = window.__solidGetDiagnostics();
+        try { window.hwLog('[Diag] ' + JSON.stringify(d)); } catch (_e) { try { console.log('[Solid][Diag]', d); } catch (_e2) {} }
+        return d;
+    };
     window.addEventListener('error', e => { window.hwLog('WinErr: ' + e.message); });
     window.addEventListener('unhandledrejection', e => { window.hwLog('PromiseRej: ' + e.reason); }); const originalConsoleError = console.error; console.error = function(...args) {
-    originalConsoleError.apply(console, args); const msg = args.join(' ').toLowerCase(); window.hwLog('[ConsoleError] ' + args.join(' '));
+    originalConsoleError.apply(console, args); const msg = args.join(' ').toLowerCase();
+    if (/shader|webgl|gl_|framebuffer|context|three\.webgl/i.test(msg)) { try { window.hwLog('[ConsoleError] ' + args.join(' ')); } catch (_e) {} }
     if (msg.includes('context lost') && !/recover|restore/i.test(msg)) { window._solidContextLost = true; window.useAdvancedRender = false; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('console_context_lost'); return; }
     if (msg.includes('could not compile shader') || msg.includes('gl_invalid_operation') || msg.includes('failed to create') || msg.includes('framebuffer incomplete') || msg.includes('feedback loop')) {
-    if (typeof triggerUnsupported === 'function') triggerUnsupported(); } }; function safeDispose(obj) { if (!obj) return; if (Array.isArray(obj)) { obj.forEach(m => safeDispose(m)); return; }
+    if (typeof triggerUnsupported === 'function') triggerUnsupported('console_gl_fatal', args.join(' ')); } }; function safeDispose(obj) { if (!obj) return; if (Array.isArray(obj)) { obj.forEach(m => safeDispose(m)); return; }
     try { if (typeof obj.dispose === 'function') obj.dispose(); } catch(e) { /* 彻底静默，忽略第三方底层库的销毁瑕疵 */ } }
     window._solidContextLost = false; window._solidRecovering = false; window.__solidRecoverSeq = 0; window.__solidLastScheduleAt = 0;
     window.__solidTryRecoverPathTracer = function(reason) { if (window._solidHardwareUnsupported) return false; if (window._solidRecovering) return false; if (!renderer || !scene || !camera) return false; window._solidRecovering = true; let recovered = false; try {
     const gl = renderer.getContext ? renderer.getContext() : null; if (!gl) throw new Error('WebGL 上下文为空');
     if (typeof gl.isContextLost === 'function' && gl.isContextLost()) throw new Error('WebGL 上下文尚未恢复');
-    if (!pathTracer) { pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? _solidPt.renderScaleMobile : _solidPt.renderScaleDesktop; if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; }
+    if (!pathTracer) { pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = _solidPathTracerRenderScale(); if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; }
     if (pathTracer.setScene) pathTracer.setScene(scene, camera);
     pathTracer.reset(); lightMoved = true; needsUpdate = true; window.sumDuration = 0; window.lastRenderTime = 0; window.isUnsupported = false; window._solidContextLost = false; window.useAdvancedRender = true; window._solidSampleTimeout = false; window.__solidLastResetAt = performance.now(); window._solidPerfSoftFail = false;
     const msg = document.getElementById('fallback-msg'); if (msg) msg.style.display = 'none'; const pw = document.getElementById('persistent-warning'); if (pw) pw.style.display = 'none'; const cc = document.getElementById('canvas-container'); if (cc) cc.style.opacity = '1'; const mp = document.getElementById('main-panel'); if (mp) { mp.style.opacity = '1'; mp.style.pointerEvents = 'auto'; }
@@ -191,9 +267,20 @@
     const _delayMap = { 'event_context_restored': [50, 200, 600], 'visibility_visible': [200, 800, 2000] }; const delays = _delayMap[reason] || [80, 420, 1200];
     (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '渲染中断，正在恢复…'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); } })();
     const run = function(i) { if (window.__solidRecoverSeq !== seq) return; if (document.hidden) return; if (window._solidUserStoppedRender) return; const needRecover = !pathTracer || window.isUnsupported || window._solidContextLost; if (!needRecover) return;
+    try {
+        const gl = renderer && renderer.getContext ? renderer.getContext() : null;
+        if (gl && typeof gl.isContextLost === 'function' && gl.isContextLost()) {
+            window.hwLog('[Recover] WebGL 上下文仍丢失，跳过本轮 PathTracer 重建（等待 webglcontextrestored 将自动再试；若长期白屏请刷新页面）');
+            return;
+        }
+    } catch (_eGlR) {}
     const ok = window.__solidTryRecoverPathTracer((reason || 'unknown') + '#' + (i + 1)); if (ok) return;
     if (i < delays.length - 1) { setTimeout(function() { run(i + 1); }, delays[i + 1]); return; }
-    if (window._solidContextLost || window.isUnsupported) triggerUnsupported(); }; setTimeout(function() { run(0); }, delays[0]); };
+    try {
+        const gl2 = renderer && renderer.getContext ? renderer.getContext() : null;
+        if (gl2 && typeof gl2.isContextLost === 'function' && gl2.isContextLost()) return;
+    } catch (_eGl2) {}
+    if (window._solidContextLost || window.isUnsupported) triggerUnsupported('recover_exhausted', (reason || '') + ' retries done'); }; setTimeout(function() { run(0); }, delays[0]); };
     function _solidDismissRenderToast() { var t = document.getElementById('render-toast'); if (t) { if (t.__hideTimer) { clearTimeout(t.__hideTimer); t.__hideTimer = 0; } t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; } if (renderer && renderer.domElement) renderer.domElement.style.filter = ''; }
 
     /** 光栅阴影：按 sceneGroup 包围体收紧 shadow frustum，提高深度精度，降低 normalBias 依赖（根治贴脚亮缝 / peter-panning） */
@@ -589,24 +676,9 @@
                             + ' * smoothstep( uSolidShadowSoftRange.z, uSolidShadowSoftRange.w, dSolidSh ) )';
 
                         m.onBeforeCompile = (shader) => {
-                            // debug log: keep minimal (remove later if stable)
-                            try { if (window.hwLog) window.hwLog('[RasterShadowSoft] ground onBeforeCompile hit'); } catch(_eLog) {}
                             let fs = shader.fragmentShader;
                             // 直接劫持 getShadow / getPointShadow 的“第4个参数(半径)”——不依赖任何 shadowRadius 字符串
                             let cnt = 0;
-                            try {
-                                try {
-                                    const c1 = (fs.match(/getShadow\s*\(/g) || []).length;
-                                    const c2 = (fs.match(/getPointShadow\s*\(/g) || []).length;
-                                    const c3 = (fs.match(/getShadowMask\s*\(/g) || []).length;
-                                    if (window.hwLog) window.hwLog('[RasterShadowSoft] fnCount getShadow=' + c1 + ' getPointShadow=' + c2 + ' getShadowMask=' + c3);
-                                    const _mIdx = fs.indexOf('getShadowMask');
-                                    if (_mIdx >= 0 && window.hwLog) window.hwLog('[RasterShadowSoft] getShadowMask ctx=' + fs.slice(Math.max(0, _mIdx - 60), Math.min(fs.length, _mIdx + 160)));
-                                    const _shIdx = fs.toLowerCase().indexOf('shadow');
-                                    if (window.hwLog) window.hwLog('[RasterShadowSoft] fsLen=' + fs.length + ' shadowIdx=' + _shIdx);
-                                    if (_shIdx >= 0 && window.hwLog) window.hwLog('[RasterShadowSoft] shadow ctx=' + fs.slice(Math.max(0, _shIdx - 60), Math.min(fs.length, _shIdx + 220)));
-                                } catch(_eFn) {}
-                            } catch(_eHack) {}
                             if (cnt <= 0) {
                                 // 标准/物理材质里 shadowmask 不一定存在；改为替换 shadowmap chunk 本体，在 getShadow/getPointShadow 内部乘远端倍率
                                 try {
@@ -643,15 +715,13 @@
 
                                         fs = fs.replace(inc, chunk);
                                         cnt = 1;
-                                        try { if (window.hwLog) window.hwLog('[RasterShadowSoft] radius replace OK via shadowmap chunk'); } catch(_eOk2) {}
                                     }
                                 } catch(_eChunk) {}
                                 if (cnt <= 0) {
-                                    try { if (window.hwLog) window.hwLog('[RasterShadowSoft] radius replace MISS'); } catch(_eMiss) {}
+                                    try { if (window.hwLog) window.hwLog('[RasterShadowSoft] shadow chunk replace MISS — ground soft shadow skipped'); } catch(_eMiss) {}
                                     return;
                                 }
                             }
-                            try { if (window.hwLog) window.hwLog('[RasterShadowSoft] radius replace OK x' + cnt); } catch(_eOk) {}
 
                             shader.uniforms.uSolidShadowAnchorCount = m.userData.uSolidShadowAnchorCount;
                             shader.uniforms.uSolidShadowAnchors = m.userData.uSolidShadowAnchors;
@@ -771,8 +841,8 @@
     // - 或在控制台手动调用 `solidShadowProbeOnce()`
     window.solidShadowProbeOnce = function() {
         try {
-            if (!renderer || !sceneGroup || !mainLight || !ground) { console.log('[solidShadowProbe] missing refs'); return; }
-            if (window.useAdvancedRender) { console.log('[solidShadowProbe] advanced render mode (path tracing)'); return; }
+            if (!renderer || !sceneGroup || !mainLight || !ground) { try { if (window.hwLog) window.hwLog('[solidShadowProbe] missing refs'); } catch (_e0) {} return; }
+            if (window.useAdvancedRender) { try { if (window.hwLog) window.hwLog('[solidShadowProbe] advanced render mode (path tracing)'); } catch (_e1) {} return; }
             // 找一个 builtin sphere
             let sph = null;
             sceneGroup.traverse(o => {
@@ -781,7 +851,7 @@
                 if (!o.userData || o.userData.type !== 'builtin' || o.userData.shape !== 'sphere') return;
                 sph = o;
             });
-            if (!sph) { console.log('[solidShadowProbe] no builtin sphere found'); return; }
+            if (!sph) { try { if (window.hwLog) window.hwLog('[solidShadowProbe] no builtin sphere found'); } catch (_e2) {} return; }
 
             const pos = new THREE.Vector3();
             const scale = new THREE.Vector3();
@@ -854,9 +924,9 @@
                 if (typeof window.hwLog === 'function') { window.hwLog(s1); window.hwLog(s2); }
                 else console.log(s1, s2);
             } catch (_eHw) {}
-            console.log('[solidShadowProbe] result', dbg);
+            try { console.log('[solidShadowProbe] result', dbg); } catch (_eRes) {}
         } catch (e) {
-            console.log('[solidShadowProbe] fatal', e);
+            try { console.error('[solidShadowProbe] fatal', e); } catch (_eCe) {}
             try { if (typeof window.hwLog === 'function') window.hwLog('[shadowProbe] fatal: ' + (e && e.message ? e.message : e)); } catch (_eHw2) {}
         }
     };
@@ -897,13 +967,25 @@
     window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none'; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
     document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1';
     document.getElementById('main-panel').style.pointerEvents = 'auto'; window.isLoadingScene = false; if (!pathTracer && renderer) { try {
-    pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? _solidPt.renderScaleMobile : _solidPt.renderScaleDesktop;
-    if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; } catch(e) { triggerUnsupported(); return; } }
+    pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = _solidPathTracerRenderScale();
+    if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; } catch(e) { triggerUnsupported('forceReRender_path_tracer', e.message); return; } }
     if(pathTracer) { needsUpdate = true; lightMoved = true; window.sumDuration = 0; window.lastRenderTime = 0; pathTracer.updateMaterials(); pathTracer.updateLights(); pathTracer.reset(); window.isUnsupported = false; window._solidContextLost = false; window._solidSampleTimeout = false; window.__solidLastResetAt = performance.now(); window._solidPerfSoftFail = false;
     if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); }
     const br = document.getElementById('btn-rerender'); if(br) { br.style.opacity = '0.4'; br.style.borderColor = 'rgba(255,255,255,0.15)'; br.style.boxShadow = 'none'; }
     const bs = document.getElementById('btn-stoprender'); if(bs) { bs.style.opacity = '0.8'; bs.style.borderColor = 'rgba(255,255,255,0.3)'; bs.style.boxShadow = 'none'; }
-    hwLog("已强制重建并重启物理光追与状态"); }; window.isUnsupported = false; function triggerUnsupported() { if(window.isUnsupported) return; window.isUnsupported = true; window.useAdvancedRender = false; window.isTestingPerformance = false;
+    hwLog("已强制重建并重启物理光追与状态"); }; window.isUnsupported = false;
+    window.__solidLastDegradeReason = null;
+    function _solidIsGlContextLost() {
+        try { const gl = renderer && renderer.getContext ? renderer.getContext() : null; return !!(gl && typeof gl.isContextLost === 'function' && gl.isContextLost()); } catch (_e) { return false; }
+    }
+    /** reason: 短标签；detail：可选补充（写入日志与 __solidLastDegradeReason） */
+    function triggerUnsupported(reason, detail) {
+        try {
+            window.__solidLastDegradeReason = { t: Date.now(), reason: reason || 'unknown', detail: detail != null ? String(detail) : '' };
+            window.hwLog('[Degrade] ' + (reason || 'unknown') + (detail ? ' | ' + detail : ''));
+        } catch (_eL) {}
+        if (window.isUnsupported) return;
+        window.isUnsupported = true; window.useAdvancedRender = false; window.isTestingPerformance = false;
     // 【核心修复 1】：先切断引用，再异步 dispose。同步 dispose 在 Shader 编译/驱动卡顿时会长时间阻塞主线程，导致关 Tab 假死。
     if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); }
     ['scene-loader', 'perf-test-overlay'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); const msg = document.getElementById('fallback-msg'); if(msg) { msg.style.display = 'flex'; msg.style.zIndex = '99999';
@@ -921,7 +1003,16 @@
     if (!window._solidHardwareUnsupported) { const _abr = document.getElementById('btn-rerender'); if(_abr) { _abr.style.display = ''; _abr.style.opacity = '0.8'; _abr.style.borderColor = 'rgba(255,255,255,0.3)'; _abr.style.boxShadow = 'none'; } }
     // 【核心修复】：降级后，如果还未成功加载过场景数据，必须强制拉取数据！
     // 否则场景列表为空，且会触发防呆机制导致右上角 X 按钮无法关闭。
-    if (!window.customScenes || window.customScenes.length === 0) { sceneGroup.clear(); window.loadJSONData(); } };
+    if (!window.customScenes || window.customScenes.length === 0) { sceneGroup.clear(); window.loadJSONData(); }
+    try {
+        needsUpdate = true;
+        requestAnimationFrame(function() {
+            try {
+                if (typeof _solidIsGlContextLost === 'function' && _solidIsGlContextLost()) { window.hwLog('[acknowledgeFallback] WebGL 仍处 context lost，光栅无法恢复，请刷新或重启浏览器'); return; }
+                if (renderer && scene && camera) { renderer.render(scene, camera); if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
+            } catch (_eAckR) { window.hwLog('[acknowledgeFallback] 补帧失败: ' + (_eAckR && _eAckR.message)); }
+        });
+    } catch (_eAck) {} };
     window.toggleAdvancedRender = function(val) { window.useAdvancedRender = val; needsUpdate = true; }; const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
     window.hasWall = false; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
     window.matType = 'origin'; window.customScenes = []; window.currentSceneIndex = -1; window.currentSceneData = null; let sceneGroup = new THREE.Group(); let gltfLoader, sysMaterials;
@@ -1490,11 +1581,11 @@
                 window.__solidAnnoViewportH = Math.max(1, Math.round(window.innerHeight || 1));
             }
         };
-        function init() { const container = document.getElementById('canvas-container'); addHwLog("系统初始化开始..."); try { try { window.hwLog("[Init] 尝试实例化最高精度 WebGLRenderer...");
+        function init() { const container = document.getElementById('canvas-container'); try { addHwLog("系统初始化开始..."); } catch(_e0) {} try { try { window.hwLog("[Init] 尝试实例化最高精度 WebGLRenderer...");
         renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: true }); } catch(err1) {
         window.hwLog(`[Init] 高精度实例化异常 (${err1.message})，降级为基础实例...`); renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true }); }
         if (!renderer || !renderer.getContext()) { throw new Error("当前设备或浏览器完全拒绝创建 WebGL 上下文"); }
-        window.hwLog("[Init] WebGLRenderer 实例化完毕"); renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window._solidContextLost = true; window.useAdvancedRender = false; window.hwLog(`Context Lost 事件: ${e.statusMessage || 'GPU运算超时或系统强制回收'}`); if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); } if (!document.hidden && typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('event_context_lost'); }, false);
+        window.hwLog("[Init] WebGLRenderer 实例化完毕"); renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window._solidContextLost = true; window.useAdvancedRender = false; window.hwLog(`Context Lost 事件: ${e.statusMessage || 'GPU运算超时或系统强制回收'}（常见原因：显存不足/驱动编译失败；恢复将在 webglcontextrestored 后进行，请勿在丢失期间重建 PathTracer）`); if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); } }, false);
         renderer.domElement.addEventListener('webglcontextrestored', () => { window.hwLog('Context Restored 事件: 准备恢复光追'); window._solidContextLost = false; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('event_context_restored'); }, false);
         scene = new THREE.Scene(); scene.add(sceneGroup); scene.backgroundRotation = new THREE.Euler(); scene.environmentRotation = new THREE.Euler();
         camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix();
@@ -1502,7 +1593,7 @@
         RectAreaLightUniformsLib.init();
         container.appendChild(renderer.domElement);
         if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport();
-        } catch (e) { window.hwLog("[Init] 发生致命级初始化异常: " + e.message); triggerUnsupported(); return; }
+        } catch (e) { window.hwLog("[Init] 发生致命级初始化异常: " + e.message); triggerUnsupported('init_fatal', e.message); return; }
         // 【静态能力检测】：在 PathTracer 实例化前检查硬性前置条件
         (function _staticGpuCheck() { try { const gl = renderer.getContext(); if (!gl) return;
         const isWebGL2 = (typeof WebGL2RenderingContext !== 'undefined') && (gl instanceof WebGL2RenderingContext);
@@ -1514,9 +1605,9 @@
         requestAnimationFrame(() => { try { window.hwLog("[Init] 推迟一帧再启动光追（先让加载层绘制，略缩短首屏等待）");
         if (window._solidHardwareUnsupported) { window.hwLog("[Init] 静态检测不通过，跳过 PathTracer 实例化"); }
         else { try { window.hwLog("[Init] 准备实例化 WebGLPathTracer...");
-        pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? _solidPt.renderScaleMobile : _solidPt.renderScaleDesktop;
+        pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = _solidPathTracerRenderScale();
         if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; window.hwLog("[Init] WebGLPathTracer 实例化完成"); } catch (ptErr) { window.hwLog("[Init] WebGLPathTracer 拒绝启动: " + ptErr.message);
-        triggerUnsupported(); return; } } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
+        triggerUnsupported('init_path_tracer_reject', ptErr.message); return; } } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
         if (window.DoFManager) window.DoFManager.init(camera, scene, renderer.domElement);
         controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 0, 0); camera.lookAt(0, 0, 0); controls.update(); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; controls.enabled = false; window._orbitInteracting = false; window._solidLastInteractAt = 0;
         let _orbitStartPos = null, _orbitStartTarget = null, _orbitStartQuat = null, _orbitStartZoom = 0;
@@ -1567,6 +1658,7 @@
         if (window.SkyEnvLight && window.SkyEnvLight.syncUI) window.SkyEnvLight.syncUI(); };
         buildEnvironment(); window.syncEnvColorPickers();
         setupUIControls(); window.addEventListener('resize', function() { onWindowResize(); if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); }); setLoaderText("首次加载，硬件检测中…");
+        try { window.hwLog('[Init] ready'); } catch (_eRdy) {}
         startSolidPerfHardwareProgress(isMobile); window.PerfTester.onProgress = function (ph) { applySolidPerfHardwarePhase(ph); };
         const skipPerfTest = new URLSearchParams(window.location.search).get('skipPerf') === '1';
         // 【性能测试缓存】：检查 localStorage 中是否有上次通过的记录
@@ -1606,17 +1698,17 @@
             resetSolidPerfHardwareProgress();
             const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none';
             window.perfTestDone = true; window.isTestingPerformance = false;
-            triggerUnsupported(); window.loadJSONData(); animate();
+            triggerUnsupported('init_static_gpu_unsupported'); window.loadJSONData(); animate();
         } else if (skipPerfTest || _perfCacheHit) {
             if (skipPerfTest) window.hwLog("[Init] 通过URL参数跳过性能测试");
             _solidPerfTestPassActions(); animate();
         } else {
             document.getElementById('perf-test-overlay').style.display = 'flex';
             window.PerfTester.start(scene, camera, pathTracer, isMobile, () => { _solidPerfTestPassActions(); }, () => { _solidPerfTestSoftFail(); } ); animate();
-        } } catch (e) { window.hwLog("[Init] 光追/后续初始化异常: " + e.message); triggerUnsupported(); } }); }
+        } } catch (e) { window.hwLog("[Init] 光追/后续初始化异常: " + e.message); triggerUnsupported('init_post_path_tracer', e.message); } }); }
         document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-        window.hwLog("👀 页面切回前台，恢复安全渲染状态");
+        try { window.hwLog("👀 页面切回前台，恢复安全渲染状态"); } catch(_eV) {}
         requestAnimationFrame(() => {
         requestAnimationFrame(() => {
         if (window.SkyEnvLight && typeof window.SkyEnvLight.invalidateSyncCache === 'function') window.SkyEnvLight.invalidateSyncCache();
@@ -1628,7 +1720,7 @@
         });
         });
         } else {
-        window.hwLog("💤 页面进入后台，安全挂起资源"); window.sumDuration = 0;
+        try { window.hwLog("💤 页面进入后台，安全挂起资源"); } catch(_eH) {} window.sumDuration = 0;
         }
         }); function buildEnvironment() { if (mainLight) { scene.remove(mainLight); if (mainLight.target) scene.remove(mainLight.target); }
         const val = parseFloat(document.getElementById('lightIntensity').value); const lSize = state.lightSize; const col = getTempColor(state.lightTemp * 100);
@@ -1762,7 +1854,27 @@
         if (_minInterval > 0 && (_now - _lastFb) < _minInterval) return;
         window._solidFallbackRenderAt = _now;
         try { _solidSyncGroundShadowUniforms(); } catch (_eSync) {}
-        if (renderer) { try { renderer.render(scene, camera); } catch(err) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); }
+        if (renderer) {
+            try {
+                if (typeof _solidIsGlContextLost === 'function' && _solidIsGlContextLost()) {
+                    if (!window._solidLoggedRasterContextLost) {
+                        window._solidLoggedRasterContextLost = true;
+                        window.hwLog('[RasterFallback] WebGL context lost — 无法绘制光栅画面，请刷新页面或重启浏览器；若仍黑/白屏，多为 GPU 进程异常。');
+                    }
+                } else {
+                    window._solidLoggedRasterContextLost = false;
+                    renderer.render(scene, camera);
+                }
+            } catch (err) {
+                const _tn = performance.now();
+                if (!window._solidLastRasterErrLog || (_tn - window._solidLastRasterErrLog) > 4000) {
+                    window._solidLastRasterErrLog = _tn;
+                    window.hwLog('[RasterFallback] renderer.render 失败: ' + (err && err.message ? err.message : err));
+                }
+            }
+            if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL();
+            if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
+        }
         return; }
         const isTesting = window.PerfTester ? window.PerfTester.isTesting : false; if (!isTesting) { if (controls && !controls.enabled) controls.enabled = true; if (controls) controls.update(); }
         // 【统一生命周期总线】：一行代码调度所有插件，彻底解耦
@@ -1882,7 +1994,7 @@
         window._solidAnimErrCount = 0;
         if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL();
         if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
-        } catch(e) { window.hwLog('[animate] 渲染异常: ' + (e.message || e)); const _fatal = /context|shader|framebuffer|gl_invalid|feedback/i.test(e.message || ''); if (_fatal) { triggerUnsupported(); } else { window._solidAnimErrCount = (window._solidAnimErrCount || 0) + 1; if (window._solidAnimErrCount >= 3) triggerUnsupported(); } } } }
+        } catch(e) { window.hwLog('[animate] 渲染异常: ' + (e.message || e)); const _fatal = /context|shader|framebuffer|gl_invalid|feedback/i.test(e.message || ''); if (_fatal) { triggerUnsupported('animate_fatal', e.message || e); } else { window._solidAnimErrCount = (window._solidAnimErrCount || 0) + 1; if (window._solidAnimErrCount >= 3) triggerUnsupported('animate_err_repeat', String(window._solidAnimErrCount)); } } } }
         init(); // 关页时禁止同步 dispose WebGL：GPU 队列卡住时 renderer.dispose/forceContextLoss 会让主线程与关 Tab 一起假死；页面卸载后进程会回收上下文。
         // 沉浸模式计时器只初始化一次（必须在 init() 之后执行，且不能放在 animate() 内部，否则可能被早退分支跳过）
         if (!window.__solidImmersiveInitDone) {
