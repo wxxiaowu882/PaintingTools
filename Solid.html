@@ -128,6 +128,7 @@
     import './plugins_02/Plugin_PosterizeShared.js'; // 色阶共通逻辑（生产/消费一致）
     import './plugins_02/Plugin_Atmosphere.js'; // ☁️ 同步接入大气透视插件
     import './plugins_02/Plugin_DepthOfField.js'; // 📷 同步接入景深虚实插件
+    import { createSolidPreviewLightingManager } from './plugins_02/SolidPreviewLighting.js';
     window.skyEnvLightMatchMainRect = true; // 【试验·抗黑点噪点】true=更干净（更慢），false=更快（更噪）
     const SOLID_PT_ANTI_SPECKLE_TEST = true; // 方案C（完成时降噪）效果不稳，默认关闭；若要再试，改为 true
     const SOLID_MOBILE_DENOISE = false; const _solidPt = SOLID_PT_ANTI_SPECKLE_TEST
@@ -370,47 +371,8 @@
     /** 每帧同步地面解析遮挡/接触点相关 uniform，避免“冻结的旧影子”与实时 shadowmap 叠两层 */
     function _solidSyncGroundShadowUniforms() {
         try {
-            if (window.useAdvancedRender) return;
-            if (!mainLight || !ground || !ground.material || !ground.material.userData) return;
-            const ud = ground.material.userData;
-            if (!ud.uSolidMainLightPos || !ud.uSolidMainLightDir || !ud.uSolidMainLightType) return;
-
-            const lp = new THREE.Vector3();
-            mainLight.getWorldPosition(lp);
-            ud.uSolidMainLightPos.value.copy(lp);
-            if (mainLight.isPointLight) ud.uSolidMainLightType.value = 2;
-            else if (mainLight.isSpotLight) ud.uSolidMainLightType.value = 1;
-            else ud.uSolidMainLightType.value = 0;
-            const d = new THREE.Vector3(0, 1, 0);
-            if (ud.uSolidMainLightType.value === 0 && mainLight.target) {
-                const t = new THREE.Vector3();
-                mainLight.target.getWorldPosition(t);
-                d.subVectors(lp, t).normalize();
-            } else {
-                d.set(0, 1, 0);
-            }
-            ud.uSolidMainLightDir.value.copy(d);
-
-            if (ud.uSolidSphereCenters && ud.uSolidSphereRadii && ud.uSolidSphereCount) {
-                let n = 0;
-                const tmpPos = new THREE.Vector3();
-                const tmpScale = new THREE.Vector3();
-                if (sceneGroup && sceneGroup.traverse) {
-                    sceneGroup.traverse((obj) => {
-                        if (n >= 8) return;
-                        if (!obj || !obj.isMesh) return;
-                        if (!obj.userData || obj.userData.type !== 'builtin' || obj.userData.shape !== 'sphere') return;
-                        try {
-                            obj.getWorldPosition(tmpPos);
-                            obj.getWorldScale(tmpScale);
-                            const r = Math.max(0.0001, Math.abs(tmpScale.y) * 2.0);
-                            ud.uSolidSphereCenters.value[n].copy(tmpPos);
-                            ud.uSolidSphereRadii.value[n] = r;
-                            n++;
-                        } catch (_eS) {}
-                    });
-                }
-                ud.uSolidSphereCount.value = n;
+            if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncGroundShadowUniforms) {
+                window.__solidPreviewLighting.syncGroundShadowUniforms();
             }
         } catch (_e) {}
     }
@@ -418,388 +380,12 @@
     /** stopRender 内立刻启用光栅阴影并强制更新（否则需要“切换光源类型”触发重建才出现投影）。 */
     function _solidEnableRasterShadowsOnce() {
         try {
-            if (!renderer || !scene || !mainLight) return;
-            if (!renderer.shadowMap) return;
-            const clearGroundSoftPatch = () => {
-                try {
-                    if (!ground || !ground.material) return;
-                    const m0 = ground.material;
-                    // three expects onBeforeCompile to be a function or undefined
-                    if (m0.onBeforeCompile) m0.onBeforeCompile = undefined;
-                    if (m0.userData) {
-                        delete m0.userData.uSolidShadowAnchorCount;
-                        delete m0.userData.uSolidShadowAnchors;
-                        delete m0.userData.uSolidShadowSoftRange;
-                        delete m0.userData.uSolidShadowSoftStrength;
-                        delete m0.userData._solidShadowSoftVer;
-                    }
-                    if (m0.customProgramCacheKey) delete m0.customProgramCacheKey;
-                    if (m0.defines) {
-                        delete m0.defines.SOLID_SHADOW_SOFT_GROUND;
-                        delete m0.defines.SOLID_SHADOW_SOFT_GROUND_VER;
-                    }
-                    m0.needsUpdate = true;
-                } catch (_eClr) {}
-            };
-
-            // RectAreaLight：不支持 shadow；只有真正的 RectAreaLight 才需要在光栅态强制关 shadowMap
-            if ((mainLight && mainLight.isRectAreaLight) || !mainLight.shadow) {
-                renderer.shadowMap.enabled = false;
-                renderer.shadowMap.needsUpdate = true;
-                try { mainLight.castShadow = false; } catch(_e) {}
-                clearGroundSoftPatch();
-                return;
+            if (window.__solidPreviewLighting && window.__solidPreviewLighting.setEnabled) {
+                window.__solidPreviewLighting.setEnabled(!window.useAdvancedRender);
             }
-
-            renderer.shadowMap.enabled = true;
-            // 关键：PCFSoft 在 r164 的 getShadow() 分支里不使用 shadowRadius（Spot/Dir 远端虚化看不到）
-            // 这里改为 PCF，使 shadowRadius 生效；远端虚化通过 shadowRadius 缩放实现。
-            renderer.shadowMap.type = THREE.PCFShadowMap;
-            renderer.shadowMap.needsUpdate = true;
-            // 避免光栅分支被节流挡住首帧更新
-            window._solidFallbackRenderAt = 0;
-
-            // Light
-            mainLight.castShadow = true;
-                const sh = mainLight.shadow;
-                // 远端虚化要“更大且更顺”：当 shadowRadius 被显著放大时，2048 很容易出现 texel 马赛克。
-                // 这里把移动端提升到 3072（仍低于桌面 4096），在“观感”与“性能”之间折中。
-                const ms = isMobile ? 3072 : 4096;
-                const range = Math.min(175, Math.max(96, (Number(state && state.radius) || 18) * 2.75 + 48));
-
-                if (mainLight.isSpotLight) {
-                    sh.mapSize.set(ms, ms);
-                    // 更紧贴接触面：略收紧基础半径（远端虚化由地面 shader patch 负责）
-                    sh.radius = 1.4;
-                    sh.blurSamples = 18;
-                    // 提升深度精度，减少接触面漏光（near 越大精度越好，但不要裁切近处）
-                    sh.camera.near = Math.max(0.26, Math.min(0.6, (Number(state && state.radius) || 18) * 0.016));
-                    sh.camera.far = range;
-                    sh.camera.updateProjectionMatrix();
-                } else if (mainLight.isDirectionalLight) {
-                    sh.mapSize.set(ms, ms);
-                    sh.radius = 1.4;
-                    sh.blurSamples = 18;
-                    const cam = sh.camera;
-                    const he = isMobile ? 26 : 32;
-                    cam.near = 1.3;
-                    cam.far = Math.min(125, (Number(state && state.radius) || 18) * 4.2 + 58);
-                    cam.left = -he; cam.right = he; cam.top = he; cam.bottom = -he;
-                    cam.updateProjectionMatrix();
-                } else if (mainLight.isPointLight) {
-                    const pms = isMobile ? 896 : 1408;
-                    sh.mapSize.set(pms, pms);
-                    sh.radius = 1.5;
-                    sh.blurSamples = 12;
-                    sh.camera.near = 0.5;
-                    sh.camera.far = range;
-                    sh.camera.updateProjectionMatrix();
-                }
-
-                // 收紧 frustum 后再设 bias/normalBias（根治“影子离地一圈亮缝”）
-                try { if (sceneGroup) sceneGroup.updateMatrixWorld(true); } catch (_eMw) {}
-                _solidFitRasterShadowFrustumForSceneGroup();
-                // 移动端阴影贴图分辨率较低（2048 vs 4096），每纹素尺寸约为桌面 2 倍，
-                // iOS（含新 iPad 以桌面 UA 上报）WebGL 精度也弱于桌面，需要按比例放大 normalBias。
-                const _nbBoost = isMobile ? 1.9 : (isIosPosterizeHost ? 1.4 : 1.0);
-                if (mainLight.isSpotLight) {
-                    // 桌面端：负 bias 容易产生“亮部接地黑边”(shadow acne)，这里收敛到更接近 0
-                    sh.bias = (isMobile || isIosPosterizeHost) ? -0.000012 : -0.000006;
-                    sh.normalBias = 0.022 * _nbBoost;
-                    // 证据：iOS 探针显示 normalBias=0.0418，会显著抬起遮挡导致贴地亮斑更明显
-                    // 在“黑边已消失”的前提下，对移动端 spot 做上限钳制，避免 peter-panning
-                    if (isMobile || isIosPosterizeHost) sh.normalBias = Math.min(sh.normalBias, 0.028);
-                } else if (mainLight.isDirectionalLight) {
-                    sh.bias = (isMobile || isIosPosterizeHost) ? -0.00005 : -0.000025;
-                    sh.normalBias = 0.025 * _nbBoost;
-                } else if (mainLight.isPointLight) {
-                    sh.bias = -0.000015;
-                    // PointLight：normalBias 过大会造成 peter-panning（贴地漏盖 => 球体底部亮斑）
-                    // 注意：移动端把 normalBias 按分辨率放大会加剧 peter-panning（尤其球体贴地）。
-                    // PointLight 在移动端单独使用更温和的 boost，优先消灭球体底部亮斑。
-                    const _ptNbBoost = isMobile ? 1.12 : (isIosPosterizeHost ? 1.08 : 1.0);
-                    sh.normalBias = 0.014 * _ptNbBoost;
-                }
-
-            // Receivers / casters
-            if (ground) { ground.receiveShadow = true; ground.castShadow = false; }
-            if (window.walls && Array.isArray(window.walls)) {
-                window.walls.forEach(w => { if (w) { w.receiveShadow = true; w.castShadow = false; } });
+            if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) {
+                window.__solidPreviewLighting.syncShadows();
             }
-            if (sceneGroup && sceneGroup.traverse) {
-                sceneGroup.traverse(obj => {
-                    if (!obj || !obj.isMesh) return;
-                    obj.receiveShadow = true;
-                    obj.castShadow = true;
-                });
-            }
-
-            // 仅地面：让投影远端更虚（不影响其它物体；只影响光栅态）
-            try {
-                if (ground && ground.material && mainLight && mainLight.castShadow) {
-                    const m = ground.material;
-                    const canPatch = !!(m.isMeshPhysicalMaterial || m.isMeshStandardMaterial);
-                    if (canPatch) {
-                        if (!m.userData) m.userData = {};
-                        // 方案3：多接触点 anchor（最多 8 个），用于“靠近模型接触点硬、离开后逐步变软”
-                        if (!m.userData.uSolidShadowAnchorCount) m.userData.uSolidShadowAnchorCount = { value: 0 };
-                        if (!m.userData.uSolidShadowAnchors) {
-                            m.userData.uSolidShadowAnchors = { value: Array.from({ length: 8 }, () => new THREE.Vector3(0, 0, 0)) };
-                        }
-                        // 解析遮挡（builtin sphere -> ground）：不依赖 shadowmap，根治贴地亮斑
-                        if (!m.userData.uSolidSphereCount) m.userData.uSolidSphereCount = { value: 0 };
-                        if (!m.userData.uSolidSphereCenters) {
-                            m.userData.uSolidSphereCenters = { value: Array.from({ length: 8 }, () => new THREE.Vector3()) };
-                        }
-                        if (!m.userData.uSolidSphereRadii) m.userData.uSolidSphereRadii = { value: new Float32Array(8) };
-                        if (!m.userData.uSolidMainLightType) m.userData.uSolidMainLightType = { value: 0 }; // 0=dir 1=spot 2=point
-                        if (!m.userData.uSolidMainLightPos) m.userData.uSolidMainLightPos = { value: new THREE.Vector3() };
-                        if (!m.userData.uSolidMainLightDir) m.userData.uSolidMainLightDir = { value: new THREE.Vector3(0, 1, 0) };
-                        // 地面接收端“贴脚亮缝”补偿：仅对 ground receiver 拉回深度比较（不影响 caster，不影响其它 receiver）
-                        // receiver pull：正值让地面更容易进入阴影（吃掉贴脚亮缝）
-                        if (!m.userData.uSolidShadowContactPull) m.userData.uSolidShadowContactPull = { value: 0.00065 };
-                        // 远端虚化参数（随场景尺寸缩放）
-                        if (!m.userData.uSolidShadowSoftRange) m.userData.uSolidShadowSoftRange = { value: new THREE.Vector4(2.8, 28.0, 2.8, 7.8) };
-                        if (!m.userData.uSolidShadowSoftStrength) m.userData.uSolidShadowSoftStrength = { value: 16.0 };
-                        // 强制重编译：否则 onBeforeCompile 可能不会再次触发
-                        m.userData._solidShadowSoftVer = (m.userData._solidShadowSoftVer || 0) + 1;
-                        const _ver = m.userData._solidShadowSoftVer;
-                        m.customProgramCacheKey = function() { return 'solid_shadow_soft_ground_v' + _ver; };
-                        if (!m.defines) m.defines = {};
-                        m.defines.SOLID_SHADOW_SOFT_GROUND = 1;
-                        m.defines.SOLID_SHADOW_SOFT_GROUND_VER = _ver;
-                        // anchors：收集“模型与地面接触点”（最多 8 个）
-                        try {
-                            const anchors = m.userData.uSolidShadowAnchors.value;
-                            const box = new THREE.Box3();
-                            const c = new THREE.Vector3();
-                            let nA = 0;
-                            const groundY = (ground && ground.position) ? ground.position.y : 0;
-                            const epsY = 0.006; // 接触容差（世界单位）
-                            let diagXZ = 12.0;
-                            try {
-                                if (sceneGroup) {
-                                    const gbox = new THREE.Box3();
-                                    const gsz = new THREE.Vector3();
-                                    gbox.setFromObject(sceneGroup);
-                                    gbox.getSize(gsz);
-                                    diagXZ = Math.max(1.0, Math.sqrt(gsz.x * gsz.x + gsz.z * gsz.z));
-                                }
-                            } catch (_eG) {}
-                            if (sceneGroup && sceneGroup.traverse) {
-                                sceneGroup.traverse((obj) => {
-                                    if (nA >= 8) return;
-                                    if (!obj || !obj.isMesh) return;
-                                    if (!obj.castShadow) return;
-                                    try {
-                                        box.setFromObject(obj);
-                                        if (Math.abs((box.min && box.min.y != null ? box.min.y : 1e9) - groundY) > epsY) return;
-                                        box.getCenter(c);
-                                        anchors[nA].set(c.x, groundY, c.z);
-                                        nA++;
-                                    } catch (_eB) {}
-                                });
-                            }
-                            m.userData.uSolidShadowAnchorCount.value = nA;
-                            try {
-                                const start = diagXZ * 0.08;
-                                const end = diagXZ * 0.85;
-                                const near0 = diagXZ * 0.02;
-                                const near1 = diagXZ * 0.10;
-                                m.userData.uSolidShadowSoftRange.value.set(start, end, near0, near1);
-                                m.userData.uSolidShadowSoftStrength.value = (isMobile || isIosPosterizeHost) ? 22.0 : 30.0;
-                            } catch (_eSR) {}
-                        } catch (_eA) { try { m.userData.uSolidShadowAnchorCount.value = 0; } catch(_eA2) {} }
-                        // light-type 相关的 pull：point 的 shadow depth 变化更敏感，稍强一点
-                        try {
-                            // 桌面端优先消除“黑边/窄圈投影”，移动端优先消除“贴地漏光/亮斑”
-                            const mob = (isMobile || isIosPosterizeHost);
-                            if (mainLight && mainLight.isPointLight) m.userData.uSolidShadowContactPull.value = mob ? 0.00175 : 0.00105;
-                            else if (mainLight && mainLight.isDirectionalLight) m.userData.uSolidShadowContactPull.value = mob ? 0.00085 : 0.00065;
-                            else m.userData.uSolidShadowContactPull.value = mob ? 0.00095 : 0.00075;
-                        } catch (_ePull) {}
-
-                        // 同步主光信息（供解析遮挡使用）
-                        try {
-                            const lp = new THREE.Vector3();
-                            mainLight.getWorldPosition(lp);
-                            m.userData.uSolidMainLightPos.value.copy(lp);
-                            if (mainLight && mainLight.isPointLight) m.userData.uSolidMainLightType.value = 2;
-                            else if (mainLight && mainLight.isSpotLight) m.userData.uSolidMainLightType.value = 1;
-                            else m.userData.uSolidMainLightType.value = 0;
-                            const d = new THREE.Vector3(0, 1, 0);
-                            if (m.userData.uSolidMainLightType.value === 0) {
-                                // dir：存“点->光”方向（与光线相反）
-                                if (mainLight && mainLight.target) {
-                                    const t = new THREE.Vector3();
-                                    mainLight.target.getWorldPosition(t);
-                                    d.subVectors(lp, t).normalize();
-                                } else {
-                                    d.set(0, 1, 0);
-                                }
-                            } else {
-                                d.set(0, 1, 0);
-                            }
-                            m.userData.uSolidMainLightDir.value.copy(d);
-                        } catch (_eL) {}
-
-                        // 收集 builtin sphere（最多 8 个）作为遮挡体
-                        try {
-                            let n = 0;
-                            const tmpPos = new THREE.Vector3();
-                            const tmpScale = new THREE.Vector3();
-                            if (sceneGroup && sceneGroup.traverse) {
-                                sceneGroup.traverse((obj) => {
-                                    if (n >= 8) return;
-                                    if (!obj || !obj.isMesh) return;
-                                    if (!obj.userData || obj.userData.type !== 'builtin' || obj.userData.shape !== 'sphere') return;
-                                    try {
-                                        obj.getWorldPosition(tmpPos);
-                                        obj.getWorldScale(tmpScale);
-                                        const r = Math.max(0.0001, Math.abs(tmpScale.y) * 2.0); // SphereGeometry 半径=2；用 Y 半径
-                                        m.userData.uSolidSphereCenters.value[n].copy(tmpPos);
-                                        m.userData.uSolidSphereRadii.value[n] = r;
-                                        n++;
-                                    } catch (_eS) {}
-                                });
-                            }
-                            m.userData.uSolidSphereCount.value = n;
-                        } catch (_eSc) { m.userData.uSolidSphereCount.value = 0; }
-
-                        // 远端更明显虚化（按“接触点距离”）：用 uniform（随场景尺寸自动缩放），避免小场景“几乎没效果”
-                        // uSolidShadowSoftRange: x=start y=end z=near0 w=near1
-                        // uSolidShadowSoftStrength: 远端最大倍率增益
-                        const multExpr =
-                            '( 1.0 + uSolidShadowSoftStrength'
-                            + ' * smoothstep( uSolidShadowSoftRange.x, uSolidShadowSoftRange.y, dSolidSh )'
-                            + ' * smoothstep( uSolidShadowSoftRange.z, uSolidShadowSoftRange.w, dSolidSh ) )';
-
-                        m.onBeforeCompile = (shader) => {
-                            let fs = shader.fragmentShader;
-                            // 直接劫持 getShadow / getPointShadow 的“第4个参数(半径)”——不依赖任何 shadowRadius 字符串
-                            let cnt = 0;
-                            if (cnt <= 0) {
-                                // 标准/物理材质里 shadowmask 不一定存在；改为替换 shadowmap chunk 本体，在 getShadow/getPointShadow 内部乘远端倍率
-                                try {
-                                    const inc = '#include <shadowmap_pars_fragment>';
-                                    if (fs.includes(inc) && typeof THREE !== 'undefined' && THREE.ShaderChunk && THREE.ShaderChunk.shadowmap_pars_fragment) {
-                                        let chunk = THREE.ShaderChunk.shadowmap_pars_fragment;
-
-                                        // 在函数体内计算倍率（可使用 varying/uniform），并缩放 shadowRadius
-                                        chunk = chunk.replace(
-                                            'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {',
-                                            `float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\tfloat dSolidSh = 1e9;\n\tfor ( int i = 0; i < 8; i++ ) {\n\t\tif ( i >= uSolidShadowAnchorCount ) break;\n\t\tdSolidSh = min( dSolidSh, length( vSolidShadowGroundPos.xz - uSolidShadowAnchors[i].xz ) );\n\t}\n\t// receiver pull：只允许非常小的、局部的拉回；上限过大必然产生“接地黑边/窄圈投影”\n\tfloat solidPullMult = 1.0 + 0.35 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00035 );\n\tshadowCoord.z += solidPull;\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
-                                        );
-                                        chunk = chunk.replace(
-                                            'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {',
-                                            `float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\t// PointLight：Three 的实现用 lightToPositionLength 计算 dp（不是 shadowCoord.z）。\n\t// 因此必须在 dp 上施加 receiver pull，才能吃掉“接触线漏光”。\n\tfloat dSolidSh = 1e9;\n\tfor ( int i = 0; i < 8; i++ ) {\n\t\tif ( i >= uSolidShadowAnchorCount ) break;\n\t\tdSolidSh = min( dSolidSh, length( vSolidShadowGroundPos.xz - uSolidShadowAnchors[i].xz ) );\n\t}\n\tfloat solidPullMult = 1.0 + 0.55 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00055 );\n\tfloat solidShadowSoftMult = ${multExpr};\n\tshadowRadius *= solidShadowSoftMult;`
-                                        );
-
-                                        // 点光源：真正影响阴影比较的是 dp（归一化深度），不是 shadowCoord.z
-                                        // 把 receiver pull 加到 dp 上：dp 越大越容易进入阴影（更不漏光）
-                                        chunk = chunk.replace(
-                                            'dp += shadowBias;',
-                                            'dp += shadowBias;\t\t\tdp += solidPull;'
-                                        );
-
-                                        // 解析球体遮挡：在 chunk 内部统一注入（比对编译后 shader 字符串更可靠）
-                                        // 所有 getShadow / getPointShadow 最终都会 return shadow; ——在返回前做下限约束
-                                        // 取证结论：当 gap≈0 仍出现“球体底部亮斑/漏光”，根因多为 iOS/移动端 shadowmap+PCF 比较链路漏判。
-                                        // 因此这里用解析几何遮挡（ray-sphere occlusion）作为兜底，不依赖 shadowmap 精度。
-                                        // 重要：必须在 ShaderChunk 内注入（不要依赖编译后 shader 文本的脆弱字符串匹配），否则不同 three/iOS 变体会“看似写了但没生效”。
-                                        try {
-                                            const inj = 'shadow = min( shadow, solidSphereOcclusion( vSolidShadowGroundPos ) );\n\treturn shadow;';
-                                            chunk = chunk.split('return shadow;').join(inj);
-                                        } catch (_eInj) {}
-
-                                        fs = fs.replace(inc, chunk);
-                                        cnt = 1;
-                                    }
-                                } catch(_eChunk) {}
-                                if (cnt <= 0) {
-                                    try { if (window.hwLog) window.hwLog('[RasterShadowSoft] shadow chunk replace MISS — ground soft shadow skipped'); } catch(_eMiss) {}
-                                    return;
-                                }
-                            }
-
-                            shader.uniforms.uSolidShadowAnchorCount = m.userData.uSolidShadowAnchorCount;
-                            shader.uniforms.uSolidShadowAnchors = m.userData.uSolidShadowAnchors;
-                            shader.uniforms.uSolidShadowContactPull = m.userData.uSolidShadowContactPull;
-                            shader.uniforms.uSolidShadowSoftRange = m.userData.uSolidShadowSoftRange;
-                            shader.uniforms.uSolidShadowSoftStrength = m.userData.uSolidShadowSoftStrength;
-                            shader.uniforms.uSolidSphereCount = m.userData.uSolidSphereCount;
-                            shader.uniforms.uSolidSphereCenters = m.userData.uSolidSphereCenters;
-                            shader.uniforms.uSolidSphereRadii = m.userData.uSolidSphereRadii;
-                            shader.uniforms.uSolidMainLightType = m.userData.uSolidMainLightType;
-                            shader.uniforms.uSolidMainLightPos = m.userData.uSolidMainLightPos;
-                            shader.uniforms.uSolidMainLightDir = m.userData.uSolidMainLightDir;
-                            shader.fragmentShader =
-                                'varying vec3 vSolidShadowGroundPos;\n' +
-                                'uniform int uSolidShadowAnchorCount;\n' +
-                                'uniform vec3 uSolidShadowAnchors[8];\n' +
-                                'uniform float uSolidShadowContactPull;\n' +
-                                'uniform vec4 uSolidShadowSoftRange;\n' +
-                                'uniform float uSolidShadowSoftStrength;\n' +
-                                'uniform int uSolidSphereCount;\n' +
-                                'uniform vec3 uSolidSphereCenters[8];\n' +
-                                'uniform float uSolidSphereRadii[8];\n' +
-                                'uniform int uSolidMainLightType;\n' +
-                                'uniform vec3 uSolidMainLightPos;\n' +
-                                'uniform vec3 uSolidMainLightDir;\n' +
-                                'float solidRaySphereOcc( vec3 ro, vec3 rd, float tMax, vec3 c, float r ) {\n' +
-                                '  vec3 oc = ro - c;\n' +
-                                '  float b = dot( oc, rd );\n' +
-                                '  float cc = dot( oc, oc ) - r * r;\n' +
-                                '  float h = b * b - cc;\n' +
-                                '  if ( h < 0.0 ) return 1.0;\n' +
-                                '  float s = sqrt( h );\n' +
-                                '  float t = -b - s;\n' +
-                                '  if ( t < 0.0 ) t = -b + s;\n' +
-                                '  return ( t > -1e-4 && t < tMax ) ? 0.0 : 1.0;\n' +
-                                '}\n' +
-                                'float solidSphereOcclusion( vec3 p ) {\n' +
-                                '  if ( uSolidSphereCount <= 0 ) return 1.0;\n' +
-                                '  float occ = 1.0;\n' +
-                                '  if ( uSolidMainLightType == 0 ) {\n' +
-                                '    vec3 rd = normalize( uSolidMainLightDir );\n' +
-                                '    for ( int i = 0; i < 8; i++ ) {\n' +
-                                '      if ( i >= uSolidSphereCount ) break;\n' +
-                                '      occ = min( occ, solidRaySphereOcc( p, rd, 1e6, uSolidSphereCenters[i], uSolidSphereRadii[i] ) );\n' +
-                                '    }\n' +
-                                '  } else {\n' +
-                                '    vec3 lp = uSolidMainLightPos;\n' +
-                                '    vec3 rd = normalize( lp - p );\n' +
-                                '    float tMax = length( lp - p );\n' +
-                                '    for ( int i = 0; i < 8; i++ ) {\n' +
-                                '      if ( i >= uSolidSphereCount ) break;\n' +
-                                '      occ = min( occ, solidRaySphereOcc( p, rd, tMax, uSolidSphereCenters[i], uSolidSphereRadii[i] ) );\n' +
-                                '    }\n' +
-                                '  }\n' +
-                                '  return occ;\n' +
-                                '}\n' +
-                                fs;
-                            shader.vertexShader = 'varying vec3 vSolidShadowGroundPos;\n' + shader.vertexShader;
-                            // 尽量稳地写入 vSolidShadowGroundPos（某些材质变体不一定包含 worldpos_vertex）
-                            if (shader.vertexShader.includes('#include <worldpos_vertex>')) {
-                                shader.vertexShader = shader.vertexShader.replace(
-                                    '#include <worldpos_vertex>',
-                                    '#include <worldpos_vertex>\n\tvSolidShadowGroundPos = worldPosition.xyz;'
-                                );
-                            } else if (shader.vertexShader.includes('#include <begin_vertex>')) {
-                                shader.vertexShader = shader.vertexShader.replace(
-                                    '#include <begin_vertex>',
-                                    '#include <begin_vertex>\n\tvSolidShadowGroundPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;'
-                                );
-                            }
-                        };
-
-                        try { if (window.hwLog) window.hwLog('[RasterShadowSoft] ground patch armed v' + _ver); } catch(_eArm) {}
-                        m.needsUpdate = true;
-                    }
-                } else {
-                    clearGroundSoftPatch();
-                }
-            } catch (_eGs) {}
         } catch (_e) {}
     }
 
@@ -1004,8 +590,8 @@
     const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0';
     syncRenderButtons();
     }; window.forceReRender = function() { window._solidUserStoppedRender = false; if (window._solidHardwareUnsupported) { window.hwLog('[forceReRender] 当前设备暂不支持渲染'); (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '当前设备暂不支持渲染'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 2500); } })(); try { syncRenderButtons(); } catch(_eBtn) {} return; }
-    try { if (_solidRasterEnvProbeTimer) { clearTimeout(_solidRasterEnvProbeTimer); _solidRasterEnvProbeTimer = 0; } } catch(_eT) {}
-    try { _solidDisposeRasterEnvProbe(); } catch(_eDisp) {}
+    try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.setEnabled) window.__solidPreviewLighting.setEnabled(false); } catch (_eT) {}
+    try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.dispose) window.__solidPreviewLighting.dispose(); } catch (_eDisp) {}
     window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none'; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
     document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1';
     document.getElementById('main-panel').style.pointerEvents = 'auto'; window.isLoadingScene = false; if (!pathTracer && renderer) { try {
@@ -1056,221 +642,41 @@
     window.toggleAdvancedRender = function(val) { window.useAdvancedRender = val; needsUpdate = true; }; const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
     window.hasWall = false; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
     window.matType = 'origin'; window.customScenes = []; window.currentSceneIndex = -1; window.currentSceneData = null; let sceneGroup = new THREE.Group(); let gltfLoader, sysMaterials;
-
-    /** 光栅态：低频多探针（CubeCapture + PMREM），用“最近探针 envMap”近似局部互反射/地面回光 */
-    let _solidRasterEnvPmremGen = null;
-    let _solidRasterEnvCubeRT = null;
-    let _solidRasterEnvCubeCam = null;
-    /** 全局弱底：接近旧版单探针的暗部填充，但强度刻意压低，避免与 per-material envMap 叠加后过亮 */
-    let _solidRasterEnvBasePmremRT = null;
-    /** @type {THREE.WebGLRenderTarget[]|null[]} */
-    let _solidRasterEnvPmremRTs = [null, null, null];
-    /** @type {THREE.Vector3[]} */
-    let _solidRasterEnvProbePositions = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-    let _solidRasterEnvProbeTimer = 0;
-    let _solidRasterEnvLastRunAt = 0;
-    const _solidRasterEnvMinIntervalMs = 2600;
-    const _solidRasterEnvDebounceMs = 220;
-    const _solidRasterEnvCubeSize = isMobile ? 48 : 64;
-    const _solidRasterEnvProbeCount = 3;
+    // 预览模式光影（投影 + 回光/反射近似）共用模块：生产/消费一致
+    const __solidPreviewLighting = createSolidPreviewLightingManager({
+        THREE,
+        getRenderer: () => renderer,
+        getScene: () => scene,
+        getCamera: () => camera,
+        getSceneGroup: () => sceneGroup,
+        getMainLight: () => mainLight,
+        getGround: () => ground,
+        getWalls: () => window.walls,
+        getIsMobile: () => isMobile,
+        getIsIosHost: () => isIosPosterizeHost,
+        getLightState: () => state,
+        shouldSkipEnvProbe: () => (
+            !!window.useAdvancedRender
+            || !!window.isLoadingScene
+            || !window.currentSceneData
+            || window.currentSceneIndex == null
+            || window.currentSceneIndex < 0
+        ),
+        log: (msg) => { try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e) {} },
+        safeDispose,
+    });
+    try { __solidPreviewLighting.install(); } catch (_e) {}
+    try { window.__solidPreviewLighting = __solidPreviewLighting; } catch (_e) {}
 
     function _solidDisposeRasterEnvProbe() {
-        // base 可能与 probe[0] 共享同一 PMREM RenderTarget 引用：避免 double dispose
-        try {
-            const _sameAs0 = (_solidRasterEnvBasePmremRT && _solidRasterEnvPmremRTs[0] && _solidRasterEnvBasePmremRT === _solidRasterEnvPmremRTs[0]);
-            if (_solidRasterEnvBasePmremRT && !_sameAs0) { try { safeDispose(_solidRasterEnvBasePmremRT); } catch (_e0) {} }
-            _solidRasterEnvBasePmremRT = null;
-        } catch (_e1) { _solidRasterEnvBasePmremRT = null; }
-        try {
-            for (let i = 0; i < _solidRasterEnvPmremRTs.length; i++) {
-                if (_solidRasterEnvPmremRTs[i]) { try { safeDispose(_solidRasterEnvPmremRTs[i]); } catch (_e) {} _solidRasterEnvPmremRTs[i] = null; }
-            }
-        } catch (_e2) {}
-        try { if (_solidRasterEnvCubeRT) safeDispose(_solidRasterEnvCubeRT); } catch (_e3) {}
-        _solidRasterEnvCubeRT = null;
-        _solidRasterEnvCubeCam = null;
-        try { if (scene) { scene.environment = null; scene.environmentIntensity = 1; } } catch (_e4) {}
-        // 清理材质上的 envMap 引用，避免 dispose 后仍指向失效纹理
-        try {
-            if (sceneGroup && sceneGroup.traverse) {
-                sceneGroup.traverse((obj) => {
-                    if (!obj || !obj.isMesh) return;
-                    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-                    for (let mi = 0; mi < mats.length; mi++) {
-                        const m = mats[mi];
-                        if (!m || !(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial)) continue;
-                        m.envMap = null;
-                        m.needsUpdate = true;
-                    }
-                });
-            }
-        } catch (_e5) {}
-    }
-
-    function _solidEnvIntensityForMaterial(m) {
-        const r = Math.min(1, Math.max(0, Number(m.roughness) || 0));
-        const met = Math.min(1, Math.max(0, Number(m.metalness) || 0));
-        // 粗糙表面更需要“填充”，金属略克制避免过曝高光
-        // 注意：现在额外有 scene.environment 弱底，这里略收敛 per-material envMap，避免整体超过旧版峰值
-        let v = 0.16 + (1.0 - r) * 0.38;
-        if (met > 0.55) v *= 0.72;
-        v = Math.min(0.78, Math.max(0.11, v));
-        return v;
-    }
-
-    function _solidComputeRasterEnvProbeLayout() {
-        const center = new THREE.Vector3(0, 1.0, 0);
-        let radius = 3.2;
-        try {
-            const box = new THREE.Box3();
-            box.setFromObject(sceneGroup);
-            if (!box.isEmpty()) {
-                const c = new THREE.Vector3();
-                box.getCenter(c);
-                const size = new THREE.Vector3();
-                box.getSize(size);
-                center.copy(c);
-                // 以水平尺度为主，避免过高物体把探针拉太远
-                radius = Math.max(1.2, Math.max(size.x, size.z) * 0.42 + size.y * 0.10);
-                // 轻微抬高，减少“埋在地面下”的概率
-                center.y = Math.max(0.35, center.y);
-            }
-        } catch (_e) {}
-
-        // 三角分布：覆盖“彼此相对”的三个方向 + 一个更贴近地面的低点（用较低 y 的探针模拟）
-        const yHi = Math.max(0.9, Math.min(2.8, center.y + radius * 0.22));
-        const yLo = Math.max(0.22, Math.min(1.1, center.y * 0.35 + 0.22));
-        _solidRasterEnvProbePositions[0].set(center.x, yHi, center.z + radius * 0.62);
-        _solidRasterEnvProbePositions[1].set(center.x + radius * 0.58, yHi, center.z - radius * 0.36);
-        _solidRasterEnvProbePositions[2].set(center.x - radius * 0.58, yLo, center.z - radius * 0.36);
-    }
-
-    function _solidPickNearestProbeIndex(p) {
-        let best = 0;
-        let bestD = Infinity;
-        for (let i = 0; i < _solidRasterEnvProbeCount; i++) {
-            const d = p.distanceToSquared(_solidRasterEnvProbePositions[i]);
-            if (d < bestD) { bestD = d; best = i; }
-        }
-        return best;
-    }
-
-    function _solidApplyRasterMultiEnvProbesToSceneGroup() {
-        if (!sceneGroup || !sceneGroup.traverse) return;
-        const tmp = new THREE.Vector3();
-        sceneGroup.traverse((obj) => {
-            if (!obj || !obj.isMesh) return;
-            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-            for (let i = 0; i < mats.length; i++) {
-                const m = mats[i];
-                if (!m) continue;
-                if (!(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial)) continue;
-                try {
-                    obj.updateWorldMatrix(true, false);
-                    const g = (obj.geometry && obj.geometry.boundingSphere) ? obj.geometry.boundingSphere : null;
-                    if (g) {
-                        tmp.copy(g.center).applyMatrix4(obj.matrixWorld);
-                    } else {
-                        obj.getWorldPosition(tmp);
-                    }
-                } catch (_eP) {
-                    try { obj.getWorldPosition(tmp); } catch (_e2) { tmp.set(0, 1, 0); }
-                }
-                const idx = _solidPickNearestProbeIndex(tmp);
-                const pm = _solidRasterEnvPmremRTs[idx];
-                if (pm && pm.texture) {
-                    m.envMap = pm.texture;
-                    m.envMapIntensity = _solidEnvIntensityForMaterial(m);
-                    m.needsUpdate = true;
-                }
-            }
-        });
-    }
-
-    function _solidUpdateRasterEnvProbeNow(reason) {
-        if (!renderer || !scene || !camera || !sceneGroup) return;
-        if (window.useAdvancedRender) return;
-        if (window.isLoadingScene) return;
-        if (!window.currentSceneData || window.currentSceneIndex == null || window.currentSceneIndex < 0) return;
-
-        const now = performance.now();
-        if (_solidRasterEnvLastRunAt && (now - _solidRasterEnvLastRunAt) < _solidRasterEnvMinIntervalMs) return;
-        _solidRasterEnvLastRunAt = now;
-
-        try {
-            if (!_solidRasterEnvPmremGen) _solidRasterEnvPmremGen = new THREE.PMREMGenerator(renderer);
-            if (!_solidRasterEnvCubeRT) {
-                _solidRasterEnvCubeRT = new THREE.WebGLCubeRenderTarget(_solidRasterEnvCubeSize, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
-            }
-            if (!_solidRasterEnvCubeCam) {
-                _solidRasterEnvCubeCam = new THREE.CubeCamera(0.08, 160, _solidRasterEnvCubeRT);
-                _solidRasterEnvCubeCam.renderTarget.texture.name = 'SolidRasterEnvCubeRT';
-            }
-
-            _solidComputeRasterEnvProbeLayout();
-
-            // 避免捕获时采样到旧的 scene.environment（自引用/脏数据）
-            scene.environment = null;
-            scene.environmentIntensity = 1;
-
-            const prevPos = _solidRasterEnvCubeCam.position.clone();
-
-            // 依次捕获 3 个探针（低频触发下可接受；分辨率已刻意压低）
-            for (let pi = 0; pi < _solidRasterEnvProbeCount; pi++) {
-                _solidRasterEnvCubeCam.position.copy(_solidRasterEnvProbePositions[pi]);
-                _solidRasterEnvCubeCam.updateMatrixWorld(true);
-                _solidRasterEnvCubeCam.update(renderer, scene);
-
-                if (_solidRasterEnvPmremRTs[pi]) {
-                    try { safeDispose(_solidRasterEnvPmremRTs[pi]); } catch (_eD) {}
-                    _solidRasterEnvPmremRTs[pi] = null;
-                }
-                _solidRasterEnvPmremRTs[pi] = _solidRasterEnvPmremGen.fromCubemap(_solidRasterEnvCubeRT.texture);
-            }
-
-            _solidRasterEnvCubeCam.position.copy(prevPos);
-            _solidRasterEnvCubeCam.updateMatrixWorld(true);
-
-            // 全局弱底：用 0 号探针的 PMREM 作为 scene.environment（强度低），再叠加 per-material 最近探针 envMap
-            try {
-                const baseSrc = _solidRasterEnvPmremRTs[0];
-                if (_solidRasterEnvBasePmremRT && _solidRasterEnvBasePmremRT !== baseSrc) {
-                    try { safeDispose(_solidRasterEnvBasePmremRT); } catch (_eDb) {}
-                }
-                _solidRasterEnvBasePmremRT = null;
-                if (baseSrc && baseSrc.texture) {
-                    // 复用同一张纹理引用即可（避免再跑一遍 PMREM）
-                    _solidRasterEnvBasePmremRT = baseSrc;
-                    scene.environment = baseSrc.texture;
-                    scene.environmentIntensity = isMobile ? 0.22 : 0.26;
-                } else {
-                    scene.environment = null;
-                    scene.environmentIntensity = 1;
-                }
-            } catch (_eB) {
-                scene.environment = null;
-                scene.environmentIntensity = 1;
-            }
-
-            _solidApplyRasterMultiEnvProbesToSceneGroup();
-            try { if (window.hwLog) window.hwLog('[RasterEnvProbe] multi updated (' + (reason || 'unknown') + '), cube=' + _solidRasterEnvCubeSize + ' x3'); } catch (_eL) {}
-        } catch (e) {
-            try { if (window.hwLog) window.hwLog('[RasterEnvProbe] failed: ' + (e && e.message ? e.message : e)); } catch (_e2) {}
-            _solidDisposeRasterEnvProbe();
-        }
+        try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.dispose) window.__solidPreviewLighting.dispose(); } catch (_e0) {}
     }
 
     window._solidRequestRasterEnvProbe = function(reason) {
-        if (!renderer || !scene || !sceneGroup) return;
-        if (window.useAdvancedRender) return;
-        if (window.isLoadingScene) return;
-        if (!window.currentSceneData || window.currentSceneIndex == null || window.currentSceneIndex < 0) return;
-
-        if (_solidRasterEnvProbeTimer) { clearTimeout(_solidRasterEnvProbeTimer); _solidRasterEnvProbeTimer = 0; }
-        _solidRasterEnvProbeTimer = setTimeout(function() {
-            _solidRasterEnvProbeTimer = 0;
-            _solidUpdateRasterEnvProbeNow(reason);
-        }, _solidRasterEnvDebounceMs);
+        try {
+            if (window.__solidPreviewLighting && window.__solidPreviewLighting.setEnabled) window.__solidPreviewLighting.setEnabled(!window.useAdvancedRender);
+            if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe(reason);
+        } catch (_e) {}
     };
     function setLoaderText(msg) { document.getElementById('loader-text').innerText = msg; }
     function setLoaderProgress(p) { p = Math.max(0, Math.min(100, Math.round(Number(p) || 0))); const fill = document.getElementById('scene-load-bar-fill'); const pctEl = document.getElementById('scene-load-pct'); if (fill) fill.style.transform = 'scaleX(' + (p / 100) + ')'; if (pctEl) pctEl.textContent = p + '%'; }
