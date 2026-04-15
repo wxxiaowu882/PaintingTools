@@ -74,9 +74,9 @@ export function createSolidPreviewLightingManager(opts) {
   }
 
   // ---------- Shadow soft ground patch (consumer extracted) ----------
-  function _fitRasterShadowFrustumForSceneGroup() {
+  function _fitRasterShadowFrustumForSceneGroup(lightOverride) {
     try {
-      const mainLight = getMainLight();
+      const mainLight = lightOverride || getMainLight();
       const sceneGroup = getSceneGroup();
       if (!mainLight || !mainLight.shadow || !mainLight.shadow.camera || !sceneGroup) return;
       const sh = mainLight.shadow;
@@ -220,6 +220,7 @@ export function createSolidPreviewLightingManager(opts) {
       const st = getLightState() || {};
 
       const dbg = _rasterShadowDbgEnabled();
+
       const clearGroundSoftPatch = () => {
         try {
           if (!ground || !ground.material) return;
@@ -262,19 +263,23 @@ export function createSolidPreviewLightingManager(opts) {
       try { renderer.shadowMap.needsUpdate = true; } catch (_e) {}
       try { if (typeof window !== 'undefined' && window._solidFallbackRenderAt !== undefined) window._solidFallbackRenderAt = 0; } catch (_eFb) {}
 
+      // Physical: point/directional/spot cast shadows on themselves (no shadow proxy light).
       mainLight.castShadow = true;
-      const sh = mainLight.shadow;
+      const shadowLight = mainLight;
+      const sh = shadowLight.shadow;
       const ms = isMobile ? 3072 : 4096;
       const range = Math.min(175, Math.max(96, (Number(st.radius) || 18) * 2.75 + 48));
 
-      if (mainLight.isSpotLight) {
+      if (shadowLight.isSpotLight) {
         sh.mapSize.set(ms, ms);
+        // Keep raster shadow kernel stable (avoid patterning on some GPUs).
+        // Softness for Spot is handled by our ground shader gaussian PCF.
         sh.radius = 1.4;
         sh.blurSamples = 18;
         sh.camera.near = Math.max(0.26, Math.min(0.6, (Number(st.radius) || 18) * 0.016));
         sh.camera.far = range;
         sh.camera.updateProjectionMatrix();
-      } else if (mainLight.isDirectionalLight) {
+      } else if (shadowLight.isDirectionalLight) {
         sh.mapSize.set(ms, ms);
         sh.radius = 1.4;
         sh.blurSamples = 18;
@@ -284,28 +289,29 @@ export function createSolidPreviewLightingManager(opts) {
         cam.far = Math.min(125, (Number(st.radius) || 18) * 4.2 + 58);
         cam.left = -he; cam.right = he; cam.top = he; cam.bottom = -he;
         cam.updateProjectionMatrix();
-      } else if (mainLight.isPointLight) {
+      } else if (shadowLight.isPointLight) {
         const pms = isMobile ? 896 : 1408;
         sh.mapSize.set(pms, pms);
         sh.radius = 1.5;
         sh.blurSamples = 12;
-        sh.camera.near = 0.5;
+        // Tighter near/far to improve depth precision and reduce banding/slice artifacts.
+        sh.camera.near = Math.max(0.15, Math.min(1.2, (Number(st.radius) || 18) * 0.02));
         sh.camera.far = range;
         sh.camera.updateProjectionMatrix();
       }
 
       try { if (sceneGroup) sceneGroup.updateMatrixWorld(true); } catch (_eMw) {}
-      _fitRasterShadowFrustumForSceneGroup();
+      _fitRasterShadowFrustumForSceneGroup(shadowLight);
 
       const _nbBoost = isMobile ? 1.9 : (isIosHost ? 1.4 : 1.0);
-      if (mainLight.isSpotLight) {
+      if (shadowLight.isSpotLight) {
         sh.bias = (isMobile || isIosHost) ? -0.000012 : -0.000006;
         sh.normalBias = 0.022 * _nbBoost;
         if (isMobile || isIosHost) sh.normalBias = Math.min(sh.normalBias, 0.028);
-      } else if (mainLight.isDirectionalLight) {
+      } else if (shadowLight.isDirectionalLight) {
         sh.bias = (isMobile || isIosHost) ? -0.00005 : -0.000025;
         sh.normalBias = 0.025 * _nbBoost;
-      } else if (mainLight.isPointLight) {
+      } else if (shadowLight.isPointLight) {
         sh.bias = -0.000015;
         const _ptNbBoost = isMobile ? 1.12 : (isIosHost ? 1.08 : 1.0);
         sh.normalBias = 0.014 * _ptNbBoost;
@@ -395,7 +401,9 @@ export function createSolidPreviewLightingManager(opts) {
 
           try {
             const mob = (isMobile || isIosHost);
-            if (mainLight && mainLight.isPointLight) m.userData.uSolidShadowContactPull.value = mob ? 0.00175 : 0.00105;
+            // Point light uses cube shadow sampling; modifying shadowCoord.z can introduce “slice / sheet” artifacts.
+            // Keep contact pull effectively disabled for point lights; sphere occlusion still handles the historical bright-spot case.
+            if (mainLight && mainLight.isPointLight) m.userData.uSolidShadowContactPull.value = 0.0;
             else if (mainLight && mainLight.isDirectionalLight) m.userData.uSolidShadowContactPull.value = mob ? 0.00085 : 0.00065;
             else m.userData.uSolidShadowContactPull.value = mob ? 0.00095 : 0.00075;
           } catch (_ePull) {}
@@ -494,8 +502,10 @@ export function createSolidPreviewLightingManager(opts) {
 
                   // Gaussian sampling helpers must live inside this shadow chunk so `texture2DCompare` is in scope.
                   chunk += `\n\nfloat solidHash12( vec2 p ) { vec3 p3 = fract( vec3( p.xyx ) * 0.1031 ); p3 += dot( p3, p3.yzx + 33.33 ); return fract( ( p3.x + p3.y ) * p3.z ); }\nmat2 solidRot2( float a ) { float s = sin( a ), c = cos( a ); return mat2( c, -s, s, c ); }\nfloat solidGaussianShadow2D( sampler2D shadowMap, vec2 shadowMapSize, vec4 shadowCoord, float shadowRadius ) {\n\tfloat shadow = 1.0;\n\tvec3 sc = shadowCoord.xyz / shadowCoord.w;\n\tbool inFrustum = sc.x >= 0.0 && sc.x <= 1.0 && sc.y >= 0.0 && sc.y <= 1.0;\n\tbool frustumTest = inFrustum && sc.z <= 1.0;\n\tif ( !frustumTest ) return 1.0;\n\tvec2 texel = vec2( 1.0 ) / shadowMapSize;\n\tfloat tapsF = clamp( uSolidShadowGaussTaps, 4.0, 32.0 );\n\tint taps = int( floor( tapsF + 0.5 ) );\n\tfloat ang = ( uSolidShadowGaussRotate > 0.5 ) ? ( 6.2831853 * solidHash12( vSolidShadowGroundPos.xz * 0.071 + sc.xy * 7.1 ) ) : 0.0;\n\tmat2 R = solidRot2( ang );\n\tfloat sum = 0.0;\n\tfloat wsum = 0.0;\n\t// Continuous disk (spiral) sampling + Gaussian weights to avoid ring / slice artifacts.\n\t// r uses sqrt distribution so samples are uniform over area.\n\tfloat rMax = 1.85;\n\tfor ( int i = 0; i < 32; i++ ) {\n\t\tif ( i >= taps ) break;\n\t\tfloat fi = float(i);\n\t\tfloat t = (fi + 0.5) / max( 1.0, float(taps) );\n\t\tfloat r = sqrt( t ) * rMax;\n\t\tfloat a = (fi + 0.5) * 2.3999632;\n\t\tvec2 o = R * vec2( cos(a), sin(a) ) * r;\n\t\tvec2 uv = sc.xy + o * texel * shadowRadius;\n\t\tfloat w = exp( - (r*r) * 1.6 );\n\t\tsum += w * texture2DCompare( shadowMap, uv, sc.z );\n\t\twsum += w;\n\t}\n\tshadow = (wsum > 0.0) ? (sum / wsum) : 1.0;\n\treturn shadow;\n}\n`;
+                  // Sphere bright-spot fix: apply occlusion only near sphere footprint (no distance-based softening).
+                  chunk += `\n\nfloat solidSphereOcclusionFaded( vec3 p ) {\n\tif ( uSolidSphereCount <= 0 ) return 1.0;\n\tfloat minEdge = 1e9;\n\tfloat nearR = 2.0;\n\tfor ( int i = 0; i < 8; i++ ) {\n\t\tif ( i >= uSolidSphereCount ) break;\n\t\tfloat r = max( 0.0001, uSolidSphereRadii[i] );\n\t\tfloat d = length( p.xz - uSolidSphereCenters[i].xz );\n\t\tfloat edge = max( 0.0, d - r );\n\t\tif ( edge < minEdge ) { minEdge = edge; nearR = r; }\n\t}\n\tfloat k = 1.0 - smoothstep( nearR * 0.35, nearR * 1.40, minEdge );\n\tk = pow( clamp( k, 0.0, 1.0 ), 1.8 );\n\tfloat occ = solidSphereOcclusion( p );\n\treturn mix( 1.0, occ, k );\n}\n`;
 
-                  chunk += `\n\nfloat getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\tfloat dSolidSh = 1e9;\n\tfor ( int i = 0; i < 8; i++ ) {\n\t\tif ( i >= uSolidShadowAnchorCount ) break;\n\t\tdSolidSh = min( dSolidSh, length( vSolidShadowGroundPos.xz - uSolidShadowAnchors[i].xz ) );\n\t}\n\tfloat solidPullMult = 1.0 + 0.35 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00035 );\n\tshadowCoord.z += solidPull;\n\tfloat tSolidSh = smoothstep( uSolidShadowSoftRange.x, uSolidShadowSoftRange.y, dSolidSh );\n\ttSolidSh = pow( clamp( tSolidSh, 0.0, 1.0 ), max( 0.75, uSolidShadowSoftExp ) );\n\tshadowRadius *= ( 1.0 + uSolidShadowSoftStrength * tSolidSh );\n\tfloat shadowOut = solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius );\n\t// Sphere occlusion fix should only affect near-contact region; fade it out toward the far soft tail.\n\tfloat occ = solidSphereOcclusion( vSolidShadowGroundPos );\n\tfloat kOcc = pow( 1.0 - tSolidSh, 1.8 );\n\tshadowOut = min( shadowOut, mix( 1.0, occ, kOcc ) );\n\treturn shadowOut;\n}\n\nfloat getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\tfloat dSolidSh = 1e9;\n\tfor ( int i = 0; i < 8; i++ ) {\n\t\tif ( i >= uSolidShadowAnchorCount ) break;\n\t\tdSolidSh = min( dSolidSh, length( vSolidShadowGroundPos.xz - uSolidShadowAnchors[i].xz ) );\n\t}\n\tfloat solidPullMult = 1.0 + 0.55 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00055 );\n\tshadowCoord.z += solidPull;\n\tfloat tSolidSh = smoothstep( uSolidShadowSoftRange.x, uSolidShadowSoftRange.y, dSolidSh );\n\ttSolidSh = pow( clamp( tSolidSh, 0.0, 1.0 ), max( 0.75, uSolidShadowSoftExp ) );\n\tshadowRadius *= ( 1.0 + uSolidShadowSoftStrength * tSolidSh );\n\t// Point light shadow uses a different projection; keep original sampling, only scale radius and apply sphere fix fade.\n\tfloat shadowOut = getPointShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord, shadowCameraNear, shadowCameraFar );\n\tfloat occ = solidSphereOcclusion( vSolidShadowGroundPos );\n\tfloat kOcc = pow( 1.0 - tSolidSh, 1.8 );\n\tshadowOut = min( shadowOut, mix( 1.0, occ, kOcc ) );\n\treturn shadowOut;\n}\n`;
+                  chunk += `\n\nfloat getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n\t// Directional light: built-in sampling + sphere bright-spot fix near footprint.\n\tif ( uSolidMainLightType == 0 ) {\n\t\tfloat sh0 = getShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord );\n\t\treturn min( sh0, solidSphereOcclusionFaded( vSolidShadowGroundPos ) );\n\t}\n\t// Spot light: soft preview behavior (Gaussian PCF).\n\tfloat dSolidSh = 1e9;\n\tfor ( int i = 0; i < 8; i++ ) {\n\t\tif ( i >= uSolidShadowAnchorCount ) break;\n\t\tdSolidSh = min( dSolidSh, length( vSolidShadowGroundPos.xz - uSolidShadowAnchors[i].xz ) );\n\t}\n\tfloat solidPullMult = 1.0 + 0.35 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00035 );\n\tshadowCoord.z += solidPull;\n\tfloat tSolidSh = smoothstep( uSolidShadowSoftRange.x, uSolidShadowSoftRange.y, dSolidSh );\n\ttSolidSh = pow( clamp( tSolidSh, 0.0, 1.0 ), max( 0.75, uSolidShadowSoftExp ) );\n\tshadowRadius *= ( 1.0 + uSolidShadowSoftStrength * tSolidSh );\n\tfloat shadowOut = solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius );\n\t// Sphere occlusion fix should only affect near-contact region; fade it out toward the far soft tail.\n\tfloat occ = solidSphereOcclusion( vSolidShadowGroundPos );\n\tfloat kOcc = pow( 1.0 - tSolidSh, 1.8 );\n\tshadowOut = min( shadowOut, mix( 1.0, occ, kOcc ) );\n\treturn shadowOut;\n}\n\nfloat getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n\t// Point light: built-in cube sampling + sphere bright-spot fix near footprint.\n\tfloat sh0 = getPointShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord, shadowCameraNear, shadowCameraFar );\n\treturn min( sh0, solidSphereOcclusionFaded( vSolidShadowGroundPos ) );\n}\n`;
 
                   fs = fs.replace(inc, chunk);
                   cnt = 1;
