@@ -134,7 +134,10 @@
     ? { targetSamples: 380, renderScaleMobile: 0.45, renderScaleDesktop: 0.82, filterGlossyFactor: 0.78, expRamp: 28, expLo: 0.63, expHi: 0.74, toneMappingExposureBase: 0.72 }
     : { targetSamples: 200, renderScaleMobile: 0.42, renderScaleDesktop: 0.75, filterGlossyFactor: 1, expRamp: 24, expLo: 0.55, expHi: 0.7, toneMappingExposureBase: 0.7 }; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const isIosPosterizeHost = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false; let solidAnimRafId = 0; window.sumDuration = 0; window.useAdvancedRender = true; window._solidUserStoppedRender = false;
+    let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false; let solidAnimRafId = 0; window.sumDuration = 0;
+    // 默认不自动光追：初次进入场景为光栅预览，需用户点击「重新渲染」再启动追光
+    window.useAdvancedRender = false;
+    window._solidUserStoppedRender = true;
     window.perfTestDone = false; window.isTestingPerformance = true; window.isLoadingScene = false; window._solidHardwareUnsupported = false; window._solidPerfSoftFail = false; window._solidSampleTimeout = false; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0; window.changeAtmosphere = function(enabled, density, noise) { window.isFogEnabled = enabled; window.fogDensity = density; if(noise !== undefined) window.fogNoise = noise; if(window.AtmosphereManager) window.AtmosphereManager.updateParams(enabled, density, window.fogNoise); if(typeof needsUpdate !== 'undefined') { needsUpdate = true; lightMoved = true; } };
     window.changeDoF = function(enabled, aperture, focus) { if(window.DoFManager) window.DoFManager.updateParams(enabled, aperture, focus); if(window.AtmosphereManager && window.AtmosphereManager.updateDoFParams) window.AtmosphereManager.updateDoFParams(enabled, aperture, focus); if(typeof needsUpdate !== 'undefined') { needsUpdate = true; lightMoved = true; } };
     window.updateDoFUIFromRaycaster = function(focusDist) { const slider = document.getElementById('dofFocusSlider'); if(slider) { slider.value = focusDist; if(window.updateDoFUI) window.updateDoFUI(); } };
@@ -1343,7 +1346,7 @@
     if (glbCount === 0) setLoaderProgress(86);
     Promise.all(promises).then(() => { setLoaderProgress(90); setLoaderText("构建物理光照BVH树..."); requestAnimationFrame(() => { requestAnimationFrame(() => { setLoaderProgress(97); window.resetAll();
     
-    if(pathTracer) { pathTracer.updateMaterials(); lightPosUpdated=true; pathTracer.reset(); window.sumDuration = 0; }
+    if (window.useAdvancedRender && pathTracer) { pathTracer.updateMaterials(); lightPosUpdated = true; pathTracer.reset(); window.sumDuration = 0; }
     window.isLoadingScene = false; // [解锁] 资产与BVH就绪，放行渲染
     try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_loaded'); } catch(_eP) {}
     setLoaderProgress(100); document.getElementById('scene-loader').style.opacity = '0'; setTimeout(() => document.getElementById('scene-loader').style.display = 'none', 600); });
