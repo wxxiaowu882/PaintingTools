@@ -128,7 +128,7 @@
     import './plugins_02/Plugin_PosterizeShared.js'; // 色阶共通逻辑（生产/消费一致）
     import './plugins_02/Plugin_Atmosphere.js'; // ☁️ 同步接入大气透视插件
     import './plugins_02/Plugin_DepthOfField.js'; // 📷 同步接入景深虚实插件
-    import { createSolidPreviewLightingManager } from './plugins_02/SolidPreviewLighting.js';
+    import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from './plugins_02/SolidPreviewLighting.js';
     window.skyEnvLightMatchMainRect = true; // 【试验·抗黑点噪点】true=更干净（更慢），false=更快（更噪）
     const SOLID_PT_ANTI_SPECKLE_TEST = true; // 方案C（完成时降噪）效果不稳，默认关闭；若要再试，改为 true
     const SOLID_MOBILE_DENOISE = false; const _solidPt = SOLID_PT_ANTI_SPECKLE_TEST
@@ -283,75 +283,11 @@
     if (window._solidContextLost || window.isUnsupported) triggerUnsupported('recover_exhausted', (reason || '') + ' retries done'); }; setTimeout(function() { run(0); }, delays[0]); };
     function _solidDismissRenderToast() { var t = document.getElementById('render-toast'); if (t) { if (t.__hideTimer) { clearTimeout(t.__hideTimer); t.__hideTimer = 0; } t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; } if (renderer && renderer.domElement) renderer.domElement.style.filter = ''; }
 
-    /** 光栅阴影：按 sceneGroup 包围体收紧 shadow frustum，提高深度精度，降低 normalBias 依赖（根治贴脚亮缝 / peter-panning） */
+    /** 光栅阴影 frustum：逻辑在 plugins_02/SolidPreviewLighting.js，与生产端共用实现。 */
     function _solidFitRasterShadowFrustumForSceneGroup() {
         try {
-            if (!mainLight || !mainLight.shadow || !mainLight.shadow.camera || !sceneGroup) return;
-            const sh = mainLight.shadow;
-            // 只用 sceneGroup（不算 100x100 地面），避免 far 被拉爆
-            const box = new THREE.Box3();
-            box.setFromObject(sceneGroup);
-            if (box.isEmpty()) return;
-            const size = new THREE.Vector3();
-            box.getSize(size);
-            // 轻微扩张：避免边缘裁切
-            try { box.expandByScalar(0.35); } catch (_e) {}
-            const sphere = new THREE.Sphere();
-            box.getBoundingSphere(sphere);
-            if (!(sphere.radius > 1e-4)) return;
-
-            const lp = new THREE.Vector3();
-            mainLight.getWorldPosition(lp);
-            const dist = lp.distanceTo(sphere.center);
-            const margin = 3.2;
-            let desiredFar = Math.max(10, dist + sphere.radius + margin);
-
-            // 低角度（掠射）时，阴影会被拉得很长；仅按包围球会低估需要的 frustum，导致“投影截断”
-            // 用 1/|dir.y| 扩张系数：|dir.y| 越小，扩张越多（但做上限避免过度放大）
-            let grazeMul = 1.0;
-            try {
-                const dir = new THREE.Vector3();
-                if (mainLight.isDirectionalLight && mainLight.target) {
-                    // dirLight：方向由 light -> target
-                    mainLight.target.getWorldPosition(dir);
-                    dir.sub(lp).normalize();
-                } else if (mainLight.isSpotLight && mainLight.target) {
-                    mainLight.target.getWorldPosition(dir);
-                    dir.sub(lp).normalize();
-                } else {
-                    // point：用 light -> scene center 近似方向
-                    dir.subVectors(sphere.center, lp).normalize();
-                }
-                const ay = Math.max(0.12, Math.min(1.0, Math.abs(dir.y)));
-                grazeMul = Math.min(3.8, Math.max(1.0, 1.0 / ay));
-            } catch (_eG) {}
-            desiredFar *= (0.92 + 0.48 * grazeMul);
-
-            if (mainLight.isSpotLight) {
-                // Spot：far 收紧后可把 near 提高一点点提升精度
-                const cap = Math.min(175, Math.max(70, (Number(state && state.radius) || 18) * 2.75 + 38));
-                sh.camera.far = Math.min(cap, Math.max(32, desiredFar * 1.14));
-                const n = Math.max(0.18, Math.min(0.85, sh.camera.far * 0.012));
-                sh.camera.near = Math.min(n, sh.camera.far * 0.06);
-                sh.camera.updateProjectionMatrix();
-            } else if (mainLight.isPointLight) {
-                const cap = Math.min(175, Math.max(70, (Number(state && state.radius) || 18) * 2.75 + 38));
-                sh.camera.far = Math.min(cap, Math.max(32, desiredFar * 1.18));
-                sh.camera.near = Math.max(0.22, Math.min(1.2, sh.camera.far * 0.015));
-                sh.camera.updateProjectionMatrix();
-            } else if (mainLight.isDirectionalLight) {
-                // Dir：这里主要问题是 near/far 精度；正交范围保持现有 he
-                const capF = Math.min(125, (Number(state && state.radius) || 18) * 4.2 + 58);
-                sh.camera.far = Math.min(capF, Math.max(28, desiredFar + 18));
-                sh.camera.near = Math.max(0.6, Math.min(2.2, sh.camera.far * 0.03));
-                // 自适应正交范围：浅角度时阴影更长，固定 he 容易裁切
-                try {
-                    const cam = sh.camera;
-                    const heAuto = (Math.max(size.x, size.z) * 0.72 + 6.5) * Math.min(2.6, Math.max(1.0, 0.75 + 0.35 * grazeMul));
-                    const he = Math.max(18, Math.min(78, heAuto));
-                    cam.left = -he; cam.right = he; cam.top = he; cam.bottom = -he;
-                } catch (_eHe) {}
-                sh.camera.updateProjectionMatrix();
+            if (window.__solidPreviewLighting && window.__solidPreviewLighting.fitRasterShadowFrustumForSceneGroup) {
+                window.__solidPreviewLighting.fitRasterShadowFrustumForSceneGroup();
             }
         } catch (_e) {}
     }
@@ -655,13 +591,12 @@
         getIsMobile: () => isMobile,
         getIsIosHost: () => isIosPosterizeHost,
         getLightState: () => state,
-        shouldSkipEnvProbe: () => (
-            !!window.useAdvancedRender
-            || !!window.isLoadingScene
-            || !window.currentSceneData
-            || window.currentSceneIndex == null
-            || window.currentSceneIndex < 0
-        ),
+        shouldSkipEnvProbe: solidRasterPreviewShouldSkipEnvProbe(() => ({
+            useAdvancedRender: window.useAdvancedRender,
+            isLoadingScene: window.isLoadingScene,
+            currentSceneData: window.currentSceneData,
+            currentSceneIndex: window.currentSceneIndex,
+        })),
         log: (msg) => { try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e) {} },
         safeDispose,
     });
@@ -1452,9 +1387,22 @@
                 window.__solidImmersiveLastInputAt = performance.now();
                 window._solidLastInteractAt = window.__solidImmersiveLastInputAt;
             };
-            // 监听所有页面交互来重置倒计时
-            ['mousedown', 'touchstart', 'keydown', 'wheel'].forEach(evt => {
+            // 监听所有页面交互来重置倒计时（含 pointer：触控笔/部分浏览器主路径）
+            ['mousedown', 'touchstart', 'pointerdown', 'keydown', 'wheel'].forEach(evt => {
                 document.addEventListener(evt, window.resetImmersiveTimer, { passive: true });
+            });
+            // 滑块拖动会持续触发 input，但不会重复触发 mousedown/touchstart；若不处理，拖过 ~10s 会误进沉浸模式把底栏藏起。
+            // 必须用 document 捕获：#main-panel 在 init() 的 requestAnimationFrame 里才注入，同步阶段 getElementById('main-panel') 恒为 null，挂不上监听器。
+            window.__solidImmersiveOnMainPanelInput = function (e) {
+                if (!e || !e.target) return;
+                var t = e.target;
+                if (t.nodeType === 3 && t.parentElement) t = t.parentElement;
+                if (!t || typeof t.closest !== 'function') return;
+                if (!t.closest('#main-panel')) return;
+                window.resetImmersiveTimer(e);
+            };
+            ['input', 'change'].forEach(function (evt) {
+                document.addEventListener(evt, window.__solidImmersiveOnMainPanelInput, { passive: true, capture: true });
             });
             window.resetImmersiveTimer(); // 启动初始计时器
         }

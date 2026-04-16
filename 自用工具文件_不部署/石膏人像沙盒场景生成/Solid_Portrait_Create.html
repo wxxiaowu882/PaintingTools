@@ -1,0 +1,1770 @@
+<!DOCTYPE html> <html lang="zh-CN"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"> <title>SolidCreate · 场景可视化编辑器</title>
+    <meta name="description" content="专为 Solid 页面设计的场景 JSON 生产工具"> <script src="../../docs/js/tailwindcss.js"></script> <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400&display=swap" rel="stylesheet"> <script async src="../../docs/js/es-module-shims.js"></script>
+    <script type="importmap">{ "imports": { "three": "../../docs/js/three_164/three.module.js", "three/addons/controls/OrbitControls.js": "../../docs/js/three_164/OrbitControls.js",
+    "three/addons/loaders/GLTFLoader.js": "../../docs/js/three_164/examples/jsm/loaders/GLTFLoader.js", "three/addons/loaders/DRACOLoader.js": "../../docs/js/three_164/examples/jsm/loaders/DRACOLoader.js", "three/addons/controls/TransformControls.js": "../../docs/js/three_164/examples/jsm/controls/TransformControls.js",
+    "three/addons/": "../../docs/js/three_164/examples/jsm/", "three/examples/jsm/": "../../docs/js/three_164/examples/jsm/", "three/": "../../docs/js/three_164/",
+    "three-mesh-bvh": "../../docs/js/three-mesh-bvh.js", "three-gpu-pathtracer": "../../docs/js/three-gpu-pathtracer.js" } }</script><script src="../../docs/js/html2canvas.min.js"></script><style>
+    body{margin:0;overflow:hidden;background-color:#050505;font-family:'Inter',-apple-system,sans-serif;-webkit-user-select:none;user-select:none;} .font-hairline{font-weight:100;}.font-thin{font-weight:200;}
+    .control-panel{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:96%;max-width:380px;background:rgba(15,15,15,0.7);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:10px 14px;z-index:100;color:#fff;touch-action:none;transition:all 0.4s cubic-bezier(0.4,0,0.2,1);box-shadow:0 10px 40px rgba(0,0,0,0.8);}
+    .control-panel.minimized { bottom: 15px; padding-bottom: 6px; } .control-panel.minimized .panel-content { display: none; }
+    .slider-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:10px;min-width:0;} .slider-label{font-size:11px;color:rgba(255,255,255,0.4);width:22px;text-align:right;letter-spacing:1px;font-weight:200;white-space:nowrap;} .slider-val{font-size:9px;color:rgba(255,255,255,0.4);width:22px;text-align:right;font-variant-numeric:tabular-nums;font-weight:200;}
+    input[type=range]{-webkit-appearance:none;flex:1;min-width:0;height:24px;background:transparent;outline:none;} input[type=range]::-webkit-slider-runnable-track{width:100%;height:1.5px;background:rgba(255,255,255,0.15);border-radius:1px;} input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;cursor:pointer;transition:0.2s;box-shadow:0 0 8px rgba(0,0,0,0.5);margin-top:-8.25px;}
+    .custom-select-trigger { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); color:#fff; padding:3px 4px; border-radius:4px; font-size:9px; height:22px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .custom-select-trigger::after { content: '▼'; font-size: 7px; transform: scaleX(1.5); opacity: 0.5; margin-left: 2px; }
+    .custom-options { display:none; position:absolute; bottom:calc(100% + 4px); left:0; width:100%; min-width:90px; background:rgba(20,20,20,0.95); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.1); border-radius:4px; z-index:1000; box-shadow:0 -4px 12px rgba(0,0,0,0.5); }
+    .custom-options.show { display:block; } .custom-option { padding:6px 8px; font-size:10px; cursor:pointer; color:#ccc; transition:0.2s; white-space:nowrap; } .custom-option:hover, .custom-option.selected { background:rgba(255,255,255,0.15); color:#fff; }
+    .opt-group-label { padding:5px 8px; color:#777; font-size:9px; font-weight:bold; background:rgba(0,0,0,0.4); border-bottom: 1px solid rgba(255,255,255,0.05); border-top: 1px solid rgba(255,255,255,0.05); } .opt-group-label:first-child { border-top: none; }
+    .env-btn { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); color:rgba(255,255,255,0.6); border-radius:3px; padding:3px 6px; cursor:pointer; transition:0.2s; user-select:none; display:flex; align-items:center; gap:4px; letter-spacing:1px; }
+    .env-btn:hover { color:#fff; background:rgba(255,255,255,0.15); } .env-btn.active { background:rgba(255,255,255,0.2); color:#fff; border-color:rgba(255,255,255,0.3); }
+    #scene-loader{transition:opacity 1s;background:#050505;}
+    /* 新增：编辑器专属UI样式 */
+    .editor-panel { position:fixed; top:15px; left:15px; width:280px; background:rgba(20,20,20,0.85); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); border-radius:8px; z-index:500; padding:15px; color:#fff; box-shadow:0 8px 30px rgba(0,0,0,0.6); }
+    .editor-panel.editor-panel-right { left:auto; right:15px; width:320px; max-height:calc(100vh - 30px); overflow:auto; }
+    .editor-btn { display:block; width:100%; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:8px; margin-bottom:8px; border-radius:6px; font-size:13px; cursor:pointer; transition:0.2s; text-align:center; }
+    .editor-btn:hover { background:rgba(255,255,255,0.2); } .editor-btn.active { background:#e74c3c; border-color:#ff7979; }
+    .editor-select { width:100%; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:6px; margin-bottom:8px; border-radius:4px; font-size:15px; outline:none; }
+    .scene-name-field { width:100%; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.22); color:#fff; padding:6px; margin-bottom:8px; border-radius:4px; font-size:15px; outline:none; text-align:center; }
+    .editor-panel input#obj-color-picker { box-sizing:border-box; border:1px solid rgba(255,255,255,0.28) !important; border-radius:4px; }
+    /* 左侧编辑面板：统一放大文本编辑控件字号（覆盖内联样式） */
+    .editor-panel input[type="text"],
+    .editor-panel textarea,
+    .editor-panel select { font-size:14px !important; line-height:1.6 !important; }
+    /* 手机取景框（生产端参考） */
+    #mobile-frame-overlay{position:fixed;inset:0;pointer-events:none;z-index:200;display:flex;align-items:center;justify-content:center;}
+    #mobile-frame-overlay[hidden]{display:none !important;} .mobile-frame-wrap{position:relative;will-change:width,height;transform:translateZ(0);}
+    .mobile-frame-outer{position:absolute;inset:0;border:1px solid rgba(255,255,255,0.18);border-radius:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.35) inset;}
+    .mobile-frame-safe{position:absolute;left:0;right:0;top:0;bottom:0;border:1px dashed rgba(255,255,255,0.12);border-radius:10px;} .mobile-frame-shade{position:absolute;background:rgba(0,0,0,0.10);}
+    </style> </head> <body><div id="debug-log-panel" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()" onpointermove="event.stopPropagation()" style="display:none; position:fixed; top:10px; right:10px; width:320px; background:rgba(0,0,0,0.9); border:1px solid #ff4444; border-radius:6px; z-index:9999; padding:10px; box-shadow: 0 4px 20px rgba(0,0,0,0.6);">
+    <div style="display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #333; padding-bottom:5px; align-items:center;"><span style="color:#ff4444; font-weight:bold; font-size:12px;">排错日志</span><button onclick="copyDebugLog()" style="background:#2ecc71; border:none; color:#fff; padding:4px 8px; border-radius:3px; cursor:pointer; font-size:10px; font-weight:bold;">一键复制</button></div>
+    <textarea id="log-content" readonly style="width:100%; height:180px; background:transparent; border:none; color:#fff; font-family:monospace; font-size:10px; line-height:1.4; resize:none; outline:none; cursor:text; overflow-y:auto;"></textarea></div> <!-- 截取框默认隐藏 --> <div id="crop-box" style="display:none; position:fixed; border:2px dashed #2ecc71; width:256px; height:256px; top:calc(50% - 128px); left:calc(50% - 128px); z-index:400; pointer-events:none; outline: 9999px solid rgba(0,0,0,0.6);">
+    <div id="crop-drag-handle" style="position:absolute; top:0; left:0; width:100%; height:24px; background:rgba(46, 204, 113, 0.8); pointer-events:auto; cursor:move; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold; user-select:none;">拖拽此处移动截取框</div><div id="crop-resize-handle" style="position:absolute; right:-7px; bottom:-7px; width:14px; height:14px; background:#fff; border:2px solid #2ecc71; border-radius:50%; pointer-events:auto; cursor:nwse-resize; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div></div> <!-- 编辑器专属面板 -->
+    <div class="editor-panel" id="editor-panel-left"><div style="font-size:12px; font-weight:bold; margin-bottom:10px; color:#a0a0a0; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:6px;">场景生产工具 (SolidCreate)</div><div style="display:flex; gap:6px; margin-bottom:6px;">
+    <button class="editor-btn" style="background:#8e44ad; border-color:#9b59b6; flex:1; margin-bottom:0; font-weight:bold;" onclick="mountWorkDirectory()">📂 挂载新目录</button>
+    <button class="editor-btn" style="background:#34495e; border-color:#2c3e50; flex:1; margin-bottom:0; font-weight:bold;" onclick="createNewScene()">📄 新建场景</button></div><div style="display:flex; gap:6px; margin-bottom:8px;">
+    <button type="button" id="btn-quick-geometry" class="editor-btn quick-dir-btn" style="background:#2c3e50; border-color:#34495e; flex:1; margin-bottom:0; font-size:11px; padding:6px;" onclick="loadQuickDir('geometry')" oncontextmenu="event.preventDefault(); loadQuickDir('geometry', true)" title="【左键】一键加载该库&#10;【右键】重新绑定文件夹">⚡ 沙盒_几何体静物</button>
+    <button type="button" id="btn-quick-portrait" class="editor-btn quick-dir-btn" style="background:#2c3e50; border-color:#34495e; flex:1; margin-bottom:0; font-size:11px; padding:6px;" onclick="loadQuickDir('portrait')" oncontextmenu="event.preventDefault(); loadQuickDir('portrait', true)" title="【左键】一键加载该库&#10;【右键】重新绑定文件夹">⚡ 沙盒_肖像光影</button></div>
+    <div id="file-list-container" style="max-height:520px; overflow-y:auto; margin-bottom:8px; font-size:12px; background:rgba(0,0,0,0.3); border-radius:4px; padding:6px; display:none;"></div>
+    <input type="text" id="scene-name-input" class="scene-name-field" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="输入新场景名称 (留空自动生成)">
+    <div style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <label for="scene-meta-detail-input" style="font-size:10px; color:#aaa; display:block; margin-bottom:4px;">场景说明：</label> <textarea id="scene-meta-detail-input" rows="6" placeholder="例如：你只需要看一条线：<b>交界线怎么走</b>。\n\n看懂它，灰面就不再“糊”。" style="width:100%; box-sizing:border-box; resize:vertical; min-height:92px; max-height:240px; padding:6px 8px; font-size:11px; line-height:1.45; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.18); border-radius:4px; color:#eee; outline:none; font-family:inherit;"></textarea> </div>
+    <div style="margin-bottom:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:6px 8px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+    <span style="font-size:11px; color:#ddd;">更新封面</span>
+    <label style="display:flex; align-items:center; gap:6px; color:#fff; font-size:11px; cursor:pointer; user-select:none;">
+    <input id="update-cover-on-save" type="checkbox" style="accent-color:#2ecc71; transform:scale(1.05); cursor:pointer;">
+    <span id="update-cover-on-save-text" style="color:rgba(255,255,255,0.75);">勾选时保存封面</span>
+    </label></div>
+    <div style="display:flex; gap:6px; margin-bottom:8px;"> <button id="btn-save-direct" class="editor-btn" style="background:#d35400; border-color:#e67e22; flex:1; margin-bottom:0; font-weight:bold;" onclick="saveCurrentSceneDirectly()">💾 覆写选中项</button>
+    <button class="editor-btn" style="background:#16a085; border-color:#1abc9c; flex:1; margin-bottom:0; font-weight:bold;" onclick="mergeAllScenes()">📦 批量合并</button></div></div>
+
+    <!-- 右侧：操作面板（从“覆写/合并”下方迁移过来，为左侧列表腾空间） -->
+    <div class="editor-panel editor-panel-right" id="editor-panel-right"><div style="font-size:12px; font-weight:bold; margin-bottom:10px; color:#a0a0a0; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:6px;">操作面板</div>
+    <div style="height:8px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px; margin-top:4px;"></div>
+    <button class="editor-btn" onclick="openGlbManagerModal()">🔍 从资产库选择 GLB 模型</button><button class="editor-btn" onclick="openBuiltinModal()">➕ 选择并添加内置几何体</button>
+    <div style="height:8px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px;"></div><div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"><span style="font-size:11px; color:#fff;">选中物体颜色：</span>
+    <input type="color" id="obj-color-picker" value="#e8e8e8" style="width:24px; height:24px; padding:0; border:none; background:none; cursor:pointer;" oninput="changeSelectedColor(event)" onchange="changeSelectedColor(event)">
+    </div><div style="display:flex; gap:4px; margin-bottom:6px;"><button id="btn-trans" class="editor-btn active" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('translate')">位移(T)</button>
+    <button id="btn-rot" class="editor-btn" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('rotate')">旋转(R)</button>
+    <button id="btn-scale" class="editor-btn" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('scale')">缩放(S)</button> </div>
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"> <span style="font-size:11px; color:#bbb; white-space:nowrap;">标注模式：</span>
+    <select id="tool-mode-select" class="editor-select" style="margin:0; flex:1; padding:3px; background:#111; color:#0df; border-color:#444;" onchange="setMode(this.value)">
+    <option value="none">未选择标注工具…</option> <option value="annotate">🏷️ 经典引出线 [Alt+Shift+划动]</option> <option value="annotate-color">🎨 屏幕取色引线 [Alt+Shift+划动]</option>
+    <option value="normal-arrow">↗️ 法线箭头 [Alt+左击]</option> <option value="polygon3d">🟩 3D光影面片 [Alt+Shift+悬停滑动]</option> <option value="prober">💡 受光探针 [直接点击]</option> </select></div>
+    <div id="solid-create-anno-detail-wrap" style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; gap:8px;"> <span id="solid-create-anno-detail-hint" style="font-size:10px; color:#888; letter-spacing:0.5px;">未选中标注</span> </div>
+    <label for="solid-create-anno-detail" style="font-size:10px; color:#aaa; display:block; margin-bottom:4px;">引线详细说明</label> <textarea id="solid-create-anno-detail" rows="4" disabled placeholder="在场景中点击选中一条标注后，在此输入说明…" style="width:100%; box-sizing:border-box; resize:vertical; min-height:72px; max-height:200px; padding:6px 8px; font-size:11px; line-height:1.45; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.18); border-radius:4px; color:#eee; outline:none; font-family:inherit;"></textarea> </div><div style="display:flex; justify-content:space-between; margin-bottom:0;">
+    <button class="editor-btn" style="flex:1; margin:0; margin-right:6px; background:rgba(142, 68, 173, 0.4); border-color:rgba(142, 68, 173, 0.6);" onclick="toggleCropBox()">✂️ 显/隐 截取框</button>
+    <span class="text-[9px] env-btn active" id="uniform-scale-btn" onclick="toggleUniformScale()" style="padding:2px 6px;">☑ 等比缩放</span>
+    <span class="text-[9px] env-btn" id="camera-lock-btn" onclick="toggleCameraLock()" style="padding:2px 6px; margin-left:6px;" title="锁定后禁止旋转/平移/缩放视角，避免移动模型时误转场景">🔓 视角</span></div>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px; background:rgba(0,0,0,0.45); padding:6px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.14);"> <span style="font-size:11px; color:#bbb; white-space:nowrap; letter-spacing:1px;">📱 手机取景框</span> <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#fff; cursor:pointer; user-select:none;">
+    <input id="mobile-frame-toggle" type="checkbox" style="accent-color:#2ecc71; transform:scale(1.05); cursor:pointer;"> <span style="color:rgba(255,255,255,0.75);">显示</span> </label> </div> </div>
+    <div id="glb-manager-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10000; backdrop-filter:blur(5px); flex-direction:column; padding:2vh 5vw;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"> <span style="color:#fff; font-size:16px; font-weight:bold; letter-spacing:2px;">GLB 模型资产库</span>
+    <button onclick="closeGlbManagerModal()" style="background:rgba(231,76,60,0.2); border:1px solid #e74c3c; color:#e74c3c; padding:6px 16px; border-radius:6px; cursor:pointer; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='#e74c3c'; this.style.color='#fff';" onmouseout="this.style.background='rgba(231,76,60,0.2)'; this.style.color='#e74c3c';">关闭面板 ✕</button></div><div style="flex:1; background:#000; border:1px solid rgba(255,255,255,0.1); border-radius:8px; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,0.8);">
+    <iframe id="glb-manager-iframe" src="" style="width:100%; height:100%; border:none;"></iframe></div></div><div id="builtin-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10000; backdrop-filter:blur(5px); flex-direction:column; padding:2vh 5vw;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;"><span style="color:#fff; font-size:16px; font-weight:bold; letter-spacing:2px;">内置几何体库</span>
+    <div style="display:flex; align-items:center; gap:8px;"><button type="button" id="builtin-thumb-refresh-btn" onclick="refreshBuiltinThumbnails()" style="background:rgba(46,204,113,0.15); border:1px solid #2ecc71; color:#2ecc71; padding:6px 14px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:12px; transition:0.2s;" onmouseover="this.style.background='#2ecc71'; this.style.color='#fff';" onmouseout="if(!this.disabled){ this.style.background='rgba(46,204,113,0.15)'; this.style.color='#2ecc71'; }">刷新缩略图</button>
+    <button onclick="closeBuiltinModal()" style="background:rgba(231,76,60,0.2); border:1px solid #e74c3c; color:#e74c3c; padding:6px 16px; border-radius:6px; cursor:pointer; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='#e74c3c'; this.style.color='#fff';" onmouseout="this.style.background='rgba(231,76,60,0.2)'; this.style.color='#e74c3c';">关闭面板 ✕</button></div></div>
+    <div id="builtin-grid-container" style="flex:1; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); border-radius:8px; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,0.8); padding:20px; display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:15px; align-content:start;"></div></div>
+    <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">渲染时遇到问题</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">当前设备不支持高级渲染，导致不能出现投影和散射光，想要获得更高级的体验，请去电脑端网页版获得更好的功能体验。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
+    <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div class="w-3 h-3 rounded-full bg-white/70 animate-pulse mb-6"></div> <div class="font-hairline text-[20px] tracking-[0.4em] text-white/40 uppercase animate-pulse">物理光追引擎初始化中...</div> </div>
+    <svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true"> <filter id="posterize-filter" color-interpolation-filters="sRGB">
+    <feColorMatrix in="SourceGraphic" type="matrix" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0" result="gray"/>
+    <feComponentTransfer in="gray" id="posterize-transfer" result="posterizedGray">
+    <feFuncR type="discrete" tableValues="0 0.5 1"/> <feFuncG type="discrete" tableValues="0 0.5 1"/>
+    <feFuncB type="discrete" tableValues="0 0.5 1"/> </feComponentTransfer>
+    <feBlend mode="luminosity" in="posterizedGray" in2="SourceGraphic"/> </filter> </svg> <div id="canvas-container" class="fixed inset-0 z-0"></div>
+    <div id="mobile-frame-overlay" aria-hidden="true"> <div class="mobile-frame-wrap" id="mobile-frame-wrap">
+    <div class="mobile-frame-shade" id="mfs-top"></div> <div class="mobile-frame-shade" id="mfs-bottom"></div>
+    <div class="mobile-frame-shade" id="mfs-left"></div> <div class="mobile-frame-shade" id="mfs-right"></div> <div class="mobile-frame-outer"></div>
+    <div class="mobile-frame-safe" id="mobile-frame-safe"></div> </div> </div>
+    <script type="module"> import * as THREE from 'three'; import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { TransformControls } from 'three/addons/controls/TransformControls.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer';
+    import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js';import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js';
+    import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from '../../plugins_02/SolidPreviewLighting.js';
+    window.skyEnvLightMatchMainRect = true; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false;
+    // 视角锁定（生产端）：状态持久化 + UI 同步
+    const SOLID_CREATE_CAMERA_LOCK_KEY = 'SolidCreatePortrait_CameraLock_v1';
+    const SOLID_CREATE_UPDATE_COVER_KEY = 'SolidCreateUpdateCoverOnSave_v1';
+    window.isCameraLocked = false;
+    function solidCreateSyncCameraLockUI() {
+        const btn = document.getElementById('camera-lock-btn');
+        if (btn) {
+            btn.classList.toggle('active', !!window.isCameraLocked);
+            btn.textContent = window.isCameraLocked ? '🔒 视角' : '🔓 视角';
+        }
+        if (controls) controls.enabled = !window.isCameraLocked;
+    }
+    function solidCreateRestoreCameraLock() {
+        let locked = false;
+        try { locked = localStorage.getItem(SOLID_CREATE_CAMERA_LOCK_KEY) === '1'; } catch (_e) { locked = false; }
+        window.isCameraLocked = locked;
+        solidCreateSyncCameraLockUI();
+    }
+    function solidCreateGetUpdateCoverEnabled() {
+        try {
+            const v = localStorage.getItem(SOLID_CREATE_UPDATE_COVER_KEY);
+            return v === null ? true : v === '1';
+        } catch (_e) { return true; }
+    }
+    function solidCreateSetUpdateCoverEnabled(enabled) {
+        try { localStorage.setItem(SOLID_CREATE_UPDATE_COVER_KEY, enabled ? '1' : '0'); } catch (_e) {}
+        const cb = document.getElementById('update-cover-on-save');
+        if (cb) cb.checked = !!enabled;
+        const txt = document.getElementById('update-cover-on-save-text');
+        if (txt) txt.textContent = enabled ? '勾选时保存封面' : '不更新封面';
+    }
+    window.toggleCameraLock = function () {
+        window.isCameraLocked = !window.isCameraLocked;
+        try { localStorage.setItem(SOLID_CREATE_CAMERA_LOCK_KEY, window.isCameraLocked ? '1' : '0'); } catch (_e) {}
+        solidCreateSyncCameraLockUI();
+    };
+    window.sumDuration = 0; window.useAdvancedRender = true; window.isExporting = false; window.hasAutoStopped = false; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
+    window.changeAtmosphere = function(enabled, density, noise) { window.isFogEnabled = enabled; window.fogDensity = density; if(noise !== undefined) window.fogNoise = noise;
+    if(window.AtmosphereManager) window.AtmosphereManager.updateParams(enabled, density, window.fogNoise); if(typeof needsUpdate !== 'undefined') { needsUpdate = true; lightMoved = true; } };
+    window.changeDoF = function(enabled, aperture, focus) { if(window.DoFManager) window.DoFManager.updateParams(enabled, aperture, focus);
+    if(window.AtmosphereManager && window.AtmosphereManager.updateDoFParams) window.AtmosphereManager.updateDoFParams(enabled, aperture, focus);
+    if(typeof needsUpdate !== 'undefined') { needsUpdate = true; lightMoved = true; } }; window.updateDoFUIFromRaycaster = function(focusDist) { const slider = document.getElementById('dofFocusSlider');
+    if(slider) { slider.value = focusDist; if(window.updateDoFUI) window.updateDoFUI(); } };
+    if (window.PosterizeShared && typeof window.PosterizeShared.init === 'function') {
+    window.PosterizeShared.init({ containerId: 'canvas-container', getLogger: () => window.hwLog });
+    }
+    window.syncPosterize2dLayout = function() { if (window.PosterizeShared && window.PosterizeShared.syncLayout) window.PosterizeShared.syncLayout(); };
+    window.ensurePosterize2dOverlay = function() { return (window.PosterizeShared && window.PosterizeShared.ensureOverlay) ? window.PosterizeShared.ensureOverlay() : null; };
+    window.refreshIosPosterizeOverlayFromWebGL = function() { if (window.PosterizeShared && window.PosterizeShared.refreshOverlayFromWebGL) window.PosterizeShared.refreshOverlayFromWebGL(); };
+    window.changePosterize = function(levels) {
+    if (window.PosterizeShared && typeof window.PosterizeShared.apply === 'function') { window.PosterizeShared.apply(levels); return; }
+    window.posterizeLevel = levels;
+    const slider = document.getElementById('posterizeSlider'); const valDisp = document.getElementById('posterizeVal'); if (slider && valDisp) {
+    const sliderVal = levels === 0 ? 0 : (21 - levels); slider.value = sliderVal; valDisp.innerText = levels === 0 ? "无" : levels + "阶"; } };
+    window._logCache = []; window.addHwLog = function(msg) { const panel = document.getElementById('debug-log-panel'); const content = document.getElementById('log-content'); if (panel && localStorage.getItem('SolidCreateDebugUI') === '1') panel.style.display = 'block'; const time = new Date().toLocaleTimeString(); window._logCache.push(`[${time}] ${msg}`); if(window._logCache.length > 50) window._logCache.shift(); if (content) { content.value = window._logCache.join('\n'); content.scrollTop = content.scrollHeight; } console.log(`[HW-LOG] ${msg}`); };
+    window.diagnosticPanelLog = function(msg) { const panel = document.getElementById('debug-log-panel'); const content = document.getElementById('log-content'); if (panel) panel.style.display = 'block'; const time = new Date().toLocaleTimeString(); window._logCache.push(`[${time}] ${msg}`); if (window._logCache.length > 80) window._logCache.shift(); if (content) { content.value = window._logCache.join('\n'); content.scrollTop = content.scrollHeight; } };
+    window.copyDebugLog = function() { const content = document.getElementById('log-content'); content.select(); try { document.execCommand('copy'); alert("成功复制日志！请粘贴发给我。"); } catch(e) { alert("自动复制失败，请在文本框内全选文字手动复制"); } }; window.hwLog = window.addHwLog;
+    window.addEventListener('error', e => window.hwLog('WinErr: ' + e.message)); window.addEventListener('unhandledrejection', e => window.hwLog('PromiseRej: ' + e.reason));
+    const originalConsoleError = console.error; console.error = function(...args) {
+    originalConsoleError.apply(console, args); const msg = args.join(' ').toLowerCase(); window.hwLog('[ConsoleError] ' + args.join(' '));
+    if (msg.includes('could not compile shader') || msg.includes('gl_invalid_operation') || msg.includes('context lost') || msg.includes('failed to create') || msg.includes('framebuffer incomplete') || msg.includes('feedback loop')) { if (typeof triggerUnsupported === 'function') triggerUnsupported(); }
+    }; // 补回底层的安全销毁函数，免疫组件清理时的未定义崩溃
+    function safeDispose(obj) { if (!obj) return; if (Array.isArray(obj)) { obj.forEach(m => safeDispose(m)); return; }
+    try { if (typeof obj.dispose === 'function') obj.dispose(); } catch(e) { console.warn("静默拦截销毁错误:", e); } }
+    // 补回渲染控制停止功能
+    window.stopRender = function() { window.useAdvancedRender = false; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
+    try { _solidEnableRasterShadowsOnce(); } catch (_ePl) {}
+    try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('stop_render'); } catch (_eP) {}
+    renderer.render(scene, camera); hwLog("已停止渲染，当前为预览模式。点击“开启渲染”可再次尝试。");
+    const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0'; }; // 补回强制重新启动渲染引擎的功能
+    window.forceReRender = function() { if (window.isUnsupported) return;
+    try { if (window.__solidPreviewLighting) { window.__solidPreviewLighting.setEnabled(false); window.__solidPreviewLighting.dispose(); } } catch (_e0) {}
+    window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none';
+    document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1';
+    document.getElementById('main-panel').style.pointerEvents = 'auto'; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
+    try { pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? 0.42 : 0.75;
+    if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = 1.0; } catch(e) { triggerUnsupported(); return; }
+    needsUpdate = true; lightMoved = true; window.sumDuration = 0; pathTracer.updateMaterials(); pathTracer.updateLights(); pathTracer.reset(); if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
+    hwLog("已尝试开启渲染并重建状态"); }; window.toggleAdvancedRender = function(val) { window.useAdvancedRender = val; needsUpdate = true; try { if (!val) { _solidEnableRasterShadowsOnce(); if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('toggle_advanced_off'); } else if (val && window.__solidPreviewLighting) { window.__solidPreviewLighting.setEnabled(false); window.__solidPreviewLighting.dispose(); } } catch (_ePl) {} }; // 编辑器专属核心变量
+    let editorGroup, transformControl, gltfLoader; let plasterMat, flatMat, sphereMat; let startScale = new THREE.Vector3(); const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
+    const isIosPosterizeHost = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const __solidPreviewLighting = createSolidPreviewLightingManager({
+    THREE,
+    getRenderer: () => renderer,
+    getScene: () => scene,
+    getCamera: () => camera,
+    getSceneGroup: () => editorGroup,
+    getMainLight: () => mainLight,
+    getGround: () => ground,
+    getWalls: () => window.walls,
+    getIsMobile: () => isMobile,
+    getIsIosHost: () => isIosPosterizeHost,
+    getLightState: () => state,
+    shouldSkipEnvProbe: solidRasterPreviewShouldSkipEnvProbe(() => ({
+            useAdvancedRender: window.useAdvancedRender,
+            isLoadingScene: window.isLoadingScene,
+            currentSceneData: window.currentSceneData,
+            currentSceneIndex: window.currentSceneIndex,
+        })),
+    log: (msg) => { try { window.hwLog(String(msg)); } catch (_e) {} },
+    safeDispose,
+    });
+    try { __solidPreviewLighting.install(); } catch (_e) {}
+    try { window.__solidPreviewLighting = __solidPreviewLighting; } catch (_e) {}
+    if (typeof window.isLoadingScene === 'undefined') window.isLoadingScene = false;
+    if (typeof window.currentSceneData === 'undefined') window.currentSceneData = null;
+    if (typeof window.currentSceneIndex === 'undefined') window.currentSceneIndex = -1;
+    function _solidFitRasterShadowFrustumForSceneGroup() {
+    try {
+    if (window.__solidPreviewLighting && window.__solidPreviewLighting.fitRasterShadowFrustumForSceneGroup) {
+    window.__solidPreviewLighting.fitRasterShadowFrustumForSceneGroup();
+    }
+    } catch (_e) {}
+    }
+    function _solidRefreshRasterShadowAfterLightMove() {
+    try {
+    if (window.useAdvancedRender) return;
+    if (!mainLight || !mainLight.castShadow || !mainLight.shadow) return;
+    if (!renderer || !renderer.shadowMap || !renderer.shadowMap.enabled) return;
+    try { if (editorGroup) editorGroup.updateMatrixWorld(true); } catch (_eMw) {}
+    _solidFitRasterShadowFrustumForSceneGroup();
+    try { renderer.shadowMap.needsUpdate = true; } catch (_eSm) {}
+    } catch (_e) {}
+    }
+    function _solidSyncGroundShadowUniforms() {
+    try {
+    if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncGroundShadowUniforms) {
+    window.__solidPreviewLighting.syncGroundShadowUniforms();
+    }
+    } catch (_e) {}
+    }
+    function _solidEnableRasterShadowsOnce() {
+    try {
+    if (window.__solidPreviewLighting && window.__solidPreviewLighting.setEnabled) {
+    window.__solidPreviewLighting.setEnabled(!window.useAdvancedRender);
+    }
+    if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) {
+    window.__solidPreviewLighting.syncShadows();
+    }
+    } catch (_e) {}
+    }
+    try {
+    window._solidRequestRasterEnvProbe = function(reason) {
+    try {
+    if (window.__solidPreviewLighting && window.__solidPreviewLighting.setEnabled) window.__solidPreviewLighting.setEnabled(!window.useAdvancedRender);
+    if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe(reason);
+    } catch (_e) {}
+    };
+    } catch (_e) {}
+    window.solidCreateRefreshPreviewRasterShadowsAfterGlb = function() {
+    if (window.useAdvancedRender) return;
+    try {
+    try { window._solidGroundShadowDirty = true; } catch (_eGd0) {}
+    if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows();
+    if (renderer && renderer.shadowMap) renderer.shadowMap.needsUpdate = true;
+    requestAnimationFrame(function() {
+    try {
+    if (window.useAdvancedRender) return;
+    try { window._solidGroundShadowDirty = true; } catch (_eGd1) {}
+    if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows();
+    if (renderer && renderer.shadowMap) renderer.shadowMap.needsUpdate = true;
+    if (renderer && scene && camera) { try { renderer.render(scene, camera); } catch (_eR) {} }
+    } catch (_e2) {}
+    });
+    } catch (_e) {}
+    };
+    // 手机取景框（生产端参考）：固定主流竖屏逻辑分辨率 + 必要时缩小以适配窗口
+    const MOBILE_FRAME_STORAGE_KEY = 'SolidCreateMobileFrameEnabled'; const MOBILE_FRAME_BASE_W = 490; const MOBILE_FRAME_BASE_H = 844; const MOBILE_SAFE_TOP = 90;   // 近似覆盖消费端顶部按钮区域
+    const MOBILE_SAFE_BOTTOM = 220; // 近似覆盖消费端底部控制面板区域
+    function getMainControlPanelEl() { return document.getElementById('main-panel') || document.querySelector('.control-panel'); }
+    let _syncPanelToFrameRetry = 0; function updateControlPanelLayoutToMobileFrame(enabled) { const wrap = document.getElementById('mobile-frame-wrap'); const panel = getMainControlPanelEl(); // 页面启动时：手机取景框会先于 ControlPanel.inject 恢复，此时 main-panel 还未注入，需补一次延迟同步
+    if (!panel) { if (enabled && _syncPanelToFrameRetry < 40) { _syncPanelToFrameRetry++; setTimeout(() => updateControlPanelLayoutToMobileFrame(enabled), 50); }
+    return; }
+    _syncPanelToFrameRetry = 0; if (!enabled || !wrap) { // 恢复默认：交还给 CSS（不影响既存功能）
+    panel.style.left = ''; panel.style.top = ''; panel.style.bottom = ''; panel.style.transformOrigin = '';
+    panel.style.transform = ''; panel.style.zIndex = ''; return; }
+    const r = wrap.getBoundingClientRect(); const frameW = Math.max(1, r.width); const frameH = Math.max(1, r.height); const cx = r.left + frameW / 2; const bottomY = r.top + frameH; // 面板宽度模拟手机端：≈屏幕宽的 96%
+    const desiredW = frameW * 0.96; // naturalW 不受 transform 影响，适合作为缩放基准
+    const naturalW = Math.max(1, panel.offsetWidth || 380); const scale = Math.max(0.2, Math.min(2.2, desiredW / naturalW)); // 底部留白：参考手机端 bottom:20px，并按白框宽度等比缩放
+    const mb = Math.round(20 * (frameW / Math.max(1, MOBILE_FRAME_BASE_W))); panel.style.position = 'fixed'; panel.style.left = cx + 'px';
+    panel.style.top = (bottomY - mb) + 'px'; panel.style.bottom = 'auto'; panel.style.transformOrigin = 'bottom center'; // translate(-50%,-100%)：让 top 成为“底边锚点”
+    panel.style.transform = `translate(-50%, -100%) scale(${scale})`; // overlay(200) < panel(300) < editor-panel(500)
+    panel.style.zIndex = '300'; }
+    function updateMobileFrameOverlayLayout() { const wrap = document.getElementById('mobile-frame-wrap'); const safe = document.getElementById('mobile-frame-safe');
+    const top = document.getElementById('mfs-top'); const bottom = document.getElementById('mfs-bottom'); const left = document.getElementById('mfs-left');
+    const right = document.getElementById('mfs-right'); if (!wrap || !safe || !top || !bottom || !left || !right) return; const pad = 24; const vw = Math.max(100, window.innerWidth - pad * 2);
+    const vh = Math.max(100, window.innerHeight - pad * 2); const aspect = MOBILE_FRAME_BASE_H / MOBILE_FRAME_BASE_W; // 主流竖屏比例（约 19.5:9）
+    // 取景框：高度优先顶满视图，宽度由比例反推
+    let h = Math.round(vh); let w = Math.round(h / aspect); // 极窄窗口兜底：避免取景框横向溢出
+    if (w > vw) { w = Math.round(vw); h = Math.round(w * aspect); }
+    // 安全区缩放因子（按高度同比例缩放）
+    const s = h / MOBILE_FRAME_BASE_H; wrap.style.width = w + 'px'; wrap.style.height = h + 'px'; // 安全区：只做参考（淡虚线内框）
+    const st = Math.round(MOBILE_SAFE_TOP * s); const sb = Math.round(MOBILE_SAFE_BOTTOM * s); safe.style.top = st + 'px'; safe.style.bottom = sb + 'px';
+    safe.style.left = '0px'; safe.style.right = '0px'; // 外部遮罩（更淡，帮助感知取景）
+    top.style.left = '0px'; top.style.top = '0px'; top.style.width = w + 'px'; top.style.height = '0px';
+    bottom.style.left = '0px'; bottom.style.top = h + 'px'; bottom.style.width = w + 'px'; bottom.style.height = '0px';
+    left.style.left = '0px'; left.style.top = '0px'; left.style.width = '0px'; left.style.height = h + 'px';
+    right.style.left = w + 'px'; right.style.top = '0px'; right.style.width = '0px'; right.style.height = h + 'px';
+    // 用 box-shadow 做“四周遮罩”，避免额外计算（视觉很淡）
+    wrap.style.boxShadow = '0 0 0 9999px rgba(0,0,0,0.10)'; // 同步把底部控制面板绑定进白框内（仅生产端）
+    updateControlPanelLayoutToMobileFrame(true); }
+    function setMobileFrameEnabled(enabled) { const ov = document.getElementById('mobile-frame-overlay'); const cb = document.getElementById('mobile-frame-toggle'); if (ov) ov.hidden = !enabled;
+    if (cb) cb.checked = !!enabled; try { localStorage.setItem(MOBILE_FRAME_STORAGE_KEY, enabled ? '1' : '0'); } catch(e) {}
+    updateControlPanelLayoutToMobileFrame(!!enabled); if (enabled) updateMobileFrameOverlayLayout(); }
+    function initMobileFrameToggleUI() { const cb = document.getElementById('mobile-frame-toggle'); if (!cb) return; let enabled = true; try { const v = localStorage.getItem(MOBILE_FRAME_STORAGE_KEY);
+    enabled = (v === null) ? true : (v === '1'); } catch(e) { enabled = true; }
+    cb.checked = enabled; setMobileFrameEnabled(enabled); cb.addEventListener('change', () => setMobileFrameEnabled(cb.checked)); updateMobileFrameOverlayLayout(); }
+        window._editorSceneLoadGen = 0; window._editorGlbInsertGen = 0; let portraitAnimRafId = 0; let _orbitNeedsThrottle = 0;
+        let _solidCamSnapA = null, _solidCamSnapB = null, _solidLastCamMotion = 0, _solidLastHeavyFrame = 0;
+    function disposeLoadedGltfRoot(root) { if (!root) return; root.traverse(c => { if (c.geometry) try { c.geometry.dispose(); } catch(e) {} if (c.material) { const m = c.material; if (Array.isArray(m)) m.forEach(x => { try { x.dispose(); } catch(e) {} }); else try { m.dispose(); } catch(e) {} } }); }
+    window.hasWall = false; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
+    window.matType = 'origin'; window.workDirHandle = null; window.currentFileHandle = null; window.targetMasterFilename = null; window.__solidCreateHasExplicitScene = false; // --- 自动草稿（低耦合：尽量通过 PluginManager 总线序列化/反序列化扩展字段） ---
+    const SOLID_CREATE_DRAFT_DB = 'SolidCreateDraftDB'; const SOLID_CREATE_DRAFT_STORE = 'drafts'; const SOLID_CREATE_DRAFT_KEY = 'main'; let _draftDirty = false;
+    let _draftSaving = false; let _draftLastSavedAt = 0; // 记录“草稿对应的源文件名”，用于恢复后继续覆写同一文件
+    window._solidCreateDraftFileName = null; function markDraftDirty() { _draftDirty = true; }
+    function solidCreateSyncSaveButtonText() { const btn = document.getElementById('btn-save-direct'); if (!btn) return; btn.innerText = window.currentFileHandle ? '💾 覆写选中项' : '💾 保存新场景';
+    }
+    function solidCreateHighlightFileInList(fileName) { const c = document.getElementById('file-list-container'); if (!c) return; Array.from(c.children).forEach(el => { try {
+    const span = el.querySelector('span'); const name = span ? span.innerText : '';
+    el.style.borderLeft = (fileName && name === fileName) ? '3px solid #2ecc71' : 'none'; } catch(_e) {} }); }
+    async function solidCreateTryBindCurrentFileHandleByName(fileName) { const fn = fileName ? String(fileName) : ''; if (!fn) return false; if (!window.workDirHandle) return false; try {
+    const h = await window.workDirHandle.getFileHandle(fn, { create: false }); if (!h) return false; window.currentFileHandle = h; window._solidCreateDraftFileName = fn; solidCreateHighlightFileInList(fn); solidCreateSyncSaveButtonText();
+    return true; } catch(_e) { return false; } }
+    function openDraftDB() { return new Promise((resolve, reject) => { const req = indexedDB.open(SOLID_CREATE_DRAFT_DB, 1); req.onupgradeneeded = e => { const db = e.target.result;
+    if (!db.objectStoreNames.contains(SOLID_CREATE_DRAFT_STORE)) db.createObjectStore(SOLID_CREATE_DRAFT_STORE); }; req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
+    async function draftPut(obj) { const db = await openDraftDB(); return new Promise((resolve, reject) => { const tx = db.transaction(SOLID_CREATE_DRAFT_STORE, 'readwrite');
+    tx.objectStore(SOLID_CREATE_DRAFT_STORE).put(obj, SOLID_CREATE_DRAFT_KEY); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+    async function draftGet() { try { const db = await openDraftDB(); return await new Promise((resolve) => {
+    const req = db.transaction(SOLID_CREATE_DRAFT_STORE, 'readonly').objectStore(SOLID_CREATE_DRAFT_STORE).get(SOLID_CREATE_DRAFT_KEY); req.onsuccess = () => resolve(req.result || null); req.onerror = () => resolve(null);
+    }); } catch (_e) { return null; } }
+    async function draftClear() { try { const db = await openDraftDB(); await new Promise((resolve) => { const tx = db.transaction(SOLID_CREATE_DRAFT_STORE, 'readwrite');
+    tx.objectStore(SOLID_CREATE_DRAFT_STORE).delete(SOLID_CREATE_DRAFT_KEY); tx.oncomplete = () => resolve(); tx.onerror = () => resolve(); }); } catch (_e) {} }
+    function buildDraftSceneData() { const _metaDetailEl = document.getElementById('scene-meta-detail-input');
+    const _metaDetail = _metaDetailEl ? String(_metaDetailEl.value || '') : ''; const inputNameEl = document.getElementById('scene-name-input');
+    const inputName = inputNameEl ? String(inputNameEl.value || '').trim() : ''; const sceneName = inputName
+    ? inputName
+    : (window.currentFileHandle && window.currentFileHandle.name ? window.currentFileHandle.name.replace(/^\d{3}_/, '').replace('.json', '') : '未命名场景');
+    const cropBox = document.getElementById('crop-box'); const crop = cropBox
+    ? { display: cropBox.style.display, left: cropBox.style.left, top: cropBox.style.top, width: cropBox.style.width, height: cropBox.style.height }
+    : { display: 'none', left: 'calc(50% - 128px)', top: 'calc(50% - 128px)', width: '256px', height: '256px' }; const items = [];
+    if (editorGroup && editorGroup.children) { editorGroup.children.forEach(child => { const pos = [parseFloat(child.position.x.toFixed(3)), parseFloat(child.position.y.toFixed(3)), parseFloat(child.position.z.toFixed(3))];
+    const rot = [parseFloat(child.rotation.x.toFixed(3)), parseFloat(child.rotation.y.toFixed(3)), parseFloat(child.rotation.z.toFixed(3))];
+    const scale = [parseFloat(child.scale.x.toFixed(3)), parseFloat(child.scale.y.toFixed(3)), parseFloat(child.scale.z.toFixed(3))];
+    const itemData = { type: child.userData.type, url: child.userData.url, shape: child.userData.shape, pos, rot, scale, color: child.userData.customColor };
+    try { if (window.PluginManager) window.PluginManager.trigger('onSaveItemData', { obj: child, itemData }); } catch (_e) {}
+    items.push(itemData); }); }
+    const sceneDataTemp = {};
+    try { if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onSaveGroundData', { obj: ground, sceneData: sceneDataTemp }); } catch (_e) {}
+    const nodeData = { name: sceneName, thumbnail: null, camera: { pos: [parseFloat(camera.position.x.toFixed(3)), parseFloat(camera.position.y.toFixed(3)), parseFloat(camera.position.z.toFixed(3))],
+    target: [parseFloat(controls.target.x.toFixed(3)), parseFloat(controls.target.y.toFixed(3)), parseFloat(controls.target.z.toFixed(3))], zoom: parseFloat(camera.zoom.toFixed(3)) }, light: { type: lightType,
+    azimuth: parseFloat(state.azimuth), elevation: parseFloat(state.elevation), distance: parseFloat(state.radius), temp: parseInt(state.lightTemp), size: parseFloat(state.lightSize),
+    intensity: parseFloat(document.getElementById('lightIntensity').value) }, env: { hasWall: window.hasWall, defaultMat: window.matType, posterizeLevel: window.posterizeLevel, fogEnabled: window.isFogEnabled,
+    fogDensity: window.fogDensity, wallColor: window.envWallColor, groundColor: window.envGroundColor, skyColor: window.envSkyColor, skyLightScale: window.envSkyLightScale }, crop, items,
+    groundAnnotations: sceneDataTemp.groundAnnotations || [], groundNormArrows: sceneDataTemp.groundNormArrows || [], groundPolygon3ds: sceneDataTemp.groundPolygon3ds || [],
+    groundColorSampleAnnotations: sceneDataTemp.groundColorSampleAnnotations || [] }; if (_metaDetail.trim() !== '') nodeData.meta = { detail: _metaDetail }; return nodeData; }
+    async function maybeSaveDraft(force) { if (window.__isPageUnloading) return; if (_draftSaving) return; if (!force && !_draftDirty) return; if (!scene || !camera || !controls || !editorGroup) return; const now = Date.now();
+    if (!force && now - _draftLastSavedAt < 1200) return; _draftSaving = true; try { const data = buildDraftSceneData();
+    await draftPut({ v: 1, savedAt: now, fileName: (window.currentFileHandle && window.currentFileHandle.name) ? window.currentFileHandle.name : null, data }); _draftDirty = false; _draftLastSavedAt = now; } catch (_e) {
+    // ignore: quota/blocked
+    } finally { _draftSaving = false; } }
+    function clearEditorSceneForRestore() { window._editorSceneLoadGen++; try { transformControl.detach(); } catch (_e) {}
+    try { if (window.AnnotationManager) window.AnnotationManager.clearAll(); } catch (_e) {}
+    const children = editorGroup ? [...editorGroup.children] : []; children.forEach(child => { try { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); } catch (_e) {} });
+    try { if (window.PluginManager) window.PluginManager.trigger('onClearScene'); } catch (_e) {} }
+    function applySceneDataToEditor(data, label) { const sceneLoadGen = ++window._editorSceneLoadGen; clearEditorSceneForRestore(); if (data && data.name) {
+    const pureName = String(data.name).replace(/_[0-9]{10}$/, ''); const nameEl = document.getElementById('scene-name-input'); if (nameEl) nameEl.value = pureName; }
+    const _d = document.getElementById('scene-meta-detail-input');
+    if (_d) { try { _d.value = (data && data.meta && data.meta.detail != null) ? String(data.meta.detail) : ''; } catch(_e) { _d.value = ''; } }
+    if (data && data.camera) { camera.position.set(data.camera.pos[0], data.camera.pos[1], data.camera.pos[2]); controls.target.set(data.camera.target[0], data.camera.target[1], data.camera.target[2]); camera.zoom = data.camera.zoom || 0.52;
+    camera.updateProjectionMatrix(); controls.update(); }
+    if (data && data.env) { if (data.env.hasWall !== undefined) { window.hasWall = data.env.hasWall; const btn = document.getElementById('wall-btn');
+    if (btn) { btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; } }
+    window.matType = data.env.defaultMat !== undefined ? data.env.defaultMat : 'origin'; window.posterizeLevel = data.env.posterizeLevel !== undefined ? data.env.posterizeLevel : 0;
+    window.isFogEnabled = data.env.fogEnabled || false; window.fogDensity = data.env.fogDensity !== undefined ? data.env.fogDensity : 0.02; window.envWallColor = data.env.wallColor || '#cccccc';
+    window.envGroundColor = data.env.groundColor || '#cccccc'; window.envSkyColor = data.env.skyColor || '#0d0d0f';
+    window.envSkyLightScale = data.env.skyLightScale !== undefined && data.env.skyLightScale !== null ? Number(data.env.skyLightScale) : 1; if (Number.isNaN(window.envSkyLightScale)) window.envSkyLightScale = 1;
+    window.envSkyLightScale = Math.min(1, Math.max(0, window.envSkyLightScale)); } else { window.matType = 'origin'; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02;
+    window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1; }
+    window.initialMatType = window.matType; if (window.syncEnvColorPickers) window.syncEnvColorPickers(); const cb = document.getElementById('crop-box'); if (cb) { if (data && data.crop) {
+    cb.style.display = data.crop.display || 'none'; cb.style.left = data.crop.left || 'calc(50% - 128px)'; cb.style.top = data.crop.top || 'calc(50% - 128px)';
+    cb.style.width = data.crop.width || '256px'; cb.style.height = data.crop.height || '256px'; } else { cb.style.display = 'none';
+    cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }
+    try { localStorage.setItem('solidCropBoxCache', JSON.stringify({left: cb.style.left, top: cb.style.top, width: cb.style.width, height: cb.style.height})); } catch(_e) {} }
+    if (data && data.light) { lightType = data.light.type; state.azimuth = data.light.azimuth; state.elevation = data.light.elevation; state.radius = data.light.distance; state.lightTemp = data.light.temp; state.lightSize = data.light.size;
+    document.getElementById('lightAzimuth').value = state.azimuth; document.getElementById('azimuthVal').innerText = state.azimuth;
+    document.getElementById('lightElevation').value = state.elevation; document.getElementById('elevationVal').innerText = state.elevation;
+    document.getElementById('lightDistance').value = state.radius; document.getElementById('distanceVal').innerText = state.radius;
+    document.getElementById('lightTemp').value = state.lightTemp; document.getElementById('tempVal').innerText = state.lightTemp * 100;
+    document.getElementById('lightSize').value = state.lightSize; document.getElementById('sizeVal').innerText = state.lightSize;
+    const _li = Math.max(0.2, Math.min(5, Number(data.light.intensity) || 1.7)); document.getElementById('lightIntensity').value = _li; document.getElementById('intensityVal').innerText = _li.toFixed(1);
+    const typeMap = {'spot':'聚光灯', 'point':'点光源', 'dir':'平行光', 'rect':'面积光'};
+    document.getElementById('light-trigger').innerText = typeMap[lightType] || '聚光灯';
+    document.querySelectorAll('#light-options .custom-option').forEach(opt => opt.classList.remove('selected'));
+    const matchedLightOpt = document.querySelector(`#light-options .custom-option[onclick*="'${lightType}'"]`); if(matchedLightOpt) matchedLightOpt.classList.add('selected'); updateDirTriggerByValues(); }
+    buildEnvironment(); if (window.PluginManager) window.PluginManager.trigger('onClearScene'); if (data && data.items && data.items.length > 0) { data.items.forEach(item => {
+    if (item.type === 'builtin') { document.getElementById('obj-color-picker').value = item.color || '#e8e8e8'; window.addEditorBuiltin(item.shape || 'cube');
+    const obj = editorGroup.children[editorGroup.children.length - 1]; obj.position.set(item.pos[0], item.pos[1], item.pos[2]); obj.rotation.set(item.rot[0], item.rot[1], item.rot[2]); obj.scale.set(item.scale[0], item.scale[1], item.scale[2]);
+    obj.updateWorldMatrix(true, true); snapBuiltinRootBottomToGround(obj); if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj, itemData: item });
+    } else if (item.type === 'glb') { gltfLoader.load(item.url, (gltf) => { if (sceneLoadGen !== window._editorSceneLoadGen) { disposeLoadedGltfRoot(gltf.scene); return; }
+    const model = gltf.scene; model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); }); model.userData = { type: 'glb', url: item.url };
+    model.position.set(item.pos[0], item.pos[1], item.pos[2]); model.rotation.set(item.rot[0], item.rot[1], item.rot[2]); model.scale.set(item.scale[0], item.scale[1], item.scale[2]); editorGroup.add(model);
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); window.changeMat(window.matType); lightMoved = true; markDraftDirty(); }); } }); }
+    if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data }); transformControl.detach();
+    window.changeMat(window.matType); if(window.changePosterize) window.changePosterize(window.posterizeLevel || 0);
+    if(window.changeAtmosphere) window.changeAtmosphere(window.isFogEnabled || false, window.fogDensity !== undefined ? window.fogDensity : 0.02);
+    const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.disabled = !window.isFogEnabled; fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); }
+    if(window.toggleFogAdvanced) window.toggleFogAdvanced(!!window.isFogEnabled);
+    const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.disabled = !(window.posterizeLevel > 0); pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } }
+    needsUpdate = true; lightMoved = true; window.sumDuration = 0; if (label) window.hwLog(label); setTimeout(() => { try { window.setMode(window.currentEditorMode); } catch(_e) {} }, 100); _draftDirty = false; }
+    async function autoRestoreDraftIfNeeded() { if (window.__solidCreateHasExplicitScene) return; if (!editorGroup || (editorGroup.children && editorGroup.children.length > 0)) return; const payload = await draftGet();
+    if (!payload || !payload.data) return; window._solidCreateDraftFileName = payload.fileName ? String(payload.fileName) : null; applySceneDataToEditor(payload.data, '✅ 已自动恢复草稿'); // 恢复草稿后，尽量把“正在编辑的文件”绑定回来，避免保存时误新建
+    try { await autoMountLastWorkDir(); } catch(_e) {}
+    await solidCreateTryBindCurrentFileHandleByName(window._solidCreateDraftFileName); }
+    window.mountWorkDirectory = async function() { try { window.workDirHandle = await window.showDirectoryPicker({id: 'solid_create_main'}); try { await saveDirHandle('lastWorkDir', window.workDirHandle); } catch(_e) {} window.currentFileHandle = null; window.targetMasterFilename = null; const container = document.getElementById('file-list-container'); container.style.display = 'block'; container.innerHTML = '<div style="color:#2ecc71; margin-bottom:4px; text-align:center;">读取中...</div>'; await window.refreshFileList(); await window.syncQuickDirButtons(); } catch(e) { window.hwLog("挂载取消或失败: " + e.message); } };
+    const dbName = 'SolidEditorDB'; const storeName = 'dirHandles'; function initDB() { return new Promise((resolve, reject) => { const req = indexedDB.open(dbName, 1); req.onupgradeneeded = e => { if(!e.target.result.objectStoreNames.contains(storeName)) e.target.result.createObjectStore(storeName); }; req.onsuccess = e => resolve(e.target.result); req.onerror = e => reject(e.target.error); }); } async function saveDirHandle(key, handle) { const db = await initDB(); return new Promise((resolve, reject) => { const tx = db.transaction(storeName, 'readwrite'); tx.objectStore(storeName).put(handle, key); tx.oncomplete = resolve; tx.onerror = reject; });     } async function getDirHandle(key) { const db = await initDB(); return new Promise((resolve, reject) => { const req = db.transaction(storeName, 'readonly').objectStore(storeName).get(key); req.onsuccess = e => resolve(e.target.result); req.onerror = () => resolve(null); }); }
+    async function handlesSameDirEntry(a, b) { if (!a || !b) return false; if (a === b) return true; if (typeof a.isSameEntry === 'function') { try { return await a.isSameEntry(b); } catch (e) { return false; } } return false; }
+    // --- 安全重命名：File System Access API 无原生 rename，用“写新→删旧”模拟 ---
+    let _suppressSceneItemClickUntil = 0; function solidCreateIsNumericSceneFileName(name) { return /^\d{3}_/.test(String(name || '')); }
+    function solidCreateIsNonNumericMasterFileName(name) { return name && !/^\d/.test(String(name)); }
+    function solidCreateNormalizeJsonFileName(input) { let s = String(input || '').trim(); // Windows 下常见：用户复制粘贴带引号
+    s = s.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+    if (s === '') return ''; if (!/\.json$/i.test(s)) s = s + '.json'; return s; }
+    function solidCreateValidateWindowsFileName(name) { const n = String(name || ''); if (!n || n.length > 180) return '文件名为空或过长'; // 非法字符 / 保留字符
+    if (/[\\\/:\*\?"<>\|]/.test(n)) return '文件名包含非法字符（\\ / : * ? " < > |）';
+            if (/[\. ]$/.test(n)) return '文件名不能以空格或点结尾';
+            const base = n.replace(/\.json$/i, '');
+            const upper = base.toUpperCase();
+            const reserved = new Set(['CON','PRN','AUX','NUL','COM1','COM2','COM3','COM4','COM5','COM6','COM7','COM8','COM9','LPT1','LPT2','LPT3','LPT4','LPT5','LPT6','LPT7','LPT8','LPT9']);
+            if (reserved.has(upper)) return '文件名为 Windows 保留名';
+            return null;
+        }
+        async function solidCreateEnsureWorkDirPermission() {
+            if (!window.workDirHandle) return false;
+            try {
+                let perm = await window.workDirHandle.queryPermission({ mode: 'readwrite' });
+                if (perm !== 'granted') perm = await window.workDirHandle.requestPermission({ mode: 'readwrite' });
+                return perm === 'granted';
+            } catch (_e) { return false; }
+        }
+        async function solidCreateFileExists(fileName) {
+            try {
+                await window.workDirHandle.getFileHandle(fileName, { create: false });
+                return true;
+            } catch (_e) { return false; }
+        }
+        async function solidCreateRenameFileInWorkDir(oldName, newName) {
+            if (!window.workDirHandle) throw new Error('未挂载工作目录');
+            if (oldName === newName) return { ok: true, newHandle: null, noOp: true };
+            const okPerm = await solidCreateEnsureWorkDirPermission();
+            if (!okPerm) throw new Error('无写入权限（需要 readwrite 授权）');
+            // 冲突检查：不覆盖
+            if (await solidCreateFileExists(newName)) {
+                throw new Error('同名文件已存在：' + newName);
+            }
+            // 读取旧文件内容
+            const oldHandle = await window.workDirHandle.getFileHandle(oldName, { create: false });
+            const oldFile = await oldHandle.getFile();
+            const text = await oldFile.text();
+            // 写入新文件
+            const newHandle = await window.workDirHandle.getFileHandle(newName, { create: true });
+            const w = await newHandle.createWritable();
+            await w.write(text);
+            await w.close();
+            // 最小校验：新文件应可读取，且长度不为 0（允许空文件但这里一般不应发生）
+            const nf = await newHandle.getFile();
+            if (nf.size <= 0 && text.length > 0) {
+                throw new Error('写入校验失败（新文件大小异常）');
+            }
+            // 删除旧文件（最后一步）
+            await window.workDirHandle.removeEntry(oldName);
+            return { ok: true, newHandle, noOp: false };
+        }
+        async function autoMountLastWorkDir() {
+        try {
+            if (window.workDirHandle) return true;
+            async function tryMountHandle(h, label) {
+                if (!h) return false;
+                let perm = 'prompt';
+                try { perm = await h.queryPermission({ mode: 'readwrite' }); } catch(_e) { perm = 'prompt'; }
+                if (perm !== 'granted') {
+                    try { perm = await h.requestPermission({ mode: 'readwrite' }); } catch(_e) { perm = 'denied'; }
+                }
+                if (perm !== 'granted') return false;
+                window.workDirHandle = h;
+                window.currentFileHandle = null;
+                window.targetMasterFilename = null;
+                const container = document.getElementById('file-list-container');
+                if (container) {
+                    container.style.display = 'block';
+                    container.innerHTML = '<div style="color:#2ecc71; margin-bottom:4px; text-align:center;">读取中...</div>';
+                }
+                await window.refreshFileList();
+                await window.syncQuickDirButtons();
+                if (label) window.showToast(label, false);
+                try { await saveDirHandle('lastWorkDir', h); } catch(_e) {}
+                return true;
+            }
+    
+            // 优先：显式挂载记录
+            const last = await getDirHandle('lastWorkDir');
+            if (await tryMountHandle(last, "已自动恢复上次挂载目录")) return true;
+    
+            // 兜底：如果用户一直用快捷库按钮挂载，则 lastWorkDir 可能未写入；这里自动尝试快捷库绑定
+            const g = await getDirHandle('geometry');
+            if (await tryMountHandle(g, "已自动恢复快捷目录：几何体静物")) return true;
+            const p = await getDirHandle('portrait');
+            if (await tryMountHandle(p, "已自动恢复快捷目录：肖像光影")) return true;
+    
+            return false;
+        } catch(_e) { return false; }
+        }
+        window.syncQuickDirButtons = async function() {
+        const gBtn = document.getElementById('btn-quick-geometry'); const pBtn = document.getElementById('btn-quick-portrait');
+        const baseStyle = 'background:#2c3e50; border-color:#34495e; flex:1; margin-bottom:0; font-size:11px; padding:6px;';
+        const onStyle = 'background:rgba(46,204,113,0.2); border-color:#2ecc71; flex:1; margin-bottom:0; font-size:11px; padding:6px;';
+        if (!gBtn || !pBtn) return;
+        if (!window.workDirHandle) { gBtn.style.cssText = baseStyle; pBtn.style.cssText = baseStyle; return; }
+        let gOn = false, pOn = false;
+        try {
+        const gH = await getDirHandle('geometry'); const pH = await getDirHandle('portrait'); const w = window.workDirHandle;
+        if (gH) gOn = await handlesSameDirEntry(w, gH); if (pH) pOn = await handlesSameDirEntry(w, pH);
+        } catch (e) { console.warn(e); }
+        gBtn.style.cssText = gOn ? onStyle : baseStyle; pBtn.style.cssText = pOn ? onStyle : baseStyle;
+        };
+        window.loadQuickDir = async function(key, forceRebind = false) { try { let handle = forceRebind ? null : await getDirHandle(key); if (handle) { const perm = await handle.queryPermission({mode: 'readwrite'}); if (perm !== 'granted') { if (await handle.requestPermission({mode: 'readwrite'}) !== 'granted') { handle = null; } } } if (!handle) { window.showToast(forceRebind ? "请选择新的文件夹进行绑定" : "首次绑定或权限过期，请选择并授权文件夹", false); handle = await window.showDirectoryPicker({id: 'solid_create_quick', mode: 'readwrite'}); await saveDirHandle(key, handle); } window.workDirHandle = handle; try { await saveDirHandle('lastWorkDir', handle); } catch(_e) {} window.currentFileHandle = null; window.targetMasterFilename = null; const container = document.getElementById('file-list-container'); container.style.display = 'block'; container.innerHTML = '<div style="color:#2ecc71; margin-bottom:4px; text-align:center;">读取中...</div>'; await window.refreshFileList(); window.showToast(forceRebind ? "已成功重新绑定快捷目录" : "成功挂载快捷目录"); } catch(e) { window.showToast("快捷挂载失败或取消", true); } };
+        window.refreshFileList = async function() { if(!window.workDirHandle) { await window.syncQuickDirButtons(); return; } const container = document.getElementById('file-list-container'); container.innerHTML = '';
+        let files = []; for await (const entry of window.workDirHandle.values()) { if(entry.kind === 'file' && entry.name.endsWith('.json')) files.push(entry); }
+        files.sort((a,b) => a.name.localeCompare(b.name, 'zh-CN', {numeric: true})); if(files.length===0){ container.innerHTML = '<div style="color:#aaa; text-align:center;">无JSON文件</div>'; await window.syncQuickDirButtons(); return; }
+        if(!window.targetMasterFilename) { const nonNumbered = files.filter(f => !/^\d+/.test(f.name)); if(nonNumbered.length > 0) window.targetMasterFilename = nonNumbered[0].name; }
+        container.innerHTML = '<div style="display:flex; justify-content:space-between; color:#a0a0a0; font-size:10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:4px;"><span>📝 场景文件 (点击读取)</span><span title="指定哪个文件为合并目标">🎯 统合目标</span></div>'; files.forEach(fileHandle => { const item = document.createElement('div'); item.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:4px 6px; margin-bottom:2px; background:rgba(255,255,255,0.05); border-radius:3px; transition:0.2s; color:#ddd;';
+        const nameSpan = document.createElement('span'); nameSpan.style.cssText = 'cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;'; nameSpan.innerText = fileHandle.name; nameSpan.onclick = () => window.loadJSONFromFileHandle(fileHandle);
+        // 双击文件名：安全重命名（数字开头场景文件 / 非数字统合文件）
+        nameSpan.ondblclick = async (ev) => {
+            try {
+                ev.preventDefault(); ev.stopPropagation();
+                _suppressSceneItemClickUntil = Date.now() + 280;
+    
+                const oldName = String(fileHandle.name || '');
+                const isNum = solidCreateIsNumericSceneFileName(oldName);
+                const isMaster = solidCreateIsNonNumericMasterFileName(oldName);
+                if (!isNum && !isMaster) return;
+    
+                // 编辑输入框（就地替换）
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.spellcheck = false;
+                input.autocomplete = 'off';
+                input.autocorrect = 'off';
+                input.style.cssText = 'flex:1; min-width:0; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.18); color:#fff; border-radius:4px; padding:2px 6px; font-size:12px; outline:none;';
+    
+                // 预填：数字文件只选中标题部分（保留编号），非数字文件选中全部
+                input.value = oldName;
+                nameSpan.replaceWith(input);
+                input.focus();
+                try {
+                    if (isNum) {
+                        const m = oldName.match(/^(\d{3}_)(.*?)(\.json)?$/i);
+                        const start = m ? m[1].length : 0;
+                        const end = m ? (m[1].length + m[2].length) : oldName.length;
+                        input.setSelectionRange(start, end);
+                    } else {
+                        input.select();
+                    }
+                } catch(_e) {}
+    
+                const restoreSpan = () => {
+                    try { input.replaceWith(nameSpan); } catch(_e) {}
+                };
+                const commit = async () => {
+                    const raw = input.value;
+                    let newName = solidCreateNormalizeJsonFileName(raw);
+                    if (!newName) { alert('文件名不能为空'); restoreSpan(); return; }
+                    const err = solidCreateValidateWindowsFileName(newName);
+                    if (err) { alert(err); restoreSpan(); return; }
+    
+                    // 类型约束：数字场景文件允许改编号，但必须仍为“三位数字+下划线”；非数字统合文件必须仍为非数字开头
+                    if (isNum) {
+                        if (!/^\d{3}_/i.test(newName)) {
+                            alert('数字场景文件名必须以“三位数字+下划线”开头，例如：001_...');
+                            restoreSpan(); return;
+                        }
+                        if (!/^\d{3}_.+\.json$/i.test(newName)) {
+                            alert('数字场景文件名格式不正确，应为：三位数字 + "_" + 名称 + ".json"');
+                            restoreSpan(); return;
+                        }
+                    } else if (isMaster) {
+                        if (/^\d/.test(newName)) {
+                            alert('统合文件名不能以数字开头（否则会被当作场景文件）');
+                            restoreSpan(); return;
+                        }
+                    }
+    
+                    if (newName === oldName) { restoreSpan(); return; }
+                    if (await solidCreateFileExists(newName)) {
+                        alert('同名文件已存在，请换一个名字。');
+                        restoreSpan(); return;
+                    }
+    
+                    input.disabled = true;
+                    input.style.opacity = '0.7';
+                    // 执行重命名（写新→删旧）
+                    const res = await solidCreateRenameFileInWorkDir(oldName, newName);
+    
+                    // 同步状态：currentFileHandle / 草稿 fileName / 统合目标名
+                    try {
+                        if (window.currentFileHandle && window.currentFileHandle.name === oldName) {
+                            if (res && res.newHandle) window.currentFileHandle = res.newHandle;
+                            window._solidCreateDraftFileName = newName;
+                            solidCreateSyncSaveButtonText();
+                        }
+                        if (window._solidCreateDraftFileName === oldName) window._solidCreateDraftFileName = newName;
+                        if (window.targetMasterFilename === oldName) window.targetMasterFilename = newName;
+                        // 立刻落一次草稿，更新 fileName（避免下次恢复绑定到旧名）
+                        try { markDraftDirty(); } catch(_e) {}
+                        try { void maybeSaveDraft(true); } catch(_e) {}
+                    } catch(_e) {}
+    
+                    await window.refreshFileList();
+                    window.showToast(`已重命名：${oldName} → ${newName}`);
+                };
+    
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); void commit(); }
+                    else if (e.key === 'Escape') { e.preventDefault(); restoreSpan(); }
+                });
+                input.addEventListener('blur', () => { restoreSpan(); }, { once: true });
+            } catch (e) {
+                try { alert('重命名失败：' + (e && e.message ? e.message : String(e))); } catch(_e) {}
+                try { await window.refreshFileList(); } catch(_e) {}
+            }
+        };
+        // 单击加载：若刚触发过双击编辑，则短暂抑制，避免误加载
+        nameSpan.onclick = (e) => {
+            if (Date.now() < _suppressSceneItemClickUntil) { try { e.preventDefault(); e.stopPropagation(); } catch(_e) {} return; }
+            window.loadJSONFromFileHandle(fileHandle);
+        };
+        item.onmouseover = () => { item.style.background='rgba(255,255,255,0.2)'; item.style.color='#fff'; }; item.onmouseout = () => { item.style.background='rgba(255,255,255,0.05)'; item.style.color='#ddd'; };
+        item.appendChild(nameSpan); if (!/^\d+/.test(fileHandle.name)) {
+        const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'masterFileSelect'; radio.style.cssText = 'margin-left:8px; cursor:pointer; accent-color:#2ecc71; transform:scale(1.1); flex-shrink:0;';
+        if(window.targetMasterFilename === fileHandle.name) radio.checked = true; radio.onchange = () => { window.targetMasterFilename = fileHandle.name; window.hwLog("已指定统合JSON: " + fileHandle.name); }; item.appendChild(radio);
+        } else { const delBtn = document.createElement('span'); delBtn.innerText = '🗑️'; delBtn.style.cssText = 'cursor:pointer; margin-left:8px; font-size:12px; opacity:0.6; transition:0.2s; flex-shrink:0;'; delBtn.title = "删除此场景";
+        delBtn.onmouseover = () => delBtn.style.opacity = '1'; delBtn.onmouseout = () => delBtn.style.opacity = '0.6';
+        delBtn.onclick = async (e) => { e.stopPropagation(); try { await window.workDirHandle.removeEntry(fileHandle.name); window.showToast(`已删除场景: ${fileHandle.name}`); if(window.currentFileHandle && window.currentFileHandle.name === fileHandle.name) { window.createNewScene(); } await window.refreshFileList(); } catch(err) { window.showToast('删除失败: ' + err.message, true); } };
+        item.appendChild(delBtn); }
+        container.appendChild(item); });
+        if(window.currentFileHandle) { Array.from(container.children).forEach(el => { const span = el.querySelector('span'); if(span && span.innerText === window.currentFileHandle.name) el.style.borderLeft = '3px solid #2ecc71'; }); }
+        await window.syncQuickDirButtons();
+        };
+        window.loadJSONFromFileHandle = async function(fileHandle) { window.currentFileHandle = fileHandle; try { window._solidCreateDraftFileName = fileHandle && fileHandle.name ? String(fileHandle.name) : null; solidCreateSyncSaveButtonText(); const file = await fileHandle.getFile(); if (window.currentFileHandle !== fileHandle) return; const text = await file.text(); if (window.currentFileHandle !== fileHandle) return; const data = JSON.parse(text); if (Array.isArray(data)) { window.showToast("该文件是统合JSON，无法读取！", true); window.currentFileHandle = null; solidCreateSyncSaveButtonText(); return; } const sceneLoadGen = ++window._editorSceneLoadGen; transformControl.detach(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); if(data.name) { const pureName = data.name.replace(/_[0-9]{10}$/, ''); document.getElementById('scene-name-input').value = pureName; } const _d = document.getElementById('scene-meta-detail-input'); if (_d) { try { _d.value = (data && data.meta && data.meta.detail != null) ? String(data.meta.detail) : ''; } catch(_e) { _d.value = ''; } } if(data.camera) { camera.position.set(data.camera.pos[0], data.camera.pos[1], data.camera.pos[2]); controls.target.set(data.camera.target[0], data.camera.target[1], data.camera.target[2]); camera.zoom = data.camera.zoom || 0.52; camera.updateProjectionMatrix(); controls.update(); } if(data.env) {
+        window.__solidCreateHasExplicitScene = true;
+        if(data.env.hasWall !== undefined) { window.hasWall = data.env.hasWall; const btn = document.getElementById('wall-btn'); btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; }
+        window.matType = data.env.defaultMat !== undefined ? data.env.defaultMat : 'origin'; window.posterizeLevel = data.env.posterizeLevel !== undefined ? data.env.posterizeLevel : 0; window.isFogEnabled = data.env.fogEnabled || false; window.fogDensity = data.env.fogDensity !== undefined ? data.env.fogDensity : 0.02;
+        window.envWallColor = data.env.wallColor || '#cccccc'; window.envGroundColor = data.env.groundColor || '#cccccc'; window.envSkyColor = data.env.skyColor || '#0d0d0f';
+        window.envSkyLightScale = data.env.skyLightScale !== undefined && data.env.skyLightScale !== null ? Number(data.env.skyLightScale) : 1;
+        if (Number.isNaN(window.envSkyLightScale)) window.envSkyLightScale = 1;
+        window.envSkyLightScale = Math.min(1, Math.max(0, window.envSkyLightScale));
+        } else { window.matType = 'origin'; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1; }
+        window.initialMatType = window.matType; // 【新增】记录JSON加载时的初始材质，以便重置时恢复
+        const matchedMatOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${window.matType}'"]`);
+        if(matchedMatOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedMatOpt.innerText; document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedMatOpt.classList.add('selected'); }
+        if (window.syncEnvColorPickers) window.syncEnvColorPickers();
+        const cb = document.getElementById('crop-box'); if(data.crop) { cb.style.display = data.crop.display || 'none'; cb.style.left = data.crop.left || 'calc(50% - 128px)'; cb.style.top = data.crop.top || 'calc(50% - 128px)'; cb.style.width = data.crop.width || '256px'; cb.style.height = data.crop.height || '256px'; } else { cb.style.display = 'none'; cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; } localStorage.setItem('solidCropBoxCache', JSON.stringify({left: cb.style.left, top: cb.style.top, width: cb.style.width, height: cb.style.height})); if(data.light) { lightType = data.light.type; state.azimuth = data.light.azimuth; document.getElementById('lightAzimuth').value = state.azimuth; document.getElementById('azimuthVal').innerText = state.azimuth; state.elevation = data.light.elevation; document.getElementById('lightElevation').value = state.elevation; document.getElementById('elevationVal').innerText = state.elevation; state.radius = data.light.distance; document.getElementById('lightDistance').value = state.radius; document.getElementById('distanceVal').innerText = state.radius; state.lightTemp = data.light.temp; document.getElementById('lightTemp').value = state.lightTemp; document.getElementById('tempVal').innerText = state.lightTemp * 100; state.lightSize = data.light.size; document.getElementById('lightSize').value = state.lightSize; document.getElementById('sizeVal').innerText = state.lightSize; const _li = Math.max(0.2, Math.min(5, Number(data.light.intensity) || 1.7)); document.getElementById('lightIntensity').value = _li; document.getElementById('intensityVal').innerText = _li.toFixed(1); const typeMap = {'spot':'聚光灯', 'point':'点光源', 'dir':'平行光', 'rect':'面积光'}; document.getElementById('light-trigger').innerText = typeMap[lightType] || '聚光灯'; document.querySelectorAll('#light-options .custom-option').forEach(opt => opt.classList.remove('selected')); const matchedLightOpt = document.querySelector(`#light-options .custom-option[onclick*="'${lightType}'"]`); if(matchedLightOpt) matchedLightOpt.classList.add('selected'); updateDirTriggerByValues(); } buildEnvironment(); if(window.PluginManager) window.PluginManager.trigger('onClearScene'); if(data.items && data.items.length > 0) { data.items.forEach(item => { if(item.type === 'builtin') { document.getElementById('obj-color-picker').value = item.color || '#e8e8e8'; window.addEditorBuiltin(item.shape || 'cube'); const obj = editorGroup.children[editorGroup.children.length - 1]; obj.position.set(item.pos[0], item.pos[1], item.pos[2]); obj.rotation.set(item.rot[0], item.rot[1], item.rot[2]); obj.scale.set(item.scale[0], item.scale[1], item.scale[2]); obj.updateWorldMatrix(true, true); snapBuiltinRootBottomToGround(obj); if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj, itemData: item }); } else if(item.type === 'glb') { gltfLoader.load(item.url, (gltf) => { if (sceneLoadGen !== window._editorSceneLoadGen) { disposeLoadedGltfRoot(gltf.scene); return; } const model = gltf.scene; model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); }); model.userData = { type: 'glb', url: item.url }; model.position.set(item.pos[0], item.pos[1], item.pos[2]); model.rotation.set(item.rot[0], item.rot[1], item.rot[2]); model.scale.set(item.scale[0], item.scale[1], item.scale[2]); editorGroup.add(model); if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); window.changeMat(window.matType); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('json_glb_item'); } catch (_eGlb) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }); } }); }
+        if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data });
+        transformControl.detach(); window.changeMat(window.matType); if(window.changePosterize) window.changePosterize(window.posterizeLevel || 0); if(window.changeAtmosphere) window.changeAtmosphere(window.isFogEnabled || false, window.fogDensity !== undefined ? window.fogDensity : 0.02); const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.disabled = !window.isFogEnabled; fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); } if(window.toggleFogAdvanced) window.toggleFogAdvanced(!!window.isFogEnabled); const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.disabled = !(window.posterizeLevel > 0); pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } needsUpdate = true; lightMoved = true; window.sumDuration = 0; document.getElementById('btn-save-direct').innerText = '💾 覆写选中项'; Array.from(document.getElementById('file-list-container').children).forEach(el => { el.style.borderLeft = el.querySelector('span') && el.querySelector('span').innerText === fileHandle.name ? '3px solid #2ecc71' : 'none'; }); window.hwLog("已加载场景: " + fileHandle.name); 
+        // 【加载唤醒】：场景读取完毕后，重新刷新一次当前的激活模式
+        setTimeout(() => { window.setMode(window.currentEditorMode); }, 100);
+        window.useAdvancedRender = false;
+        if (pathTracer) { try { safeDispose(pathTracer); } catch (_ePt) {} pathTracer = null; }
+        window.hasAutoStopped = false;
+        try {
+        if (window.__solidPreviewLighting) {
+        window.__solidPreviewLighting.setEnabled(true);
+        window.__solidPreviewLighting.syncShadows();
+        window.__solidPreviewLighting.onSceneChanged('json_loaded');
+        }
+        } catch (_ePl) {}
+        try { if (renderer && scene && camera) { renderer.render(scene, camera); } } catch (_eR) {}
+        } catch(err) { console.error(err); window.showToast("读取或解析失败！", true); } };
+        window.saveCurrentSceneDirectly = async function() { if(!window.workDirHandle) { window.showToast("请先挂载工作目录！", true); return; }
+        let inputName = document.getElementById('scene-name-input').value.trim(); if(!window.currentFileHandle && !inputName) { window.showToast("请先填写【场景名称】！", true); return; }
+        const _metaDetailEl = document.getElementById('scene-meta-detail-input');
+        const _metaDetail = _metaDetailEl ? String(_metaDetailEl.value || '') : '';
+        const updateCoverOnSave = solidCreateGetUpdateCoverEnabled();
+        async function solidCreateReadThumbnailFromHandle(fileHandle) {
+        if (!fileHandle) return null;
+        try {
+        const f = await fileHandle.getFile();
+        const txt = await f.text();
+        const data = JSON.parse(txt);
+        if (data && typeof data === 'object' && !Array.isArray(data) && Object.prototype.hasOwnProperty.call(data, 'thumbnail')) return data.thumbnail || null;
+        return null;
+        } catch(_e) { return null; }
+        }
+        transformControl.detach();
+        let thumbnail = null;
+        if (updateCoverOnSave) {
+        if(pathTracer) { const dofOn = window.DoFManager ? window.DoFManager.enabled : false; if (window.AtmosphereManager && (window.isFogEnabled || dofOn)) window.AtmosphereManager.render(pathTracer, renderer, scene, camera); else pathTracer.renderSample(); } else { renderer.render(scene, camera); }
+        try { if (window.PluginManager) window.PluginManager.trigger('onUpdate', { camera, scene, pathTracer, renderer }); } catch(_e) {}
+        await new Promise(r => requestAnimationFrame(r));
+        const cropBox = document.getElementById('crop-box'); let rect; if(cropBox.style.display !== 'none') { rect = cropBox.getBoundingClientRect(); } else { rect = { left: (window.innerWidth - 256)/2, top: (window.innerHeight - 256)/2, width: 256, height: 256 }; }
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const cropLeft = Math.max(0, Math.floor(rect.left)), cropTop = Math.max(0, Math.floor(rect.top));
+        const cropW = Math.max(1, Math.min(Math.ceil(rect.width), vw - cropLeft)), cropH = Math.max(1, Math.min(Math.ceil(rect.height), vh - cropTop));
+        const snapRect = { left: cropLeft, top: cropTop, width: cropW, height: cropH };
+        const cboxEl = document.getElementById('crop-box'); const prevCropVis = cboxEl ? cboxEl.style.visibility : '';
+        if (cboxEl) cboxEl.style.visibility = 'hidden';
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        try {
+        thumbnail = await (async function solidCreateCaptureCropThumbnail() {
+        const OUT = 256;
+        const tCanvas = document.createElement('canvas'); tCanvas.width = OUT; tCanvas.height = OUT;
+        const ctx = tCanvas.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+        const h2cBase = { windowWidth: vw, windowHeight: vh, scrollX: 0, scrollY: 0, useCORS: true, allowTaint: true, logging: false, backgroundColor: null, scale: 1, foreignObjectRendering: false };
+        function solidCreateIsLikelyBlackFrame(canvas) {
+        try {
+        const c = document.createElement('canvas'); c.width = 24; c.height = 24;
+        const x = c.getContext('2d', { willReadFrequently: true }); if (!x) return false;
+        x.drawImage(canvas, 0, 0, 24, 24);
+        const data = x.getImageData(0, 0, 24, 24).data;
+        let maxRGB = 0;
+        for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        maxRGB = Math.max(maxRGB, r, g, b);
+        }
+        return maxRGB <= 2;
+        } catch (_e) { return false; }
+        }
+        async function solidCreateCaptureViaDisplayMedia() {
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') return null;
+        if (typeof window.__solidCreateReleaseCaptureTrack !== 'function') {
+        window.__solidCreateReleaseCaptureTrack = function() {
+        try {
+        const t = window.__solidCreateCaptureTrack;
+        if (t) { try { t.stop(); } catch(_e) {} }
+        } catch(_e2) {}
+        window.__solidCreateCaptureTrack = null;
+        };
+        }
+        let track = window.__solidCreateCaptureTrack || null;
+        try {
+        if (!track || track.readyState !== 'live') {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+        displaySurface: 'browser',
+        frameRate: 30,
+        selfBrowserSurface: 'include'
+        },
+        audio: false
+        });
+        track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
+        if (!track) return null;
+        window.__solidCreateCaptureTrack = track;
+        track.onended = function() {
+        if (window.__solidCreateCaptureTrack === track) window.__solidCreateCaptureTrack = null;
+        };
+        }
+        if (!track || track.readyState !== 'live') return null;
+        let srcCanvas = null;
+        if (typeof ImageCapture === 'function') {
+        try {
+        const cap = new ImageCapture(track);
+        const bmp = await cap.grabFrame();
+        if (bmp && bmp.width > 0 && bmp.height > 0) {
+        srcCanvas = document.createElement('canvas');
+        srcCanvas.width = bmp.width; srcCanvas.height = bmp.height;
+        const bctx = srcCanvas.getContext('2d');
+        if (bctx) bctx.drawImage(bmp, 0, 0);
+        }
+        } catch(_e) {}
+        }
+        if (!srcCanvas) {
+        const v = document.createElement('video');
+        v.muted = true; v.playsInline = true; v.srcObject = new MediaStream([track]);
+        await v.play();
+        await new Promise(r => requestAnimationFrame(r));
+        const vw2 = v.videoWidth || 0, vh2 = v.videoHeight || 0;
+        if (vw2 > 0 && vh2 > 0) {
+        srcCanvas = document.createElement('canvas');
+        srcCanvas.width = vw2; srcCanvas.height = vh2;
+        const vctx = srcCanvas.getContext('2d');
+        if (vctx) vctx.drawImage(v, 0, 0, vw2, vh2);
+        }
+        try { v.pause(); } catch(_e) {}
+        v.srcObject = null;
+        }
+        if (!srcCanvas) return null;
+        const srcW = srcCanvas.width, srcH = srcCanvas.height;
+        if (srcW < 2 || srcH < 2) return null;
+        const scX = srcW / Math.max(1, vw), scY = srcH / Math.max(1, vh);
+        const sx = Math.max(0, Math.floor(cropLeft * scX)), sy = Math.max(0, Math.floor(cropTop * scY));
+        const sw = Math.max(1, Math.min(Math.ceil(cropW * scX), srcW - sx)), sh = Math.max(1, Math.min(Math.ceil(cropH * scY), srcH - sy));
+        const o = document.createElement('canvas'); o.width = OUT; o.height = OUT;
+        const ox = o.getContext('2d'); if (!ox) return null;
+        ox.imageSmoothingEnabled = true; ox.imageSmoothingQuality = 'high';
+        ox.drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, OUT, OUT);
+        if (solidCreateIsLikelyBlackFrame(o)) return null;
+        return o;
+        } catch (_e) {
+        if (track && track.readyState !== 'live' && window.__solidCreateCaptureTrack === track) window.__solidCreateCaptureTrack = null;
+        return null;
+        }
+        }
+        let drewWysiwyg = false;
+        const nativeSnap = await solidCreateCaptureViaDisplayMedia();
+        if (nativeSnap) {
+        ctx.drawImage(nativeSnap, 0, 0, OUT, OUT);
+        drewWysiwyg = true;
+        }
+        if (typeof html2canvas === 'function') {
+        if (!drewWysiwyg) {
+        try {
+        const canvasEl = renderer.domElement;
+        let snap = null;
+        if (canvasEl) canvasEl.setAttribute('data-solid-capture-canvas', '1');
+        try {
+        const frozenDataUrl = canvasEl.toDataURL('image/png');
+        snap = await html2canvas(document.body, Object.assign({}, h2cBase, {
+        x: cropLeft, y: cropTop, width: cropW, height: cropH,
+        onclone: function(cloneDoc) {
+        try {
+        const cloneCrop = cloneDoc.getElementById('crop-box');
+        if (cloneCrop) cloneCrop.style.visibility = 'hidden';
+        const cloneCanvas = cloneDoc.querySelector('[data-solid-capture-canvas="1"]');
+        if (cloneCanvas && cloneCanvas.parentNode) {
+        const img = cloneDoc.createElement('img');
+        const st = cloneDoc.defaultView.getComputedStyle(cloneCanvas);
+        img.src = frozenDataUrl;
+        img.draggable = false;
+        img.alt = '';
+        img.style.cssText = 'position:' + st.position + ';left:' + st.left + ';top:' + st.top + ';width:' + st.width + ';height:' + st.height + ';display:' + st.display + ';pointer-events:none;';
+        cloneCanvas.parentNode.replaceChild(img, cloneCanvas);
+        }
+        } catch(_e) {}
+        }
+        }));
+        } finally {
+        if (canvasEl) canvasEl.removeAttribute('data-solid-capture-canvas');
+        }
+        if (snap && snap.width > 0 && snap.height > 0) {
+        if (solidCreateIsLikelyBlackFrame(snap)) {
+        console.warn('[SolidCreate] WYSIWYG 缩略图疑似黑帧，回退 WebGL 截图');
+        } else {
+        ctx.drawImage(snap, 0, 0, snap.width, snap.height, 0, 0, OUT, OUT);
+        drewWysiwyg = true;
+        }
+        } else {
+        console.warn('[SolidCreate] WYSIWYG 缩略图为空，回退 WebGL 截图');
+        }
+        } catch (eWysiwyg) {
+        console.warn('[SolidCreate] WYSIWYG 缩略图失败，回退 WebGL 截图:', eWysiwyg);
+        }
+        }
+        }
+        if (!drewWysiwyg) {
+        const canvasEl = renderer.domElement; const cR = canvasEl.getBoundingClientRect();
+        const buX = canvasEl.width / Math.max(1, cR.width), buY = canvasEl.height / Math.max(1, cR.height);
+        const sx = Math.max(0, (cropLeft - cR.left) * buX), sy = Math.max(0, (cropTop - cR.top) * buY);
+        const sw = Math.max(1, Math.min(cropW * buX, canvasEl.width - sx)), sh = Math.max(1, Math.min(cropH * buY, canvasEl.height - sy));
+        ctx.drawImage(canvasEl, sx, sy, sw, sh, 0, 0, OUT, OUT);
+        }
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        if (!drewWysiwyg && typeof html2canvas === 'function') {
+        const overlayIds = ['poly3d-layer', 'dashed-line-layer', 'norm-arrow-layer', 'anno-layer', 'anno-cs-layer', 'prober-html-layer'];
+        for (let i = 0; i < overlayIds.length; i++) {
+        const el = document.getElementById(overlayIds[i]); if (!el) continue;
+        const er = el.getBoundingClientRect(); if (er.width < 1 || er.height < 1) continue;
+        try {
+        const snap = await html2canvas(el, Object.assign({}, h2cBase, { x: cropLeft - er.left, y: cropTop - er.top, width: cropW, height: cropH }));
+        if (snap && snap.width > 0 && snap.height > 0) ctx.drawImage(snap, 0, 0, snap.width, snap.height, 0, 0, OUT, OUT);
+        } catch (e2) { console.warn('[SolidCreate] html2canvas 叠层失败: ' + overlayIds[i], e2); }
+        }
+        } else if (!drewWysiwyg) {
+        if (window.PluginManager) window.PluginManager.trigger('onDrawSnapshot', { ctx: ctx, rect: snapRect, camera: camera });
+        }
+        return tCanvas.toDataURL('image/jpeg', 0.85);
+        })();
+        } catch (e) {
+        console.warn('[SolidCreate] 缩略图异常，回退 WebGL+标注重绘:', e);
+        const canvasEl = renderer.domElement; const cR = canvasEl.getBoundingClientRect();
+        const buX = canvasEl.width / Math.max(1, cR.width), buY = canvasEl.height / Math.max(1, cR.height);
+        const sx = Math.max(0, (cropLeft - cR.left) * buX), sy = Math.max(0, (cropTop - cR.top) * buY);
+        const sw = Math.max(1, Math.min(cropW * buX, canvasEl.width - sx)), sh = Math.max(1, Math.min(cropH * buY, canvasEl.height - sy));
+        const tCanvas = document.createElement('canvas'); tCanvas.width = 256; tCanvas.height = 256; const ctx = tCanvas.getContext('2d');
+        ctx.drawImage(canvasEl, sx, sy, sw, sh, 0, 0, 256, 256);
+        if (window.PluginManager) window.PluginManager.trigger('onDrawSnapshot', { ctx: ctx, rect: snapRect, camera: camera });
+        thumbnail = tCanvas.toDataURL('image/jpeg', 0.85);
+        } finally { if (cboxEl) cboxEl.style.visibility = prevCropVis; }
+        } else {
+        let keepHandle = window.currentFileHandle || null;
+        if (!keepHandle && window._solidCreateDraftFileName && window.workDirHandle) {
+        try { keepHandle = await window.workDirHandle.getFileHandle(String(window._solidCreateDraftFileName), { create: false }); } catch(_e) { keepHandle = null; }
+        }
+        thumbnail = await solidCreateReadThumbnailFromHandle(keepHandle);
+        }
+        const items = []; editorGroup.children.forEach(child => { const pos = [parseFloat(child.position.x.toFixed(3)), parseFloat(child.position.y.toFixed(3)), parseFloat(child.position.z.toFixed(3))];
+        const rot = [parseFloat(child.rotation.x.toFixed(3)), parseFloat(child.rotation.y.toFixed(3)), parseFloat(child.rotation.z.toFixed(3))];
+        const scale = [parseFloat(child.scale.x.toFixed(3)), parseFloat(child.scale.y.toFixed(3)), parseFloat(child.scale.z.toFixed(3))];
+        const itemData = { type: child.userData.type, url: child.userData.url, shape: child.userData.shape, pos: pos, rot: rot, scale: scale, color: child.userData.customColor }; // 【解耦写入】：通过总线通知各插件把自己的数据附着到 itemData 上
+        if (window.PluginManager) window.PluginManager.trigger('onSaveItemData', { obj: child, itemData: itemData }); items.push(itemData); }); const sceneDataTemp = {}; // 【解耦写入】：通过总线通知各插件把地面数据附着到 sceneDataTemp 上
+        if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onSaveGroundData', { obj: ground, sceneData: sceneDataTemp });
+        const groundAnnos = sceneDataTemp.groundAnnotations || []; const groundNormArrows = sceneDataTemp.groundNormArrows || []; const groundPolys = sceneDataTemp.groundPolygon3ds || []; const groundColorSamples = sceneDataTemp.groundColorSampleAnnotations || [];
+        window.hwLog(`[App-Save] 地面提取结束. 引线:${groundAnnos.length}, 法线:${groundNormArrows.length}, 面片:${groundPolys.length}, 取色:${groundColorSamples.length}`);
+        const sceneName = inputName ? inputName : window.currentFileHandle.name.replace(/^\d{3}_/, '').replace('.json', '');
+        const cropBox = document.getElementById('crop-box');
+        const nodeData = { name: sceneName, thumbnail: thumbnail, camera: { pos: [parseFloat(camera.position.x.toFixed(3)), parseFloat(camera.position.y.toFixed(3)), parseFloat(camera.position.z.toFixed(3))], target: [parseFloat(controls.target.x.toFixed(3)), parseFloat(controls.target.y.toFixed(3)), parseFloat(controls.target.z.toFixed(3))], zoom: parseFloat(camera.zoom.toFixed(3)) }, light: { type: lightType, azimuth: parseFloat(state.azimuth), elevation: parseFloat(state.elevation), distance: parseFloat(state.radius), temp: parseInt(state.lightTemp), size: parseFloat(state.lightSize), intensity: parseFloat(document.getElementById('lightIntensity').value) }, env: { hasWall: window.hasWall, defaultMat: window.matType, posterizeLevel: window.posterizeLevel, fogEnabled: window.isFogEnabled, fogDensity: window.fogDensity, wallColor: window.envWallColor, groundColor: window.envGroundColor, skyColor: window.envSkyColor, skyLightScale: window.envSkyLightScale }, crop: { display: cropBox.style.display, left: cropBox.style.left, top: cropBox.style.top, width: cropBox.style.width, height: cropBox.style.height }, items: items, groundAnnotations: groundAnnos, groundNormArrows: groundNormArrows, groundPolygon3ds: groundPolys, groundColorSampleAnnotations: groundColorSamples };
+        if (_metaDetail.trim() !== '') nodeData.meta = { detail: _metaDetail };
+        window.hwLog(`[App-Save] 最终 JSON 封包完成. 模型总数: ${items.length}`);
+        items.forEach((item, idx) => { if(item.polygon3ds && item.polygon3ds.length > 0) window.hwLog(` -> 模型[${idx}] 携带面片: ${item.polygon3ds.length}个`); });
+            try { let targetHandle = window.currentFileHandle;
+            // 兜底：若草稿恢复后丢了 currentFileHandle，但仍知道源文件名，则优先覆写源文件，避免误新建
+            if(!targetHandle && window._solidCreateDraftFileName) { try { const h = await window.workDirHandle.getFileHandle(String(window._solidCreateDraftFileName), { create: false }); if (h) { targetHandle = h; window.currentFileHandle = h; solidCreateHighlightFileInList(String(window._solidCreateDraftFileName)); solidCreateSyncSaveButtonText(); } } catch(_e) {} }
+            if(!targetHandle) { let maxNum = 0; for await (const entry of window.workDirHandle.values()) { if(entry.kind === 'file' && /^\d{3}_/.test(entry.name)) {
+        const num = parseInt(entry.name.substring(0, 3), 10); if(num > maxNum) maxNum = num; } }
+        const nextNumStr = String(maxNum + 1).padStart(3, '0'); const fileName = nextNumStr + "_" + inputName + ".json";
+        targetHandle = await window.workDirHandle.getFileHandle(fileName, {create: true}); window.currentFileHandle = targetHandle; }
+        const writable = await targetHandle.createWritable(); await writable.write(JSON.stringify(nodeData)); await writable.close(); window.hwLog("成功保存: " + targetHandle.name);
+        const btn = document.getElementById('btn-save-direct'); if(btn){ btn.innerText = '✔️ 已保存'; setTimeout(()=>{ btn.innerText = '💾 覆写选中项'; }, 1500); }
+        lightMoved = true; await window.refreshFileList(); } catch(e) { window.showToast("写入失败，请检查修改权限。", true); } };
+        window.showToast = function(msg, isError = false) { let toast = document.getElementById('toast-msg'); if(!toast) { toast = document.createElement('div'); toast.id = 'toast-msg'; toast.style.cssText = 'display:none; position:fixed; top:20px; left:50%; transform:translateX(-50%); background:rgba(46,204,113,0.9); color:#fff; padding:10px 20px; border-radius:6px; z-index:10000; font-size:14px; font-weight:bold; box-shadow:0 4px 12px rgba(0,0,0,0.3); pointer-events:none; transition:opacity 0.3s;'; document.body.appendChild(toast); } toast.innerText = msg; toast.style.background = isError ? 'rgba(231,76,60,0.9)' : 'rgba(46,204,113,0.9)'; toast.style.display = 'block'; setTimeout(() => toast.style.opacity = '1', 10); setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.style.display = 'none', 300); }, 2500); window.hwLog((isError ? "❌ " : "✅ ") + msg); };
+        window.mergeAllScenes = async function() { if(!window.workDirHandle) { window.showToast("请先挂载工作目录！", true); return; }
+        if(!window.targetMasterFilename) { window.showToast("请先勾选一个目标作为【统合JSON】！", true); return; }
+        try { let files = []; for await (const entry of window.workDirHandle.values()) { if(entry.kind === 'file' && entry.name.endsWith('.json') && /^\d+/.test(entry.name)) files.push(entry); }
+        files.sort((a,b) => a.name.localeCompare(b.name, 'zh-CN', {numeric: true})); if(files.length === 0) { window.showToast("未找到以数字开头的场景文件！", true); return; }
+        let mergedData = []; for(const fileHandle of files) { if(fileHandle.name === window.targetMasterFilename) continue; const file = await fileHandle.getFile(); const text = await file.text();
+        try { const data = JSON.parse(text); mergedData.push(data); } catch(e) { window.hwLog(fileHandle.name + " 解析跳过"); } }
+        const targetHandle = await window.workDirHandle.getFileHandle(window.targetMasterFilename, {create: true}); const writable = await targetHandle.createWritable(); await writable.write(JSON.stringify(mergedData)); await writable.close();
+        window.showToast(`成功合并 ${files.length} 个文件！`); } catch(e) { window.showToast("合并失败: " + e.message, true); } };
+        window.createNewScene = function() { window._editorSceneLoadGen++; transformControl.detach(); if(window.AnnotationManager) window.AnnotationManager.clearAll(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); document.getElementById('scene-name-input').value = ''; const _d = document.getElementById('scene-meta-detail-input'); if (_d) _d.value = ''; window.currentFileHandle = null; if(document.getElementById('file-list-container').children.length > 0) { Array.from(document.getElementById('file-list-container').children).forEach(el => el.style.borderLeft = 'none'); } document.getElementById('btn-save-direct').innerText = '💾 保存新场景'; const cb = document.getElementById('crop-box'); cb.style.display = 'none'; const cachedCrop = localStorage.getItem('solidCropBoxCache'); if(cachedCrop) { const c = JSON.parse(cachedCrop); cb.style.left = c.left; cb.style.top = c.top; cb.style.width = c.width; cb.style.height = c.height; } else { cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }
+        window._solidCreateDraftFileName = null; solidCreateSyncSaveButtonText();
+        window.__solidCreateHasExplicitScene = true;
+        const matchedMatOpt = document.querySelector(`#mat-options .custom-option[onclick*="'origin'"]`);
+        if(matchedMatOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedMatOpt.innerText; document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedMatOpt.classList.add('selected'); }
+        window.changeMat('origin'); window.initialMatType = 'origin'; // 【新增】新建场景时，初始材质重置为自带材质
+        window.changePosterize(0); window.changeAtmosphere(false, 0.02); const fogCheck = document.getElementById('fogEnable'); if(fogCheck) fogCheck.checked = false; if(window.toggleFogAdvanced) window.toggleFogAdvanced(false); const posterizeCheck = document.getElementById('posterizeEnable'); if(posterizeCheck) posterizeCheck.checked = false;
+        // 【核心解耦】：通知所有插件安全销毁自己的内存和 DOM 节点
+        if (window.PluginManager) window.PluginManager.trigger('onClearScene'); window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1; if (window.syncEnvColorPickers) window.syncEnvColorPickers(); buildEnvironment();
+        window.hwLog("已清空画布，进入新建场景状态"); needsUpdate = true; lightMoved = true; 
+        // 【加载唤醒】：新建场景后，重新刷新一次当前的激活模式
+        setTimeout(() => { window.setMode(window.currentEditorMode); }, 100); };
+        function getTempColor(t) { const stops = [[3000,255,160,87],[4000,255,200,140],[5000,255,239,223],[6000,255,255,255],[7500,225,235,255],[9000,190,210,255]]; let c1 = stops[0], c2 = stops[stops.length-1]; for(let i=0; i<stops.length-1; i++) { if(t>=stops[i][0] && t<=stops[i+1][0]){ c1=stops[i]; c2=stops[i+1]; break; } } const f = (t-c1[0])/(c2[0]-c1[0]||1); return new THREE.Color((c1[1]+f*(c2[1]-c1[1]))/255, (c1[2]+f*(c2[2]-c1[2]))/255, (c1[3]+f*(c2[3]-c1[3]))/255); }
+        window.toggleCustomSelect = function(e, id) { e.stopPropagation(); document.querySelectorAll('.custom-options').forEach(el => { if (el.id !== id) el.classList.remove('show'); }); document.getElementById(id).classList.toggle('show'); };
+        // 【新增】：材质切换（非破坏性预览）
+        window.changeMat = function(val) { window.matType = val; const roughs = [0.95, 0.15, 0.3, 0.05, 0.4]; const metals = [0.0, 0.0, 0.85, 0.0, 0.0]; const trans = [0.0, 0.0, 0.0, 1.0, 1.0]; // 彻底解禁调色板：满足标注与模型全局调色需求
+        const picker = document.getElementById('obj-color-picker'); if (picker) { picker.style.opacity = '1'; picker.style.cursor = 'pointer'; picker.disabled = false; }
+        editorGroup.traverse(child => { if (child.isMesh) {
+        if (child.material && child.material !== child.userData.originalMaterial && child.material !== flatMat && child.material !== sphereMat && child.material !== plasterMat) { safeDispose(child.material); }
+        if (window.matType === 'origin') { if (child.userData.originalMaterial) { child.material = child.userData.originalMaterial; } else {
+        child.material = child.userData.isFlat ? flatMat.clone() : (child.userData.shape==='sphere' ? sphereMat.clone() : plasterMat.clone());
+        if(child.userData.customColor) child.material.color.set(child.userData.customColor); } } else { const idx = parseInt(window.matType); child.material = plasterMat.clone();
+        child.material.color.set(child.userData.customColor || '#e8e8e8');
+        child.material.roughness = (child.userData.shape==='sphere' && idx===0) ? 0.6 : roughs[idx]; child.material.metalness = metals[idx]; child.material.transmission = trans[idx];
+        child.material.transparent = trans[idx] > 0; child.material.ior = 1.5; if(child.userData.isFlat) child.material.flatShading = true; } } });
+        if(pathTracer) { lightMoved = true; needsUpdate = true; pathTracer.reset(); window.sumDuration = 0; } }; // 同步接入所有下拉框逻辑（包含新加入的 mat）
+        window.selectCustomOpt = function(type, value, text, el) {
+        el.parentElement.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected')); el.classList.add('selected');
+        if (type === 'light') {
+        document.getElementById('light-trigger').innerText = text;
+        lightType = value;
+        buildEnvironment();
+        lightMoved = true;
+        needsUpdate = true;
+        try { window._solidGroundShadowDirty = true; } catch (_eGdL) {}
+        // 预览(光栅)模式切灯：只在切换动作发生时同步一次阴影，避免把 syncShadows 放进每帧循环导致卡顿
+        if (!window.useAdvancedRender) {
+        try {
+        if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows();
+        if (renderer && renderer.shadowMap) renderer.shadowMap.needsUpdate = true;
+        requestAnimationFrame(() => {
+        try { if (renderer && scene && camera && !window.useAdvancedRender) renderer.render(scene, camera); } catch (_eR0) {}
+        });
+        } catch (_eShOnce) {}
+        }
+        }
+        else if (type === 'mat') { document.getElementById('mat-trigger').innerText = text; window.changeMat(value); }
+        else if (type === 'lightDir') { document.getElementById('dir-trigger').innerText = text; const [az, elv] = value.split(','); state.azimuth = parseFloat(az); state.elevation = parseFloat(elv); document.getElementById('lightAzimuth').value = state.azimuth; document.getElementById('azimuthVal').innerText = state.azimuth; document.getElementById('lightElevation').value = state.elevation; document.getElementById('elevationVal').innerText = state.elevation; updateLightPosition(); lightMoved = true; }
+        }; // 工具函数：数值滑块拨动后，更新下拉框里的文字变为“自定义”或对应的名称
+        function updateDirTriggerByValues() {
+        const presetMap = {'113,45':'默认顶侧', '90,6':'正面光', '0,6':'左侧光', '180,6':'右侧光', '270,6':'背面光', '90,85':'顶面光', '90,-45':'前下底光'};
+        const dirKey = `${state.azimuth},${state.elevation}`; const dirName = presetMap[dirKey] || '自定义'; const trigger = document.getElementById('dir-trigger'); if (trigger) trigger.innerText = dirName;
+        document.querySelectorAll('#dir-options .custom-option').forEach(opt => opt.classList.remove('selected')); const matchedOpt = document.querySelector(`#dir-options .custom-option[onclick*="'${dirKey}'"]`);
+        if(matchedOpt) matchedOpt.classList.add('selected'); }
+        document.addEventListener('click', () => { document.querySelectorAll('.custom-options').forEach(el => el.classList.remove('show')); });
+        window.toggleWall = function() { window.hasWall = !window.hasWall; const btn = document.getElementById('wall-btn'); btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; setTimeout(() => { buildEnvironment(); lightMoved = true; }, 100); };
+        window.isUnsupported = false; function triggerUnsupported() { if(window.isUnsupported) return; window.isUnsupported = true; document.getElementById('scene-loader').style.display = 'none'; const msg = document.getElementById('fallback-msg'); if(msg) { msg.style.display = 'flex'; msg.style.zIndex = '99999'; } document.getElementById('canvas-container').style.opacity = '0.1'; const mainPanel = document.getElementById('main-panel'); if (mainPanel) { mainPanel.style.opacity = '0.3'; mainPanel.style.pointerEvents = 'none'; } }
+        window.acknowledgeFallback = function() { document.getElementById('fallback-msg').style.display = 'none'; document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1'; document.getElementById('main-panel').style.pointerEvents = 'auto'; };
+        window.resetAll = function() { state.azimuth = 113; document.getElementById('lightAzimuth').value = 113; document.getElementById('azimuthVal').innerText = 113; state.elevation = 45; document.getElementById('lightElevation').value = 45; document.getElementById('elevationVal').innerText = 45; state.radius = 21; document.getElementById('lightDistance').value = 21; document.getElementById('distanceVal').innerText = 21; state.lightSize = 1.9; document.getElementById('lightSize').value = 1.9; document.getElementById('sizeVal').innerText = 1.9; document.getElementById('lightIntensity').value = 1.7; document.getElementById('intensityVal').innerText = 1.7; state.lightTemp = 38;     document.getElementById('lightTemp').value = 38; document.getElementById('tempVal').innerText = 3800; window.hasWall = false; document.getElementById('wall-btn').innerText = '☐ 背景墙'; document.getElementById('wall-btn').classList.remove('active'); window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc';     window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1; if (window.syncEnvColorPickers) window.syncEnvColorPickers(); updateDirTriggerByValues();
+        const targetMat = window.initialMatType || 'origin'; // 【修复】：重置为JSON原本加载的材质
+        const matchedMatOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${targetMat}'"]`);
+        if(matchedMatOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedMatOpt.innerText; document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedMatOpt.classList.add('selected'); }
+        window.changeMat(targetMat); window.changePosterize(window.posterizeLevel || 0); window.changeAtmosphere(window.isFogEnabled || false, window.fogDensity !== undefined ? window.fogDensity : 0.02); const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.disabled = !window.isFogEnabled; fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); } if(window.toggleFogAdvanced) window.toggleFogAdvanced(!!window.isFogEnabled); const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.disabled = !(window.posterizeLevel > 0); pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } }
+        camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); controls.target.set(0, 0, 0); controls.update(); buildEnvironment(); if(pathTracer && pathTracer.updateMaterials) pathTracer.updateMaterials(); lightMoved = true; };
+        window.togglePanel = function(){ const panel = document.getElementById('main-panel'); panel.classList.toggle('minimized'); document.getElementById('toggle-icon').innerText = panel.classList.contains('minimized') ? '▲' : '✕'; };
+        let lastWinW = window.innerWidth, lastWinH = window.innerHeight; function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); lightMoved = true; if(window.AtmosphereManager) window.AtmosphereManager.resize(renderer);
+        updateMobileFrameOverlayLayout();
+        const cb = document.getElementById('crop-box'); if (cb && cb.style.left && cb.style.left.includes('px')) {
+        cb.style.left = (parseFloat(cb.style.left) + (window.innerWidth - lastWinW)/2) + 'px'; cb.style.top = (parseFloat(cb.style.top) + (window.innerHeight - lastWinH)/2) + 'px'; }
+        lastWinW = window.innerWidth; lastWinH = window.innerHeight; }
+        // --- 编辑器核心交互逻辑 ---
+        window.isUniformScale = true;
+        window.toggleUniformScale = function() { window.isUniformScale = !window.isUniformScale; const btn = document.getElementById('uniform-scale-btn'); btn.classList.toggle('active', window.isUniformScale); btn.innerText = window.isUniformScale ? '☑ 等比缩放' : '☐ 等比缩放'; };
+        window.isCameraLocked = false;
+        window.applyCameraLockState = function() {
+            try {
+                const locked = !!window.isCameraLocked;
+                const btn = document.getElementById('camera-lock-btn');
+                if (btn) {
+                    btn.classList.toggle('active', locked);
+                    btn.innerText = locked ? '🔒 视角' : '🔓 视角';
+                }
+                if (typeof controls !== 'undefined' && controls) {
+                    controls.enableRotate = !locked;
+                    controls.enablePan = !locked;
+                    controls.enableZoom = !locked;
+                    const tcDragging = (typeof transformControl !== 'undefined' && transformControl) ? !!transformControl.dragging : false;
+                    const planeDragging = !!(window._planeXZDrag && window._planeXZDrag.active);
+                    controls.enabled = (!locked) && (!tcDragging) && (!planeDragging);
+                }
+            } catch(_e) {}
+        };
+        window.toggleCameraLock = function() { window.isCameraLocked = !window.isCameraLocked; window.applyCameraLockState(); };
+        window.deleteSelected = function() { if (transformControl.object) { const obj = transformControl.object; transformControl.detach();
+        if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(obj); else editorGroup.remove(obj); lightMoved = true; markDraftDirty(); try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('delete_selected'); } catch (_ePl) {} } }; window.changeSelectedColor = function(e) {
+        const colorHex = e.target.value; localStorage.setItem('solid_obj_color_cache', colorHex); // 【优化 3】：将用户选择的颜色立即存入浏览器缓存
+        if (window.AnnotationManager && window.AnnotationManager.selectedId) return; // 引线颜色交由标注插件底层接管
+        if (window.ColorSampleAnnotationManager && window.ColorSampleAnnotationManager.selectedId) return;
+        if (window.NormalArrowManager && window.NormalArrowManager.selectedId) return; // 法线颜色交由法线插件底层接管
+        // 解除锁定：无论在什么材质预览模式下，都允许直接更改底层的定制颜色
+        if (transformControl.object && transformControl.object.userData.type === 'builtin') { transformControl.object.userData.customColor = colorHex;
+        transformControl.object.traverse(child => { if (child.isMesh && child.material) { child.material.color.set(colorHex); child.userData.customColor = colorHex; } });
+        needsUpdate = true; lightMoved = true; window.sumDuration = 0; markDraftDirty(); } }; window.toggleCropBox = function() { const cb = document.getElementById('crop-box');
+        cb.style.display = cb.style.display === 'none' ? 'block' : 'none'; };
+        /** 缩略图缓存版本；调试内置体贴地/缩略图请设 localStorage: SolidCreateBuiltinDebug=1，并 SolidCreateDebugUI=1 显示排错面板 */
+        const BUILTIN_THUMB_CACHE_VERSION = '8';
+        const BUILTIN_THUMB_SIZE = 128;
+        const BUILTIN_THUMB_DB = 'SolidBuiltinThumbDB';
+        const BUILTIN_THUMB_STORE = 'thumbs';
+        const builtinShapes = [
+        { id: 'sphere', name: '球体', icon:'⚪' }, { id: 'poly_sphere', name: '多面球', icon:'⚽' },
+        { id: 'cube', name: '正方体', icon:'🧊' }, { id: 'cylinder', name: '圆柱体', icon:'🥫' },
+        { id: 'cylinder_cut', name: '圆柱斜切', icon:'🔪' }, { id: 'cone', name: '圆锥体', icon:'⛺' },
+        { id: 'prism', name: '六棱柱', icon:'⬡' }, { id: 'prism8', name: '八棱柱', icon:'⬢' },
+        { id: 'pyramid', name: '四棱锥', icon:'🔺' }, { id: 'pyramid6', name: '六棱锥', icon:'◮' },
+        { id: 'dodecahedron', name: '十二面五角', icon:'⬟' }, { id: 'icosahedron', name: '二十面三角', icon:'💎' },
+        { id: 'octahedron', name: '八面体', icon:'💠' }, { id: 'tetrahedron', name: '三棱锥', icon:'▴' },
+        { id: 'intersect_cube', name: '组合：长方体十字', icon:'➕' }, { id: 'intersect_cone', name: '组合：圆锥穿插', icon:'🎪' },
+        { id: 'intersect_pyramid', name: '组合：四棱锥穿插', icon:'🏕️' }, { id: 'torus', name: '圆环体', icon:'🍩' },
+        { id: 'capsule', name: '胶囊体', icon:'💊' } ];
+        function builtinThumbCacheKey(shapeId) { return `${BUILTIN_THUMB_CACHE_VERSION}:${shapeId}`; }
+        function openBuiltinThumbDB() { return new Promise((resolve, reject) => { const req = indexedDB.open(BUILTIN_THUMB_DB, 1);
+        req.onupgradeneeded = e => { if (!e.target.result.objectStoreNames.contains(BUILTIN_THUMB_STORE)) e.target.result.createObjectStore(BUILTIN_THUMB_STORE); };
+        req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
+        async function idbGetBuiltinThumb(shapeId) { const db = await openBuiltinThumbDB(); return new Promise((resolve, reject) => {
+        const tx = db.transaction(BUILTIN_THUMB_STORE, 'readonly'); const r = tx.objectStore(BUILTIN_THUMB_STORE).get(builtinThumbCacheKey(shapeId));
+        r.onsuccess = () => resolve(r.result || null); r.onerror = () => reject(r.error); }); }
+        async function idbPutBuiltinThumb(shapeId, dataUrl) { const db = await openBuiltinThumbDB(); return new Promise((resolve, reject) => {
+        const tx = db.transaction(BUILTIN_THUMB_STORE, 'readwrite'); tx.objectStore(BUILTIN_THUMB_STORE).put(dataUrl, builtinThumbCacheKey(shapeId));
+        tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+        async function idbClearBuiltinThumbs() { const db = await openBuiltinThumbDB(); return new Promise((resolve, reject) => {
+        const tx = db.transaction(BUILTIN_THUMB_STORE, 'readwrite'); tx.objectStore(BUILTIN_THUMB_STORE).clear();
+        tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+        /** 凸多面体：枚举三角面外向法线并对齐世界 -Y；用「全局最低高度处、三角面落底面积之和」最大来选姿态，避免四面体等用棱/顶点撑地 */
+        function groundPlatonicMeshFlatOnXZ(mesh) {
+        mesh.position.set(0, 0, 0);
+        mesh.rotation.set(0, 0, 0);
+        mesh.quaternion.identity();
+        mesh.updateWorldMatrix(true, true);
+        const pos = mesh.geometry.attributes.position;
+        if (!pos || pos.count < 3) return;
+        let cx = 0, cy = 0, cz = 0;
+        for (let j = 0; j < pos.count; j++) { cx += pos.getX(j); cy += pos.getY(j); cz += pos.getZ(j); }
+        cx /= pos.count; cy /= pos.count; cz /= pos.count;
+        const c = new THREE.Vector3(cx, cy, cz);
+        const arr = pos.array;
+        const v0 = new THREE.Vector3();
+        const v1 = new THREE.Vector3();
+        const v2 = new THREE.Vector3();
+        const e1 = new THREE.Vector3();
+        const e2 = new THREE.Vector3();
+        const n = new THREE.Vector3();
+        const fc = new THREE.Vector3();
+        const toC = new THREE.Vector3();
+        const p0 = new THREE.Vector3();
+        const p1 = new THREE.Vector3();
+        const p2 = new THREE.Vector3();
+        const worldDown = new THREE.Vector3(0, -1, 0);
+        let bestQ = new THREE.Quaternion();
+        let bestArea = -1;
+        let bestFcY = Infinity;
+        let span = 0;
+        for (let j = 0; j < pos.count; j++) span = Math.max(span, Math.abs(pos.getY(j) - cy));
+        const eps = Math.max(2e-3, span * 8e-4);
+        for (let i = 0; i < arr.length; i += 9) {
+        v0.set(arr[i], arr[i + 1], arr[i + 2]);
+        v1.set(arr[i + 3], arr[i + 4], arr[i + 5]);
+        v2.set(arr[i + 6], arr[i + 7], arr[i + 8]);
+        e1.subVectors(v1, v0);
+        e2.subVectors(v2, v0);
+        n.crossVectors(e1, e2);
+        const len = n.length();
+        if (len < 1e-10) continue;
+        n.multiplyScalar(1 / len);
+        fc.copy(v0).add(v1).add(v2).multiplyScalar(1 / 3);
+        toC.subVectors(c, fc);
+        if (toC.lengthSq() > 1e-12 && n.dot(toC) > 0) n.negate();
+        const q = new THREE.Quaternion().setFromUnitVectors(n, worldDown);
+        let gMin = Infinity;
+        for (let j = 0; j < pos.count; j++) {
+        p0.set(pos.getX(j), pos.getY(j), pos.getZ(j));
+        p0.applyQuaternion(q);
+        gMin = Math.min(gMin, p0.y);
+        }
+        let supportArea = 0;
+        for (let k = 0; k < arr.length; k += 9) {
+        p0.set(arr[k], arr[k + 1], arr[k + 2]);
+        p1.set(arr[k + 3], arr[k + 4], arr[k + 5]);
+        p2.set(arr[k + 6], arr[k + 7], arr[k + 8]);
+        p0.applyQuaternion(q);
+        p1.applyQuaternion(q);
+        p2.applyQuaternion(q);
+        if (p0.y <= gMin + eps && p1.y <= gMin + eps && p2.y <= gMin + eps) {
+        e1.subVectors(p1, p0);
+        e2.subVectors(p2, p0);
+        supportArea += e1.cross(e2).length() * 0.5;
+        }
+        }
+        const fcy = fc.y;
+        if (supportArea > bestArea + 1e-10 || (Math.abs(supportArea - bestArea) <= 1e-10 && fcy < bestFcY)) {
+        bestArea = supportArea;
+        bestFcY = fcy;
+        bestQ.copy(q);
+        }
+        }
+        if (bestArea > 1e-8) mesh.quaternion.copy(bestQ);
+        mesh.updateWorldMatrix(true, true);
+        const box = new THREE.Box3().setFromObject(mesh, true);
+        mesh.position.y = -box.min.y;
+        mesh.updateWorldMatrix(true, true);
+        if (localStorage.getItem('SolidCreateBuiltinDebug') === '1') {
+        const b2 = new THREE.Box3().setFromObject(mesh, true);
+        window.hwLog(`[Platonic] bestArea=${bestArea.toFixed(6)} minY=${b2.min.y.toFixed(6)} maxY=${b2.max.y.toFixed(6)} pos.y=${mesh.position.y.toFixed(6)}`);
+        }
+        }
+        /** 内置根节点：世界包围盒底对齐场景地面。必须用 updateWorldMatrix + setFromObject(precise)，否则父级未刷新时 Box3 会错、物体悬空 */
+        function snapBuiltinRootBottomToGround(root, surfaceY) {
+        let gy = surfaceY;
+        if (gy === undefined || gy === null) {
+        if (typeof ground !== 'undefined' && ground) {
+        ground.updateWorldMatrix(true, true);
+        gy = new THREE.Box3().setFromObject(ground, true).max.y;
+        } else gy = 0;
+        }
+        root.updateWorldMatrix(true, true);
+        const box = new THREE.Box3().setFromObject(root, true);
+        const delta = gy - box.min.y;
+        root.position.y += delta;
+        root.updateWorldMatrix(true, true);
+        if (localStorage.getItem('SolidCreateBuiltinDebug') === '1') {
+        const b2 = new THREE.Box3().setFromObject(root, true);
+        const eg = typeof editorGroup !== 'undefined' && editorGroup ? editorGroup.position.y : NaN;
+        window.hwLog(`[SnapBuiltin] shape=${root.userData && root.userData.shape ? root.userData.shape : '(group)'} gy=${gy.toFixed(5)} boxMinY=${box.min.y.toFixed(5)} dY=${delta.toFixed(5)} afterMinY=${b2.min.y.toFixed(5)} root.posY=${root.position.y.toFixed(5)} editorGroup.y=${eg}`);
+        }
+        }
+        function createBuiltinObject3D(shapeStr, colorHex) {
+        const col = colorHex || '#e8e8e8'; let obj3d; let isFlat = false;
+        if (shapeStr.startsWith('intersect_')) { obj3d = new THREE.Group(); if (shapeStr === 'intersect_cube') { const g1 = new THREE.BoxGeometry(1.5, 4, 1.5).toNonIndexed(); g1.computeVertexNormals();
+        const m1 = new THREE.Mesh(g1, flatMat.clone()); const g2 = new THREE.BoxGeometry(4, 1.5, 1.5).toNonIndexed(); g2.computeVertexNormals(); const m2 = new THREE.Mesh(g2, flatMat.clone()); obj3d.add(m1); obj3d.add(m2); }
+        else if (shapeStr === 'intersect_cone') { const m1 = new THREE.Mesh(new THREE.ConeGeometry(2, 4, 64), plasterMat.clone()); const m2 = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 4.5, 64), plasterMat.clone());
+        m2.rotation.z = Math.PI / 2; m2.position.y = -0.5; obj3d.add(m1); obj3d.add(m2); }
+        else if (shapeStr === 'intersect_pyramid') { const g1 = new THREE.ConeGeometry(2.2, 4, 4).toNonIndexed(); g1.computeVertexNormals(); const m1 = new THREE.Mesh(g1, flatMat.clone()); m1.rotation.y = Math.PI / 4;
+        const g2 = new THREE.BoxGeometry(4.5, 1.2, 1.2).toNonIndexed(); g2.computeVertexNormals(); const m2 = new THREE.Mesh(g2, flatMat.clone()); m2.rotation.y = Math.PI / 4; m2.position.y = -0.5; obj3d.add(m1); obj3d.add(m2); }
+        obj3d.position.set(0, 0, 0);
+        obj3d.userData = { type: 'builtin', shape: shapeStr, isFlat: false, customColor: col }; obj3d.traverse(c => { if(c.isMesh) { c.material.color.set(col); c.userData.customColor = col; } });
+        } else { let geo; if(shapeStr === 'sphere') { geo = new THREE.SphereGeometry(2, 64, 64); }
+        else if(shapeStr === 'poly_sphere') { geo = new THREE.IcosahedronGeometry(2, 2); isFlat = true; }
+        else if(shapeStr === 'cube') { geo = new THREE.BoxGeometry(3, 3, 3); isFlat = true; }
+        else if(shapeStr === 'cylinder') { geo = new THREE.CylinderGeometry(1.5, 1.5, 4, 64); }
+        else if(shapeStr === 'cylinder_cut') {
+        geo = new THREE.CylinderGeometry(1.5, 1.5, 4, 64, 1, false); const pos = geo.attributes.position; for(let i=0; i<pos.count; i++) { let y = pos.getY(i); if (y > 1.9) pos.setY(i, y - (pos.getZ(i) + 1.5) * 0.6); }
+        geo.computeVertexNormals(); }
+        else if(shapeStr === 'cone') { geo = new THREE.ConeGeometry(2, 4, 64); }
+        else if(shapeStr === 'prism') { geo = new THREE.CylinderGeometry(1.5, 1.5, 4, 6); isFlat = true; }
+        else if(shapeStr === 'prism8') { geo = new THREE.CylinderGeometry(1.5, 1.5, 4, 8); isFlat = true; }
+        else if(shapeStr === 'pyramid') { geo = new THREE.ConeGeometry(2.2, 4, 4); isFlat = true; }
+        else if(shapeStr === 'pyramid6') { geo = new THREE.ConeGeometry(2.2, 4, 6); isFlat = true; }
+        else if(shapeStr === 'dodecahedron') { geo = new THREE.DodecahedronGeometry(1.8, 0); isFlat = true; }
+        else if(shapeStr === 'octahedron') { geo = new THREE.OctahedronGeometry(2, 0); isFlat = true; }
+        else if(shapeStr === 'icosahedron') { geo = new THREE.IcosahedronGeometry(2, 0); isFlat = true; }
+        else if(shapeStr === 'tetrahedron') { geo = new THREE.TetrahedronGeometry(2, 0); isFlat = true; }
+        else if(shapeStr === 'torus') { geo = new THREE.TorusGeometry(1.5, 0.6, 64, 64); }
+        else if(shapeStr === 'capsule') { geo = new THREE.CapsuleGeometry(1.5, 2, 32, 64); }
+        if(isFlat) { if (geo.index) geo = geo.toNonIndexed(); geo.computeVertexNormals(); }
+        const mat = (shapeStr === 'sphere' || shapeStr === 'torus' || shapeStr === 'capsule' || shapeStr === 'cylinder' || shapeStr === 'cylinder_cut' || shapeStr === 'cone') ? plasterMat.clone() : (isFlat ? flatMat.clone() : plasterMat.clone());
+        if(shapeStr === 'sphere') mat.roughness = 0.6; obj3d = new THREE.Mesh(geo, mat); if(shapeStr === 'pyramid' || shapeStr === 'pyramid6') obj3d.rotation.y = Math.PI/4;
+        if(shapeStr === 'torus') obj3d.rotation.x = -Math.PI/2;
+        if (shapeStr === 'dodecahedron' || shapeStr === 'icosahedron' || shapeStr === 'octahedron' || shapeStr === 'tetrahedron') { groundPlatonicMeshFlatOnXZ(obj3d); }
+        else { obj3d.position.set(0, 0, 0); }
+        obj3d.userData = { type: 'builtin', shape: shapeStr, isFlat: isFlat, customColor: col }; obj3d.material.color.set(col); obj3d.traverse(c => { if(c.isMesh) c.userData.customColor = col; });
+        }
+        snapBuiltinRootBottomToGround(obj3d);
+        if (localStorage.getItem('SolidCreateBuiltinDebug') === '1') {
+        obj3d.updateWorldMatrix(true, true);
+        const fb = new THREE.Box3().setFromObject(obj3d, true);
+        window.hwLog(`[CreateBuiltin] ${shapeStr} final AABB minY=${fb.min.y.toFixed(6)} maxY=${fb.max.y.toFixed(6)} (expect minY≈groundY)`);
+        }
+        return obj3d; }
+        let _thumbRenderer, _thumbScene, _thumbCamera, _thumbAmb, _thumbDir;
+        function ensureBuiltinThumbRenderer() {
+        if (_thumbRenderer) return;
+        const sz = BUILTIN_THUMB_SIZE;
+        _thumbScene = new THREE.Scene();
+        _thumbScene.background = new THREE.Color(0x1a1a1a);
+        _thumbCamera = new THREE.OrthographicCamera(-2.2, 2.2, 2.2, -2.2, 0.05, 500);
+        _thumbAmb = new THREE.AmbientLight(0xffffff, 0.5);
+        _thumbDir = new THREE.DirectionalLight(0xffffff, 1.0);
+        _thumbDir.position.set(3.2, 5.5, 4);
+        _thumbScene.add(_thumbAmb, _thumbDir);
+        _thumbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true, powerPreference: 'low-power' });
+        _thumbRenderer.setSize(sz, sz);
+        _thumbRenderer.setPixelRatio(1);
+        if ('outputColorSpace' in _thumbRenderer && THREE.SRGBColorSpace) _thumbRenderer.outputColorSpace = THREE.SRGBColorSpace;
+        }
+        function renderBuiltinThumbDataURL(shapeStr) {
+        if (!plasterMat || !flatMat) return null;
+        ensureBuiltinThumbRenderer();
+        const THUMB_BBOX_TARGET = 3.5;
+        const wrap = new THREE.Group();
+        const obj = createBuiltinObject3D(shapeStr, '#e8e8e8');
+        wrap.add(obj);
+        wrap.updateWorldMatrix(true, true);
+        let box = new THREE.Box3().setFromObject(wrap, true);
+        const c0 = new THREE.Vector3(); box.getCenter(c0);
+        wrap.position.set(-c0.x, -c0.y, -c0.z);
+        wrap.updateWorldMatrix(true, true);
+        box.setFromObject(wrap, true);
+        const sz = new THREE.Vector3(); box.getSize(sz);
+        const m = Math.max(sz.x, sz.y, sz.z, 0.001);
+        wrap.scale.setScalar(THUMB_BBOX_TARGET / m);
+        wrap.updateWorldMatrix(true, true);
+        snapBuiltinRootBottomToGround(wrap, 0);
+        _thumbScene.add(wrap);
+        wrap.updateWorldMatrix(true, true);
+        box.setFromObject(wrap, true);
+        const center = new THREE.Vector3(); box.getCenter(center);
+        const sizeFinal = new THREE.Vector3(); box.getSize(sizeFinal);
+        const halfDiag = 0.5 * sizeFinal.length();
+        const half = Math.max(THUMB_BBOX_TARGET * 0.52, halfDiag * 1.12);
+        _thumbCamera.left = -half;
+        _thumbCamera.right = half;
+        _thumbCamera.top = half;
+        _thumbCamera.bottom = -half;
+        _thumbCamera.near = 0.08;
+        _thumbCamera.far = 120;
+        _thumbCamera.position.set(center.x + 2.65, center.y + 2.05, center.z + 2.8);
+        _thumbCamera.lookAt(center);
+        _thumbCamera.updateProjectionMatrix();
+        if (localStorage.getItem('SolidCreateBuiltinDebug') === '1') {
+        window.hwLog(`[Thumb] ${shapeStr} size=${sizeFinal.x.toFixed(3)},${sizeFinal.y.toFixed(3)},${sizeFinal.z.toFixed(3)} halfOrtho=${half.toFixed(3)} center.y=${center.y.toFixed(3)}`);
+        }
+        _thumbRenderer.render(_thumbScene, _thumbCamera);
+        let dataUrl = null;
+        try { dataUrl = _thumbRenderer.domElement.toDataURL('image/jpeg', 0.82); } catch (e) { console.warn(e); }
+        _thumbScene.remove(wrap);
+        disposeLoadedGltfRoot(wrap);
+        return dataUrl;
+        }
+        let _builtinHydrateAttempts = 0;
+        async function hydrateBuiltinThumbnailsFromCache() {
+        if (!plasterMat || !flatMat) {
+        if (++_builtinHydrateAttempts > 60) return;
+        setTimeout(() => void hydrateBuiltinThumbnailsFromCache(), 150);
+        return;
+        }
+        _builtinHydrateAttempts = 0;
+        const grid = document.getElementById('builtin-grid-container');
+        for (const s of builtinShapes) {
+        const card = grid.querySelector(`[data-builtin-id="${s.id}"]`); if (!card) continue;
+        const img = card.querySelector('img.builtin-thumb-img'); const ph = card.querySelector('.builtin-thumb-ph');
+        let cached = null; try { cached = await idbGetBuiltinThumb(s.id); } catch (e) { console.warn(e); }
+        if (cached) { img.onload = () => { img.style.opacity = '1'; if (ph) ph.style.display = 'none'; }; img.src = cached; }
+        else {
+        await new Promise(r => requestAnimationFrame(r));
+        const url = renderBuiltinThumbDataURL(s.id);
+        if (url) { try { await idbPutBuiltinThumb(s.id, url); } catch (e) { console.warn(e); }
+        img.onload = () => { img.style.opacity = '1'; if (ph) ph.style.display = 'none'; }; img.src = url; }
+        else if (ph) { ph.textContent = s.icon || '—'; }
+        await new Promise(r => requestAnimationFrame(r));
+        }
+        }
+        }
+        window.refreshBuiltinThumbnails = async function() {
+        const btn = document.getElementById('builtin-thumb-refresh-btn');
+        if (btn) { btn.disabled = true; btn.textContent = '生成中…'; }
+        try { await idbClearBuiltinThumbs(); } catch (e) { console.warn(e); }
+        const grid = document.getElementById('builtin-grid-container');
+        try {
+        for (const s of builtinShapes) {
+        const card = grid.querySelector(`[data-builtin-id="${s.id}"]`); if (!card) continue;
+        const img = card.querySelector('img.builtin-thumb-img'); const ph = card.querySelector('.builtin-thumb-ph');
+        if (ph) { ph.style.display = 'flex'; ph.textContent = '…'; }
+        img.style.opacity = '0'; img.removeAttribute('src');
+        await new Promise(r => requestAnimationFrame(r));
+        const url = renderBuiltinThumbDataURL(s.id);
+        if (url) { try { await idbPutBuiltinThumb(s.id, url); } catch (e2) { console.warn(e2); }
+        await new Promise((resolve) => { img.onload = () => resolve(); img.onerror = () => resolve();
+        img.src = url; if (img.complete) resolve(); });
+        img.style.opacity = '1'; if (ph) ph.style.display = 'none';
+        } else if (ph) { ph.textContent = s.icon || '—'; ph.style.display = 'flex'; }
+        await new Promise(r => requestAnimationFrame(r));
+        }
+        } finally { if (btn) { btn.disabled = false; btn.textContent = '刷新缩略图'; } }
+        };
+        window.openBuiltinModal = function() { const modal = document.getElementById('builtin-modal');
+        const grid = document.getElementById('builtin-grid-container');
+        if (grid.innerHTML.trim() === '') {
+        builtinShapes.forEach(s => { const btn = document.createElement('div');
+        btn.dataset.builtinId = s.id;
+        btn.style.cssText = 'background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:12px; cursor:pointer; text-align:center; transition:all 0.2s cubic-bezier(0.4,0,0.2,1); display:flex; flex-direction:column; align-items:center; gap:8px;';
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'width:96px;height:96px;border-radius:6px;background:#222;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;';
+        const ph = document.createElement('div'); ph.className = 'builtin-thumb-ph';
+        ph.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px;color:#555;';
+        ph.textContent = '…';
+        const img = document.createElement('img'); img.className = 'builtin-thumb-img'; img.alt = s.name; img.draggable = false;
+        img.style.cssText = 'max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity 0.25s ease;position:relative;z-index:1;';
+        wrap.appendChild(ph); wrap.appendChild(img);
+        const label = document.createElement('span'); label.style.cssText = 'font-size:12px; color:#ddd; font-weight:bold;'; label.textContent = s.name;
+        btn.appendChild(wrap); btn.appendChild(label);
+        btn.onmouseover = () => { btn.style.background = 'rgba(255,255,255,0.15)'; btn.style.borderColor = '#2ecc71'; btn.style.transform = 'translateY(-2px)'; };
+        btn.onmouseout = () => { btn.style.background = 'rgba(255,255,255,0.05)'; btn.style.borderColor = 'rgba(255,255,255,0.1)'; btn.style.transform = 'none'; };
+        btn.onclick = () => { window.addEditorBuiltin(s.id); window.closeBuiltinModal(); }; grid.appendChild(btn); });
+        _builtinHydrateAttempts = 0;
+        void hydrateBuiltinThumbnailsFromCache(); }
+        modal.style.display = 'flex'; };
+        window.closeBuiltinModal = function() { document.getElementById('builtin-modal').style.display = 'none'; };
+        window.addEditorBuiltin = function(shapeStr) {
+        const col = document.getElementById('obj-color-picker').value;
+        const obj3d = createBuiltinObject3D(shapeStr, col);
+        editorGroup.add(obj3d);
+        obj3d.updateWorldMatrix(true, true);
+        snapBuiltinRootBottomToGround(obj3d);
+        transformControl.attach(obj3d);
+        markDraftDirty();
+        requestAnimationFrame(() => { requestAnimationFrame(() => {
+        if (obj3d.parent === editorGroup && obj3d.userData && obj3d.userData.type === 'builtin') {
+        obj3d.updateWorldMatrix(true, true);
+        snapBuiltinRootBottomToGround(obj3d);
+        }
+        }); });
+        lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_builtin'); } catch (_ePl) {} };
+        window.openGlbManagerModal = function() { const modal = document.getElementById('glb-manager-modal');
+        const iframe = document.getElementById('glb-manager-iframe'); if (!iframe.src || iframe.src === window.location.href) { iframe.src = '../GBL管理器/Glb管理器.html'; }
+        modal.style.display = 'flex'; }; window.closeGlbManagerModal = function() { document.getElementById('glb-manager-modal').style.display = 'none'; };
+        window.addEventListener('message', function(event) { if (event.data && event.data.type === 'INSERT_GLB') { window.closeGlbManagerModal(); const basePath = '../../docs/model/';
+        const fullUrl = basePath + event.data.path; window.addEditorGLB(fullUrl); } }); window.addEditorGLB = function(url) { if (!url) return; const glbGen = ++window._editorGlbInsertGen; addHwLog("尝试从资产库加载 GLB: " + url); gltfLoader.load(url, (gltf) => {
+        if (glbGen !== window._editorGlbInsertGen) { disposeLoadedGltfRoot(gltf.scene); return; }
+        const model = gltf.scene; model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); }); const box = new THREE.Box3().setFromObject(model); const size = box.getSize(new THREE.Vector3()); if (size.y > 0.001) { const scaleFactor = 4.0 / size.y; model.scale.set(scaleFactor, scaleFactor, scaleFactor); }
+        box.setFromObject(model); const center = box.getCenter(new THREE.Vector3()); const minY = box.min.y; model.position.x -= center.x; model.position.z -= center.z; model.position.y -= minY;
+        model.userData = { type: 'glb', url: url }; editorGroup.add(model); transformControl.attach(model); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_glb'); } catch (_ePl) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }, undefined, (error) => { alert("模型加载失败，请检查路径是否对应 '../../docs/model/' 目录"); }); };
+        window.currentEditorMode = 'translate'; window.setMode = function(mode) { 
+        // 【优化1】：支持点击已激活的变换按钮取消激活（最多只有一个激活，也可以全不激活）
+        if (window.currentEditorMode === mode && ['translate', 'rotate', 'scale'].includes(mode)) { mode = 'none'; }
+        window.currentEditorMode = mode;
+        // PluginManager.setMode 内会 cancelInteractivePlacing（取色/引线放置中、面片绘制中等），勿绕开。
+        if (window.PluginManager && typeof window.PluginManager.setMode === 'function') { window.PluginManager.setMode(mode); }
+        const toolSelect = document.getElementById('tool-mode-select'); if (toolSelect) { 
+        if (mode === 'annotate' || mode === 'annotate-color' || mode === 'normal-arrow' || mode === 'polygon3d' || mode === 'prober') { toolSelect.value = mode; }
+        else { toolSelect.value = 'none'; } }
+        if(mode === 'translate' || mode === 'rotate' || mode === 'scale') { transformControl.setMode(mode);
+        if(window.selectedObj) transformControl.attach(window.selectedObj); document.body.style.cursor = 'default'; } else { transformControl.detach(); 
+        // 移除 window.selectedObj = null，使得在全不激活的状态下依然能选中模型上色
+        document.body.style.cursor = mode === 'none' ? 'default' : 'crosshair'; if(mode === 'annotate') window.showToast("引线快捷键：按住 Alt+Shift+左键 划动"); else if(mode === 'annotate-color') window.showToast("取色引线：按住 Alt+Shift+左键 划动（颜色随画面实时变化）"); else if(mode === 'normal-arrow') window.showToast("法线快捷键：按住 Alt+左键 点击"); else if(mode === 'prober') window.showToast("受光探针：直接点击模型表面"); }
+        ['trans', 'rot', 'scale'].forEach(id => { const btn = document.getElementById('btn-' + id); if (btn) btn.classList.remove('active'); });
+        if(mode === 'translate') document.getElementById('btn-trans').classList.add('active');
+        if(mode === 'rotate') document.getElementById('btn-rot').classList.add('active');
+        if(mode === 'scale') document.getElementById('btn-scale').classList.add('active'); };
+        window.addEventListener('keydown', function (event) {
+        if(event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable) return; switch (event.key) {
+        case 't': case 'T': window.setMode('translate'); break;
+        case 'r': case 'R': window.setMode('rotate'); break;
+        case 's': case 'S': window.setMode('scale'); break;
+        case 'a': case 'A': window.setMode('annotate'); break;
+        case 'n': case 'N': window.setMode('normal-arrow'); break;
+        case 'Delete': case 'Backspace': window.deleteSelected(); break; } }); // 【事件解耦】：原先硬编码的 keyup 松弛模式逻辑已删除，现由 Plugin_Annotation.js 通过 onKeyUp 钩子自行闭环处理。
+        /** 生产端：选中标注时编辑 detailText，覆写保存后由 Solid 消费端展示 */
+        function installSolidCreateAnnotationDetailUI() {
+            const ta = document.getElementById('solid-create-anno-detail');
+            const hint = document.getElementById('solid-create-anno-detail-hint');
+            if (!ta || !window.PluginManager) return;
+            function syncPanel() {
+                let text = '';
+                let title = '未选中标注';
+                let active = false;
+                function tryOne(mgr, list, label) {
+                    if (!mgr || mgr.selectedId == null || !Array.isArray(list)) return false;
+                    const d = list.find(function (a) { return a.id === mgr.selectedId; });
+                    if (!d) return false;
+                    text = d.detailText != null ? String(d.detailText) : '';
+                    title = label;
+                    active = true;
+                    return true;
+                }
+                if (tryOne(window.AnnotationManager, window.annoDataList, '经典引线')) {}
+                else if (tryOne(window.ColorSampleAnnotationManager, window.colorSampleAnnoList, '取色引线')) {}
+                else if (tryOne(window.NormalArrowManager, window.normArrowList, '法线箭头')) {}
+                else if (tryOne(window.Polygon3DManager, window.poly3dList, '3D 光影面片')) {}
+                else if (tryOne(window.ProberManager, window.proberList, '受光探针')) {}
+                else if (tryOne(window.DashedLineManager, window.dashedLineList, '虚线标注')) {}
+                ta.disabled = !active;
+                ta.value = text;
+                if (hint) hint.textContent = title;
+            }
+            window.solidCreateSyncAnnoDetailPanel = syncPanel;
+            ta.addEventListener('input', function () {
+                const v = this.value;
+                function setOn(mgr, list) {
+                    if (!mgr || mgr.selectedId == null || !list) return false;
+                    const d = list.find(function (a) { return a.id === mgr.selectedId; });
+                    if (!d) return false;
+                    d.detailText = v;
+                    return true;
+                }
+                if (setOn(window.AnnotationManager, window.annoDataList)) {}
+                else if (setOn(window.ColorSampleAnnotationManager, window.colorSampleAnnoList)) {}
+                else if (setOn(window.NormalArrowManager, window.normArrowList)) {}
+                else if (setOn(window.Polygon3DManager, window.poly3dList)) {}
+                else if (setOn(window.ProberManager, window.proberList)) {}
+                else if (setOn(window.DashedLineManager, window.dashedLineList)) {}
+                if (typeof needsUpdate !== 'undefined') needsUpdate = true;
+                try { if (typeof markDraftDirty === 'function') markDraftDirty(); } catch(_e) {}
+            });
+            const pm = window.PluginManager;
+            if (pm && !pm._solidCreateDetailHooked) {
+                pm._solidCreateDetailHooked = true;
+                var oSet = pm.setExclusiveSelection.bind(pm);
+                pm.setExclusiveSelection = function (owner, id) {
+                    oSet(owner, id);
+                    syncPanel();
+                };
+                var oClear = pm.clearAllSelections.bind(pm);
+                pm.clearAllSelections = function () {
+                    oClear();
+                    syncPanel();
+                };
+            }
+            syncPanel();
+            setInterval(function () {
+                try {
+                    if (document.activeElement === ta) return;
+                    syncPanel();
+                } catch (_e) {}
+            }, 2000);
+        }
+        function init() { installSolidCreateAnnotationDetailUI(); const container = document.getElementById('canvas-container'); addHwLog("SolidCreate 初始化开始..."); // 【优化 3】：初始化时，自动读取上次存入缓存的颜色数据
+        const cachedColor = localStorage.getItem('solid_obj_color_cache'); if (cachedColor) { const picker = document.getElementById('obj-color-picker'); if (picker) picker.value = cachedColor; }
+        try {
+            const nameEl = document.getElementById('scene-name-input');
+            const detailEl = document.getElementById('scene-meta-detail-input');
+            if (nameEl) nameEl.addEventListener('input', () => markDraftDirty());
+            if (detailEl) detailEl.addEventListener('input', () => markDraftDirty());
+            const coverCb = document.getElementById('update-cover-on-save');
+            if (coverCb) {
+                const enabled = solidCreateGetUpdateCoverEnabled();
+                solidCreateSetUpdateCoverEnabled(enabled);
+                coverCb.addEventListener('change', function() {
+                    solidCreateSetUpdateCoverEnabled(!!this.checked);
+                });
+            }
+        } catch(_e) {}
+        initMobileFrameToggleUI();
+        scene = new THREE.Scene(); scene.backgroundRotation = new THREE.Euler(); scene.environmentRotation = new THREE.Euler();
+        camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); try {
+        renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: true });
+        RectAreaLightUniformsLib.init();
+        renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.2) : window.devicePixelRatio); renderer.setSize(window.innerWidth, window.innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.7;
+        renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); addHwLog('Context Lost'); triggerUnsupported(); }, false); container.appendChild(renderer.domElement); try {
+        try { if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); } catch(_e) {}
+        pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? 0.38 : 0.62;
+        try { window._solidPt = window._solidPt || {}; window._solidPt.targetSamples = isMobile ? 120 : 160; } catch (_ePtS) {}
+        try { window._solidGroundShadowDirty = true; } catch (_eGs0) {}
+        if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = 1.0; } catch (ptErr) { triggerUnsupported(); return; } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
+        if (window.DoFManager) window.DoFManager.init(camera, scene, renderer.domElement);
+        const canvasContainerForEvents = document.getElementById('canvas-container');
+        // 【优化3核心】：仅将场景控制器挂载到父级 container 上，接收穿透冒泡的拖拽旋转事件！
+        controls = new OrbitControls(camera, canvasContainerForEvents); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; window._orbitInteracting = false;
+        // 恢复“视角锁定”缓存，并同步到 controls 与按钮
+        solidCreateRestoreCameraLock();
+        let _orbitStartPos = null, _orbitStartTarget = null, _orbitStartQuat = null, _orbitStartZoom = 0;
+        controls.addEventListener('start', () => {
+            window._orbitInteracting = true;
+            // 仅用于判断“纯点击”不触发重渲染
+            _orbitStartPos = camera.position.clone();
+            _orbitStartTarget = controls.target.clone();
+            _orbitStartQuat = camera.quaternion.clone();
+            _orbitStartZoom = camera.zoom;
+        });
+        controls.addEventListener('end', () => {
+            window._orbitInteracting = false;
+            // 若只是点击未产生视角变化，则不触发 needsUpdate（避免重置光追/重渲染）
+            const eps = 1e-6;
+            const moved = !_orbitStartPos || !_orbitStartTarget || !_orbitStartQuat
+                ? true
+                : (camera.position.distanceToSquared(_orbitStartPos) > eps
+                    || controls.target.distanceToSquared(_orbitStartTarget) > eps
+                    || (1 - Math.abs(camera.quaternion.dot(_orbitStartQuat))) > eps
+                    || Math.abs((camera.zoom || 0) - (_orbitStartZoom || 0)) > 1e-6);
+            if (moved) { needsUpdate = true; try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('orbit_end'); } catch (_eP) {} }
+        });
+        controls.addEventListener('change', () => { if (window._orbitInteracting) return; const now = performance.now(); if (now - _orbitNeedsThrottle < 100) return; _orbitNeedsThrottle = now; needsUpdate = true; });
+        gltfLoader = new GLTFLoader(); const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'); gltfLoader.setDRACOLoader(dracoLoader); editorGroup = new THREE.Group(); scene.add(editorGroup);
+        // 【优化2修复】：将变换控制器重新挂载回底层 canvas，解决激活状态下坐标辅助图形隐形的问题！
+        transformControl = new TransformControls(camera, renderer.domElement); // 【极其重要的优化】：获取并记录模型的“绝对底边”，这保证了后续放大时，模型永远紧贴地面！
+        transformControl.addEventListener('dragging-changed', function (event) { controls.enabled = (!event.value) && (!window.isCameraLocked); if(event.value && transformControl.object) { const obj = transformControl.object; startScale.copy(obj.scale);
+        const box = new THREE.Box3().setFromObject(obj); obj.userData.startBottomY = box.min.y; obj.userData.localBottom = (box.min.y - obj.position.y) / obj.scale.y; }
+        if (!event.value && transformControl.object && transformControl.object.userData && transformControl.object.userData.type === 'builtin' && transformControl.getMode() === 'scale') {
+        transformControl.object.updateWorldMatrix(true, true);
+        snapBuiltinRootBottomToGround(transformControl.object);
+        }
+        if(!event.value) { needsUpdate = true; lightMoved = true; window.sumDuration = 0; } window.applyCameraLockState(); }); transformControl.addEventListener('change', () => {
+        if (transformControl.dragging && transformControl.getMode() === 'scale' && transformControl.object) { const obj = transformControl.object; if (window.isUniformScale) {
+        const dx = obj.scale.x / startScale.x; const dy = obj.scale.y / startScale.y; const dz = obj.scale.z / startScale.z; let maxR = dx; if(Math.abs(dy - 1) > Math.abs(maxR - 1)) maxR = dy; if(Math.abs(dz - 1) > Math.abs(maxR - 1)) maxR = dz;
+        obj.scale.set(startScale.x * maxR, startScale.y * maxR, startScale.z * maxR); }
+        // 内置几何体经旋转后不能用 localBottom 线性补 Y，改在缩放结束时 snap；GLB 等仍用原逻辑
+        if (obj.userData.type !== 'builtin' && obj.userData.localBottom !== undefined && obj.userData.startBottomY !== undefined) { obj.position.y = obj.userData.startBottomY - obj.userData.localBottom * obj.scale.y; } }
+        if (transformControl.dragging) { needsUpdate = true; lightMoved = true; window.sumDuration = 0; } }); scene.add(transformControl);
+        const dragRaycaster = new THREE.Raycaster(); const dragMouse = new THREE.Vector2();
+        const groundPlaneXZ = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); const planeXZHit = new THREE.Vector3(); window._planeXZDrag = null;
+        /** 与 TransformControls 一致：按 canvas 的 getBoundingClientRect 算 NDC（左侧工具栏时不能用 window 尺寸，否则射线歪、误判轴/模型并导致按下瞬间跳动） */
+        function solidEditorSetRaycasterFromClient(raycaster, clientX, clientY, cam, domEl, outVec2) {
+            const rect = domEl.getBoundingClientRect();
+            const rw = Math.max(1, rect.width);
+            const rh = Math.max(1, rect.height);
+            outVec2.x = ((clientX - rect.left) / rw) * 2 - 1;
+            outVec2.y = -((clientY - rect.top) / rh) * 2 + 1;
+            raycaster.setFromCamera(outVec2, cam);
+        }
+        // 统一“引线长度”的口径：以实际画布大小为准（生产端画布并非占满整页）
+        window.__solidSyncAnnoViewport = function() {
+            try {
+                const cv = renderer && renderer.domElement ? renderer.domElement : null;
+                const rect = cv ? cv.getBoundingClientRect() : null;
+                const w = rect ? rect.width : window.innerWidth;
+                const h = rect ? rect.height : window.innerHeight;
+                window.__solidAnnoViewportW = Math.max(1, Math.round(w || 1));
+                window.__solidAnnoViewportH = Math.max(1, Math.round(h || 1));
+            } catch (_e) {
+                window.__solidAnnoViewportW = Math.max(1, Math.round(window.innerWidth || 1));
+                window.__solidAnnoViewportH = Math.max(1, Math.round(window.innerHeight || 1));
+            }
+        };
+        function endPlaneXZDrag(e) { const st = window._planeXZDrag; if (!st || !st.active) return; if (e && e.pointerId !== undefined && e.pointerId !== st.pointerId) return; const pid = st.pointerId; st.active = false; window._planeXZDrag = null; controls.enabled = !window.isCameraLocked; try { renderer.domElement.releasePointerCapture(pid); } catch (err) {} needsUpdate = true; lightMoved = true; window.sumDuration = 0; window.applyCameraLockState(); }
+        function onPlaneXZPointerMove(e) { const st = window._planeXZDrag; if (!st || !st.active || e.pointerId !== st.pointerId) return; solidEditorSetRaycasterFromClient(dragRaycaster, e.clientX, e.clientY, camera, renderer.domElement, dragMouse); if (!dragRaycaster.ray.intersectPlane(groundPlaneXZ, planeXZHit)) return; const o = st.object; o.position.x = st.startX + (planeXZHit.x - st.grabX); o.position.z = st.startZ + (planeXZHit.z - st.grabZ); o.position.y = -st.localBottom * o.scale.y; needsUpdate = true; lightMoved = true; window.sumDuration = 0; e.preventDefault(); }
+        function onPlaneXZPointerDown(e) { if (e.button !== 0 || e.altKey) return; if (window.currentEditorMode !== 'translate' || !transformControl.object) return; if (e.target !== renderer.domElement && e.target.id !== 'canvas-container') return; const obj = transformControl.object; solidEditorSetRaycasterFromClient(dragRaycaster, e.clientX, e.clientY, camera, renderer.domElement, dragMouse); const gizmoHits = dragRaycaster.intersectObject(transformControl, true); const meshHits = dragRaycaster.intersectObject(obj, true); if (gizmoHits.length && (!meshHits.length || gizmoHits[0].distance <= meshHits[0].distance + 0.002)) return; if (!meshHits.length) return; if (!dragRaycaster.ray.intersectPlane(groundPlaneXZ, planeXZHit)) return; obj.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(obj); const sy = Math.abs(obj.scale.y) > 1e-8 ? obj.scale.y : 1; const lb = (box.min.y - obj.position.y) / sy; window._planeXZDrag = { pointerId: e.pointerId, object: obj, localBottom: lb, active: true, grabX: planeXZHit.x, grabZ: planeXZHit.z, startX: obj.position.x, startZ: obj.position.z }; controls.enabled = false; try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) {} e.preventDefault(); e.stopImmediatePropagation(); }
+        renderer.domElement.addEventListener('pointerdown', onPlaneXZPointerDown, true); window.addEventListener('pointermove', onPlaneXZPointerMove, true); window.addEventListener('pointerup', endPlaneXZDrag, true); window.addEventListener('pointercancel', endPlaneXZDrag, true);
+        // 【核心注销】：引线标注引擎 (AnnotationManager) 已抽离至外部插件 ../../plugins_02/Plugin_Annotation.js 中独立维护
+        let mouseDownPos = {x:0, y:0}; window.mouseDownTarget = null; // 【新增】：记录真实的鼠标按下目标，防止指针捕获导致的靶向偏移
+        window.addEventListener('pointerdown', e => { if (localStorage.getItem('SolidCreateDebugUI') === '1') window.hwLog(`[Log-Down] pointerdown 触发. x:${e.clientX}, y:${e.clientY}, target:${e.target.tagName}`); mouseDownPos = {x: e.clientX, y: e.clientY}; window.mouseDownTarget = e.target; }, true); // 【强制防吞事件】：在 window 的捕获阶段(true)第一时间锁定真实点击坐标！
+        /* Alt+取色/引线：须在 window 捕获阶段、且晚于上一行 mouseDownPos 之后拦截。canvas 上 TransformControls 先于本页监听器注册，仅用 stopPropagation 无法挡住它；Orbit 在 container 上吃 Shift+左键平移。此处 stopImmediatePropagation 终止整次派发，避免与 Alt+Shift 抢指针。 */
+        window.addEventListener('pointerdown', function solidCreateAltSceneHitWinCapture(e) {
+        const t = e.target; if (t !== renderer.domElement && (!t || t.id !== 'canvas-container')) return;
+        if (e.button !== 0) return;
+        const altDown = e.altKey || (typeof e.getModifierState === 'function' && e.getModifierState('Alt'));
+        if (!altDown) return;
+        const csLog = function(m) { if (window.diagnosticPanelLog) window.diagnosticPanelLog('[AltHit] ' + m); };
+        csLog(`Alt+LMB target=${t && t.tagName} id=${t && t.id} client=${e.clientX},${e.clientY} editorMode=${window.currentEditorMode} pmMode=${window.PluginManager && window.PluginManager.State.currentMode} shiftKey=${e.shiftKey} getShift=${typeof e.getModifierState === 'function' ? e.getModifierState('Shift') : 'n/a'} pointerId=${e.pointerId}`);
+        if (window.PluginManager && window.PluginManager.triggerEvent('onBeforePointerDown', e) === true) { csLog('abort: onBeforePointerDown 已拦截'); e.preventDefault(); e.stopImmediatePropagation(); return; }
+        e.preventDefault(); solidEditorSetRaycasterFromClient(dragRaycaster, e.clientX, e.clientY, camera, renderer.domElement, dragMouse);
+        const hitTargets = (typeof ground !== 'undefined' && ground) ? [...editorGroup.children, ground] : editorGroup.children;
+        const intersects = dragRaycaster.intersectObjects(hitTargets, true); if (intersects.length === 0) { csLog('abort: 射线未命中任何物体'); e.stopImmediatePropagation(); return; }
+        const hit = intersects[0]; csLog(`ray hit #0 distance=${hit.distance.toFixed(4)} obj=${hit.object && hit.object.type} name=${hit.object && hit.object.name}`);
+        let rootObj = hit.object;
+        while (rootObj.parent && rootObj.parent !== editorGroup) rootObj = rootObj.parent; const targetObj = (hit.object === ground) ? ground : (rootObj !== editorGroup ? rootObj : null); if (!targetObj) { csLog('abort: 解析 targetObj 为 null（rootObj 未落在 editorGroup 下）'); e.stopImmediatePropagation(); return; }
+        const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld); const worldNormal = hit.face ? hit.face.normal.clone().applyMatrix3(normalMatrix).normalize() : new THREE.Vector3(0,1,0);
+        if (window.PluginManager) { window.PluginManager.triggerEvent('onSceneHit', { event: e, targetObj: targetObj, hitPoint: hit.point, worldNormal: worldNormal, controls: controls }); csLog('已派发 onSceneHit'); }
+        e.stopImmediatePropagation(); }, true);
+        window.isPlacingLeader = false; window.activeLeaderData = null; 
+        document.getElementById('canvas-container').addEventListener('pointerdown', e => {
+        if (window.PluginManager && window.PluginManager.triggerEvent('onBeforePointerDown', e) === true) return; }); window.addEventListener('pointermove', e => { // 【事件解耦】：核心只负责广播鼠标移动，具体的位移计算交给正在激活的插件
+        if (window.PluginManager) { window.PluginManager.triggerEvent('onGlobalPointerMove', { event: e, startX: mouseDownPos.x, startY: mouseDownPos.y }); } });
+        window.addEventListener('pointerup', e => { 
+        const __d = localStorage.getItem('SolidCreateDebugUI') === '1';
+        if (__d) window.hwLog(`[Log-Up] pointerup 触发. mode:${window.currentEditorMode}, dragging:${transformControl.dragging}, axis:${transformControl.axis}, hasObj:${!!transformControl.object}`);
+        if (transformControl.dragging || (transformControl.object && transformControl.axis !== null)) { if (__d) window.hwLog(`[Log-Up] 拦截 1: dragging 或悬停在轴上`); return; } // 【修复幽灵轴】：只有真正挂载了模型时，才允许因悬停在轴上而拦截点击！
+        // 【事件解耦】：如果有插件接管了松开逻辑，则不再往下执行模型选中操作
+        if (window.PluginManager && window.PluginManager.triggerEvent('onGlobalPointerUp', e) === true) { if (__d) window.hwLog(`[Log-Up] 拦截 2: 被插件接管`); return; } 
+        if (__d) window.hwLog(`[Log-Up] 坐标对比: downX=${mouseDownPos.x}, upX=${e.clientX}, diffX=${Math.abs(e.clientX - mouseDownPos.x)}, diffY=${Math.abs(e.clientY - mouseDownPos.y)}`);
+        if (Math.abs(e.clientX - mouseDownPos.x) > 5 || Math.abs(e.clientY - mouseDownPos.y) > 5) { if (__d) window.hwLog(`[Log-Up] 拦截 3: 鼠标滑动位移过大(>5)`); return; } 
+        // 【核心防误杀逻辑】：如果鼠标按下的起点不是 3D 画布（比如点在了 SVG 面片上），即使因为 OrbitControls 接管导致松开时 target 变成了 Canvas，我们依然果断拦截！绝对不误杀面片，也不穿透面片去选背后的模型！
+        if (window.mouseDownTarget && window.mouseDownTarget !== renderer.domElement && window.mouseDownTarget.id !== 'canvas-container') { if (__d) window.hwLog(`[Log-Up] 拦截 4: 鼠标按下的真实起点非画布，安全拦截穿透`); return; }
+        if (e.target !== renderer.domElement && e.target.id !== 'canvas-container') { if (__d) window.hwLog(`[Log-Up] 拦截 4.1: target 既非 Canvas 也非容器, 而是 ${e.target.tagName} / id:${e.target.id}`); return; } // 【核心修复】：如果按住了 Alt 键，绝对不允许触发选中物体或调出移动工具轴！
+        if (e.altKey) { if (__d) window.hwLog(`[Log-Up] 拦截 5: 按住了 Alt 键`); return; } // 移除了 currentEditorMode 的拦截，保证普通的鼠标左键始终能够正常选中模型进行操作
+        if (__d) window.hwLog(`[Log-Up] 通过所有拦截，准备进行射线检测...`);
+        
+        // 【低耦合触发】：主程序确认这是有效点击后，通知插件管理器一键清理所有标注插件！
+        if (window.PluginManager && typeof window.PluginManager.clearAllSelections === 'function') {
+            window.PluginManager.clearAllSelections();
+        }
+    
+        solidEditorSetRaycasterFromClient(dragRaycaster, e.clientX, e.clientY, camera, renderer.domElement, dragMouse);
+        const hitTargets = (typeof ground !== 'undefined' && ground) ? [...editorGroup.children, ground] : editorGroup.children;
+        const intersects = dragRaycaster.intersectObjects(hitTargets, true); if (intersects.length > 0) { let obj = intersects[0].object; if (obj === ground) {
+        if (__d) window.hwLog(`[Log-Ray] 射线命中: ground (地面), 执行 detach`);
+        transformControl.detach(); window.selectedObj = null;
+        } else { while(obj.parent && obj.parent !== editorGroup) obj = obj.parent;
+       window.selectedObj = obj; if (__d) window.hwLog(`[Log-Ray] 射线命中模型: ${obj.userData.type||'unknown'}. 准备挂载, 当前mode: ${window.currentEditorMode}`);
+        if (['translate', 'rotate', 'scale'].includes(window.currentEditorMode)) { transformControl.setMode(window.currentEditorMode); transformControl.attach(obj); if (__d) window.hwLog(`[Log-Ray] 成功执行 attach`); } else { transformControl.detach(); if (__d) window.hwLog(`[Log-Ray] mode不匹配，执行 detach`); }  
+        } } else { if (__d) window.hwLog(`[Log-Ray] 射线未命中任何物体(包括地面), 执行 detach`); transformControl.detach(); window.selectedObj = null;
+        } }); // 清理掉之前用于排错的界面盒子
+        const oldDebug = document.getElementById('anno-debug-panel'); if(oldDebug) oldDebug.remove();
+        plasterMat = new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0.0 }); flatMat = plasterMat.clone(); flatMat.flatShading = true; sphereMat = plasterMat.clone(); sphereMat.roughness = 0.6;
+        // 【架构重构】：必须在任何读取 UI 状态的函数（如 buildEnvironment）之前，注入 DOM 模具！
+        if (window.ControlPanel) window.ControlPanel.inject({ mode: 'producer' });
+        if (window.SkyEnvLight && window.SkyEnvLight.mountUI) window.SkyEnvLight.mountUI();
+        window.setSkyLightScale = function(v) {
+        window.envSkyLightScale = Math.min(1, Math.max(0, parseFloat(v) || 0));
+        const el = document.getElementById('env-sky-light-val'); if (el) el.textContent = window.envSkyLightScale.toFixed(2);
+        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
+        needsUpdate = true; lightMoved = true; if (pathTracer) { pathTracer.reset(); window.sumDuration = 0; }
+        try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('sky_light_scale'); } catch (_eP) {} };
+        window.setEnvColor = function(kind, hex) { if (!hex) return; if (kind === 'wall') window.envWallColor = hex; else if (kind === 'ground') window.envGroundColor = hex; else if (kind === 'sky') window.envSkyColor = hex;
+        if (kind === 'sky' && window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
+        else if (kind === 'sky') { scene.background = new THREE.Color(hex); scene.backgroundIntensity = 1; }
+        if (kind === 'ground' && ground && ground.material) ground.material.color.set(hex); if (kind === 'wall' && window.walls) window.walls.forEach(w => { if (w.material) w.material.color.set(hex); });
+        needsUpdate = true; lightMoved = true; if (pathTracer) { pathTracer.reset(); window.sumDuration = 0; }
+        try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('env_color_' + kind); } catch (_eP) {} };
+        window.syncEnvColorPickers = function() { const w = document.getElementById('env-wall-color'); const g = document.getElementById('env-ground-color'); const s = document.getElementById('env-sky-color');
+        if (w) w.value = window.envWallColor || '#cccccc'; if (g) g.value = window.envGroundColor || '#cccccc'; if (s) s.value = window.envSkyColor || '#0d0d0f';
+        if (window.SkyEnvLight && window.SkyEnvLight.syncUI) window.SkyEnvLight.syncUI(); };
+        buildEnvironment(); window.syncEnvColorPickers();
+        const _f0 = document.getElementById('fogEnable'); if (window.toggleFogAdvanced && _f0) window.toggleFogAdvanced(_f0.checked);
+        setupUIControls(); window.applyCameraLockState(); window.addEventListener('resize', function() { onWindowResize(); try { if (typeof window.syncPosterize2dLayout === 'function') window.syncPosterize2dLayout(); } catch(_e0) {} try { if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); } catch(_e) {} });
+        (function syncToolModeSelectUI() {
+        const ts = document.getElementById('tool-mode-select'); if (!ts) return;
+        const m = window.currentEditorMode;
+        if (m === 'annotate' || m === 'annotate-color' || m === 'normal-arrow' || m === 'polygon3d' || m === 'prober') ts.value = m; else ts.value = 'none';
+        if (window.PluginManager && typeof window.PluginManager.setMode === 'function') window.PluginManager.setMode(m);
+        })();
+        // 生产端策略 A：页面重载时默认不启动光追采样，避免自动刷新导致 GPU/Shader 编译卡死
+        window.hasAutoStopped = true;
+        try { window.useAdvancedRender = false; } catch(_e) {}
+        setTimeout(() => { if (!window.isUnsupported) { const loader = document.getElementById('scene-loader'); if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.style.display = 'none', 1000); } } }, 500);
+        // 下一帧立刻释放光追器（如已创建），只保留普通预览渲染；需要高质量时手动点“重新渲染”
+        setTimeout(() => { try { if (!window.isUnsupported && typeof window.stopRender === 'function') window.stopRender(); } catch(_e) {} }, 0);
+        // 自动回挂载目录 + 自动恢复草稿 + 低频自动保存草稿
+        setTimeout(() => { try { void autoMountLastWorkDir(); } catch(_e) {} }, 60);
+        setTimeout(() => { try { void autoRestoreDraftIfNeeded(); } catch(_e) {} }, 120);
+        setInterval(() => { try { void maybeSaveDraft(false); } catch(_e) {} }, 4000);
+        window.currentSceneData = window.currentSceneData || { producer: true };
+        if (window.currentSceneIndex == null || window.currentSceneIndex < 0) window.currentSceneIndex = 0;
+        animate();
+        } catch (e) { triggerUnsupported(); } }
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') {
+        try { void maybeSaveDraft(true); } catch(_e) {}
+        window.hwLog("💤 页面进入后台，安全挂起资源"); window.sumDuration = 0;
+        if (portraitAnimRafId) { try { cancelAnimationFrame(portraitAnimRafId); } catch(e) {} portraitAnimRafId = 0; }
+        return; }
+        window.hwLog("👀 页面切回前台，恢复安全渲染状态");
+        requestAnimationFrame(() => { requestAnimationFrame(() => {
+        if (pathTracer) { lightMoved = true; needsUpdate = true; window.sumDuration = 0; }
+        try { window._solidGroundShadowDirty = true; } catch (_eGd) {}
+        try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('visibility_visible'); } catch (_eP) {}
+        }); });
+        if (!portraitAnimRafId && !document.hidden) portraitAnimRafId = requestAnimationFrame(animate);
+        }); function buildEnvironment() { if (mainLight) { scene.remove(mainLight); if (mainLight.target) scene.remove(mainLight.target); }
+        const val = parseFloat(document.getElementById('lightIntensity').value); const lSize = state.lightSize; const col = getTempColor(state.lightTemp * 100);
+        if (lightType === 'spot') { mainLight = new THREE.SpotLight(col, val * 300); mainLight.angle = Math.PI/5.5; mainLight.penumbra = 0.5; mainLight.radius = lSize; scene.add(mainLight.target); }
+        else if (lightType === 'point') { mainLight = new THREE.PointLight(col, val * 250); mainLight.radius = lSize; }
+        else if (lightType === 'dir') { mainLight = new THREE.DirectionalLight(col, val * 2.8); mainLight.radius = lSize; }
+        else if (lightType === 'rect') { mainLight = new THREE.RectAreaLight(col.getHex(), val * 18, 8 * (lSize/2 + 0.1), 8 * (lSize/2 + 0.1)); }
+        scene.add(mainLight); const gCol = new THREE.Color(window.envGroundColor || '#cccccc');
+        if (!ground) { ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhysicalMaterial({ color: gCol, roughness: 1.0, metalness: 0.0 })); ground.rotation.x = -Math.PI / 2; scene.add(ground); }
+        else if (ground.material) ground.material.color.copy(gCol);
+        if (window.walls) { window.walls.forEach(w => { scene.remove(w); safeDispose(w.geometry); safeDispose(w.material); }); window.walls = null; }
+        if (window.hasWall) { const wCol = new THREE.Color(window.envWallColor || '#cccccc'); const wallMat = new THREE.MeshPhysicalMaterial({ color: wCol, roughness: 1.0, metalness: 0.0 }); const wall1 = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), wallMat); wall1.position.set(0, 50, -6); const wall2 = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), wallMat); wall2.rotation.y = Math.PI / 2; wall2.position.set(-8, 50, 0); window.walls = [wall1, wall2]; scene.add(wall1); scene.add(wall2); }
+        updateLightPosition();
+        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
+        else { scene.background = new THREE.Color(window.envSkyColor || '#0d0d0f'); scene.backgroundIntensity = 1; }
+        try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('build_environment'); } catch (_ePl) {}
+        if (!window.useAdvancedRender) {
+        try { window._solidFallbackRenderAt = 0; } catch(_e) {}
+        try { _solidEnableRasterShadowsOnce(); } catch(_e2) {}
+        try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('build_environment'); } catch(_eP) {}
+        }
+        try { window._solidGroundShadowDirty = true; } catch (_eGsb) {} }
+        function updateLightPosition() { const phi = THREE.MathUtils.degToRad(90 - parseFloat(state.elevation)); const theta = THREE.MathUtils.degToRad(parseFloat(state.azimuth)); const x = state.radius * Math.sin(phi) * Math.cos(theta); const y = state.radius * Math.cos(phi); const z = state.radius * Math.sin(phi) * Math.sin(theta); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') mainLight.lookAt(0, 1, 0); mainLight.updateMatrixWorld();
+        try { _solidRefreshRasterShadowAfterLightMove(); } catch(_eRf) {}
+        try { _solidSyncGroundShadowUniforms(); } catch (_eSyncL) {}
+        } lightPosUpdated = true; try { window._solidGroundShadowDirty = true; } catch (_eGsl) {} }
+        function setupUIControls() {
+        document.querySelector('.control-panel').addEventListener('pointerdown', e => { if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'LABEL' && !e.target.classList.contains('env-btn')) e.stopPropagation(); });
+        document.getElementById('lightAzimuth').addEventListener('input', e => { state.azimuth = e.target.value; document.getElementById('azimuthVal').innerText = state.azimuth; updateDirTriggerByValues(); updateLightPosition(); });
+        document.getElementById('lightElevation').addEventListener('input', e => { state.elevation = e.target.value; document.getElementById('elevationVal').innerText = state.elevation; updateDirTriggerByValues(); updateLightPosition(); });
+        document.getElementById('lightDistance').addEventListener('input', e => { state.radius = parseFloat(e.target.value); document.getElementById('distanceVal').innerText = state.radius; updateLightPosition(); });
+        document.getElementById('lightTemp').addEventListener('input', e => { state.lightTemp = parseInt(e.target.value); document.getElementById('tempVal').innerText = state.lightTemp * 100; if (mainLight) { mainLight.color = getTempColor(state.lightTemp * 100); } lightPosUpdated = true; try { window._solidGroundShadowDirty = true; } catch (_eGst) {} });
+        document.getElementById('lightSize').addEventListener('input', e => { state.lightSize = parseFloat(e.target.value); document.getElementById('sizeVal').innerText = state.lightSize; buildEnvironment(); lightMoved = true; });
+        document.getElementById('lightIntensity').addEventListener('input', e => { const val = parseFloat(e.target.value); document.getElementById('intensityVal').innerText = val.toFixed(1); buildEnvironment(); lightMoved = true; });
+        document.getElementById('lightAzimuth').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_azimuth'); } catch(_eP) {} });
+        document.getElementById('lightElevation').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_elevation'); } catch(_eP) {} });
+        document.getElementById('lightDistance').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_distance'); } catch(_eP) {} });
+        document.getElementById('lightTemp').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_temp'); } catch(_eP) {} });
+        document.getElementById('lightSize').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_size'); } catch(_eP) {} });
+        const cropBox = document.getElementById('crop-box'), dragH = document.getElementById('crop-drag-handle'), resH = document.getElementById('crop-resize-handle');
+        let cDrag = false, cRes = false, stX, stY, stW, stH, stL, stT;
+        dragH.addEventListener('pointerdown', e => { cDrag = true; stX = e.clientX; stY = e.clientY; stL = cropBox.offsetLeft; stT = cropBox.offsetTop; e.stopPropagation(); });
+        resH.addEventListener('pointerdown', e => { cRes = true; stX = e.clientX; stY = e.clientY; stW = cropBox.offsetWidth; stH = cropBox.offsetHeight; e.stopPropagation(); });
+        window.addEventListener('pointermove', e => { if(cDrag) { cropBox.style.left = (stL + e.clientX - stX) + 'px'; cropBox.style.top = (stT + e.clientY - stY) + 'px'; }
+        if(cRes) { let s = Math.max(100, Math.min(stW + e.clientX - stX, stH + e.clientY - stY)); cropBox.style.width = s + 'px'; cropBox.style.height = s + 'px'; } });
+        window.addEventListener('pointerup', () => { if(cDrag || cRes) { localStorage.setItem('solidCropBoxCache', JSON.stringify({left: cropBox.style.left, top: cropBox.style.top, width: cropBox.style.width, height: cropBox.style.height})); markDraftDirty(); } cDrag = false; cRes = false; });
+        const cachedCrop = localStorage.getItem('solidCropBoxCache'); if(cachedCrop) { const c = JSON.parse(cachedCrop); cropBox.style.left = c.left; cropBox.style.top = c.top; cropBox.style.width = c.width; cropBox.style.height = c.height; }
+        }
+        function animate() {
+        if (document.hidden) { portraitAnimRafId = 0; return; }
+        portraitAnimRafId = requestAnimationFrame(animate);
+        const _refreshPoster = () => { if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); };
+        controls.update();
+        const _now = performance.now();
+        if (!_solidCamSnapA) { _solidCamSnapA = new THREE.Vector3().copy(camera.position); _solidCamSnapB = new THREE.Vector3().copy(controls.target); _solidLastCamMotion = _now; }
+        else {
+        const moved = camera.position.distanceToSquared(_solidCamSnapA) > 1e-8 || controls.target.distanceToSquared(_solidCamSnapB) > 1e-8;
+        if (moved) { _solidLastCamMotion = _now; _solidCamSnapA.copy(camera.position); _solidCamSnapB.copy(controls.target); }
+        }
+        if (window.PluginManager) { const isInterrupted = window.PluginManager.trigger('onUpdate', { camera, scene, pathTracer, renderer }); if (isInterrupted) return; }
+        const _interactive = !!(transformControl && transformControl.dragging) || !!window._orbitInteracting || !!(window._planeXZDrag && window._planeXZDrag.active);
+        const _idleAfterMs = 380;
+        const _idleMinFrameMs = 1000 / 14;
+        function _shouldSkipHeavyRaster() {
+        if (_interactive || needsUpdate) return false;
+        if ((_now - _solidLastCamMotion) < _idleAfterMs) return false;
+        if ((_now - _solidLastHeavyFrame) < _idleMinFrameMs) return true;
+        return false;
+        }
+        if (window.isUnsupported || !window.useAdvancedRender) {
+        if (_shouldSkipHeavyRaster()) return;
+        _solidLastHeavyFrame = _now;
+        try { window._solidFallbackRenderAt = _now; } catch (_eFb) {}
+        try { _solidSyncGroundShadowUniforms(); } catch (_eGs) {}
+        renderer.render(scene, camera);
+        _refreshPoster();
+        if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
+        return;
+        }
+        if (pathTracer) { try { if(transformControl.dragging) { renderer.render(scene, camera); _refreshPoster(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
+        if (window._planeXZDrag && window._planeXZDrag.active) { renderer.render(scene, camera); _refreshPoster(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
+        if (window._orbitInteracting) { renderer.render(scene, camera); _refreshPoster(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
+        if (lightMoved || lightPosUpdated || needsUpdate) { camera.updateMatrixWorld(); scene.remove(transformControl);
+        if (lightMoved) { pathTracer.setScene(scene, camera); } else if (lightPosUpdated && pathTracer.updateLights) { pathTracer.updateLights(); } else { pathTracer.updateCamera(); }
+        scene.add(transformControl); pathTracer.reset(); lightMoved = false; lightPosUpdated = false; needsUpdate = false; window.sumDuration = 0; }
+        const pBar = document.getElementById('render-progress-bar'); const targetSamples = (window._solidPt && window._solidPt.targetSamples) ? window._solidPt.targetSamples : 160; const currentSamples = pathTracer.samples;
+        if (pBar) { const progressPct = Math.min(100, (currentSamples / targetSamples) * 100); pBar.style.width = progressPct + '%'; pBar.style.opacity = (currentSamples >= targetSamples) ? '0' : '1'; }
+        if (currentSamples < 4) { renderer.toneMappingExposure = 0.4; } else { renderer.toneMappingExposure = 0.7; }
+        if (currentSamples < targetSamples) {
+        const dofOn = window.DoFManager ? window.DoFManager.enabled : false;
+        if (window.AtmosphereManager && (window.isFogEnabled || dofOn)) window.AtmosphereManager.render(pathTracer, renderer, scene, camera); else pathTracer.renderSample();
+        if (!window.hasAutoStopped && pathTracer.samples >= 2) { window.hasAutoStopped = true; setTimeout(() => { window.stopRender(); }, 100); }
+        _solidLastHeavyFrame = _now;
+        } else {
+        if (!_interactive && !needsUpdate && (_now - _solidLastCamMotion) >= _idleAfterMs && (_now - _solidLastHeavyFrame) < _idleMinFrameMs) return;
+        _solidLastHeavyFrame = _now;
+        }
+        _refreshPoster();
+        if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
+        } catch(e) { triggerUnsupported(); } } }
+        init(); // 关页避免同步 dispose WebGL。pagehide/visibility 取消 RAF，避免后台仍排队 requestAnimationFrame（旧逻辑每帧先 rAF 再 return），刷新时与 WebGL 回收竞态易整页卡死。
+        window.addEventListener('pagehide', function() { try { void maybeSaveDraft(true); } catch(_e) {} window.__isPageUnloading = true; window.useAdvancedRender = false; try { if (typeof window.__solidCreateReleaseCaptureTrack === 'function') window.__solidCreateReleaseCaptureTrack(); } catch(_e2) {} if (portraitAnimRafId) { try { cancelAnimationFrame(portraitAnimRafId); } catch(e) {} portraitAnimRafId = 0; } }, { capture: true });
+        window.addEventListener('pageshow', function(ev) { if (ev.persisted && !portraitAnimRafId && !document.hidden) portraitAnimRafId = requestAnimationFrame(animate); });
+        window.addEventListener('beforeunload', function() { try { void maybeSaveDraft(true); } catch(_e) {} window.__isPageUnloading = true; window.useAdvancedRender = false; try { if (typeof window.__solidCreateReleaseCaptureTrack === 'function') window.__solidCreateReleaseCaptureTrack(); } catch(_e2) {} if (portraitAnimRafId) { try { cancelAnimationFrame(portraitAnimRafId); } catch(e) {} portraitAnimRafId = 0; } }); </script> </body> </html>
