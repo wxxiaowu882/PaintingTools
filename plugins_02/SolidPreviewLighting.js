@@ -429,7 +429,11 @@ export function createSolidPreviewLightingManager(opts) {
             // Keep contact pull effectively disabled for point lights; sphere occlusion still handles the historical bright-spot case.
             if (mainLight && mainLight.isPointLight) m.userData.uSolidShadowContactPull.value = 0.0;
             else if (mainLight && mainLight.isDirectionalLight) m.userData.uSolidShadowContactPull.value = mob ? 0.00085 : 0.00065;
-            else m.userData.uSolidShadowContactPull.value = mob ? 0.00095 : 0.00075;
+            else {
+              // Spot: almost disable contact pull to avoid the dark “contact line” on the lit side.
+              // Penumbra softness is handled by the PCF kernel, not by pulling compare depth.
+              m.userData.uSolidShadowContactPull.value = mob ? 0.00020 : 0.00014;
+            }
           } catch (_ePull) {}
 
           // softening curve parameters (per light type; keep independent)
@@ -529,16 +533,49 @@ export function createSolidPreviewLightingManager(opts) {
                   const solidShadowSoftAppend =
                     '\n\nfloat solidHash12( vec2 p ) { vec3 p3 = fract( vec3( p.xyx ) * 0.1031 ); p3 += dot( p3, p3.yzx + 33.33 ); return fract( ( p3.x + p3.y ) * p3.z ); }\n' +
                     'mat2 solidRot2( float a ) { float s = sin( a ), c = cos( a ); return mat2( c, -s, s, c ); }\n' +
-                    'float solidGaussianShadow2D( sampler2D shadowMap, vec2 shadowMapSize, vec4 shadowCoord, float shadowRadius ) {\n' +
+                    'float solidShadowSoftCompare( sampler2D shadowMap, vec2 uv, float compareZ, float smoothZ ) {\n' +
+                    '\tfloat depth = unpackRGBAToDepth( texture2D( shadowMap, uv ) );\n' +
+                    '\t// 1.0=lit, 0.0=shadow. smoothZ is in normalized shadow depth units.\n' +
+                    '\treturn 1.0 - smoothstep( 0.0, smoothZ, compareZ - depth );\n' +
+                    '}\n' +
+                    'vec2 solidPoisson24( int i ) {\n' +
+                    '\tif ( i == 0 ) return vec2( -0.326, -0.406 );\n' +
+                    '\tif ( i == 1 ) return vec2( -0.840, -0.074 );\n' +
+                    '\tif ( i == 2 ) return vec2( -0.696,  0.457 );\n' +
+                    '\tif ( i == 3 ) return vec2( -0.203,  0.621 );\n' +
+                    '\tif ( i == 4 ) return vec2(  0.962, -0.195 );\n' +
+                    '\tif ( i == 5 ) return vec2(  0.473, -0.480 );\n' +
+                    '\tif ( i == 6 ) return vec2(  0.519,  0.767 );\n' +
+                    '\tif ( i == 7 ) return vec2(  0.185, -0.893 );\n' +
+                    '\tif ( i == 8 ) return vec2(  0.507,  0.064 );\n' +
+                    '\tif ( i == 9 ) return vec2(  0.896,  0.412 );\n' +
+                    '\tif ( i == 10 ) return vec2( -0.322, -0.933 );\n' +
+                    '\tif ( i == 11 ) return vec2( -0.792, -0.598 );\n' +
+                    '\tif ( i == 12 ) return vec2( -0.043,  0.280 );\n' +
+                    '\tif ( i == 13 ) return vec2( -0.155,  0.970 );\n' +
+                    '\tif ( i == 14 ) return vec2(  0.252,  0.395 );\n' +
+                    '\tif ( i == 15 ) return vec2( -0.444,  0.106 );\n' +
+                    '\tif ( i == 16 ) return vec2(  0.727,  0.279 );\n' +
+                    '\tif ( i == 17 ) return vec2(  0.395, -0.732 );\n' +
+                    '\tif ( i == 18 ) return vec2( -0.600,  0.780 );\n' +
+                    '\tif ( i == 19 ) return vec2(  0.043, -0.165 );\n' +
+                    '\tif ( i == 20 ) return vec2(  0.143,  0.867 );\n' +
+                    '\tif ( i == 21 ) return vec2(  0.675, -0.160 );\n' +
+                    '\tif ( i == 22 ) return vec2( -0.325,  0.320 );\n' +
+                    '\treturn vec2( -0.069, -0.492 );\n' +
+                    '}\n' +
+                    'float solidGaussianShadow2D( sampler2D shadowMap, vec2 shadowMapSize, vec4 shadowCoord, float shadowRadius, float shadowBias, float solidPullZ ) {\n' +
                     '\tfloat shadow = 1.0;\n' +
                     '\tvec3 sc = shadowCoord.xyz / shadowCoord.w;\n' +
+                    '\t// IMPORTANT: apply bias/pull AFTER perspective divide to avoid “sheet/stripe” artifacts.\n' +
+                    '\tsc.z += shadowBias + solidPullZ;\n' +
                     '\tbool inFrustum = sc.x >= 0.0 && sc.x <= 1.0 && sc.y >= 0.0 && sc.y <= 1.0;\n' +
                     '\tbool frustumTest = inFrustum && sc.z <= 1.0;\n' +
                     '\tif ( !frustumTest ) return 1.0;\n' +
                     '\tvec2 texel = vec2( 1.0 ) / shadowMapSize;\n' +
                     '\tfloat tapsF = clamp( uSolidShadowGaussTaps, 4.0, 32.0 );\n' +
                     '\tint taps = int( floor( tapsF + 0.5 ) );\n' +
-                    '\tfloat ang = ( uSolidShadowGaussRotate > 0.5 ) ? ( 6.2831853 * solidHash12( vSolidShadowGroundPos.xz * 0.071 + sc.xy * 7.1 ) ) : 0.0;\n' +
+                    '\tfloat ang = ( uSolidShadowGaussRotate > 0.5 ) ? ( 6.2831853 * solidHash12( vSolidShadowGroundPos.xz * 0.071 + sc.xy * shadowMapSize.xy * 0.17 ) ) : 0.0;\n' +
                     '\tmat2 R = solidRot2( ang );\n' +
                     '\tfloat sum = 0.0;\n' +
                     '\tfloat wsum = 0.0;\n' +
@@ -547,12 +584,17 @@ export function createSolidPreviewLightingManager(opts) {
                     '\t\tif ( i >= taps ) break;\n' +
                     '\t\tfloat fi = float(i);\n' +
                     '\t\tfloat t = (fi + 0.5) / max( 1.0, float(taps) );\n' +
-                    '\t\tfloat r = sqrt( t ) * rMax;\n' +
-                    '\t\tfloat a = (fi + 0.5) * 2.3999632;\n' +
-                    '\t\tvec2 o = R * vec2( cos(a), sin(a) ) * r;\n' +
+                    '\t\t// Scale samples progressively to avoid “ring edge” in penumbra.\n' +
+                    '\t\tvec2 o = ( R * solidPoisson24( i ) ) * sqrt( clamp( t, 0.001, 1.0 ) );\n' +
                     '\t\tvec2 uv = sc.xy + o * texel * shadowRadius;\n' +
-                    '\t\tfloat w = exp( - (r*r) * 1.6 );\n' +
-                    '\t\tsum += w * step( sc.z, unpackRGBAToDepth( texture2D( shadowMap, uv ) ) );\n' +
+                    '\t\tif ( uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 ) continue;\n' +
+                    '\t\tfloat rr = dot( o, o );\n' +
+                    '\t\tfloat w = exp( - rr * 2.4 );\n' +
+                    '\t\tfloat hardTap = texture2DCompare( shadowMap, uv, sc.z );\n' +
+                    '\t\tfloat softTap = solidShadowSoftCompare( shadowMap, uv, sc.z, 0.0018 );\n' +
+                    '\t\t// Keep contact from getting brighter (no leak), but smooth the transition.\n' +
+                    '\t\tfloat tap = min( hardTap, softTap );\n' +
+                    '\t\tsum += w * tap;\n' +
                     '\t\twsum += w;\n' +
                     '\t}\n' +
                     '\tshadow = (wsum > 0.0) ? (sum / wsum) : 1.0;\n' +
@@ -587,12 +629,11 @@ export function createSolidPreviewLightingManager(opts) {
                     '\t\tdSolidSh = min( dSolidSh, length( vSolidShadowGroundPos.xz - uSolidShadowAnchors[i].xz ) );\n' +
                     '\t}\n' +
                     '\tfloat solidPullMult = 1.0 + 0.35 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n' +
-                    '\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00035 );\n' +
-                    '\tshadowCoord.z += solidPull;\n' +
+                    '\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00008 );\n' +
                     '\tfloat tSolidSh = smoothstep( uSolidShadowSoftRange.x, uSolidShadowSoftRange.y, dSolidSh );\n' +
                     '\ttSolidSh = pow( clamp( tSolidSh, 0.0, 1.0 ), max( 0.75, uSolidShadowSoftExp ) );\n' +
                     '\tshadowRadius *= ( 1.0 + uSolidShadowSoftStrength * tSolidSh );\n' +
-                    '\tfloat shadowOut = solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius );\n' +
+                    '\tfloat shadowOut = solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius, shadowBias, solidPull );\n' +
                     '\tfloat occ = solidSphereOcclusion( vSolidShadowGroundPos );\n' +
                     '\tfloat kOcc = pow( 1.0 - tSolidSh, 1.8 );\n' +
                     '\tshadowOut = min( shadowOut, mix( 1.0, occ, kOcc ) );\n' +
