@@ -314,10 +314,11 @@ export function createSolidPreviewLightingManager(opts) {
         cam.left = -he; cam.right = he; cam.top = he; cam.bottom = -he;
         cam.updateProjectionMatrix();
       } else if (shadowLight.isPointLight) {
-        const pms = isMobile ? 896 : 1408;
+        // Point/cube shadow: increase resolution to reduce aliasing on model surfaces.
+        const pms = isMobile ? 1536 : 2048;
         sh.mapSize.set(pms, pms);
-        sh.radius = 1.5;
-        sh.blurSamples = 12;
+        sh.radius = 2.2;
+        sh.blurSamples = 24;
         // Tighter near/far to improve depth precision and reduce banding/slice artifacts.
         sh.camera.near = Math.max(0.15, Math.min(1.2, (Number(st.radius) || 18) * 0.02));
         sh.camera.far = range;
@@ -336,9 +337,11 @@ export function createSolidPreviewLightingManager(opts) {
         sh.bias = (isMobile || isIosHost) ? -0.00005 : -0.000025;
         sh.normalBias = 0.025 * _nbBoost;
       } else if (shadowLight.isPointLight) {
-        sh.bias = -0.000015;
-        const _ptNbBoost = isMobile ? 1.12 : (isIosHost ? 1.08 : 1.0);
-        sh.normalBias = 0.014 * _ptNbBoost;
+        // Point/cube shadow: textured surfaces are prone to shadow acne “interference stripes”.
+        // Raise normalBias significantly for point lights to suppress self-shadow moiré.
+        // (Contact gap is handled elsewhere; we prioritize removing model-surface artifacts here.)
+        sh.bias = (isMobile || isIosHost) ? -0.00004 : -0.00003;
+        sh.normalBias = (isMobile || isIosHost) ? 0.040 : 0.032;
       }
 
       if (ground) { ground.receiveShadow = true; ground.castShadow = false; }
@@ -430,9 +433,10 @@ export function createSolidPreviewLightingManager(opts) {
             if (mainLight && mainLight.isPointLight) m.userData.uSolidShadowContactPull.value = 0.0;
             else if (mainLight && mainLight.isDirectionalLight) m.userData.uSolidShadowContactPull.value = mob ? 0.00085 : 0.00065;
             else {
-              // Spot: almost disable contact pull to avoid the dark “contact line” on the lit side.
-              // Penumbra softness is handled by the PCF kernel, not by pulling compare depth.
-              m.userData.uSolidShadowContactPull.value = mob ? 0.00020 : 0.00014;
+              // Spot: small pull to prevent dark-side “contact leak”.
+              // iOS/iPad tends to show the gap more due to precision/bias, so give it a bit more.
+              if (isIosHost) m.userData.uSolidShadowContactPull.value = 0.00044;
+              else m.userData.uSolidShadowContactPull.value = mob ? 0.00030 : 0.00022;
             }
           } catch (_ePull) {}
 
@@ -568,7 +572,22 @@ export function createSolidPreviewLightingManager(opts) {
                     '\tfloat shadow = 1.0;\n' +
                     '\tvec3 sc = shadowCoord.xyz / shadowCoord.w;\n' +
                     '\t// IMPORTANT: apply bias/pull AFTER perspective divide to avoid “sheet/stripe” artifacts.\n' +
-                    '\tsc.z += shadowBias + solidPullZ;\n' +
+                    '\tvec3 sc0 = sc;\n' +
+                    '\tsc0.z += shadowBias;\n' +
+                    '\t// Two-worlds solution: only apply contact pull where the fragment is already in shadow.\n' +
+                    '\t// This closes dark-side contact leaks without creating a lit-side dark ring.\n' +
+                    '\tfloat applyPull = 0.0;\n' +
+                    '\tif ( solidPullZ > 0.0 ) {\n' +
+                    '\t\t// Use a small neighborhood min: closes tiny gaps in penumbra (esp. iPad precision)\n' +
+                    '\t\tfloat c0 = texture2DCompare( shadowMap, sc0.xy, sc0.z );\n' +
+                    '\t\tfloat c1 = texture2DCompare( shadowMap, sc0.xy + vec2( 0.5, 0.0 ) / shadowMapSize, sc0.z );\n' +
+                    '\t\tfloat c2 = texture2DCompare( shadowMap, sc0.xy + vec2( 0.0, 0.5 ) / shadowMapSize, sc0.z );\n' +
+                    '\t\tfloat cMin = min( c0, min( c1, c2 ) );\n' +
+                    '\t\t// Continuous gate: strong in shadow/penumbra, fades to 0 when fully lit.\n' +
+                    '\t\tapplyPull = clamp( ( 0.985 - cMin ) / 0.22, 0.0, 1.0 );\n' +
+                    '\t}\n' +
+                    '\tsc = sc0;\n' +
+                    '\tsc.z += solidPullZ * applyPull;\n' +
                     '\tbool inFrustum = sc.x >= 0.0 && sc.x <= 1.0 && sc.y >= 0.0 && sc.y <= 1.0;\n' +
                     '\tbool frustumTest = inFrustum && sc.z <= 1.0;\n' +
                     '\tif ( !frustumTest ) return 1.0;\n' +
@@ -629,7 +648,7 @@ export function createSolidPreviewLightingManager(opts) {
                     '\t\tdSolidSh = min( dSolidSh, length( vSolidShadowGroundPos.xz - uSolidShadowAnchors[i].xz ) );\n' +
                     '\t}\n' +
                     '\tfloat solidPullMult = 1.0 + 0.35 * exp( - ( dSolidSh * dSolidSh ) / 2.2 );\n' +
-                    '\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00008 );\n' +
+                    '\tfloat solidPull = min( uSolidShadowContactPull * solidPullMult, uSolidShadowContactPull + 0.00012 );\n' +
                     '\tfloat tSolidSh = smoothstep( uSolidShadowSoftRange.x, uSolidShadowSoftRange.y, dSolidSh );\n' +
                     '\ttSolidSh = pow( clamp( tSolidSh, 0.0, 1.0 ), max( 0.75, uSolidShadowSoftExp ) );\n' +
                     '\tshadowRadius *= ( 1.0 + uSolidShadowSoftStrength * tSolidSh );\n' +
