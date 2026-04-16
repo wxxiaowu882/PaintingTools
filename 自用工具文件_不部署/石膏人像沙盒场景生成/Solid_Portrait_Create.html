@@ -142,20 +142,6 @@
         solidCreateSyncCameraLockUI();
     };
     window.sumDuration = 0; window.useAdvancedRender = true; window.isExporting = false; window.hasAutoStopped = false; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
-    // changePosterize/changeAtmosphere/changeDoF/setEnvColor/setSkyLightScale/toggleWall 由 shared 胶水统一注入（生产端暂不注入 ControlPanel UI，但语义保持一致）
-    const markNeedsUpdate = function(reason) { needsUpdate = true; lightMoved = true; };
-    installSolidEnvHostBindings({
-        THREE,
-        getScene: () => scene,
-        getGround: () => ground,
-        getWalls: () => window.walls,
-        getLightType: () => lightType,
-        buildEnvironment: (typeof buildEnvironment === 'function') ? buildEnvironment : undefined,
-        markNeedsUpdate,
-        requestRasterProbe: (reason) => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe(reason); } catch(_e) {} },
-    });
-    installSolidAtmosphereHostBindings({ markNeedsUpdate });
-    installSolidAssistHostBindings({ markNeedsUpdate });
     window.updateDoFUIFromRaycaster = function(focusDist) { const slider = document.getElementById('dofFocusSlider');
     if(slider) { slider.value = focusDist; if(window.updateDoFUI) window.updateDoFUI(); } };
     if (window.PosterizeShared && typeof window.PosterizeShared.init === 'function') {
@@ -1030,7 +1016,20 @@
         document.querySelectorAll('#dir-options .custom-option').forEach(opt => opt.classList.remove('selected')); const matchedOpt = document.querySelector(`#dir-options .custom-option[onclick*="'${dirKey}'"]`);
         if(matchedOpt) matchedOpt.classList.add('selected'); }
         document.addEventListener('click', () => { document.querySelectorAll('.custom-options').forEach(el => el.classList.remove('show')); });
-        window.toggleWall = function() { window.hasWall = !window.hasWall; const btn = document.getElementById('wall-btn'); btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; setTimeout(() => { buildEnvironment(); lightMoved = true; }, 100); };
+        // changePosterize/changeAtmosphere/changeDoF/setEnvColor/setSkyLightScale/toggleWall 由 shared 胶水统一注入
+        const markNeedsUpdate = function(reason) { needsUpdate = true; lightMoved = true; };
+        installSolidEnvHostBindings({
+            THREE,
+            getScene: () => scene,
+            getGround: () => ground,
+            getWalls: () => window.walls,
+            getLightType: () => lightType,
+            buildEnvironment,
+            markNeedsUpdate,
+            requestRasterProbe: (reason) => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe(reason); } catch(_e) {} },
+        });
+        installSolidAtmosphereHostBindings({ markNeedsUpdate });
+        installSolidAssistHostBindings({ markNeedsUpdate });
         window.isUnsupported = false; function triggerUnsupported() { if(window.isUnsupported) return; window.isUnsupported = true; document.getElementById('scene-loader').style.display = 'none'; const msg = document.getElementById('fallback-msg'); if(msg) { msg.style.display = 'flex'; msg.style.zIndex = '99999'; } document.getElementById('canvas-container').style.opacity = '0.1'; const mainPanel = document.getElementById('main-panel'); if (mainPanel) { mainPanel.style.opacity = '0.3'; mainPanel.style.pointerEvents = 'none'; } }
         window.acknowledgeFallback = function() { document.getElementById('fallback-msg').style.display = 'none'; document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1'; document.getElementById('main-panel').style.pointerEvents = 'auto'; };
         window.resetAll = function() { state.azimuth = 113; document.getElementById('lightAzimuth').value = 113; document.getElementById('azimuthVal').innerText = 113; state.elevation = 45; document.getElementById('lightElevation').value = 45; document.getElementById('elevationVal').innerText = 45; state.radius = 21; document.getElementById('lightDistance').value = 21; document.getElementById('distanceVal').innerText = 21; state.lightSize = 1.9; document.getElementById('lightSize').value = 1.9; document.getElementById('sizeVal').innerText = 1.9; document.getElementById('lightIntensity').value = 1.7; document.getElementById('intensityVal').innerText = 1.7; state.lightTemp = 38;     document.getElementById('lightTemp').value = 38; document.getElementById('tempVal').innerText = 3800; window.hasWall = false; document.getElementById('wall-btn').innerText = '☐ 背景墙'; document.getElementById('wall-btn').classList.remove('active'); window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc';     window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1; if (window.syncEnvColorPickers) window.syncEnvColorPickers(); updateDirTriggerByValues();

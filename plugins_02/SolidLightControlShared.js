@@ -126,6 +126,38 @@ export function solidGetTempColorFromKelvin100(THREE, t) {
 }
 
 /**
+ * 与 `solidGetTempColorFromKelvin100` 同口径，但复用 out（避免拖动时频繁 new Color 导致 GC 抖动）。
+ * @param {typeof import('three')} THREE
+ * @param {number} tKelvin100
+ * @param {import('three').Color} out
+ */
+export function solidGetTempColorFromKelvin100Into(THREE, tKelvin100, out) {
+  const stops = [
+    [3000, 255, 160, 87],
+    [4000, 255, 200, 140],
+    [5000, 255, 239, 223],
+    [6000, 255, 255, 255],
+    [7500, 225, 235, 255],
+    [9000, 190, 210, 255],
+  ];
+  let c1 = stops[0];
+  let c2 = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (tKelvin100 >= stops[i][0] && tKelvin100 <= stops[i + 1][0]) {
+      c1 = stops[i];
+      c2 = stops[i + 1];
+      break;
+    }
+  }
+  const f = (tKelvin100 - c1[0]) / (c2[0] - c1[0] || 1);
+  const r = (c1[1] + f * (c2[1] - c1[1])) / 255;
+  const g = (c1[2] + f * (c2[2] - c1[2])) / 255;
+  const b = (c1[3] + f * (c2[3] - c1[3])) / 255;
+  if (out && typeof out.setRGB === 'function') out.setRGB(r, g, b);
+  return out;
+}
+
+/**
  * 与宿主 `updateLightPosition` 内球坐标公式一致。
  * @param {typeof import('three')} THREE
  * @param {{ radius: number; elevation: number|string; azimuth: number|string }} state
@@ -217,6 +249,68 @@ export function installSolidMainLightSliderBindings(deps) {
     } catch (_e) {}
   };
 
+  // 拖动更顺滑：对 input 事件做 rAF 合帧（每帧最多更新一次灯位/色温），避免高频 input 导致卡顿。
+  let _rafPos = 0;
+  let _rafTemp = 0;
+  let _posDirty = false;
+  let _dirDirty = false;
+  let _tempDirty = false;
+  const _tmpTempColor = (() => {
+    try {
+      // 依赖宿主/插件已 import three；这里仅为缓存对象，避免每次 new Color
+      const c = deps.getTempColor?.(6000);
+      if (c && typeof c.clone === 'function') return c.clone();
+    } catch (_e) {}
+    return null;
+  })();
+
+  function _schedulePos() {
+    _posDirty = true;
+    if (_rafPos) return;
+    _rafPos = requestAnimationFrame(() => {
+      _rafPos = 0;
+      if (!_posDirty) return;
+      _posDirty = false;
+      deps.updateLightPosition();
+    });
+  }
+
+  function _scheduleTemp() {
+    _tempDirty = true;
+    if (_rafTemp) return;
+    _rafTemp = requestAnimationFrame(() => {
+      _rafTemp = 0;
+      if (!_tempDirty) return;
+      _tempDirty = false;
+      const ml = deps.getMainLight();
+      if (ml && ml.color) {
+        try {
+          if (_tmpTempColor) {
+            // 复用 out，避免 GC
+            solidGetTempColorFromKelvin100Into(
+              { Color: ml.color.constructor },
+              deps.state.lightTemp * 100,
+              _tmpTempColor,
+            );
+            if (typeof ml.color.copy === 'function') ml.color.copy(_tmpTempColor);
+            else ml.color = _tmpTempColor;
+          } else {
+            const c = deps.getTempColor(deps.state.lightTemp * 100);
+            if (c && typeof ml.color.copy === 'function') ml.color.copy(c);
+            else ml.color = c;
+          }
+        } catch (_e) {
+          // fallback：不因色温更新失败而中断交互
+          try { ml.color = deps.getTempColor(deps.state.lightTemp * 100); } catch (_e2) {}
+        }
+      }
+      deps.assignPathTracerFlags({ lightPosUpdated: true });
+      try {
+        deps.afterLightTempInput?.();
+      } catch (_e) {}
+    });
+  }
+
   document.querySelector('.control-panel').addEventListener('pointerdown', (e) => {
     if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'LABEL' && !e.target.classList.contains('env-btn')) {
       e.stopPropagation();
@@ -226,37 +320,36 @@ export function installSolidMainLightSliderBindings(deps) {
   document.getElementById('lightAzimuth').addEventListener('input', (e) => {
     deps.state.azimuth = e.target.value;
     document.getElementById('azimuthVal').innerText = deps.state.azimuth;
-    runDir();
-    deps.updateLightPosition();
+    _dirDirty = true;
+    _schedulePos();
   });
-  document.getElementById('lightAzimuth').addEventListener('change', () => probe('light_azimuth'));
+  document.getElementById('lightAzimuth').addEventListener('change', () => {
+    if (_dirDirty) { _dirDirty = false; runDir(); }
+    probe('light_azimuth');
+  });
 
   document.getElementById('lightElevation').addEventListener('input', (e) => {
     deps.state.elevation = e.target.value;
     document.getElementById('elevationVal').innerText = deps.state.elevation;
-    runDir();
-    deps.updateLightPosition();
+    _dirDirty = true;
+    _schedulePos();
   });
-  document.getElementById('lightElevation').addEventListener('change', () => probe('light_elevation'));
+  document.getElementById('lightElevation').addEventListener('change', () => {
+    if (_dirDirty) { _dirDirty = false; runDir(); }
+    probe('light_elevation');
+  });
 
   document.getElementById('lightDistance').addEventListener('input', (e) => {
     deps.state.radius = parseFloat(e.target.value);
     document.getElementById('distanceVal').innerText = deps.state.radius;
-    deps.updateLightPosition();
+    _schedulePos();
   });
   document.getElementById('lightDistance').addEventListener('change', () => probe('light_distance'));
 
   document.getElementById('lightTemp').addEventListener('input', (e) => {
     deps.state.lightTemp = parseInt(e.target.value, 10);
     document.getElementById('tempVal').innerText = deps.state.lightTemp * 100;
-    const ml = deps.getMainLight();
-    if (ml) {
-      ml.color = deps.getTempColor(deps.state.lightTemp * 100);
-    }
-    deps.assignPathTracerFlags({ lightPosUpdated: true });
-    try {
-      deps.afterLightTempInput?.();
-    } catch (_e) {}
+    _scheduleTemp();
   });
   document.getElementById('lightTemp').addEventListener('change', () => probe('light_temp'));
 

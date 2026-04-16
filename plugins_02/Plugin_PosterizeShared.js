@@ -99,11 +99,43 @@
         } catch (_eDraw) {}
     }
 
-    function apply(levels) {
+    function forceWebKitFilterRebind(el, fRef) {
+        if (!el) return;
+        try { el.style.webkitFilter = 'none'; el.style.filter = 'none'; } catch (_e0) {}
+        try { void el.offsetWidth; } catch (_e1) {}
+        try { el.style.webkitFilter = fRef; el.style.filter = fRef; } catch (_e2) {}
+    }
+
+    // iOS：滑块高频调用 apply 时做 rAF 合帧，避免在 WebKit 上出现“滞后追帧 + 反复无效重绘”的浪费。
+    let iosApplyRaf = 0;
+    let iosPendingLevels = null;
+    function scheduleIosApply(levels) {
+        iosPendingLevels = levels;
+        if (iosApplyRaf) return;
+        iosApplyRaf = requestAnimationFrame(() => {
+            iosApplyRaf = 0;
+            const v = iosPendingLevels;
+            iosPendingLevels = null;
+            if (v == null) return;
+            applyNow(v);
+        });
+    }
+
+    function applyNow(levels) {
         window.posterizeLevel = levels;
         const canvasContainer = getContainer();
         const targetCanvas = getTargetCanvas(canvasContainer);
         if (!canvasContainer) return;
+
+        // 缓存：避免同一 levels 重复触发 WebKit 的昂贵重绘链路
+        if (window.__solidPosterizeLastLevels === levels && levels !== 0) {
+            // iOS 下仍可能需要强制 copy 一次（例如上一帧 overlay 未准备好）
+            if (isIosHost() && window.__solidPosterizeForceNextIosCopy) {
+                try { refreshOverlayFromWebGL(); } catch (_e) {}
+            }
+        } else {
+            window.__solidPosterizeLastLevels = levels;
+        }
 
         if (levels === 0) {
             const po = document.getElementById('posterize-2d-overlay');
@@ -135,17 +167,21 @@
             for (let i = 0; i < levels; i++) tableArr.push((i / denom).toFixed(4));
             const tableStr = tableArr.join(',');
 
-            const xfer = document.getElementById('posterize-transfer');
-            if (xfer) {
-                ['feFuncR', 'feFuncG', 'feFuncB'].forEach((tag) => {
-                    const el = xfer.getElementsByTagName(tag)[0];
-                    if (el) el.setAttribute('tableValues', tableStr);
-                });
-            }
-            const filterNode = document.getElementById('posterize-filter');
-            if (filterNode && filterNode.parentNode) {
-                const clone = filterNode.cloneNode(true);
-                filterNode.parentNode.replaceChild(clone, filterNode);
+            // 仅当 tableStr 变化时才更新 SVG filter（避免 iOS 上频繁 clone 带来的重排）
+            if (window.__solidPosterizeLastTableStr !== tableStr) {
+                window.__solidPosterizeLastTableStr = tableStr;
+                const xfer = document.getElementById('posterize-transfer');
+                if (xfer) {
+                    ['feFuncR', 'feFuncG', 'feFuncB'].forEach((tag) => {
+                        const el = xfer.getElementsByTagName(tag)[0];
+                        if (el) el.setAttribute('tableValues', tableStr);
+                    });
+                }
+                const filterNode = document.getElementById('posterize-filter');
+                if (filterNode && filterNode.parentNode) {
+                    const clone = filterNode.cloneNode(true);
+                    filterNode.parentNode.replaceChild(clone, filterNode);
+                }
             }
 
             canvasContainer.style.isolation = '';
@@ -159,14 +195,14 @@
 
             void canvasContainer.offsetWidth;
             requestAnimationFrame(() => {
+                const fRef = 'url(#posterize-filter)';
                 if (isIosHost()) {
-                    const fRef = 'url(#posterize-filter)';
                     const ov = ensureOverlay();
                     if (ov) {
                         ov.style.zIndex = '';
-                        ov.style.webkitFilter = fRef;
-                        ov.style.filter = fRef;
                         ov.style.display = 'block';
+                        // WebKit 核心修复：强制重新绑定 filter，避免“tableValues 已更新但画面不变”
+                        forceWebKitFilterRebind(ov, fRef);
                         if (targetCanvas) {
                             targetCanvas.style.opacity = '0';
                             targetCanvas.style.position = '';
@@ -178,9 +214,11 @@
                             if (poly3dLayer.parentNode === canvasContainer) canvasContainer.appendChild(poly3dLayer);
                         }
                         syncLayout();
+                        // 强制至少拷贝 1~2 帧，避免 overlay 像素仍是旧帧造成“滑块没反应”的错觉
                         window.__solidPosterizeForceNextIosCopy = true;
                         window.__solidPosterizeAccSkipTick = 0;
-                        refreshOverlayFromWebGL();
+                        try { refreshOverlayFromWebGL(); } catch (_e0) {}
+                        requestAnimationFrame(() => { try { refreshOverlayFromWebGL(); } catch (_e1) {} });
                     }
                     log(`[Engine-色阶] iOS/WebKit：2D叠层 + 页内 CSS url(#posterize-filter), 阶梯: ${tableStr.substring(0, 20)}...`);
                 } else {
@@ -198,7 +236,6 @@
                     }
                     const poly3dLayer = document.getElementById('poly3d-layer');
                     if (poly3dLayer) poly3dLayer.style.zIndex = '';
-                    const fRef = 'url(#posterize-filter)';
                     canvasContainer.style.webkitFilter = fRef;
                     canvasContainer.style.filter = fRef;
                     log(`[Engine-色阶] PC：#canvas-container + 页内 ${fRef}，阶梯: ${tableStr.substring(0, 20)}...`);
@@ -213,6 +250,15 @@
             slider.value = sliderVal;
             valDisp.innerText = levels === 0 ? '无' : levels + '阶';
         }
+    }
+
+    function apply(levels) {
+        // iOS：合帧以减少 WebKit 下的“追帧重绘浪费”，并提升 slider 反馈一致性
+        if (isIosHost()) {
+            scheduleIosApply(levels);
+            return;
+        }
+        applyNow(levels);
     }
 
     function init(options) {

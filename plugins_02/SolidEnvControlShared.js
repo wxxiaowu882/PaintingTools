@@ -51,19 +51,31 @@ export function installSolidEnvHostBindings(options) {
   }
 
   window.setSkyLightScale = function setSkyLightScale(v) {
-    window.envSkyLightScale = clamp01(v);
+    const next = clamp01(v);
+    window.envSkyLightScale = next;
     const el = document.getElementById('env-sky-light-val');
-    if (el) el.textContent = Number(window.envSkyLightScale).toFixed(2);
-    _triggerSkySync();
-    if (typeof markNeedsUpdate === 'function') {
-      try { markNeedsUpdate('sky_light_scale'); } catch (_e) {}
-    } else {
-      // 兼容旧宿主：ControlPanel 仍会写 window.needsUpdate
-      window.needsUpdate = true;
-    }
-    if (typeof requestRasterProbe === 'function') {
-      try { requestRasterProbe('sky_light_scale'); } catch (_e) {}
-    }
+    if (el) el.textContent = Number(next).toFixed(2);
+
+    // 拖动更顺滑：合帧触发 onSkyEnvSync/needsUpdate（保持实时：每帧更新一次）
+    if (!window.__solidSkyScaleRaf) window.__solidSkyScaleRaf = 0;
+    window.__solidSkyScalePending = next;
+    if (window.__solidSkyScaleRaf) return;
+    window.__solidSkyScaleRaf = requestAnimationFrame(() => {
+      window.__solidSkyScaleRaf = 0;
+      const pending = window.__solidSkyScalePending;
+      if (pending == null) return;
+      window.envSkyLightScale = pending;
+      _triggerSkySync();
+      if (typeof markNeedsUpdate === 'function') {
+        try { markNeedsUpdate('sky_light_scale'); } catch (_e) {}
+      } else {
+        // 兼容旧宿主：ControlPanel 仍会写 window.needsUpdate
+        window.needsUpdate = true;
+      }
+      if (typeof requestRasterProbe === 'function') {
+        try { requestRasterProbe('sky_light_scale'); } catch (_e) {}
+      }
+    });
   };
 
   window.setEnvColor = function setEnvColor(kind, hex) {

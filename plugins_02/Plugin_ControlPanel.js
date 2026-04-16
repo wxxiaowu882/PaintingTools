@@ -320,18 +320,40 @@ window.ControlPanel = {
             window.currentFogType = type; window.updateFogUI();
         };
 
+        // 拖动更顺滑：对 fog/doF 的 UI→uniform 更新做 rAF 合帧（同一帧内多次 input 只更新一次）
+        let _fogRaf = 0;
+        let _fogPending = null;
+        function _flushFogUI() {
+            _fogRaf = 0;
+            const p = _fogPending;
+            _fogPending = null;
+            if (!p) return;
+
+            const valDisp = document.getElementById('fogVal');
+            if (valDisp) valDisp.innerText = p.density.toFixed(2);
+            if (p.type && p.type !== 'basic') {
+                const d1 = document.getElementById('fogVal1_' + p.type); if (d1) d1.innerText = p.p1.toFixed(1);
+                const d2 = document.getElementById('fogVal2_' + p.type); if (d2) d2.innerText = p.p2.toFixed(1);
+            }
+
+            if (window.changeAtmosphere) window.changeAtmosphere(p.enabled, p.density, { type: p.type, color: p.color, p1: p.p1, p2: p.p2 });
+        }
+
         window.updateFogUI = function() {
             const checkbox = document.getElementById('fogEnable'); const checked = checkbox ? checkbox.checked : false;
             const slider = document.getElementById('fogSlider'); const val = slider ? parseFloat(slider.value) : 0.02;
-            const valDisp = document.getElementById('fogVal'); if(valDisp && slider) valDisp.innerText = val.toFixed(2);
             const colorPicker = document.getElementById('fogColorPicker'); const color = colorPicker ? colorPicker.value : '#ffffff';
             let p1 = 0, p2 = 0;
-            if(window.currentFogType !== 'basic') {
-                const s1 = document.getElementById('fogParam1_' + window.currentFogType); const s2 = document.getElementById('fogParam2_' + window.currentFogType);
-                if(s1) { p1 = parseFloat(s1.value); const d1 = document.getElementById('fogVal1_' + window.currentFogType); if(d1) d1.innerText = p1.toFixed(1); }
-                if(s2) { p2 = parseFloat(s2.value); const d2 = document.getElementById('fogVal2_' + window.currentFogType); if(d2) d2.innerText = p2.toFixed(1); }
+            const t = window.currentFogType || 'basic';
+            if (t !== 'basic') {
+                const s1 = document.getElementById('fogParam1_' + t); const s2 = document.getElementById('fogParam2_' + t);
+                if (s1) p1 = parseFloat(s1.value);
+                if (s2) p2 = parseFloat(s2.value);
             }
-            if(window.changeAtmosphere) window.changeAtmosphere(checked, val, { type: window.currentFogType, color: color, p1: p1, p2: p2 });
+
+            _fogPending = { enabled: checked, density: val, color: color, type: t, p1: p1, p2: p2 };
+            if (_fogRaf) return;
+            _fogRaf = requestAnimationFrame(_flushFogUI);
         };
 
         window.toggleDoF = function(checked) {
@@ -346,15 +368,25 @@ window.ControlPanel = {
             window.updateDoFUI();
         };
 
+        let _dofRaf = 0;
+        let _dofPending = null;
+        function _flushDoFUI() {
+            _dofRaf = 0;
+            const p = _dofPending;
+            _dofPending = null;
+            if (!p) return;
+            const aVal = document.getElementById('dofApertureVal'); if (aVal) aVal.innerText = 'f/' + p.aperture.toFixed(1);
+            const fVal = document.getElementById('dofFocusVal'); if (fVal) fVal.innerText = p.focus.toFixed(1);
+            if (window.changeDoF) window.changeDoF(p.enabled, p.aperture, p.focus);
+        }
+
         window.updateDoFUI = function() {
             const checkbox = document.getElementById('dofEnable'); const checked = checkbox ? checkbox.checked : false;
             const aSlider = document.getElementById('dofApertureSlider'); const aperture = aSlider ? parseFloat(aSlider.value) : 2.8;
-            const aVal = document.getElementById('dofApertureVal'); if(aVal) aVal.innerText = 'f/' + aperture.toFixed(1);
-            
             const fSlider = document.getElementById('dofFocusSlider'); const focus = fSlider ? parseFloat(fSlider.value) : 10;
-            const fVal = document.getElementById('dofFocusVal'); if(fVal) fVal.innerText = focus.toFixed(1);
-            
-            if(window.changeDoF) window.changeDoF(checked, aperture, focus);
+            _dofPending = { enabled: checked, aperture: aperture, focus: focus };
+            if (_dofRaf) return;
+            _dofRaf = requestAnimationFrame(_flushDoFUI);
         };
         
         if(window.hwLog) window.hwLog(`[UI] 控制面板已动态注入 (${mode} 模式)`); 
