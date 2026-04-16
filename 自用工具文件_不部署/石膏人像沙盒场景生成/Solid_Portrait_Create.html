@@ -99,6 +99,7 @@
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { TransformControls } from 'three/addons/controls/TransformControls.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer';
     import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js';import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js';
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from '../../plugins_02/SolidPreviewLighting.js';
+    import { computeSolidMainLightCartesianPosition, createSolidMainLight, installSolidMainLightSliderBindings, solidGetTempColorFromKelvin100 } from '../../plugins_02/SolidLightControlShared.js';
     window.skyEnvLightMatchMainRect = true; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false;
     // 视角锁定（生产端）：状态持久化 + UI 同步
@@ -167,6 +168,8 @@
     try { if (typeof obj.dispose === 'function') obj.dispose(); } catch(e) { console.warn("静默拦截销毁错误:", e); } }
     // 补回渲染控制停止功能
     window.stopRender = function() { window.useAdvancedRender = false; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
+    if (renderer) renderer.toneMappingExposure = 0.7;
+    try { if (typeof buildEnvironment === 'function') buildEnvironment(); } catch (_eBe) {}
     try { _solidEnableRasterShadowsOnce(); } catch (_ePl) {}
     try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('stop_render'); } catch (_eP) {}
     renderer.render(scene, camera); hwLog("已停止渲染，当前为预览模式。点击“开启渲染”可再次尝试。");
@@ -409,7 +412,19 @@
     const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.disabled = !window.isFogEnabled; fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); }
     if(window.toggleFogAdvanced) window.toggleFogAdvanced(!!window.isFogEnabled);
     const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.disabled = !(window.posterizeLevel > 0); pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } }
-    needsUpdate = true; lightMoved = true; window.sumDuration = 0; if (label) window.hwLog(label); setTimeout(() => { try { window.setMode(window.currentEditorMode); } catch(_e) {} }, 100); _draftDirty = false; }
+    needsUpdate = true; lightMoved = true; window.sumDuration = 0; if (label) window.hwLog(label);
+    window.useAdvancedRender = false;
+    if (pathTracer) { try { safeDispose(pathTracer); } catch (_ePt) {} pathTracer = null; }
+    window.hasAutoStopped = false;
+    try {
+    if (window.__solidPreviewLighting) {
+    window.__solidPreviewLighting.setEnabled(true);
+    window.__solidPreviewLighting.syncShadows();
+    window.__solidPreviewLighting.onSceneChanged('apply_scene_data');
+    }
+    } catch (_ePl) {}
+    try { if (renderer && scene && camera) { renderer.toneMappingExposure = 0.7; renderer.render(scene, camera); } } catch (_eR) {}
+    setTimeout(() => { try { window.setMode(window.currentEditorMode); } catch(_e) {} }, 100); _draftDirty = false; }
     async function autoRestoreDraftIfNeeded() { if (window.__solidCreateHasExplicitScene) return; if (!editorGroup || (editorGroup.children && editorGroup.children.length > 0)) return; const payload = await draftGet();
     if (!payload || !payload.data) return; window._solidCreateDraftFileName = payload.fileName ? String(payload.fileName) : null; applySceneDataToEditor(payload.data, '✅ 已自动恢复草稿'); // 恢复草稿后，尽量把“正在编辑的文件”绑定回来，避免保存时误新建
     try { await autoMountLastWorkDir(); } catch(_e) {}
@@ -937,11 +952,33 @@
         window.changeMat('origin'); window.initialMatType = 'origin'; // 【新增】新建场景时，初始材质重置为自带材质
         window.changePosterize(0); window.changeAtmosphere(false, 0.02); const fogCheck = document.getElementById('fogEnable'); if(fogCheck) fogCheck.checked = false; if(window.toggleFogAdvanced) window.toggleFogAdvanced(false); const posterizeCheck = document.getElementById('posterizeEnable'); if(posterizeCheck) posterizeCheck.checked = false;
         // 【核心解耦】：通知所有插件安全销毁自己的内存和 DOM 节点
-        if (window.PluginManager) window.PluginManager.trigger('onClearScene'); window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1; if (window.syncEnvColorPickers) window.syncEnvColorPickers(); buildEnvironment();
+        if (window.PluginManager) window.PluginManager.trigger('onClearScene'); window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 0;
+        lightType = 'spot'; state.azimuth = 113; state.elevation = 45; state.radius = 21; state.lightSize = 1.9; state.lightTemp = 38;
+        document.getElementById('lightAzimuth').value = state.azimuth; document.getElementById('azimuthVal').innerText = String(state.azimuth);
+        document.getElementById('lightElevation').value = state.elevation; document.getElementById('elevationVal').innerText = String(state.elevation);
+        document.getElementById('lightDistance').value = state.radius; document.getElementById('distanceVal').innerText = String(state.radius);
+        document.getElementById('lightSize').value = state.lightSize; document.getElementById('sizeVal').innerText = String(state.lightSize);
+        document.getElementById('lightTemp').value = state.lightTemp; document.getElementById('tempVal').innerText = String(state.lightTemp * 100);
+        document.getElementById('lightIntensity').value = 1.7; document.getElementById('intensityVal').innerText = '1.7';
+        const _ltNew = document.getElementById('light-trigger'); if (_ltNew) _ltNew.innerText = '聚光灯';
+        document.querySelectorAll('#light-options .custom-option').forEach(opt => opt.classList.remove('selected'));
+        const _spotOptNew = document.querySelector("#light-options .custom-option[onclick*='spot']"); if (_spotOptNew) _spotOptNew.classList.add('selected');
+        updateDirTriggerByValues();
+        try { if (window.SkyEnvLight && window.SkyEnvLight.invalidateSyncCache) window.SkyEnvLight.invalidateSyncCache(); } catch (_eSk) {}
+        if (window.syncEnvColorPickers) window.syncEnvColorPickers(); buildEnvironment();
+        try { window.useAdvancedRender = false; } catch (_eUarNs) {}
+        if (pathTracer) { try { safeDispose(pathTracer); } catch (_ePtNs) {} pathTracer = null; }
+        try {
+        if (window.__solidPreviewLighting) {
+        window.__solidPreviewLighting.setEnabled(true);
+        window.__solidPreviewLighting.syncShadows();
+        window.__solidPreviewLighting.onSceneChanged('new_scene');
+        }
+        } catch (_ePlNs) {}
+        try { if (renderer && scene && camera) { renderer.toneMappingExposure = 0.7; renderer.render(scene, camera); } } catch (_eRNs) {}
         window.hwLog("已清空画布，进入新建场景状态"); needsUpdate = true; lightMoved = true; 
         // 【加载唤醒】：新建场景后，重新刷新一次当前的激活模式
         setTimeout(() => { window.setMode(window.currentEditorMode); }, 100); };
-        function getTempColor(t) { const stops = [[3000,255,160,87],[4000,255,200,140],[5000,255,239,223],[6000,255,255,255],[7500,225,235,255],[9000,190,210,255]]; let c1 = stops[0], c2 = stops[stops.length-1]; for(let i=0; i<stops.length-1; i++) { if(t>=stops[i][0] && t<=stops[i+1][0]){ c1=stops[i]; c2=stops[i+1]; break; } } const f = (t-c1[0])/(c2[0]-c1[0]||1); return new THREE.Color((c1[1]+f*(c2[1]-c1[1]))/255, (c1[2]+f*(c2[2]-c1[2]))/255, (c1[3]+f*(c2[3]-c1[3]))/255); }
         window.toggleCustomSelect = function(e, id) { e.stopPropagation(); document.querySelectorAll('.custom-options').forEach(el => { if (el.id !== id) el.classList.remove('show'); }); document.getElementById(id).classList.toggle('show'); };
         // 【新增】：材质切换（非破坏性预览）
         window.changeMat = function(val) { window.matType = val; const roughs = [0.95, 0.15, 0.3, 0.05, 0.4]; const metals = [0.0, 0.0, 0.85, 0.0, 0.0]; const trans = [0.0, 0.0, 0.0, 1.0, 1.0]; // 彻底解禁调色板：满足标注与模型全局调色需求
@@ -1351,7 +1388,8 @@
         snapBuiltinRootBottomToGround(obj3d);
         }
         }); });
-        lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_builtin'); } catch (_ePl) {} };
+        lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_builtin'); } catch (_ePl) {}
+        try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eShBi) {} };
         window.openGlbManagerModal = function() { const modal = document.getElementById('glb-manager-modal');
         const iframe = document.getElementById('glb-manager-iframe'); if (!iframe.src || iframe.src === window.location.href) { iframe.src = '../GBL管理器/Glb管理器.html'; }
         modal.style.display = 'flex'; }; window.closeGlbManagerModal = function() { document.getElementById('glb-manager-modal').style.display = 'none'; };
@@ -1630,6 +1668,9 @@
         window.syncEnvColorPickers = function() { const w = document.getElementById('env-wall-color'); const g = document.getElementById('env-ground-color'); const s = document.getElementById('env-sky-color');
         if (w) w.value = window.envWallColor || '#cccccc'; if (g) g.value = window.envGroundColor || '#cccccc'; if (s) s.value = window.envSkyColor || '#0d0d0f';
         if (window.SkyEnvLight && window.SkyEnvLight.syncUI) window.SkyEnvLight.syncUI(); };
+        // 须先于首次 buildEnvironment：否则主光按“光追”口径创建（如 rect→RectAreaLight），随后 stopRender 只 sync 不重绑，光栅无投影。
+        window.hasAutoStopped = true;
+        try { window.useAdvancedRender = false; } catch (_eUar0) {}
         buildEnvironment(); window.syncEnvColorPickers();
         const _f0 = document.getElementById('fogEnable'); if (window.toggleFogAdvanced && _f0) window.toggleFogAdvanced(_f0.checked);
         setupUIControls(); window.applyCameraLockState(); window.addEventListener('resize', function() { onWindowResize(); try { if (typeof window.syncPosterize2dLayout === 'function') window.syncPosterize2dLayout(); } catch(_e0) {} try { if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); } catch(_e) {} });
@@ -1639,9 +1680,7 @@
         if (m === 'annotate' || m === 'annotate-color' || m === 'normal-arrow' || m === 'polygon3d' || m === 'prober') ts.value = m; else ts.value = 'none';
         if (window.PluginManager && typeof window.PluginManager.setMode === 'function') window.PluginManager.setMode(m);
         })();
-        // 生产端策略 A：页面重载时默认不启动光追采样，避免自动刷新导致 GPU/Shader 编译卡死
-        window.hasAutoStopped = true;
-        try { window.useAdvancedRender = false; } catch(_e) {}
+        // 生产端策略 A：页面重载时默认不启动光追采样，避免自动刷新导致 GPU/Shader 编译卡死（useAdvancedRender 已在首次 buildEnvironment 前置为 false）
         setTimeout(() => { if (!window.isUnsupported) { const loader = document.getElementById('scene-loader'); if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.style.display = 'none', 1000); } } }, 500);
         // 下一帧立刻释放光追器（如已创建），只保留普通预览渲染；需要高质量时手动点“重新渲染”
         setTimeout(() => { try { if (!window.isUnsupported && typeof window.stopRender === 'function') window.stopRender(); } catch(_e) {} }, 0);
@@ -1665,12 +1704,18 @@
         try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('visibility_visible'); } catch (_eP) {}
         }); });
         if (!portraitAnimRafId && !document.hidden) portraitAnimRafId = requestAnimationFrame(animate);
-        }); function buildEnvironment() { if (mainLight) { scene.remove(mainLight); if (mainLight.target) scene.remove(mainLight.target); }
-        const val = parseFloat(document.getElementById('lightIntensity').value); const lSize = state.lightSize; const col = getTempColor(state.lightTemp * 100);
-        if (lightType === 'spot') { mainLight = new THREE.SpotLight(col, val * 300); mainLight.angle = Math.PI/5.5; mainLight.penumbra = 0.5; mainLight.radius = lSize; scene.add(mainLight.target); }
-        else if (lightType === 'point') { mainLight = new THREE.PointLight(col, val * 250); mainLight.radius = lSize; }
-        else if (lightType === 'dir') { mainLight = new THREE.DirectionalLight(col, val * 2.8); mainLight.radius = lSize; }
-        else if (lightType === 'rect') { mainLight = new THREE.RectAreaLight(col.getHex(), val * 18, 8 * (lSize/2 + 0.1), 8 * (lSize/2 + 0.1)); }
+        }); function buildEnvironment() { if (mainLight) {
+        try { if (mainLight.shadow && mainLight.shadow.map) safeDispose(mainLight.shadow.map); } catch(_eSm) {}
+        try { if (mainLight.shadow && mainLight.shadow.mapPass) safeDispose(mainLight.shadow.mapPass); } catch(_eSmp) {}
+        scene.remove(mainLight); if (mainLight.target) scene.remove(mainLight.target); }
+        const val = parseFloat(document.getElementById('lightIntensity').value);
+        const tempEl = document.getElementById('lightTemp'); const sizeEl = document.getElementById('lightSize');
+        if (tempEl && tempEl.value !== '') { const tv = parseFloat(tempEl.value); if (Number.isFinite(tv)) state.lightTemp = Math.max(30, Math.min(90, tv)); }
+        if (sizeEl && sizeEl.value !== '') { const sv = parseFloat(sizeEl.value); if (Number.isFinite(sv)) state.lightSize = Math.max(1, Math.min(4, sv)); }
+        const lSize = state.lightSize; const col = solidGetTempColorFromKelvin100(THREE, state.lightTemp * 100);
+        const _main = createSolidMainLight(THREE, { lightType, color: col, intensitySlider: val, lightSize: lSize, useAdvancedRender: window.useAdvancedRender });
+        mainLight = _main.light;
+        if (_main.addSpotTargetToScene && mainLight.target) scene.add(mainLight.target);
         scene.add(mainLight); const gCol = new THREE.Color(window.envGroundColor || '#cccccc');
         if (!ground) { ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhysicalMaterial({ color: gCol, roughness: 1.0, metalness: 0.0 })); ground.rotation.x = -Math.PI / 2; scene.add(ground); }
         else if (ground.material) ground.material.color.copy(gCol);
@@ -1686,23 +1731,24 @@
         try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('build_environment'); } catch(_eP) {}
         }
         try { window._solidGroundShadowDirty = true; } catch (_eGsb) {} }
-        function updateLightPosition() { const phi = THREE.MathUtils.degToRad(90 - parseFloat(state.elevation)); const theta = THREE.MathUtils.degToRad(parseFloat(state.azimuth)); const x = state.radius * Math.sin(phi) * Math.cos(theta); const y = state.radius * Math.cos(phi); const z = state.radius * Math.sin(phi) * Math.sin(theta); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') mainLight.lookAt(0, 1, 0); mainLight.updateMatrixWorld();
+        function updateLightPosition() { const { x, y, z } = computeSolidMainLightCartesianPosition(THREE, state); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') mainLight.lookAt(0, 1, 0); mainLight.updateMatrixWorld();
         try { _solidRefreshRasterShadowAfterLightMove(); } catch(_eRf) {}
         try { _solidSyncGroundShadowUniforms(); } catch (_eSyncL) {}
         } lightPosUpdated = true; try { window._solidGroundShadowDirty = true; } catch (_eGsl) {} }
         function setupUIControls() {
-        document.querySelector('.control-panel').addEventListener('pointerdown', e => { if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'LABEL' && !e.target.classList.contains('env-btn')) e.stopPropagation(); });
-        document.getElementById('lightAzimuth').addEventListener('input', e => { state.azimuth = e.target.value; document.getElementById('azimuthVal').innerText = state.azimuth; updateDirTriggerByValues(); updateLightPosition(); });
-        document.getElementById('lightElevation').addEventListener('input', e => { state.elevation = e.target.value; document.getElementById('elevationVal').innerText = state.elevation; updateDirTriggerByValues(); updateLightPosition(); });
-        document.getElementById('lightDistance').addEventListener('input', e => { state.radius = parseFloat(e.target.value); document.getElementById('distanceVal').innerText = state.radius; updateLightPosition(); });
-        document.getElementById('lightTemp').addEventListener('input', e => { state.lightTemp = parseInt(e.target.value); document.getElementById('tempVal').innerText = state.lightTemp * 100; if (mainLight) { mainLight.color = getTempColor(state.lightTemp * 100); } lightPosUpdated = true; try { window._solidGroundShadowDirty = true; } catch (_eGst) {} });
-        document.getElementById('lightSize').addEventListener('input', e => { state.lightSize = parseFloat(e.target.value); document.getElementById('sizeVal').innerText = state.lightSize; buildEnvironment(); lightMoved = true; });
-        document.getElementById('lightIntensity').addEventListener('input', e => { const val = parseFloat(e.target.value); document.getElementById('intensityVal').innerText = val.toFixed(1); buildEnvironment(); lightMoved = true; });
-        document.getElementById('lightAzimuth').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_azimuth'); } catch(_eP) {} });
-        document.getElementById('lightElevation').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_elevation'); } catch(_eP) {} });
-        document.getElementById('lightDistance').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_distance'); } catch(_eP) {} });
-        document.getElementById('lightTemp').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_temp'); } catch(_eP) {} });
-        document.getElementById('lightSize').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_size'); } catch(_eP) {} });
+        installSolidMainLightSliderBindings({
+        state,
+        getUseAdvancedRender: () => window.useAdvancedRender,
+        getMainLight: () => mainLight,
+        getLightType: () => lightType,
+        updateDirTriggerByValues,
+        buildEnvironment,
+        updateLightPosition,
+        getTempColor: (t) => solidGetTempColorFromKelvin100(THREE, t),
+        assignPathTracerFlags(f) { if (f.lightPosUpdated) lightPosUpdated = true; if (f.lightMoved) lightMoved = true; },
+        requestRasterProbe(reason) { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe(reason); },
+        afterLightTempInput() { try { window._solidGroundShadowDirty = true; } catch (_eGst) {} },
+        });
         const cropBox = document.getElementById('crop-box'), dragH = document.getElementById('crop-drag-handle'), resH = document.getElementById('crop-resize-handle');
         let cDrag = false, cRes = false, stX, stY, stW, stH, stL, stT;
         dragH.addEventListener('pointerdown', e => { cDrag = true; stX = e.clientX; stY = e.clientY; stL = cropBox.offsetLeft; stT = cropBox.offsetTop; e.stopPropagation(); });

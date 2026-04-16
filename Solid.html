@@ -129,6 +129,12 @@
     import './plugins_02/Plugin_Atmosphere.js'; // ☁️ 同步接入大气透视插件
     import './plugins_02/Plugin_DepthOfField.js'; // 📷 同步接入景深虚实插件
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from './plugins_02/SolidPreviewLighting.js';
+    import {
+        computeSolidMainLightCartesianPosition,
+        createSolidMainLight,
+        installSolidMainLightSliderBindings,
+        solidGetTempColorFromKelvin100,
+    } from './plugins_02/SolidLightControlShared.js';
     window.skyEnvLightMatchMainRect = true; // 【试验·抗黑点噪点】true=更干净（更慢），false=更快（更噪）
     const SOLID_PT_ANTI_SPECKLE_TEST = true; // 方案C（完成时降噪）效果不稳，默认关闭；若要再试，改为 true
     const SOLID_MOBILE_DENOISE = false; const _solidPt = SOLID_PT_ANTI_SPECKLE_TEST
@@ -620,7 +626,6 @@
     function resetSolidPerfHardwareProgress() { window._solidPerfHardwareT0 = 0; window._solidPerfHardwareLastP = 0; window._solidPerfStageLo = 0; window._solidPerfStageHi = 0; window._solidPerfStageT0 = 0; window._solidPerfStageTau = 800; if (window.PerfTester) window.PerfTester.onProgress = null; }
     function applySolidPerfHardwarePhase(phase) { const mo = window._solidPerfHardwareIsMobile ? 1.14 : 1; const M = { scene_connect: { lo: 6, hi: 16, tau: 1000 }, ui_buffer: { lo: 16, hi: 22, tau: 700 }, gpu_dispatch: { lo: 22, hi: 30, tau: 550 }, shader_compile: { lo: 30, hi: 76, tau: 12800 }, sample_1: { lo: 76, hi: 88, tau: 2200 }, sample_2: { lo: 88, hi: 94, tau: 900 } }; const c = M[phase]; if (!c) return; window._solidPerfStageLo = c.lo; window._solidPerfStageHi = c.hi; window._solidPerfStageTau = c.tau * mo; window._solidPerfStageT0 = performance.now(); window._solidPerfHardwareLastP = Math.max(window._solidPerfHardwareLastP, c.lo); setLoaderProgress(window._solidPerfHardwareLastP); const txt = { scene_connect: '接入测试场景…', ui_buffer: '界面缓冲…', gpu_dispatch: '调度 GPU 渲染…', shader_compile: '编译着色器（可能较久）…', sample_1: '首帧渲染采样…', sample_2: '二次采样校验…' }; if (txt[phase]) setLoaderText(txt[phase]); }
     function tickSolidPerfHardwareProgress() { if (!window._solidPerfHardwareT0 || !window.PerfTester || !window.PerfTester.isTesting) return; const lo = window._solidPerfStageLo, hi = window._solidPerfStageHi; if (hi <= lo) return; const t = performance.now() - window._solidPerfStageT0; const span = hi - lo; const tau = Math.max(200, window._solidPerfStageTau || 2000); const eased = 1 - Math.exp(-t / tau); const target = lo + span * Math.min(0.96, eased); const capped = Math.min(hi - 0.02, target); const p = Math.floor(Math.max(window._solidPerfHardwareLastP, capped)); if (p !== window._solidPerfHardwareLastP) { window._solidPerfHardwareLastP = p; setLoaderProgress(p); } }
-    function getTempColor(t) { const stops = [[3000,255,160,87],[4000,255,200,140],[5000,255,239,223],[6000,255,255,255],[7500,225,235,255],[9000,190,210,255]]; let c1 = stops[0], c2 = stops[stops.length-1]; for(let i=0; i<stops.length-1; i++) { if(t>=stops[i][0] && t<=stops[i+1][0]){ c1=stops[i]; c2=stops[i+1]; break; } } const f = (t-c1[0])/(c2[0]-c1[0]||1); return new THREE.Color((c1[1]+f*(c2[1]-c1[1]))/255, (c1[2]+f*(c2[2]-c1[2]))/255, (c1[3]+f*(c2[3]-c1[3]))/255); }
     window.toggleCustomSelect = function(e, id) { e.stopPropagation(); document.querySelectorAll('.custom-options').forEach(el => { if (el.id !== id) el.classList.remove('show'); }); document.getElementById(id).classList.toggle('show'); };
     window.toggleWall = function() { window.hasWall = !window.hasWall; const btn = document.getElementById('wall-btn'); const wchk = document.getElementById('wall-btn-checkbox'); if (wchk) wchk.checked = !!window.hasWall; if (btn) { btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; } setTimeout(() => { buildEnvironment(); lightMoved = true; try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('toggle_wall'); } catch(_eP) {} }, 100); };
     // 消费端标记：插件在该标记下禁用编辑/显隐切换
@@ -1117,20 +1122,10 @@
         try { if (mainLight.shadow && mainLight.shadow.map) safeDispose(mainLight.shadow.map); } catch(_eSm) {}
         try { if (mainLight.shadow && mainLight.shadow.mapPass) safeDispose(mainLight.shadow.mapPass); } catch(_eSmp) {}
         scene.remove(mainLight); if (mainLight.target) scene.remove(mainLight.target); }
-        const val = parseFloat(document.getElementById('lightIntensity').value); const lSize = state.lightSize; const col = getTempColor(state.lightTemp * 100);
-        if (lightType === 'spot') { mainLight = new THREE.SpotLight(col, val * 300); mainLight.angle = Math.PI/5.5; mainLight.penumbra = 0.5; mainLight.radius = lSize; scene.add(mainLight.target); } else if (lightType === 'point') { mainLight = new THREE.PointLight(col, val * 250); mainLight.radius = lSize; } else if (lightType === 'dir') { mainLight = new THREE.DirectionalLight(col, val * 2.8); mainLight.radius = lSize; } else if (lightType === 'rect') {
-        // RectAreaLight 在部分平台的“光栅(WebGL)路径”会完全不生效（导致画面接近全黑）。
-        // 为了保持“面积光”在光栅模式可用，这里做兼容降级：光追用 RectAreaLight，光栅用 SpotLight 近似（支持投影）。
-        if (window.useAdvancedRender) {
-        mainLight = new THREE.RectAreaLight(col.getHex(), val * 18, 8 * (lSize/2 + 0.1), 8 * (lSize/2 + 0.1));
-        } else {
-        mainLight = new THREE.SpotLight(col, val * 300);
-        mainLight.angle = Math.PI / 3.2;
-        mainLight.penumbra = 0.75;
-        mainLight.radius = lSize;
-        scene.add(mainLight.target);
-        }
-        }
+        const val = parseFloat(document.getElementById('lightIntensity').value); const lSize = state.lightSize; const col = solidGetTempColorFromKelvin100(THREE, state.lightTemp * 100);
+        const _main = createSolidMainLight(THREE, { lightType, color: col, intensitySlider: val, lightSize: lSize, useAdvancedRender: window.useAdvancedRender });
+        mainLight = _main.light;
+        if (_main.addSpotTargetToScene && mainLight.target) scene.add(mainLight.target);
         scene.add(mainLight); const gCol = new THREE.Color(window.envGroundColor || '#cccccc');
         if (!ground) { ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhysicalMaterial({ color: gCol, roughness: 1.0, metalness: 0.0 })); ground.rotation.x = -Math.PI / 2; scene.add(ground); }
         else if (ground.material) ground.material.color.copy(gCol);
@@ -1147,38 +1142,25 @@
             try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('build_environment'); } catch(_eP) {}
         }
         }
-        function updateLightPosition() { const phi = THREE.MathUtils.degToRad(90 - parseFloat(state.elevation)); const theta = THREE.MathUtils.degToRad(parseFloat(state.azimuth)); const x = state.radius * Math.sin(phi) * Math.cos(theta); const y = state.radius * Math.cos(phi); const z = state.radius * Math.sin(phi) * Math.sin(theta); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') { mainLight.lookAt(0, 1, 0); } mainLight.updateMatrixWorld();
+        function updateLightPosition() { const { x, y, z } = computeSolidMainLightCartesianPosition(THREE, state); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') { mainLight.lookAt(0, 1, 0); } mainLight.updateMatrixWorld();
         try { _solidRefreshRasterShadowAfterLightMove(); } catch(_eRf) {}
         // 光栅态：阴影软化参数由 SolidPreviewLighting 统一管理（syncShadows），避免滑块交互时出现“参数被覆盖→阴影突然变硬”。
         try { _solidSyncGroundShadowUniforms(); } catch (_eSyncL) {}
         } lightPosUpdated = true; }
-        function setupUIControls() { document.querySelector('.control-panel').addEventListener('pointerdown', e => { if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'LABEL' && !e.target.classList.contains('env-btn')) e.stopPropagation(); });
-        document.getElementById('lightAzimuth').addEventListener('input', e => { state.azimuth = e.target.value; document.getElementById('azimuthVal').innerText = state.azimuth; updateDirTriggerByValues(); updateLightPosition(); });
-        document.getElementById('lightAzimuth').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_azimuth'); } catch(_eP) {} });
-        document.getElementById('lightElevation').addEventListener('input', e => { state.elevation = e.target.value; document.getElementById('elevationVal').innerText = state.elevation; updateDirTriggerByValues(); updateLightPosition(); });
-        document.getElementById('lightElevation').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_elevation'); } catch(_eP) {} });
-        document.getElementById('lightDistance').addEventListener('input', e => { state.radius = parseFloat(e.target.value); document.getElementById('distanceVal').innerText = state.radius; updateLightPosition(); });
-        document.getElementById('lightDistance').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_distance'); } catch(_eP) {} });
-        document.getElementById('lightTemp').addEventListener('input', e => { state.lightTemp = parseInt(e.target.value); document.getElementById('tempVal').innerText = state.lightTemp * 100; if (mainLight) { mainLight.color = getTempColor(state.lightTemp * 100); } lightPosUpdated = true; });
-        document.getElementById('lightTemp').addEventListener('change', () => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_temp'); } catch(_eP) {} });
-        // Size slider: throttle heavy rebuild (shadow maps) for performance.
-        let __solidLightSizeRebuildTimer = 0;
-        document.getElementById('lightSize').addEventListener('input', e => {
-            state.lightSize = parseFloat(e.target.value);
-            document.getElementById('sizeVal').innerText = state.lightSize;
-            lightMoved = true;
-            if (__solidLightSizeRebuildTimer) clearTimeout(__solidLightSizeRebuildTimer);
-            __solidLightSizeRebuildTimer = setTimeout(() => {
-                __solidLightSizeRebuildTimer = 0;
-                try { buildEnvironment(); } catch(_e) {}
-            }, 90);
+        function setupUIControls() {
+        installSolidMainLightSliderBindings({
+        state,
+        getUseAdvancedRender: () => window.useAdvancedRender,
+        getMainLight: () => mainLight,
+        getLightType: () => lightType,
+        updateDirTriggerByValues,
+        buildEnvironment,
+        updateLightPosition,
+        getTempColor: (t) => solidGetTempColorFromKelvin100(THREE, t),
+        assignPathTracerFlags(f) { if (f.lightPosUpdated) lightPosUpdated = true; if (f.lightMoved) lightMoved = true; },
+        requestRasterProbe(reason) { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe(reason); },
         });
-        document.getElementById('lightSize').addEventListener('change', () => {
-            if (__solidLightSizeRebuildTimer) { clearTimeout(__solidLightSizeRebuildTimer); __solidLightSizeRebuildTimer = 0; }
-            try { buildEnvironment(); } catch(_e) {}
-            try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_size'); } catch(_eP) {}
-        });
-        document.getElementById('lightIntensity').addEventListener('input', e => { const val = parseFloat(e.target.value); document.getElementById('intensityVal').innerText = val.toFixed(1); buildEnvironment(); lightMoved = true; }); }
+        }
         function __solidEvalImmersiveIdle() {
             if (!document.body) return;
             const now = performance.now();
