@@ -99,6 +99,9 @@
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { TransformControls } from 'three/addons/controls/TransformControls.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer';
     import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js';import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js';
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from '../../plugins_02/SolidPreviewLighting.js';
+    import { installSolidEnvHostBindings } from '../../plugins_02/SolidEnvControlShared.js';
+    import { installSolidAtmosphereHostBindings } from '../../plugins_02/SolidAtmosphereControlShared.js';
+    import { installSolidAssistHostBindings } from '../../plugins_02/SolidAssistControlShared.js';
     import { computeSolidMainLightCartesianPosition, createSolidMainLight, installSolidMainLightSliderBindings, solidGetTempColorFromKelvin100 } from '../../plugins_02/SolidLightControlShared.js';
     window.skyEnvLightMatchMainRect = true; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false;
@@ -139,11 +142,21 @@
         solidCreateSyncCameraLockUI();
     };
     window.sumDuration = 0; window.useAdvancedRender = true; window.isExporting = false; window.hasAutoStopped = false; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
-    window.changeAtmosphere = function(enabled, density, noise) { window.isFogEnabled = enabled; window.fogDensity = density; if(noise !== undefined) window.fogNoise = noise;
-    if(window.AtmosphereManager) window.AtmosphereManager.updateParams(enabled, density, window.fogNoise); if(typeof needsUpdate !== 'undefined') { needsUpdate = true; lightMoved = true; } };
-    window.changeDoF = function(enabled, aperture, focus) { if(window.DoFManager) window.DoFManager.updateParams(enabled, aperture, focus);
-    if(window.AtmosphereManager && window.AtmosphereManager.updateDoFParams) window.AtmosphereManager.updateDoFParams(enabled, aperture, focus);
-    if(typeof needsUpdate !== 'undefined') { needsUpdate = true; lightMoved = true; } }; window.updateDoFUIFromRaycaster = function(focusDist) { const slider = document.getElementById('dofFocusSlider');
+    // changePosterize/changeAtmosphere/changeDoF/setEnvColor/setSkyLightScale/toggleWall 由 shared 胶水统一注入（生产端暂不注入 ControlPanel UI，但语义保持一致）
+    const markNeedsUpdate = function(reason) { needsUpdate = true; lightMoved = true; };
+    installSolidEnvHostBindings({
+        THREE,
+        getScene: () => scene,
+        getGround: () => ground,
+        getWalls: () => window.walls,
+        getLightType: () => lightType,
+        buildEnvironment: (typeof buildEnvironment === 'function') ? buildEnvironment : undefined,
+        markNeedsUpdate,
+        requestRasterProbe: (reason) => { try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe(reason); } catch(_e) {} },
+    });
+    installSolidAtmosphereHostBindings({ markNeedsUpdate });
+    installSolidAssistHostBindings({ markNeedsUpdate });
+    window.updateDoFUIFromRaycaster = function(focusDist) { const slider = document.getElementById('dofFocusSlider');
     if(slider) { slider.value = focusDist; if(window.updateDoFUI) window.updateDoFUI(); } };
     if (window.PosterizeShared && typeof window.PosterizeShared.init === 'function') {
     window.PosterizeShared.init({ containerId: 'canvas-container', getLogger: () => window.hwLog });
@@ -151,11 +164,7 @@
     window.syncPosterize2dLayout = function() { if (window.PosterizeShared && window.PosterizeShared.syncLayout) window.PosterizeShared.syncLayout(); };
     window.ensurePosterize2dOverlay = function() { return (window.PosterizeShared && window.PosterizeShared.ensureOverlay) ? window.PosterizeShared.ensureOverlay() : null; };
     window.refreshIosPosterizeOverlayFromWebGL = function() { if (window.PosterizeShared && window.PosterizeShared.refreshOverlayFromWebGL) window.PosterizeShared.refreshOverlayFromWebGL(); };
-    window.changePosterize = function(levels) {
-    if (window.PosterizeShared && typeof window.PosterizeShared.apply === 'function') { window.PosterizeShared.apply(levels); return; }
-    window.posterizeLevel = levels;
-    const slider = document.getElementById('posterizeSlider'); const valDisp = document.getElementById('posterizeVal'); if (slider && valDisp) {
-    const sliderVal = levels === 0 ? 0 : (21 - levels); slider.value = sliderVal; valDisp.innerText = levels === 0 ? "无" : levels + "阶"; } };
+    // window.changePosterize 已由 SolidAssistControlShared 注入
     window._logCache = []; window.addHwLog = function(msg) { const panel = document.getElementById('debug-log-panel'); const content = document.getElementById('log-content'); if (panel && localStorage.getItem('SolidCreateDebugUI') === '1') panel.style.display = 'block'; const time = new Date().toLocaleTimeString(); window._logCache.push(`[${time}] ${msg}`); if(window._logCache.length > 50) window._logCache.shift(); if (content) { content.value = window._logCache.join('\n'); content.scrollTop = content.scrollHeight; } console.log(`[HW-LOG] ${msg}`); };
     window.diagnosticPanelLog = function(msg) { const panel = document.getElementById('debug-log-panel'); const content = document.getElementById('log-content'); if (panel) panel.style.display = 'block'; const time = new Date().toLocaleTimeString(); window._logCache.push(`[${time}] ${msg}`); if (window._logCache.length > 80) window._logCache.shift(); if (content) { content.value = window._logCache.join('\n'); content.scrollTop = content.scrollHeight; } };
     window.copyDebugLog = function() { const content = document.getElementById('log-content'); content.select(); try { document.execCommand('copy'); alert("成功复制日志！请粘贴发给我。"); } catch(e) { alert("自动复制失败，请在文本框内全选文字手动复制"); } }; window.hwLog = window.addHwLog;
