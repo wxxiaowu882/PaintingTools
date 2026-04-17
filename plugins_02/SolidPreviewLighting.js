@@ -4,6 +4,8 @@
 // 生产端页面（如石膏人像沙盒）请与 Solid.html 一致：只 import 本模块并 wiring install/setEnabled/syncShadows，
 // 不要在页面内复制地面阴影的 onBeforeCompile / ShaderChunk 改写逻辑。
 
+import { SOLID_RASTER_SHADOW_PERF } from '../js/PaintingConfig.js';
+
 /**
  * 与 Solid.html 中 shouldSkipEnvProbe 条件一致，供消费端与生产端共用，避免各写一套导致行为分叉。
  * @param {() => { useAdvancedRender?: boolean; isLoadingScene?: boolean; currentSceneData?: unknown; currentSceneIndex?: number }} getFlags
@@ -50,6 +52,84 @@ export function createSolidPreviewLightingManager(opts) {
   let _receiverEnsureBusy = false;
   let _receiverWallsSigLast = '';
   let _receiverModelsSigLast = '';
+
+  // ---------- Perf tiering (interactive vs idle) ----------
+  // We only adjust uniforms (taps/rotate) during interaction to avoid shader recompiles.
+  let _perfTier = 'idle'; // 'idle' | 'interactive'
+  let _perfTierLastApplied = '';
+  let _perfLastSphereUpdateAt = 0;
+  let _perfLastEnsureAt = 0;
+  let _perfLastLogAt = 0;
+
+  function _perfNow() {
+    return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  }
+
+  function _perfIsInteractive(now) {
+    try {
+      const cfg = SOLID_RASTER_SHADOW_PERF;
+      if (!cfg || !cfg.enableDynamicRasterShadowQuality) return false;
+      const w = (typeof window !== 'undefined') ? window : null;
+      if (!w) return false;
+      if (w._orbitInteracting) return true;
+      const t = Number(w._solidLastInteractAt || 0);
+      const winMs = Math.max(0, Number(cfg.interactWindowMs) || 0);
+      return (t > 0) && (now - t) <= winMs;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function _perfUpdateTier(now) {
+    try {
+      const cfg = SOLID_RASTER_SHADOW_PERF;
+      if (!cfg || !cfg.enableDynamicRasterShadowQuality) {
+        _perfTier = 'idle';
+        return;
+      }
+      const w = (typeof window !== 'undefined') ? window : null;
+      const lastInteract = w ? Number(w._solidLastInteractAt || 0) : 0;
+      const restoreMs = Math.max(0, Number(cfg.restoreDelayMs) || 0);
+      const interactive = _perfIsInteractive(now);
+      if (interactive) {
+        _perfTier = 'interactive';
+      } else {
+        // Consider idle only after restoreDelayMs has passed since the last interaction.
+        if (!lastInteract || (now - lastInteract) >= restoreMs) _perfTier = 'idle';
+        else _perfTier = 'interactive';
+      }
+    } catch (_e) {}
+  }
+
+  function _perfTierCfg() {
+    const cfg = SOLID_RASTER_SHADOW_PERF || {};
+    const t = (cfg.qualityTiers && cfg.qualityTiers[_perfTier]) ? cfg.qualityTiers[_perfTier] : null;
+    return t || (cfg.qualityTiers ? cfg.qualityTiers.idle : null) || null;
+  }
+
+  function _perfCpuCfg() {
+    const cfg = SOLID_RASTER_SHADOW_PERF || {};
+    const t = (cfg.cpuThrottle && cfg.cpuThrottle[_perfTier]) ? cfg.cpuThrottle[_perfTier] : null;
+    return t || (cfg.cpuThrottle ? cfg.cpuThrottle.idle : null) || null;
+  }
+
+  function _perfApplyUniformQuality(sharedUd, isMobile, isIosHost) {
+    try {
+      const cfg = SOLID_RASTER_SHADOW_PERF;
+      if (!cfg || !cfg.enableDynamicRasterShadowQuality) return false;
+      if (!sharedUd) return false;
+      const q = _perfTierCfg();
+      if (!q) return false;
+      const mob = !!(isMobile || isIosHost);
+      const taps = mob ? Number(q.tapsMobile) : Number(q.tapsDesktop);
+      const rot = Number(q.rotate);
+      if (sharedUd.uSolidShadowGaussTaps) sharedUd.uSolidShadowGaussTaps.value = Math.max(4.0, Math.min(32.0, taps || 16.0));
+      if (sharedUd.uSolidShadowGaussRotate) sharedUd.uSolidShadowGaussRotate.value = (rot ? 1.0 : 0.0);
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
 
   // ---------- Raster shadow softening params ----------
   // Goal: keep contact edge relatively sharp, then progressively blur farther away from the model footprint
@@ -98,6 +178,11 @@ export function createSolidPreviewLightingManager(opts) {
 
   function _rasterShadowDbgEnabled() {
     try { return typeof window !== 'undefined' && localStorage.getItem('SolidRasterShadowDbg') === '1'; }
+    catch (_e) { return false; }
+  }
+
+  function _perfDbgEnabled() {
+    try { return !!(SOLID_RASTER_SHADOW_PERF && SOLID_RASTER_SHADOW_PERF.debugLog); }
     catch (_e) { return false; }
   }
 
@@ -607,6 +692,9 @@ export function createSolidPreviewLightingManager(opts) {
   function syncGroundShadowUniforms() {
     try {
       if (!previewEnabled) return;
+      const nowPerf = _perfNow();
+      _perfUpdateTier(nowPerf);
+
       // Keep shadowMap type stable in preview mode.
       // Some hosts may switch shadowMap.type during light moves; PCFSoft ignores shadowRadius in r164,
       // which would make our distance-based softening appear “hard”.
@@ -629,12 +717,39 @@ export function createSolidPreviewLightingManager(opts) {
       if (ud.uSolidSphereDebug) ud.uSolidSphereDebug.value = _contactPatchDebugAllEnabled() ? 1.0 : 0.0;
       if (ud.uSolidDbgForceRed) ud.uSolidDbgForceRed.value = _contactPatchForceRedEnabled() ? 1.0 : 0.0;
 
+      // Apply dynamic uniform quality (taps/rotate) only on tier changes.
+      // This keeps interaction fast while guaranteeing idle recovers to baseline.
+      try {
+        if (SOLID_RASTER_SHADOW_PERF && SOLID_RASTER_SHADOW_PERF.enableDynamicRasterShadowQuality) {
+          if (_perfTier !== _perfTierLastApplied) {
+            const isMobile = !!getIsMobile();
+            const isIosHost = !!getIsIosHost();
+            _perfApplyUniformQuality(ud, isMobile, isIosHost);
+            _perfTierLastApplied = _perfTier;
+            // When recovering to idle, force one full sync to guarantee final quality state.
+            if (_perfTier === 'idle') {
+              try { syncShadows(); } catch (_eSyncIdle) {}
+            }
+          }
+        }
+      } catch (_eTier) {}
+
+      // Optional debug log (throttled).
+      try {
+        if (_perfDbgEnabled()) {
+          if ((nowPerf - _perfLastLogAt) > 900) {
+            _perfLastLogAt = nowPerf;
+            log('[RasterShadowPerf] tier=' + _perfTier);
+          }
+        }
+      } catch (_eLog) {}
+
       // Deterministic auto-heal:
       // - immediate re-arm when receiver material signature changes
       // - throttled safety check for unexpected missing patch
       try {
         if (!_receiverEnsureBusy) {
-          const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          const now = nowPerf;
           const mainLight = getMainLight();
           const isDir = !!(mainLight && mainLight.isDirectionalLight);
           const wantWalls = _receiverSoftShadowWallsEnabled();
@@ -656,7 +771,10 @@ export function createSolidPreviewLightingManager(opts) {
             }
           }
 
-          const needByThrottle = (now - _receiverPatchLastEnsureAt) > 380 && _shouldEnsureReceiverSoftPatch();
+          // Throttle auto-heal more aggressively during interaction to avoid extra syncShadows cost.
+          const cpuCfg = _perfCpuCfg() || {};
+          const ensureMs = Math.max(50, Number(cpuCfg.receiverEnsureMs) || 380);
+          const needByThrottle = (now - _receiverPatchLastEnsureAt) > ensureMs && _shouldEnsureReceiverSoftPatch();
           if (changed || needByThrottle) {
             _receiverEnsureBusy = true;
             try { syncShadows(); } catch (_eReSync) {}
@@ -685,6 +803,12 @@ export function createSolidPreviewLightingManager(opts) {
       // IMPORTANT: this must NOT be limited to builtin spheres; otherwise only spheres get “contact seam” protection.
       // We approximate near-ground casters as spheres on the ground plane (xz footprint).
       if (ud.uSolidSphereCenters && ud.uSolidSphereRadii && ud.uSolidSphereCount) {
+        // CPU throttle: during interaction we update these approximations at a lower rate.
+        const cpuCfg = _perfCpuCfg() || {};
+        const sphereEveryMs = Math.max(0, Number(cpuCfg.sphereOccluderUpdateMs) || 0);
+        if (sphereEveryMs > 0 && (nowPerf - _perfLastSphereUpdateAt) < sphereEveryMs) return;
+        _perfLastSphereUpdateAt = nowPerf;
+
         let n = 0;
         let nBuiltin = 0;
         const tmpBox = new THREE.Box3();
@@ -764,6 +888,8 @@ export function createSolidPreviewLightingManager(opts) {
       const st = getLightState() || {};
 
       const dbg = _rasterShadowDbgEnabled();
+      const nowPerf = _perfNow();
+      _perfUpdateTier(nowPerf);
 
       const clearGroundSoftPatch = () => {
         try {
@@ -813,8 +939,22 @@ export function createSolidPreviewLightingManager(opts) {
       mainLight.castShadow = true;
       const shadowLight = mainLight;
       const sh = shadowLight.shadow;
-      const ms = isMobile ? 3072 : 4096;
+      // Optional dynamic shadowMap mapSize tiering (OFF by default).
+      // We only change it on tier transitions (via syncShadows calls), never per-frame.
+      let ms = isMobile ? 3072 : 4096;
       const range = Math.min(175, Math.max(96, (Number(st.radius) || 18) * 2.75 + 48));
+      try {
+        const cfg = SOLID_RASTER_SHADOW_PERF;
+        if (cfg && cfg.enableDynamicRasterShadowQuality && cfg.enableDynamicShadowMapSize && cfg.shadowMapSizeTiers) {
+          const t = (_perfTier === 'interactive') ? 'interactive' : 'idle';
+          if (t === 'interactive') {
+            ms = isMobile ? Number(cfg.shadowMapSizeTiers.interactiveMobile) : Number(cfg.shadowMapSizeTiers.interactiveDesktop);
+          } else {
+            ms = isMobile ? Number(cfg.shadowMapSizeTiers.idleMobile) : Number(cfg.shadowMapSizeTiers.idleDesktop);
+          }
+          ms = Math.max(512, Math.min(8192, ms || (isMobile ? 3072 : 4096)));
+        }
+      } catch (_eMsTier) {}
 
       if (shadowLight.isSpotLight) {
         sh.mapSize.set(ms, ms);
@@ -837,7 +977,19 @@ export function createSolidPreviewLightingManager(opts) {
         cam.updateProjectionMatrix();
       } else if (shadowLight.isPointLight) {
         // Point/cube shadow: increase resolution to reduce aliasing on model surfaces.
-        const pms = isMobile ? 1536 : 2048;
+        let pms = isMobile ? 1536 : 2048;
+        try {
+          const cfg = SOLID_RASTER_SHADOW_PERF;
+          if (cfg && cfg.enableDynamicRasterShadowQuality && cfg.enableDynamicShadowMapSize && cfg.shadowMapSizeTiers) {
+            const t = (_perfTier === 'interactive') ? 'interactive' : 'idle';
+            if (t === 'interactive') {
+              pms = isMobile ? Number(cfg.shadowMapSizeTiers.interactivePointMobile) : Number(cfg.shadowMapSizeTiers.interactivePointDesktop);
+            } else {
+              pms = isMobile ? Number(cfg.shadowMapSizeTiers.idlePointMobile) : Number(cfg.shadowMapSizeTiers.idlePointDesktop);
+            }
+            pms = Math.max(256, Math.min(4096, pms || (isMobile ? 1536 : 2048)));
+          }
+        } catch (_ePmsTier) {}
         sh.mapSize.set(pms, pms);
         sh.radius = 2.2;
         sh.blurSamples = 24;
@@ -920,6 +1072,12 @@ export function createSolidPreviewLightingManager(opts) {
           if (!m.userData.uSolidContactPatchEnable) m.userData.uSolidContactPatchEnable = { value: 1.0 };
           if (!m.userData.uSolidBuiltinSphereCount) m.userData.uSolidBuiltinSphereCount = { value: 0 };
           m.userData.uSolidContactPatchEnable.value = _contactPatchEnabled() ? 1.0 : 0.0;
+
+          // Perf tiering: keep gaussian PCF taps/rotate in sync with current tier.
+          // This is safe because these are uniforms (no shader recompile).
+          if (!m.userData.uSolidShadowGaussTaps) m.userData.uSolidShadowGaussTaps = { value: 16.0 };
+          if (!m.userData.uSolidShadowGaussRotate) m.userData.uSolidShadowGaussRotate = { value: 1.0 };
+          _perfApplyUniformQuality(m.userData, isMobile, isIosHost);
 
           m.userData._solidShadowSoftVer = (m.userData._solidShadowSoftVer || 0) + 1;
           const _ver = m.userData._solidShadowSoftVer;
