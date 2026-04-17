@@ -97,6 +97,82 @@ export function createSolidPreviewLightingManager(opts) {
     catch (_e) { return false; }
   }
 
+  const _tmpFootprintV = new THREE.Vector3();
+
+  /**
+   * 地面脚印圆盘：旧版用水平 AABB 外接圆 (0.5*max(sx,sz))，头像等竖高网格会把整头宽度当“脚”，补丁过大。
+   * 优先用「底部一条带」内顶点在 xz 上的包围盒，再混合内外接圆；无几何或蒙皮实例则退回较紧的 AABB 混合半径。
+   * @returns {{ cx: number, cz: number, r: number } | null}
+   */
+  function _computeFootprintSphereOnGround(node, groundY, groundEps, tmpBox, tmpSize) {
+    try {
+      tmpBox.setFromObject(node);
+      if (!tmpBox || tmpBox.isEmpty()) return null;
+      const minY = (tmpBox.min && tmpBox.min.y != null) ? tmpBox.min.y : 1e9;
+      if (minY > groundY + groundEps) return null;
+
+      tmpBox.getSize(tmpSize);
+      const sx = Math.abs(tmpSize.x);
+      const sz = Math.abs(tmpSize.z);
+      const tmpH = tmpBox.max.y - tmpBox.min.y;
+      const bminY = tmpBox.min.y;
+      const halfMin = 0.5 * Math.min(sx, sz);
+      const halfMax = 0.5 * Math.max(sx, sz);
+      const rFallback = Math.max(0.04, halfMax);
+
+      let cx = 0.5 * (tmpBox.min.x + tmpBox.max.x);
+      let cz = 0.5 * (tmpBox.min.z + tmpBox.max.z);
+      // 比纯外接圆紧：长短轴混合（细长物体明显缩小）
+      let r = Math.max(0.04, 0.62 * halfMin + 0.38 * halfMax);
+
+      const geom = node.geometry;
+      const canSampleVerts =
+        geom &&
+        geom.attributes &&
+        geom.attributes.position &&
+        !node.isSkinnedMesh &&
+        !node.isInstancedMesh;
+
+      if (canSampleVerts) {
+        const posAttr = geom.attributes.position;
+        const count = posAttr.count;
+        const sliceH = Math.min(Math.max(tmpH * 0.14, 0.025), 0.11);
+        const yCut = bminY + sliceH;
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minZ = Infinity;
+        let maxZ = -Infinity;
+        let nHit = 0;
+        const stride = Math.max(1, Math.floor(count / 14000));
+        const m = node.matrixWorld;
+        for (let vi = 0; vi < count; vi += stride) {
+          _tmpFootprintV.fromBufferAttribute(posAttr, vi).applyMatrix4(m);
+          if (_tmpFootprintV.y <= yCut + 1e-5) {
+            const vx = _tmpFootprintV.x;
+            const vz = _tmpFootprintV.z;
+            if (vx < minX) minX = vx;
+            if (vx > maxX) maxX = vx;
+            if (vz < minZ) minZ = vz;
+            if (vz > maxZ) maxZ = vz;
+            nHit++;
+          }
+        }
+        if (nHit >= 2 && maxX > minX && maxZ > minZ) {
+          const frx = 0.5 * (maxX - minX);
+          const frz = 0.5 * (maxZ - minZ);
+          cx = 0.5 * (minX + maxX);
+          cz = 0.5 * (minZ + maxZ);
+          const rBlend = 0.58 * Math.min(frx, frz) + 0.42 * Math.max(frx, frz);
+          r = Math.min(rFallback, Math.max(0.04, rBlend));
+        }
+      }
+
+      return { cx, cz, r };
+    } catch (_eFp) {
+      return null;
+    }
+  }
+
   // ---------- Shadow soft ground patch (consumer extracted) ----------
   function _fitRasterShadowFrustumForSceneGroup(lightOverride) {
     try {
@@ -202,24 +278,62 @@ export function createSolidPreviewLightingManager(opts) {
       }
       ud.uSolidMainLightDir.value.copy(d);
 
+      // Keep sphere-based occlusion data up-to-date every frame.
+      // IMPORTANT: this must NOT be limited to builtin spheres; otherwise only spheres get “contact seam” protection.
+      // We approximate near-ground casters as spheres on the ground plane (xz footprint).
       if (ud.uSolidSphereCenters && ud.uSolidSphereRadii && ud.uSolidSphereCount) {
         let n = 0;
+        const tmpBox = new THREE.Box3();
+        const tmpSize = new THREE.Vector3();
+        const tmpCenter = new THREE.Vector3();
         const tmpPos = new THREE.Vector3();
         const tmpScale = new THREE.Vector3();
-        if (sceneGroup && sceneGroup.traverse) {
-          sceneGroup.traverse((obj) => {
-            if (n >= 8) return;
-            if (!obj || !obj.isMesh) return;
-            if (!obj.userData || obj.userData.type !== 'builtin' || obj.userData.shape !== 'sphere') return;
+        const groundY = (ground && ground.position) ? ground.position.y : 0;
+        const epsY = 0.12; // tolerant: many assets float slightly; keep in sync with syncShadows()
+        // Manual traversal allows early-exit once we've got enough spheres.
+        // We do two passes in one walk: (1) builtin spheres (exact center/radius), (2) other near-ground casters (footprint spheres).
+        if (sceneGroup) {
+          const stack = [sceneGroup];
+          const otherCandidates = [];
+          while (stack.length) {
+            const node = stack.pop();
+            if (!node) continue;
+            const children = node.children;
+            if (children && children.length) {
+              for (let i = 0; i < children.length; i++) stack.push(children[i]);
+            }
+            if (!node.isMesh) continue;
+            if (!node.castShadow) continue;
+
+            // Pass #1: keep builtin spheres exact (historical behavior: fixes sphere shadow position/size).
             try {
-              obj.getWorldPosition(tmpPos);
-              obj.getWorldScale(tmpScale);
-              const r = Math.max(0.0001, Math.abs(tmpScale.y) * 2.0);
-              ud.uSolidSphereCenters.value[n].copy(tmpPos);
-              ud.uSolidSphereRadii.value[n] = r;
+              if (node.userData && node.userData.type === 'builtin' && node.userData.shape === 'sphere') {
+                if (n < 8) {
+                  node.getWorldPosition(tmpPos);
+                  node.getWorldScale(tmpScale);
+                  const r = Math.max(0.0001, Math.abs(tmpScale.y) * 2.0); // SphereGeometry radius=2
+                  ud.uSolidSphereCenters.value[n].copy(tmpPos);
+                  ud.uSolidSphereRadii.value[n] = r;
+                  n++;
+                }
+                continue;
+              }
+            } catch (_eBs) {}
+
+            // Pass #2: collect others for footprint approximation (filled after spheres).
+            if (n < 8) otherCandidates.push(node);
+          }
+
+          for (let i = 0; i < otherCandidates.length && n < 8; i++) {
+            const node = otherCandidates[i];
+            try {
+              const fp = _computeFootprintSphereOnGround(node, groundY, epsY, tmpBox, tmpSize);
+              if (!fp) continue;
+              ud.uSolidSphereCenters.value[n].set(fp.cx, groundY, fp.cz);
+              ud.uSolidSphereRadii.value[n] = fp.r;
               n++;
             } catch (_eS) {}
-          });
+          }
         }
         ud.uSolidSphereCount.value = n;
       }
@@ -369,10 +483,25 @@ export function createSolidPreviewLightingManager(opts) {
           if (!m.userData.uSolidSphereCount) m.userData.uSolidSphereCount = { value: 0 };
           if (!m.userData.uSolidSphereCenters) m.userData.uSolidSphereCenters = { value: Array.from({ length: 8 }, () => new THREE.Vector3()) };
           if (!m.userData.uSolidSphereRadii) m.userData.uSolidSphereRadii = { value: new Float32Array(8) };
+          // Sphere-based patch (reference implementation): apply only on ground, gated to dark-side.
+          if (!m.userData.uSolidSpherePatchStrength) m.userData.uSolidSpherePatchStrength = { value: 0.95 };
+          // Debug toggles (default OFF).
+          if (!m.userData.uSolidSphereDebug) m.userData.uSolidSphereDebug = { value: 1.0 };
+          if (!m.userData.uSolidDbgForceRed) m.userData.uSolidDbgForceRed = { value: 0.0 };
           if (!m.userData.uSolidMainLightType) m.userData.uSolidMainLightType = { value: 0 };
           if (!m.userData.uSolidMainLightPos) m.userData.uSolidMainLightPos = { value: new THREE.Vector3() };
           if (!m.userData.uSolidMainLightDir) m.userData.uSolidMainLightDir = { value: new THREE.Vector3(0, 1, 0) };
           if (!m.userData.uSolidShadowContactPull) m.userData.uSolidShadowContactPull = { value: 0.00065 };
+          // Dark-side contact seam leak fix (ground-only; directional/spot use 2D shadow map).
+          if (!m.userData.uSolidShadowSeamStrength) m.userData.uSolidShadowSeamStrength = { value: 0.85 };
+          if (!m.userData.uSolidShadowSeamPush) m.userData.uSolidShadowSeamPush = { value: 0.00065 };
+          if (!m.userData.uSolidShadowSeamRadius) m.userData.uSolidShadowSeamRadius = { value: 1.0 };
+          // Scheme A: direction-locked narrow wedge patch (ground-only).
+          if (!m.userData.uSolidWedgeEnable) m.userData.uSolidWedgeEnable = { value: 1.0 };
+          if (!m.userData.uSolidWedgeStrength) m.userData.uSolidWedgeStrength = { value: 0.65 };
+          if (!m.userData.uSolidWedgeWidth) m.userData.uSolidWedgeWidth = { value: 0.18 };
+          if (!m.userData.uSolidWedgeLength) m.userData.uSolidWedgeLength = { value: 0.90 };
+          if (!m.userData.uSolidWedgeDebug) m.userData.uSolidWedgeDebug = { value: 0.0 };
           if (!m.userData.uSolidShadowSoftRange) m.userData.uSolidShadowSoftRange = { value: new THREE.Vector4(2.8, 28.0, 2.8, 7.8) };
           if (!m.userData.uSolidShadowSoftStrength) m.userData.uSolidShadowSoftStrength = { value: 16.0 };
           if (!m.userData.uSolidShadowSoftExp) m.userData.uSolidShadowSoftExp = { value: 2.25 };
@@ -440,6 +569,22 @@ export function createSolidPreviewLightingManager(opts) {
             }
           } catch (_ePull) {}
 
+          // seam fix defaults (keep conservative; only ground)
+          try {
+            const mob = (isMobile || isIosHost);
+            // More push on iOS/mobile where precision tends to show gaps.
+            // iPad tends to show jagged seam leaks: use slightly larger radius and push.
+            m.userData.uSolidShadowSeamPush.value = isIosHost ? 0.00145 : (mob ? 0.00105 : 0.00065);
+            m.userData.uSolidShadowSeamStrength.value = mob ? 0.92 : 0.85;
+            m.userData.uSolidShadowSeamRadius.value = isIosHost ? 1.35 : 1.0;
+          } catch (_eSeamCfg) {}
+
+          // wedge patch defaults (keep OFF by default; we are switching to sphere-based patch)
+          try {
+            m.userData.uSolidWedgeEnable.value = 0.0;
+            m.userData.uSolidWedgeDebug.value = 0.0;
+          } catch (_eWdg) {}
+
           // softening curve parameters (per light type; keep independent)
           try {
             const isPoint = !!(mainLight && mainLight.isPointLight);
@@ -489,25 +634,53 @@ export function createSolidPreviewLightingManager(opts) {
             m.userData.uSolidMainLightDir.value.copy(d);
           } catch (_eL) {}
 
-          // spheres
+          // spheres（与 syncGroundShadowUniforms 相同：builtin 优先，再其它近地投射体；脚印半径见 _computeFootprintSphereOnGround）
           try {
             let n = 0;
             const tmpPos = new THREE.Vector3();
             const tmpScale = new THREE.Vector3();
-            if (sceneGroup && sceneGroup.traverse) {
-              sceneGroup.traverse((obj) => {
-                if (n >= 8) return;
-                if (!obj || !obj.isMesh) return;
-                if (!obj.userData || obj.userData.type !== 'builtin' || obj.userData.shape !== 'sphere') return;
+            const tmpBox = new THREE.Box3();
+            const tmpSize = new THREE.Vector3();
+            const tmpCenter = new THREE.Vector3();
+            const groundY = (ground && ground.position) ? ground.position.y : 0;
+            const epsY = 0.12; // tolerant: many assets float slightly; keep in sync with syncGroundShadowUniforms()
+            if (sceneGroup) {
+              const stack = [sceneGroup];
+              const otherCandidates = [];
+              while (stack.length) {
+                const node = stack.pop();
+                if (!node) continue;
+                const children = node.children;
+                if (children && children.length) {
+                  for (let ci = 0; ci < children.length; ci++) stack.push(children[ci]);
+                }
+                if (!node.isMesh) continue;
+                if (!node.castShadow) continue;
                 try {
-                  obj.getWorldPosition(tmpPos);
-                  obj.getWorldScale(tmpScale);
-                  const r = Math.max(0.0001, Math.abs(tmpScale.y) * 2.0);
-                  m.userData.uSolidSphereCenters.value[n].copy(tmpPos);
-                  m.userData.uSolidSphereRadii.value[n] = r;
+                  if (node.userData && node.userData.type === 'builtin' && node.userData.shape === 'sphere') {
+                    if (n < 8) {
+                      node.getWorldPosition(tmpPos);
+                      node.getWorldScale(tmpScale);
+                      const r0 = Math.max(0.0001, Math.abs(tmpScale.y) * 2.0);
+                      m.userData.uSolidSphereCenters.value[n].copy(tmpPos);
+                      m.userData.uSolidSphereRadii.value[n] = r0;
+                      n++;
+                    }
+                    continue;
+                  }
+                } catch (_eBs) {}
+                if (n < 8) otherCandidates.push(node);
+              }
+              for (let si = 0; si < otherCandidates.length && n < 8; si++) {
+                const node = otherCandidates[si];
+                try {
+                  const fp = _computeFootprintSphereOnGround(node, groundY, epsY, tmpBox, tmpSize);
+                  if (!fp) continue;
+                  m.userData.uSolidSphereCenters.value[n].set(fp.cx, groundY, fp.cz);
+                  m.userData.uSolidSphereRadii.value[n] = fp.r;
                   n++;
                 } catch (_eS) {}
-              });
+              }
             }
             m.userData.uSolidSphereCount.value = n;
           } catch (_eSc) { try { m.userData.uSolidSphereCount.value = 0; } catch (_e2) {} }
@@ -537,6 +710,101 @@ export function createSolidPreviewLightingManager(opts) {
                   const solidShadowSoftAppend =
                     '\n\nfloat solidHash12( vec2 p ) { vec3 p3 = fract( vec3( p.xyx ) * 0.1031 ); p3 += dot( p3, p3.yzx + 33.33 ); return fract( ( p3.x + p3.y ) * p3.z ); }\n' +
                     'mat2 solidRot2( float a ) { float s = sin( a ), c = cos( a ); return mat2( c, -s, s, c ); }\n' +
+                    'float solidWedgeMaskAtAnchor( vec2 p, vec2 a, vec2 dirXZ, float halfW, float len ) {\n' +
+                    '\tvec2 d = p - a;\n' +
+                    '\tfloat u = dot( d, dirXZ );\n' +
+                    '\tfloat v = dot( d, vec2( -dirXZ.y, dirXZ.x ) );\n' +
+                    '\tfloat side = smoothstep( 0.0, -len, u );\n' +
+                    '\tfloat band = 1.0 - smoothstep( halfW, halfW * 1.6, abs( v ) );\n' +
+                    '\treturn side * band;\n' +
+                    '}\n' +
+                    'float solidWedgeRawMask( vec2 dirXZ ) {\n' +
+                    '\tfloat halfW = max( 0.001, uSolidWedgeWidth * 0.5 );\n' +
+                    '\tfloat len = max( 0.001, uSolidWedgeLength );\n' +
+                    '\tfloat m = 0.0;\n' +
+                    '\tfor ( int i = 0; i < 8; i++ ) {\n' +
+                    '\t\tif ( i >= uSolidShadowAnchorCount ) break;\n' +
+                    '\t\tm = max( m, solidWedgeMaskAtAnchor( vSolidShadowGroundPos.xz, uSolidShadowAnchors[i].xz, dirXZ, halfW, len ) );\n' +
+                    '\t}\n' +
+                    '\treturn m;\n' +
+                    '}\n' +
+                    'float solidShadowAvgGate2D( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, vec4 shadowCoord ) {\n' +
+                    '\tvec3 sc = shadowCoord.xyz / shadowCoord.w;\n' +
+                    '\tsc.z += shadowBias;\n' +
+                    '\tif ( sc.x < 0.0 || sc.x > 1.0 || sc.y < 0.0 || sc.y > 1.0 || sc.z > 1.0 ) return 0.0;\n' +
+                    '\tvec2 texel = vec2( 1.0 ) / shadowMapSize;\n' +
+                    '\tfloat c0 = texture2DCompare( shadowMap, sc.xy, sc.z );\n' +
+                    '\tfloat c1 = texture2DCompare( shadowMap, sc.xy + vec2( texel.x, 0.0 ), sc.z );\n' +
+                    '\tfloat c2 = texture2DCompare( shadowMap, sc.xy - vec2( texel.x, 0.0 ), sc.z );\n' +
+                    '\tfloat c3 = texture2DCompare( shadowMap, sc.xy + vec2( 0.0, texel.y ), sc.z );\n' +
+                    '\tfloat c4 = texture2DCompare( shadowMap, sc.xy - vec2( 0.0, texel.y ), sc.z );\n' +
+                    '\tfloat avg = ( c0 + c1 + c2 + c3 + c4 ) * 0.2;\n' +
+                    '\treturn clamp( ( 0.92 - avg ) / 0.30, 0.0, 1.0 );\n' +
+                    '}\n' +
+                    'float solidApplyWedgePatch2D( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, vec4 shadowCoord, float sh0 ) {\n' +
+                    '\tif ( uSolidWedgeEnable < 0.5 ) return sh0;\n' +
+                    '\tvec2 dirXZ;\n' +
+                    '\tif ( uSolidMainLightType == 0 ) {\n' +
+                    '\t\tdirXZ = normalize( vec2( uSolidMainLightDir.x, uSolidMainLightDir.z ) );\n' +
+                    '\t} else {\n' +
+                    '\t\tvec2 d = normalize( uSolidMainLightPos.xz - vSolidShadowGroundPos.xz );\n' +
+                    '\t\tdirXZ = d;\n' +
+                    '\t}\n' +
+                    '\tif ( dot( dirXZ, dirXZ ) < 1e-6 ) return sh0;\n' +
+                    '\tfloat m = solidWedgeRawMask( dirXZ );\n' +
+                    '\tif ( m <= 1e-5 ) return sh0;\n' +
+                    '\tfloat gate = solidShadowAvgGate2D( shadowMap, shadowMapSize, shadowBias, shadowCoord );\n' +
+                    '\tfloat k = clamp( uSolidWedgeStrength, 0.0, 1.0 ) * gate;\n' +
+                    '\treturn clamp( sh0 * ( 1.0 - k * m ), 0.0, 1.0 );\n' +
+                    '}\n' +
+                    'float solidSeamFix2D( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, vec4 shadowCoord, float sh0 ) {\n' +
+                    '\t// sh0: 1=lit, 0=shadow. Only darken thin bright seams near shadow boundary.\n' +
+                    '\tfloat k = clamp( uSolidShadowSeamStrength, 0.0, 1.0 );\n' +
+                    '\tif ( k <= 0.0001 ) return sh0;\n' +
+                    '\tvec3 sc = shadowCoord.xyz / shadowCoord.w;\n' +
+                    '\t// IMPORTANT: decide gate WITHOUT push (avoid lit-side black rim).\n' +
+                    '\tvec3 sc0 = sc;\n' +
+                    '\tsc0.z += shadowBias;\n' +
+                    '\tif ( sc0.x < 0.0 || sc0.x > 1.0 || sc0.y < 0.0 || sc0.y > 1.0 || sc0.z > 1.0 ) return sh0;\n' +
+                    '\tvec2 texel = vec2( 1.0 ) / shadowMapSize;\n' +
+                    '\tfloat r = clamp( uSolidShadowSeamRadius, 0.5, 2.5 );\n' +
+                    '\tvec2 dx = vec2( r, 0.0 ) * texel;\n' +
+                    '\tvec2 dy = vec2( 0.0, r ) * texel;\n' +
+                    '\tfloat c0 = texture2DCompare( shadowMap, sc0.xy, sc0.z );\n' +
+                    '\tfloat c1 = texture2DCompare( shadowMap, sc0.xy + dx, sc0.z );\n' +
+                    '\tfloat c2 = texture2DCompare( shadowMap, sc0.xy - dx, sc0.z );\n' +
+                    '\tfloat c3 = texture2DCompare( shadowMap, sc0.xy + dy, sc0.z );\n' +
+                    '\tfloat c4 = texture2DCompare( shadowMap, sc0.xy - dy, sc0.z );\n' +
+                    '\tfloat cMin = min( c0, min( c1, min( c2, min( c3, c4 ) ) ) );\n' +
+                    '\t// Gate #1 (neighbor): apply only when neighborhood indicates "almost shadow" (bright seam case).\n' +
+                    '\tfloat gN = clamp( ( 0.995 - cMin ) / 0.20, 0.0, 1.0 );\n' +
+                    '\t// Gate #2 (neighborhood ratio):\n' +
+                    '\t// - Dark-side leak: most taps are shadowed => avg is low => gA is high (we patch).\n' +
+                    '\t// - Lit-side edge: most taps are lit      => avg is high => gA is near 0 (avoid black rim).\n' +
+                    '\tfloat avg = ( c0 + c1 + c2 + c3 + c4 ) * 0.2;\n' +
+                    '\t// Slightly more permissive in dark-side: triggers patch when neighborhood is mostly shadow.\n' +
+                    '\tfloat gA = clamp( ( 0.93 - avg ) / 0.30, 0.0, 1.0 );\n' +
+                    '\tfloat g = gN * gA;\n' +
+                    '\t// Only when gate passes, use pushed compare to aggressively close the seam.\n' +
+                    '\tvec3 scP = sc0;\n' +
+                    '\t// Adaptive push: stronger only where gate is strong (dark-side seam),\n' +
+                    '\t// avoids over-darkening near lit-side boundary.\n' +
+                    '\tfloat pPush = max( 0.0, uSolidShadowSeamPush ) * ( 0.35 + 0.65 * g );\n' +
+                    '\tscP.z += pPush;\n' +
+                    '\t// Use 9-tap min (including diagonals) to fill jagged seam gaps on mobile.\n' +
+                    '\tvec2 dd = ( dx + dy ) * 0.70710678;\n' +
+                    '\tfloat p0 = texture2DCompare( shadowMap, scP.xy, scP.z );\n' +
+                    '\tfloat p1 = texture2DCompare( shadowMap, scP.xy + dx, scP.z );\n' +
+                    '\tfloat p2 = texture2DCompare( shadowMap, scP.xy - dx, scP.z );\n' +
+                    '\tfloat p3 = texture2DCompare( shadowMap, scP.xy + dy, scP.z );\n' +
+                    '\tfloat p4 = texture2DCompare( shadowMap, scP.xy - dy, scP.z );\n' +
+                    '\tfloat p5 = texture2DCompare( shadowMap, scP.xy + dd, scP.z );\n' +
+                    '\tfloat p6 = texture2DCompare( shadowMap, scP.xy - dd, scP.z );\n' +
+                    '\tfloat p7 = texture2DCompare( shadowMap, scP.xy + vec2( dd.x, -dd.y ), scP.z );\n' +
+                    '\tfloat p8 = texture2DCompare( shadowMap, scP.xy + vec2( -dd.x, dd.y ), scP.z );\n' +
+                    '\tfloat pMin = min( p0, min( p1, min( p2, min( p3, min( p4, min( p5, min( p6, min( p7, p8 ) ) ) ) ) ) ) );\n' +
+                    '\treturn min( sh0, mix( sh0, pMin, k * g ) );\n' +
+                    '}\n' +
                     'float solidShadowSoftCompare( sampler2D shadowMap, vec2 uv, float compareZ, float smoothZ ) {\n' +
                     '\tfloat depth = unpackRGBAToDepth( texture2D( shadowMap, uv ) );\n' +
                     '\t// 1.0=lit, 0.0=shadow. smoothZ is in normalized shadow depth units.\n' +
@@ -631,15 +899,29 @@ export function createSolidPreviewLightingManager(opts) {
                     '\t\tfloat edge = max( 0.0, d - r );\n' +
                     '\t\tif ( edge < minEdge ) { minEdge = edge; nearR = r; }\n' +
                     '\t}\n' +
-                    '\tfloat k = 1.0 - smoothstep( nearR * 0.35, nearR * 1.40, minEdge );\n' +
+                    '\t// Narrower footprint than original (avoid lit-side dark rim):\n' +
+                    '\tfloat k = 1.0 - smoothstep( nearR * 0.18, nearR * 0.95, minEdge );\n' +
                     '\tk = pow( clamp( k, 0.0, 1.0 ), 1.8 );\n' +
                     '\tfloat occ = solidSphereOcclusion( p );\n' +
                     '\treturn mix( 1.0, occ, k );\n' +
+                    '}\n' +
+                    'float solidApplySpherePatchGated( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, vec4 shadowCoord, float sh0 ) {\n' +
+                    '\t// Gate using shadow neighborhood avg (same idea as seam fix): only patch in dark-side.\n' +
+                    '\tfloat gate = solidShadowAvgGate2D( shadowMap, shadowMapSize, shadowBias, shadowCoord );\n' +
+                    '\tfloat occ = solidSphereOcclusionFaded( vSolidShadowGroundPos );\n' +
+                    '\tfloat a = clamp( 1.0 - occ, 0.0, 1.0 );\n' +
+                    '\tfloat k = clamp( uSolidSpherePatchStrength, 0.0, 1.0 ) * gate;\n' +
+                    '\tfloat outSh = sh0;\n' +
+                    '\t// Only darken.\n' +
+                    '\toutSh = clamp( outSh * ( 1.0 - k * a ), 0.0, 1.0 );\n' +
+                    '\treturn outSh;\n' +
                     '}\n' +
                     '\n' +
                     'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n' +
                     '\tif ( uSolidMainLightType == 0 ) {\n' +
                     '\t\tfloat sh0 = getShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord );\n' +
+                    '\t\tsh0 = solidSeamFix2D( shadowMap, shadowMapSize, shadowBias, shadowCoord, sh0 );\n' +
+                    '\t\tsh0 = solidApplySpherePatchGated( shadowMap, shadowMapSize, shadowBias, shadowCoord, sh0 );\n' +
                     '\t\treturn min( sh0, solidSphereOcclusionFaded( vSolidShadowGroundPos ) );\n' +
                     '\t}\n' +
                     '\tfloat dSolidSh = 1e9;\n' +
@@ -684,12 +966,23 @@ export function createSolidPreviewLightingManager(opts) {
             shader.uniforms.uSolidShadowAnchorCount = m.userData.uSolidShadowAnchorCount;
             shader.uniforms.uSolidShadowAnchors = m.userData.uSolidShadowAnchors;
             shader.uniforms.uSolidShadowContactPull = m.userData.uSolidShadowContactPull;
+            shader.uniforms.uSolidShadowSeamStrength = m.userData.uSolidShadowSeamStrength;
+            shader.uniforms.uSolidShadowSeamPush = m.userData.uSolidShadowSeamPush;
+            shader.uniforms.uSolidShadowSeamRadius = m.userData.uSolidShadowSeamRadius;
+            shader.uniforms.uSolidWedgeEnable = m.userData.uSolidWedgeEnable;
+            shader.uniforms.uSolidWedgeStrength = m.userData.uSolidWedgeStrength;
+            shader.uniforms.uSolidWedgeWidth = m.userData.uSolidWedgeWidth;
+            shader.uniforms.uSolidWedgeLength = m.userData.uSolidWedgeLength;
+            shader.uniforms.uSolidWedgeDebug = m.userData.uSolidWedgeDebug;
             shader.uniforms.uSolidShadowSoftRange = m.userData.uSolidShadowSoftRange;
             shader.uniforms.uSolidShadowSoftStrength = m.userData.uSolidShadowSoftStrength;
             shader.uniforms.uSolidShadowSoftExp = m.userData.uSolidShadowSoftExp;
             shader.uniforms.uSolidSphereCount = m.userData.uSolidSphereCount;
             shader.uniforms.uSolidSphereCenters = m.userData.uSolidSphereCenters;
             shader.uniforms.uSolidSphereRadii = m.userData.uSolidSphereRadii;
+            shader.uniforms.uSolidSpherePatchStrength = m.userData.uSolidSpherePatchStrength;
+            shader.uniforms.uSolidSphereDebug = m.userData.uSolidSphereDebug;
+            shader.uniforms.uSolidDbgForceRed = m.userData.uSolidDbgForceRed;
             shader.uniforms.uSolidMainLightType = m.userData.uSolidMainLightType;
             shader.uniforms.uSolidMainLightPos = m.userData.uSolidMainLightPos;
             shader.uniforms.uSolidMainLightDir = m.userData.uSolidMainLightDir;
@@ -699,6 +992,14 @@ export function createSolidPreviewLightingManager(opts) {
               'uniform int uSolidShadowAnchorCount;\n' +
               'uniform vec3 uSolidShadowAnchors[8];\n' +
               'uniform float uSolidShadowContactPull;\n' +
+              'uniform float uSolidShadowSeamStrength;\n' +
+              'uniform float uSolidShadowSeamPush;\n' +
+              'uniform float uSolidShadowSeamRadius;\n' +
+              'uniform float uSolidWedgeEnable;\n' +
+              'uniform float uSolidWedgeStrength;\n' +
+              'uniform float uSolidWedgeWidth;\n' +
+              'uniform float uSolidWedgeLength;\n' +
+              'uniform float uSolidWedgeDebug;\n' +
               'uniform vec4 uSolidShadowSoftRange;\n' +
               'uniform float uSolidShadowSoftStrength;\n' +
               'uniform float uSolidShadowSoftExp;\n' +
@@ -707,6 +1008,9 @@ export function createSolidPreviewLightingManager(opts) {
               'uniform int uSolidSphereCount;\n' +
               'uniform vec3 uSolidSphereCenters[8];\n' +
               'uniform float uSolidSphereRadii[8];\n' +
+              'uniform float uSolidSpherePatchStrength;\n' +
+              'uniform float uSolidSphereDebug;\n' +
+              'uniform float uSolidDbgForceRed;\n' +
               'uniform int uSolidMainLightType;\n' +
               'uniform vec3 uSolidMainLightPos;\n' +
               'uniform vec3 uSolidMainLightDir;\n' +
@@ -742,6 +1046,32 @@ export function createSolidPreviewLightingManager(opts) {
               '  return occ;\n' +
               '}\n' +
               fs;
+
+            // Debug/Experiment: tint ground red (visual confirmation).
+            // IMPORTANT: inject only once; #include tag is removed after first replace.
+            try {
+              const tag = '#include <output_fragment>';
+              if (shader.fragmentShader && shader.fragmentShader.includes(tag)) {
+                shader.fragmentShader = shader.fragmentShader.replace(
+                  tag,
+                  tag +
+                    '\nif ( uSolidDbgForceRed > 0.5 ) {\n' +
+                    '  gl_FragColor = vec4( 1.0, 0.0, 0.0, 1.0 );\n' +
+                    '}\n' +
+                    '\n{\n' +
+                    '  float aDbg = 0.0;\n' +
+                    '  if ( uSolidSphereDebug > 0.5 ) {\n' +
+                    '    float occS = solidSphereOcclusionFaded( vSolidShadowGroundPos );\n' +
+                    '    aDbg = max( aDbg, clamp( 1.0 - occS, 0.0, 1.0 ) );\n' +
+                    '  }\n' +
+                    '  if ( aDbg > 0.0 ) {\n' +
+                    '    // EXPERIMENT: force pure red for guaranteed visibility.\n' +
+                    '    gl_FragColor = vec4( 1.0, 0.0, 0.0, 1.0 );\n' +
+                    '  }\n' +
+                    '}\n'
+                );
+              }
+            } catch (_eDbg) {}
 
             // gaussian PCF params (constants wrapped as uniforms for easy tuning)
             try {
