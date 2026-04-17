@@ -127,7 +127,193 @@ export function createSolidPreviewLightingManager(opts) {
     }
   }
 
+  function _receiverSoftShadowWallsEnabled() {
+    try {
+      if (typeof window === 'undefined') return false;
+      if (window.__solidReceiverSoftShadowWalls != null) return !!window.__solidReceiverSoftShadowWalls;
+      return localStorage.getItem('SolidReceiverSoftShadowWalls') === '1';
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function _receiverSoftShadowModelsEnabled() {
+    try {
+      if (typeof window === 'undefined') return false;
+      if (window.__solidReceiverSoftShadowModels != null) return !!window.__solidReceiverSoftShadowModels;
+      return localStorage.getItem('SolidReceiverSoftShadowModels') === '1';
+    } catch (_e) {
+      return false;
+    }
+  }
+
   const _tmpFootprintV = new THREE.Vector3();
+
+  function _installReceiverSoftShadowPatch(material, sharedUd, cfg) {
+    try {
+      if (!material || !sharedUd) return false;
+      const canPatch = !!(material.isMeshPhysicalMaterial || material.isMeshStandardMaterial);
+      if (!canPatch) return false;
+      if (!material.userData) material.userData = {};
+      const ud = material.userData;
+      if (!ud._solidReceiverSoft) ud._solidReceiverSoft = { v: 1 };
+      if (!ud.uSolidShadowGaussTaps) ud.uSolidShadowGaussTaps = sharedUd.uSolidShadowGaussTaps || { value: 16.0 };
+      if (!ud.uSolidShadowGaussRotate) ud.uSolidShadowGaussRotate = sharedUd.uSolidShadowGaussRotate || { value: 1.0 };
+
+      if (!material.defines) material.defines = {};
+      material.defines.SOLID_SHADOW_SOFT_RECEIVER = 1;
+      material.defines.SOLID_SHADOW_SOFT_RECEIVER_KIND = cfg && cfg.kindTag ? cfg.kindTag : 0;
+      if (material.customProgramCacheKey) {
+        // keep existing if any (ground relies on versioning); receiver uses stable key.
+      } else {
+        material.customProgramCacheKey = function() { return 'solid_shadow_soft_receiver_v1_k' + (cfg && cfg.kindTag ? cfg.kindTag : 0); };
+      }
+
+      material.onBeforeCompile = (shader) => {
+        try {
+          // --- patch shadow chunk wrappers ---
+          let fs = shader.fragmentShader;
+          const inc = '#include <shadowmap_pars_fragment>';
+          if (!(fs && fs.includes(inc) && THREE.ShaderChunk && THREE.ShaderChunk.shadowmap_pars_fragment)) return;
+          let chunk = THREE.ShaderChunk.shadowmap_pars_fragment;
+          chunk = chunk.replace(
+            'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {',
+            'float getShadow_orig( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {'
+          );
+          chunk = chunk.replace(
+            'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {',
+            'float getPointShadow_orig( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {'
+          );
+
+          const append =
+            '\n\nfloat solidHash12( vec2 p ) { vec3 p3 = fract( vec3( p.xyx ) * 0.1031 ); p3 += dot( p3, p3.yzx + 33.33 ); return fract( ( p3.x + p3.y ) * p3.z ); }\n' +
+            'mat2 solidRot2( float a ) { float s = sin( a ), c = cos( a ); return mat2( c, -s, s, c ); }\n' +
+            'float solidShadowSoftCompare( sampler2D shadowMap, vec2 uv, float compareZ, float smoothZ ) {\n' +
+            '\tfloat depth = unpackRGBAToDepth( texture2D( shadowMap, uv ) );\n' +
+            '\treturn 1.0 - smoothstep( 0.0, smoothZ, compareZ - depth );\n' +
+            '}\n' +
+            'vec2 solidPoisson24( int i ) {\n' +
+            '\tif ( i == 0 ) return vec2( -0.326, -0.406 );\n' +
+            '\tif ( i == 1 ) return vec2( -0.840, -0.074 );\n' +
+            '\tif ( i == 2 ) return vec2( -0.696,  0.457 );\n' +
+            '\tif ( i == 3 ) return vec2( -0.203,  0.621 );\n' +
+            '\tif ( i == 4 ) return vec2(  0.962, -0.195 );\n' +
+            '\tif ( i == 5 ) return vec2(  0.473, -0.480 );\n' +
+            '\tif ( i == 6 ) return vec2(  0.519,  0.767 );\n' +
+            '\tif ( i == 7 ) return vec2(  0.185, -0.893 );\n' +
+            '\tif ( i == 8 ) return vec2(  0.507,  0.064 );\n' +
+            '\tif ( i == 9 ) return vec2(  0.896,  0.412 );\n' +
+            '\tif ( i == 10 ) return vec2( -0.322, -0.933 );\n' +
+            '\tif ( i == 11 ) return vec2( -0.792, -0.598 );\n' +
+            '\tif ( i == 12 ) return vec2( -0.043,  0.280 );\n' +
+            '\tif ( i == 13 ) return vec2( -0.155,  0.970 );\n' +
+            '\tif ( i == 14 ) return vec2(  0.252,  0.395 );\n' +
+            '\tif ( i == 15 ) return vec2( -0.444,  0.106 );\n' +
+            '\tif ( i == 16 ) return vec2(  0.727,  0.279 );\n' +
+            '\tif ( i == 17 ) return vec2(  0.395, -0.732 );\n' +
+            '\tif ( i == 18 ) return vec2( -0.600,  0.780 );\n' +
+            '\tif ( i == 19 ) return vec2(  0.043, -0.165 );\n' +
+            '\tif ( i == 20 ) return vec2(  0.143,  0.867 );\n' +
+            '\tif ( i == 21 ) return vec2(  0.675, -0.160 );\n' +
+            '\tif ( i == 22 ) return vec2( -0.325,  0.320 );\n' +
+            '\treturn vec2( -0.069, -0.492 );\n' +
+            '}\n' +
+            'float solidGaussianShadow2D( sampler2D shadowMap, vec2 shadowMapSize, vec4 shadowCoord, float shadowRadius, float shadowBias ) {\n' +
+            '\tvec3 sc = shadowCoord.xyz / shadowCoord.w;\n' +
+            '\tvec3 sc0 = sc;\n' +
+            '\tsc0.z += shadowBias;\n' +
+            '\tsc = sc0;\n' +
+            '\tbool inFrustum = sc.x >= 0.0 && sc.x <= 1.0 && sc.y >= 0.0 && sc.y <= 1.0;\n' +
+            '\tbool frustumTest = inFrustum && sc.z <= 1.0;\n' +
+            '\tif ( !frustumTest ) return 1.0;\n' +
+            '\tvec2 texel = vec2( 1.0 ) / shadowMapSize;\n' +
+            '\tfloat tapsF = clamp( uSolidShadowGaussTaps, 4.0, 32.0 );\n' +
+            '\tint taps = int( floor( tapsF + 0.5 ) );\n' +
+            '\tfloat ang = ( uSolidShadowGaussRotate > 0.5 ) ? ( 6.2831853 * solidHash12( vSolidShadowWorldPos.xz * 0.071 + sc.xy * shadowMapSize.xy * 0.17 ) ) : 0.0;\n' +
+            '\tmat2 R = solidRot2( ang );\n' +
+            '\tfloat sum = 0.0;\n' +
+            '\tfloat wsum = 0.0;\n' +
+            '\tfor ( int i = 0; i < 32; i++ ) {\n' +
+            '\t\tif ( i >= taps ) break;\n' +
+            '\t\tfloat fi = float(i);\n' +
+            '\t\tfloat t = (fi + 0.5) / max( 1.0, float(taps) );\n' +
+            '\t\tvec2 o = ( R * solidPoisson24( i ) ) * sqrt( clamp( t, 0.001, 1.0 ) );\n' +
+            '\t\tvec2 uv = sc.xy + o * texel * shadowRadius;\n' +
+            '\t\tif ( uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 ) continue;\n' +
+            '\t\tfloat rr = dot( o, o );\n' +
+            '\t\tfloat w = exp( - rr * 2.4 );\n' +
+            '\t\tfloat hardTap = texture2DCompare( shadowMap, uv, sc.z );\n' +
+            '\t\tfloat softTap = solidShadowSoftCompare( shadowMap, uv, sc.z, 0.0018 );\n' +
+            '\t\tfloat tap = min( hardTap, softTap );\n' +
+            '\t\tsum += w * tap;\n' +
+            '\t\twsum += w;\n' +
+            '\t}\n' +
+            '\treturn (wsum > 0.0) ? (sum / wsum) : 1.0;\n' +
+            '}\n' +
+            'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n' +
+            '\tfloat dSolidSh = 1e9;\n' +
+            '\tfor ( int i = 0; i < 8; i++ ) {\n' +
+            '\t\tif ( i >= uSolidShadowAnchorCount ) break;\n' +
+            '\t\tdSolidSh = min( dSolidSh, length( vSolidShadowWorldPos.xz - uSolidShadowAnchors[i].xz ) );\n' +
+            '\t}\n' +
+            '\tfloat tSolidSh = smoothstep( uSolidShadowSoftRange.x, uSolidShadowSoftRange.y, dSolidSh );\n' +
+            '\ttSolidSh = pow( clamp( tSolidSh, 0.0, 1.0 ), max( 0.75, uSolidShadowSoftExp ) );\n' +
+            '\tshadowRadius *= ( 1.0 + uSolidShadowSoftStrength * tSolidSh );\n' +
+            '\treturn solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius, shadowBias );\n' +
+            '}\n' +
+            'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n' +
+            '\treturn getPointShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord, shadowCameraNear, shadowCameraFar );\n' +
+            '}\n';
+
+          const endifIdx = chunk.lastIndexOf('#endif');
+          if (endifIdx < 0) return;
+          chunk = chunk.slice(0, endifIdx) + append + '\n' + chunk.slice(endifIdx);
+          fs = fs.replace(inc, chunk);
+
+          shader.uniforms.uSolidShadowAnchorCount = sharedUd.uSolidShadowAnchorCount;
+          shader.uniforms.uSolidShadowAnchors = sharedUd.uSolidShadowAnchors;
+          shader.uniforms.uSolidShadowSoftRange = sharedUd.uSolidShadowSoftRange;
+          shader.uniforms.uSolidShadowSoftStrength = sharedUd.uSolidShadowSoftStrength;
+          shader.uniforms.uSolidShadowSoftExp = sharedUd.uSolidShadowSoftExp;
+          shader.uniforms.uSolidShadowGaussTaps = ud.uSolidShadowGaussTaps;
+          shader.uniforms.uSolidShadowGaussRotate = ud.uSolidShadowGaussRotate;
+
+          // receiver uniforms/varying
+          shader.fragmentShader =
+            'varying vec3 vSolidShadowWorldPos;\n' +
+            'uniform int uSolidShadowAnchorCount;\n' +
+            'uniform vec3 uSolidShadowAnchors[8];\n' +
+            'uniform vec4 uSolidShadowSoftRange;\n' +
+            'uniform float uSolidShadowSoftStrength;\n' +
+            'uniform float uSolidShadowSoftExp;\n' +
+            'uniform float uSolidShadowGaussTaps;\n' +
+            'uniform float uSolidShadowGaussRotate;\n' +
+            fs;
+
+          // vertex varying assign
+          shader.vertexShader = 'varying vec3 vSolidShadowWorldPos;\n' + shader.vertexShader;
+          const assign = '\n\tvSolidShadowWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;';
+          if (shader.vertexShader.includes('#include <worldpos_vertex>')) {
+            shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>' + assign);
+          } else if (shader.vertexShader.includes('#include <begin_vertex>')) {
+            shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + assign);
+          }
+        } catch (_e) {}
+      };
+
+      // gaussian params
+      try {
+        const g = cfg && cfg.gauss ? cfg.gauss : { taps: 16, rotate: 1 };
+        ud.uSolidShadowGaussTaps.value = g.taps;
+        ud.uSolidShadowGaussRotate.value = g.rotate ? 1.0 : 0.0;
+      } catch (_eG) {}
+
+      material.needsUpdate = true;
+      return true;
+    } catch (_e0) {
+      return false;
+    }
+  }
 
   /**
    * 地面脚印圆盘：旧版用水平 AABB 外接圆 (0.5*max(sx,sz))，头像等竖高网格会把整头宽度当“脚”，补丁过大。
@@ -1290,6 +1476,55 @@ export function createSolidPreviewLightingManager(opts) {
           m.needsUpdate = true;
         }
       } catch (_eGs) {}
+
+      // ---------- Receiver soft shadow (walls) ----------
+      try {
+        const walls = getWalls();
+        const ground = getGround();
+        const mainLight = getMainLight();
+        const sharedUd = ground && ground.material && ground.material.userData ? ground.material.userData : null;
+        const okShared = !!(sharedUd && sharedUd.uSolidShadowAnchorCount && sharedUd.uSolidShadowAnchors && sharedUd.uSolidShadowSoftRange);
+        // Directional light: keep legacy projection behavior (no receiver softening).
+        if (_receiverSoftShadowWallsEnabled() && okShared && walls && Array.isArray(walls) && !(mainLight && mainLight.isDirectionalLight)) {
+          const mob = (isMobile || isIosHost);
+          const g = mob ? RASTER_SHADOW_GAUSS_PARAMS.mobile : RASTER_SHADOW_GAUSS_PARAMS.desktop;
+          for (let wi = 0; wi < walls.length; wi++) {
+            const w = walls[wi];
+            if (!w || !w.isMesh || !w.material) continue;
+            const mats = Array.isArray(w.material) ? w.material : [w.material];
+            for (let mi = 0; mi < mats.length; mi++) {
+              const mat = mats[mi];
+              if (!mat) continue;
+              _installReceiverSoftShadowPatch(mat, sharedUd, { kindTag: 1, gauss: g });
+            }
+          }
+        }
+      } catch (_eWallSoft) {}
+
+      // ---------- Receiver soft shadow (sceneGroup models) ----------
+      try {
+        const mainLight = getMainLight();
+        const ground = getGround();
+        const sharedUd = ground && ground.material && ground.material.userData ? ground.material.userData : null;
+        const okShared = !!(sharedUd && sharedUd.uSolidShadowAnchorCount && sharedUd.uSolidShadowAnchors && sharedUd.uSolidShadowSoftRange);
+        const sg = getSceneGroup();
+        if (_receiverSoftShadowModelsEnabled() && okShared && sg && sg.traverse && !(mainLight && mainLight.isDirectionalLight)) {
+          const mob = (isMobile || isIosHost);
+          const g = mob ? RASTER_SHADOW_GAUSS_PARAMS.mobile : RASTER_SHADOW_GAUSS_PARAMS.desktop;
+          sg.traverse((obj) => {
+            try {
+              if (!obj || !obj.isMesh) return;
+              if (!obj.receiveShadow) return;
+              const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+              for (let mi = 0; mi < mats.length; mi++) {
+                const mat = mats[mi];
+                if (!mat) continue;
+                _installReceiverSoftShadowPatch(mat, sharedUd, { kindTag: 2, gauss: g });
+              }
+            } catch (_eM) {}
+          });
+        }
+      } catch (_eModelSoft) {}
     } catch (_e) {}
   }
 
