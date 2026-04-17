@@ -107,6 +107,26 @@ export function createSolidPreviewLightingManager(opts) {
     }
   }
 
+  function _contactPatchDebugAllEnabled() {
+    try {
+      if (typeof window === 'undefined') return false;
+      if (window.__solidContactPatchDebugAll != null) return !!window.__solidContactPatchDebugAll;
+      return localStorage.getItem('SolidContactPatchDebugAll') === '1';
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function _contactPatchForceRedEnabled() {
+    try {
+      if (typeof window === 'undefined') return false;
+      if (window.__solidContactPatchForceRed != null) return !!window.__solidContactPatchForceRed;
+      return localStorage.getItem('SolidContactPatchForceRed') === '1';
+    } catch (_e) {
+      return false;
+    }
+  }
+
   const _tmpFootprintV = new THREE.Vector3();
 
   /**
@@ -299,6 +319,8 @@ export function createSolidPreviewLightingManager(opts) {
       const ud = ground.material.userData;
       if (!ud.uSolidMainLightPos || !ud.uSolidMainLightDir || !ud.uSolidMainLightType) return;
       if (ud.uSolidContactPatchEnable) ud.uSolidContactPatchEnable.value = _contactPatchEnabled() ? 1.0 : 0.0;
+      if (ud.uSolidSphereDebug) ud.uSolidSphereDebug.value = _contactPatchDebugAllEnabled() ? 1.0 : 0.0;
+      if (ud.uSolidDbgForceRed) ud.uSolidDbgForceRed.value = _contactPatchForceRedEnabled() ? 1.0 : 0.0;
 
       const lp = new THREE.Vector3();
       mainLight.getWorldPosition(lp);
@@ -487,11 +509,13 @@ export function createSolidPreviewLightingManager(opts) {
       const _nbBoost = isMobile ? 1.9 : (isIosHost ? 1.4 : 1.0);
       if (shadowLight.isSpotLight) {
         sh.bias = (isMobile || isIosHost) ? -0.000012 : -0.000006;
-        sh.normalBias = 0.022 * _nbBoost;
-        if (isMobile || isIosHost) sh.normalBias = Math.min(sh.normalBias, 0.028);
+        // Tighten caster/receiver contact to suppress bright seam lines on pedestal/cylinders.
+        sh.normalBias = 0.014 * _nbBoost;
+        if (isMobile || isIosHost) sh.normalBias = Math.min(sh.normalBias, 0.022);
       } else if (shadowLight.isDirectionalLight) {
         sh.bias = (isMobile || isIosHost) ? -0.00005 : -0.000025;
-        sh.normalBias = 0.025 * _nbBoost;
+        // Same tightening for directional shadows (ground + model receivers).
+        sh.normalBias = 0.014 * _nbBoost;
       } else if (shadowLight.isPointLight) {
         // Point/cube shadow: textured surfaces are prone to shadow acne “interference stripes”.
         // Raise normalBias significantly for point lights to suppress self-shadow moiré.
@@ -528,8 +552,10 @@ export function createSolidPreviewLightingManager(opts) {
           // Sphere-based patch (reference implementation): apply only on ground, gated to dark-side.
           if (!m.userData.uSolidSpherePatchStrength) m.userData.uSolidSpherePatchStrength = { value: 0.95 };
           // Debug toggles (default OFF).
-          if (!m.userData.uSolidSphereDebug) m.userData.uSolidSphereDebug = { value: 1.0 };
+          if (!m.userData.uSolidSphereDebug) m.userData.uSolidSphereDebug = { value: 0.0 };
           if (!m.userData.uSolidDbgForceRed) m.userData.uSolidDbgForceRed = { value: 0.0 };
+          m.userData.uSolidSphereDebug.value = _contactPatchDebugAllEnabled() ? 1.0 : 0.0;
+          m.userData.uSolidDbgForceRed.value = _contactPatchForceRedEnabled() ? 1.0 : 0.0;
           if (!m.userData.uSolidMainLightType) m.userData.uSolidMainLightType = { value: 0 };
           if (!m.userData.uSolidMainLightPos) m.userData.uSolidMainLightPos = { value: new THREE.Vector3() };
           if (!m.userData.uSolidMainLightDir) m.userData.uSolidMainLightDir = { value: new THREE.Vector3(0, 1, 0) };
@@ -829,20 +855,21 @@ export function createSolidPreviewLightingManager(opts) {
                     '\tfloat c3 = texture2DCompare( shadowMap, sc0.xy + dy, sc0.z );\n' +
                     '\tfloat c4 = texture2DCompare( shadowMap, sc0.xy - dy, sc0.z );\n' +
                     '\tfloat cMin = min( c0, min( c1, min( c2, min( c3, c4 ) ) ) );\n' +
-                    '\t// Gate #1 (neighbor): apply only when neighborhood indicates "almost shadow" (bright seam case).\n' +
-                    '\tfloat gN = clamp( ( 0.995 - cMin ) / 0.20, 0.0, 1.0 );\n' +
-                    '\t// Gate #2 (neighborhood ratio):\n' +
-                    '\t// - Dark-side leak: most taps are shadowed => avg is low => gA is high (we patch).\n' +
-                    '\t// - Lit-side edge: most taps are lit      => avg is high => gA is near 0 (avoid black rim).\n' +
                     '\tfloat avg = ( c0 + c1 + c2 + c3 + c4 ) * 0.2;\n' +
-                    '\t// Slightly more permissive in dark-side: triggers patch when neighborhood is mostly shadow.\n' +
+                    '\tfloat gN = clamp( ( 0.995 - cMin ) / 0.20, 0.0, 1.0 );\n' +
                     '\tfloat gA = clamp( ( 0.93 - avg ) / 0.30, 0.0, 1.0 );\n' +
-                    '\tfloat g = gN * gA;\n' +
+                    '\tfloat gLegacy = gN * gA;\n' +
+                    '\t// Edge gate: only patch on real shadow boundary (max local contrast in 4-neighborhood).\n' +
+                    '\tfloat e0 = max( abs( c0 - c1 ), abs( c0 - c2 ) );\n' +
+                    '\tfloat e1 = max( abs( c0 - c3 ), abs( c0 - c4 ) );\n' +
+                    '\tfloat edge = max( e0, e1 );\n' +
+                    '\tfloat gE = clamp( ( edge - 0.012 ) / 0.075, 0.0, 1.0 );\n' +
+                    '\tfloat gate = max( gLegacy, gA * gE );\n' +
                     '\t// Only when gate passes, use pushed compare to aggressively close the seam.\n' +
                     '\tvec3 scP = sc0;\n' +
                     '\t// Adaptive push: stronger only where gate is strong (dark-side seam),\n' +
                     '\t// avoids over-darkening near lit-side boundary.\n' +
-                    '\tfloat pPush = max( 0.0, uSolidShadowSeamPush ) * ( 0.35 + 0.65 * g );\n' +
+                    '\tfloat pPush = max( 0.0, uSolidShadowSeamPush ) * ( 0.35 + 0.65 * gate );\n' +
                     '\tscP.z += pPush;\n' +
                     '\t// Use 9-tap min (including diagonals) to fill jagged seam gaps on mobile.\n' +
                     '\tvec2 dd = ( dx + dy ) * 0.70710678;\n' +
@@ -856,7 +883,28 @@ export function createSolidPreviewLightingManager(opts) {
                     '\tfloat p7 = texture2DCompare( shadowMap, scP.xy + vec2( dd.x, -dd.y ), scP.z );\n' +
                     '\tfloat p8 = texture2DCompare( shadowMap, scP.xy + vec2( -dd.x, dd.y ), scP.z );\n' +
                     '\tfloat pMin = min( p0, min( p1, min( p2, min( p3, min( p4, min( p5, min( p6, min( p7, p8 ) ) ) ) ) ) ) );\n' +
-                    '\treturn min( sh0, mix( sh0, pMin, k * g ) );\n' +
+                    '\t// Contact-band gate (all casters): close thin bright seams near ground contact without affecting far tail.\n' +
+                    '\tfloat mC = 0.0;\n' +
+                    '\tfor ( int i = 0; i < 8; i++ ) {\n' +
+                    '\t\tif ( i >= uSolidSphereCount ) break;\n' +
+                    '\t\tfloat rC = max( 0.0001, uSolidSphereRadii[i] );\n' +
+                    '\t\tfloat dC = length( vSolidShadowGroundPos.xz - uSolidSphereCenters[i].xz );\n' +
+                    '\t\t// For large bases (big radius), widen contact band slightly to cover persistent underside bright seams.\n' +
+                    '\t\tfloat isBig = step( 1.25, rC );\n' +
+                    '\t\tfloat inMul = mix( 0.92, 0.84, isBig );\n' +
+                    '\t\tfloat outMul = mix( 1.18, 1.34, isBig );\n' +
+                    '\t\tfloat mm = 1.0 - smoothstep( rC * inMul, rC * outMul, dC );\n' +
+                    '\t\tmm = mix( mm, pow( clamp( mm, 0.0, 1.0 ), 0.72 ), isBig );\n' +
+                    '\t\tmC = max( mC, mm );\n' +
+                    '\t}\n' +
+                    '\tmC = clamp( mC, 0.0, 1.0 );\n' +
+                    '\t// In contact leaks, avg may look "lit" while cMin still indicates nearby shadow.\n' +
+                    '\t// Still require dark-side gate (gA) to avoid lit-side over-trigger (prevents "回潮").\n' +
+                    '\tfloat gateC = gN * gA * mC;\n' +
+                    '\tfloat gateAll = max( gate, gateC );\n' +
+                    '\t// Slightly stronger closure in contact band.\n' +
+                    '\tfloat k2 = k * ( 0.85 + 0.75 * mC );\n' +
+                    '\treturn min( sh0, mix( sh0, pMin, k2 * gateAll ) );\n' +
                     '}\n' +
                     'float solidShadowSoftCompare( sampler2D shadowMap, vec2 uv, float compareZ, float smoothZ ) {\n' +
                     '\tfloat depth = unpackRGBAToDepth( texture2D( shadowMap, uv ) );\n' +
@@ -1155,31 +1203,58 @@ export function createSolidPreviewLightingManager(opts) {
               '  }\n' +
               '  return occ;\n' +
               '}\n' +
+              'float solidContactDebugMask( vec3 p ) {\n' +
+              '  if ( uSolidSphereCount <= 0 ) return 0.0;\n' +
+              '  float m = 0.0;\n' +
+              '  for ( int i = 0; i < 8; i++ ) {\n' +
+              '    if ( i >= uSolidSphereCount ) break;\n' +
+              '    float r = max( 0.0001, uSolidSphereRadii[i] );\n' +
+              '    float d = length( p.xz - uSolidSphereCenters[i].xz );\n' +
+              '    // Exaggerated wide band for visual verification.\n' +
+              '    float mm = 1.0 - smoothstep( r * 0.65, r * 1.75, d );\n' +
+              '    m = max( m, mm );\n' +
+              '  }\n' +
+              '  return clamp( m, 0.0, 1.0 );\n' +
+              '}\n' +
               fs;
 
             // Debug/Experiment: tint ground red (visual confirmation).
             // IMPORTANT: inject only once; #include tag is removed after first replace.
             try {
-              const tag = '#include <output_fragment>';
-              if (shader.fragmentShader && shader.fragmentShader.includes(tag)) {
-                shader.fragmentShader = shader.fragmentShader.replace(
-                  tag,
-                  tag +
-                    '\nif ( uSolidDbgForceRed > 0.5 ) {\n' +
-                    '  gl_FragColor = vec4( 1.0, 0.0, 0.0, 1.0 );\n' +
-                    '}\n' +
-                    '\n{\n' +
-                    '  float aDbg = 0.0;\n' +
-                    '  if ( uSolidSphereDebug > 0.5 ) {\n' +
-                    '    float occS = solidSphereOcclusionFaded( vSolidShadowGroundPos );\n' +
-                    '    aDbg = max( aDbg, clamp( 1.0 - occS, 0.0, 1.0 ) );\n' +
-                    '  }\n' +
-                    '  if ( aDbg > 0.0 ) {\n' +
-                    '    // EXPERIMENT: force pure red for guaranteed visibility.\n' +
-                    '    gl_FragColor = vec4( 1.0, 0.0, 0.0, 1.0 );\n' +
-                    '  }\n' +
-                    '}\n'
-                );
+              if (shader.fragmentShader) {
+                const dbgCode =
+                  '\nif ( uSolidDbgForceRed > 0.5 ) {\n' +
+                  '  gl_FragColor = vec4( 1.0, 0.0, 0.0, 1.0 );\n' +
+                  '}\n' +
+                  '\n{\n' +
+                  '  float aDbg = 0.0;\n' +
+                  '  if ( uSolidSphereDebug > 0.5 ) {\n' +
+                  '    aDbg = max( aDbg, solidContactDebugMask( vSolidShadowGroundPos ) );\n' +
+                  '  }\n' +
+                  '  if ( uSolidSphereDebug > 0.5 ) {\n' +
+                  '    if ( aDbg > 1e-4 ) gl_FragColor = vec4( 1.0, 0.0, 0.0, 1.0 );\n' +
+                  '    else gl_FragColor = vec4( 0.0, 0.35, 1.0, 1.0 );\n' +
+                  '  }\n' +
+                  '}\n';
+
+                let injected = false;
+                const tags = [
+                  '#include <output_fragment>',
+                  '#include <opaque_fragment>',
+                  '#include <dithering_fragment>',
+                ];
+                for (let ti = 0; ti < tags.length; ti++) {
+                  const tag = tags[ti];
+                  if (shader.fragmentShader.includes(tag)) {
+                    shader.fragmentShader = shader.fragmentShader.replace(tag, tag + dbgCode);
+                    injected = true;
+                    break;
+                  }
+                }
+                if (!injected) {
+                  // Last-resort: append at end for visibility diagnosis.
+                  shader.fragmentShader += dbgCode;
+                }
               }
             } catch (_eDbg) {}
 
