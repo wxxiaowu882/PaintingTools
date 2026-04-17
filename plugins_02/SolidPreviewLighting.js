@@ -97,6 +97,16 @@ export function createSolidPreviewLightingManager(opts) {
     catch (_e) { return false; }
   }
 
+  function _contactPatchEnabled() {
+    try {
+      if (typeof window === 'undefined') return true;
+      if (window.__solidContactPatchEnabled != null) return !!window.__solidContactPatchEnabled;
+      return localStorage.getItem('SolidContactPatch') !== '0';
+    } catch (_e) {
+      return true;
+    }
+  }
+
   const _tmpFootprintV = new THREE.Vector3();
 
   /**
@@ -288,6 +298,7 @@ export function createSolidPreviewLightingManager(opts) {
       if (!mainLight || !ground || !ground.material || !ground.material.userData) return;
       const ud = ground.material.userData;
       if (!ud.uSolidMainLightPos || !ud.uSolidMainLightDir || !ud.uSolidMainLightType) return;
+      if (ud.uSolidContactPatchEnable) ud.uSolidContactPatchEnable.value = _contactPatchEnabled() ? 1.0 : 0.0;
 
       const lp = new THREE.Vector3();
       mainLight.getWorldPosition(lp);
@@ -309,6 +320,7 @@ export function createSolidPreviewLightingManager(opts) {
       // We approximate near-ground casters as spheres on the ground plane (xz footprint).
       if (ud.uSolidSphereCenters && ud.uSolidSphereRadii && ud.uSolidSphereCount) {
         let n = 0;
+        let nBuiltin = 0;
         const tmpBox = new THREE.Box3();
         const tmpSize = new THREE.Vector3();
         const tmpCenter = new THREE.Vector3();
@@ -341,6 +353,7 @@ export function createSolidPreviewLightingManager(opts) {
                   ud.uSolidSphereCenters.value[n].copy(tmpPos);
                   ud.uSolidSphereRadii.value[n] = r;
                   n++;
+                  nBuiltin++;
                 }
                 continue;
               }
@@ -362,6 +375,7 @@ export function createSolidPreviewLightingManager(opts) {
           }
         }
         ud.uSolidSphereCount.value = n;
+        if (ud.uSolidBuiltinSphereCount) ud.uSolidBuiltinSphereCount.value = nBuiltin;
       }
     } catch (_e) {}
   }
@@ -398,6 +412,8 @@ export function createSolidPreviewLightingManager(opts) {
             delete m0.userData.uSolidShadowSoftRange;
             delete m0.userData.uSolidShadowSoftStrength;
             delete m0.userData.uSolidShadowSoftExp;
+            delete m0.userData.uSolidContactPatchEnable;
+            delete m0.userData.uSolidBuiltinSphereCount;
             delete m0.userData._solidShadowSoftVer;
           }
           if (m0.customProgramCacheKey) delete m0.customProgramCacheKey;
@@ -531,6 +547,9 @@ export function createSolidPreviewLightingManager(opts) {
           if (!m.userData.uSolidShadowSoftRange) m.userData.uSolidShadowSoftRange = { value: new THREE.Vector4(2.8, 28.0, 2.8, 7.8) };
           if (!m.userData.uSolidShadowSoftStrength) m.userData.uSolidShadowSoftStrength = { value: 16.0 };
           if (!m.userData.uSolidShadowSoftExp) m.userData.uSolidShadowSoftExp = { value: 2.25 };
+          if (!m.userData.uSolidContactPatchEnable) m.userData.uSolidContactPatchEnable = { value: 1.0 };
+          if (!m.userData.uSolidBuiltinSphereCount) m.userData.uSolidBuiltinSphereCount = { value: 0 };
+          m.userData.uSolidContactPatchEnable.value = _contactPatchEnabled() ? 1.0 : 0.0;
 
           m.userData._solidShadowSoftVer = (m.userData._solidShadowSoftVer || 0) + 1;
           const _ver = m.userData._solidShadowSoftVer;
@@ -663,6 +682,7 @@ export function createSolidPreviewLightingManager(opts) {
           // spheres（与 syncGroundShadowUniforms 相同：builtin 优先，再其它近地投射体；脚印半径见 _computeFootprintSphereOnGround）
           try {
             let n = 0;
+            let nBuiltin = 0;
             const tmpPos = new THREE.Vector3();
             const tmpScale = new THREE.Vector3();
             const tmpBox = new THREE.Box3();
@@ -691,6 +711,7 @@ export function createSolidPreviewLightingManager(opts) {
                       m.userData.uSolidSphereCenters.value[n].copy(tmpPos);
                       m.userData.uSolidSphereRadii.value[n] = r0;
                       n++;
+                      nBuiltin++;
                     }
                     continue;
                   }
@@ -709,7 +730,11 @@ export function createSolidPreviewLightingManager(opts) {
               }
             }
             m.userData.uSolidSphereCount.value = n;
-          } catch (_eSc) { try { m.userData.uSolidSphereCount.value = 0; } catch (_e2) {} }
+            m.userData.uSolidBuiltinSphereCount.value = nBuiltin;
+          } catch (_eSc) {
+            try { m.userData.uSolidSphereCount.value = 0; } catch (_e2) {}
+            try { m.userData.uSolidBuiltinSphereCount.value = 0; } catch (_e3) {}
+          }
 
           m.onBeforeCompile = (shader) => {
             let fs = shader.fragmentShader;
@@ -768,6 +793,7 @@ export function createSolidPreviewLightingManager(opts) {
                     '\treturn clamp( ( 0.92 - avg ) / 0.30, 0.0, 1.0 );\n' +
                     '}\n' +
                     'float solidApplyWedgePatch2D( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, vec4 shadowCoord, float sh0 ) {\n' +
+                    '\tif ( uSolidContactPatchEnable < 0.5 ) return sh0;\n' +
                     '\tif ( uSolidWedgeEnable < 0.5 ) return sh0;\n' +
                     '\tvec2 dirXZ;\n' +
                     '\tif ( uSolidMainLightType == 0 ) {\n' +
@@ -784,6 +810,7 @@ export function createSolidPreviewLightingManager(opts) {
                     '\treturn clamp( sh0 * ( 1.0 - k * m ), 0.0, 1.0 );\n' +
                     '}\n' +
                     'float solidSeamFix2D( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, vec4 shadowCoord, float sh0 ) {\n' +
+                    '\tif ( uSolidContactPatchEnable < 0.5 ) return sh0;\n' +
                     '\t// sh0: 1=lit, 0=shadow. Only darken thin bright seams near shadow boundary.\n' +
                     '\tfloat k = clamp( uSolidShadowSeamStrength, 0.0, 1.0 );\n' +
                     '\tif ( k <= 0.0001 ) return sh0;\n' +
@@ -931,7 +958,54 @@ export function createSolidPreviewLightingManager(opts) {
                     '\tfloat occ = solidSphereOcclusion( p );\n' +
                     '\treturn mix( 1.0, occ, k );\n' +
                     '}\n' +
+                    'float solidSphereOcclusionBuiltin( vec3 p ) {\n' +
+                    '\tif ( uSolidBuiltinSphereCount <= 0 ) return 1.0;\n' +
+                    '\tfloat occ = 1.0;\n' +
+                    '\tif ( uSolidMainLightType == 0 ) {\n' +
+                    '\t\tvec3 rd = normalize( uSolidMainLightDir );\n' +
+                    '\t\tfor ( int i = 0; i < 8; i++ ) {\n' +
+                    '\t\t\tif ( i >= uSolidBuiltinSphereCount ) break;\n' +
+                    '\t\t\tocc = min( occ, solidRaySphereOcc( p, rd, 1e6, uSolidSphereCenters[i], uSolidSphereRadii[i] ) );\n' +
+                    '\t\t}\n' +
+                    '\t} else {\n' +
+                    '\t\tvec3 lp = uSolidMainLightPos;\n' +
+                    '\t\tvec3 rd = normalize( lp - p );\n' +
+                    '\t\tfloat tMax = length( lp - p );\n' +
+                    '\t\tfor ( int i = 0; i < 8; i++ ) {\n' +
+                    '\t\t\tif ( i >= uSolidBuiltinSphereCount ) break;\n' +
+                    '\t\t\tocc = min( occ, solidRaySphereOcc( p, rd, tMax, uSolidSphereCenters[i], uSolidSphereRadii[i] ) );\n' +
+                    '\t\t}\n' +
+                    '\t}\n' +
+                    '\treturn occ;\n' +
+                    '}\n' +
+                    'float solidSphereOcclusionFadedBuiltin( vec3 p ) {\n' +
+                    '\tif ( uSolidBuiltinSphereCount <= 0 ) return 1.0;\n' +
+                    '\tfloat minEdge = 1e9;\n' +
+                    '\tfloat nearR = 2.0;\n' +
+                    '\tfor ( int i = 0; i < 8; i++ ) {\n' +
+                    '\t\tif ( i >= uSolidBuiltinSphereCount ) break;\n' +
+                    '\t\tfloat r = max( 0.0001, uSolidSphereRadii[i] );\n' +
+                    '\t\tfloat d = length( p.xz - uSolidSphereCenters[i].xz );\n' +
+                    '\t\tfloat edge = max( 0.0, d - r );\n' +
+                    '\t\tif ( edge < minEdge ) { minEdge = edge; nearR = r; }\n' +
+                    '\t}\n' +
+                    '\tfloat k = 1.0 - smoothstep( nearR * 0.18, nearR * 0.95, minEdge );\n' +
+                    '\tk = pow( clamp( k, 0.0, 1.0 ), 1.8 );\n' +
+                    '\tfloat occ = solidSphereOcclusionBuiltin( p );\n' +
+                    '\treturn mix( 1.0, occ, k );\n' +
+                    '}\n' +
+                    'float solidApplyBuiltinSpherePatchGated( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, vec4 shadowCoord, float sh0 ) {\n' +
+                    '\tif ( uSolidContactPatchEnable < 0.5 || uSolidBuiltinSphereCount <= 0 ) return sh0;\n' +
+                    '\tfloat gate = solidShadowAvgGate2D( shadowMap, shadowMapSize, shadowBias, shadowCoord );\n' +
+                    '\tfloat occ = solidSphereOcclusionFadedBuiltin( vSolidShadowGroundPos );\n' +
+                    '\tfloat a = clamp( 1.0 - occ, 0.0, 1.0 );\n' +
+                    '\tfloat k = gate;\n' +
+                    '\tfloat outSh = sh0;\n' +
+                    '\toutSh = clamp( outSh * ( 1.0 - k * a ), 0.0, 1.0 );\n' +
+                    '\treturn outSh;\n' +
+                    '}\n' +
                     'float solidApplySpherePatchGated( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, vec4 shadowCoord, float sh0 ) {\n' +
+                    '\tif ( uSolidContactPatchEnable < 0.5 ) return sh0;\n' +
                     '\t// Gate using shadow neighborhood avg (same idea as seam fix): only patch in dark-side.\n' +
                     '\tfloat gate = solidShadowAvgGate2D( shadowMap, shadowMapSize, shadowBias, shadowCoord );\n' +
                     '\tfloat occ = solidSphereOcclusionFaded( vSolidShadowGroundPos );\n' +
@@ -946,12 +1020,10 @@ export function createSolidPreviewLightingManager(opts) {
                     'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n' +
                     '\tif ( uSolidMainLightType == 0 ) {\n' +
                     '\t\tfloat sh0 = getShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord );\n' +
+                    '\t\tif ( uSolidContactPatchEnable < 0.5 ) return sh0;\n' +
                     '\t\tsh0 = solidSeamFix2D( shadowMap, shadowMapSize, shadowBias, shadowCoord, sh0 );\n' +
-                    '\t\tsh0 = solidApplySpherePatchGated( shadowMap, shadowMapSize, shadowBias, shadowCoord, sh0 );\n' +
-                    '\t\t// IMPORTANT: gate occlusion to dark-side only; proxy spheres must not create lit-side black rims.\n' +
-                    '\t\tfloat gate0 = solidShadowAvgGate2D( shadowMap, shadowMapSize, shadowBias, shadowCoord );\n' +
-                    '\t\tfloat occ0 = solidSphereOcclusionFaded( vSolidShadowGroundPos );\n' +
-                    '\t\treturn min( sh0, mix( 1.0, occ0, gate0 ) );\n' +
+                    '\t\tsh0 = solidApplyBuiltinSpherePatchGated( shadowMap, shadowMapSize, shadowBias, shadowCoord, sh0 );\n' +
+                    '\t\treturn min( sh0, solidSphereOcclusionFadedBuiltin( vSolidShadowGroundPos ) );\n' +
                     '\t}\n' +
                     '\tfloat dSolidSh = 1e9;\n' +
                     '\tfor ( int i = 0; i < 8; i++ ) {\n' +
@@ -963,20 +1035,21 @@ export function createSolidPreviewLightingManager(opts) {
                     '\tfloat tSolidSh = smoothstep( uSolidShadowSoftRange.x, uSolidShadowSoftRange.y, dSolidSh );\n' +
                     '\ttSolidSh = pow( clamp( tSolidSh, 0.0, 1.0 ), max( 0.75, uSolidShadowSoftExp ) );\n' +
                     '\tshadowRadius *= ( 1.0 + uSolidShadowSoftStrength * tSolidSh );\n' +
-                    '\tfloat shadowOut = solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius, shadowBias, solidPull );\n' +
-                    '\tfloat occ = solidSphereOcclusion( vSolidShadowGroundPos );\n' +
-                    '\tfloat kOcc = pow( 1.0 - tSolidSh, 1.8 );\n' +
-                    '\t// IMPORTANT: gate occlusion to dark-side only; otherwise proxy spheres may cause a thin black rim on lit contact.\n' +
-                    '\tfloat gateOcc = solidShadowAvgGate2D( shadowMap, shadowMapSize, shadowBias, shadowCoord );\n' +
-                    '\tshadowOut = min( shadowOut, mix( 1.0, occ, kOcc * gateOcc ) );\n' +
+                    '\tfloat solidPullUse = ( uSolidContactPatchEnable < 0.5 ) ? 0.0 : solidPull;\n' +
+                    '\tfloat shadowOut = solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius, shadowBias, solidPullUse );\n' +
+                    '\tif ( uSolidContactPatchEnable < 0.5 ) return shadowOut;\n' +
+                    '\tif ( uSolidBuiltinSphereCount <= 0 ) return shadowOut;\n' +
+                    '\tfloat occB = solidSphereOcclusionBuiltin( vSolidShadowGroundPos );\n' +
+                    '\tfloat kOccB = pow( 1.0 - tSolidSh, 1.8 );\n' +
+                    '\tshadowOut = min( shadowOut, mix( 1.0, occB, kOccB ) );\n' +
                     '\treturn shadowOut;\n' +
                     '}\n' +
                     '\n' +
                     'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n' +
                     '\tfloat sh0 = getPointShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord, shadowCameraNear, shadowCameraFar );\n' +
-                    '\t// Cube shadow sampling differs; gate occlusion using sh0 itself to avoid lit-side dark rims.\n' +
-                    '\tfloat g0 = clamp( ( 0.98 - sh0 ) / 0.35, 0.0, 1.0 );\n' +
-                    '\treturn min( sh0, mix( 1.0, solidSphereOcclusionFaded( vSolidShadowGroundPos ), g0 ) );\n' +
+                    '\tif ( uSolidContactPatchEnable < 0.5 ) return sh0;\n' +
+                    '\tif ( uSolidBuiltinSphereCount <= 0 ) return sh0;\n' +
+                    '\treturn min( sh0, solidSphereOcclusionFadedBuiltin( vSolidShadowGroundPos ) );\n' +
                     '}\n';
 
                   const endifIdx = chunk.lastIndexOf('#endif');
@@ -1010,6 +1083,8 @@ export function createSolidPreviewLightingManager(opts) {
             shader.uniforms.uSolidShadowSoftRange = m.userData.uSolidShadowSoftRange;
             shader.uniforms.uSolidShadowSoftStrength = m.userData.uSolidShadowSoftStrength;
             shader.uniforms.uSolidShadowSoftExp = m.userData.uSolidShadowSoftExp;
+            shader.uniforms.uSolidContactPatchEnable = m.userData.uSolidContactPatchEnable;
+            shader.uniforms.uSolidBuiltinSphereCount = m.userData.uSolidBuiltinSphereCount;
             shader.uniforms.uSolidSphereCount = m.userData.uSolidSphereCount;
             shader.uniforms.uSolidSphereCenters = m.userData.uSolidSphereCenters;
             shader.uniforms.uSolidSphereRadii = m.userData.uSolidSphereRadii;
@@ -1036,6 +1111,8 @@ export function createSolidPreviewLightingManager(opts) {
               'uniform vec4 uSolidShadowSoftRange;\n' +
               'uniform float uSolidShadowSoftStrength;\n' +
               'uniform float uSolidShadowSoftExp;\n' +
+              'uniform float uSolidContactPatchEnable;\n' +
+              'uniform int uSolidBuiltinSphereCount;\n' +
               'uniform float uSolidShadowGaussTaps;\n' +
               'uniform float uSolidShadowGaussRotate;\n' +
               'uniform int uSolidSphereCount;\n' +
