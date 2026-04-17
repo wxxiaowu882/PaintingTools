@@ -46,6 +46,10 @@ export function createSolidPreviewLightingManager(opts) {
   const shouldSkipEnvProbe = typeof opts.shouldSkipEnvProbe === 'function' ? opts.shouldSkipEnvProbe : () => false;
 
   let previewEnabled = true;
+  let _receiverPatchLastEnsureAt = 0;
+  let _receiverEnsureBusy = false;
+  let _receiverWallsSigLast = '';
+  let _receiverModelsSigLast = '';
 
   // ---------- Raster shadow softening params ----------
   // Goal: keep contact edge relatively sharp, then progressively blur farther away from the model footprint
@@ -128,23 +132,15 @@ export function createSolidPreviewLightingManager(opts) {
   }
 
   function _receiverSoftShadowWallsEnabled() {
-    try {
-      if (typeof window === 'undefined') return false;
-      if (window.__solidReceiverSoftShadowWalls != null) return !!window.__solidReceiverSoftShadowWalls;
-      return localStorage.getItem('SolidReceiverSoftShadowWalls') === '1';
-    } catch (_e) {
-      return false;
-    }
+    // Receiver soft shadows are always enabled in raster preview
+    // (except directional path where we explicitly keep legacy projection).
+    return true;
   }
 
   function _receiverSoftShadowModelsEnabled() {
-    try {
-      if (typeof window === 'undefined') return false;
-      if (window.__solidReceiverSoftShadowModels != null) return !!window.__solidReceiverSoftShadowModels;
-      return localStorage.getItem('SolidReceiverSoftShadowModels') === '1';
-    } catch (_e) {
-      return false;
-    }
+    // Receiver soft shadows are always enabled in raster preview
+    // (except directional path where we explicitly keep legacy projection).
+    return true;
   }
 
   const _tmpFootprintV = new THREE.Vector3();
@@ -312,6 +308,131 @@ export function createSolidPreviewLightingManager(opts) {
       return true;
     } catch (_e0) {
       return false;
+    }
+  }
+
+  function _clearReceiverSoftShadowPatch(material) {
+    try {
+      if (!material) return false;
+      const had = !!(material.defines && (material.defines.SOLID_SHADOW_SOFT_RECEIVER || material.defines.SOLID_SHADOW_SOFT_RECEIVER_KIND != null));
+      if (!had) return false;
+      // Keep behavior conservative: remove defines + neutralize onBeforeCompile to avoid shader-cache key pitfalls.
+      try {
+        if (material.defines) {
+          delete material.defines.SOLID_SHADOW_SOFT_RECEIVER;
+          delete material.defines.SOLID_SHADOW_SOFT_RECEIVER_KIND;
+        }
+      } catch (_eDef) {}
+      try {
+        if (material.onBeforeCompile) material.onBeforeCompile = function() {};
+      } catch (_eObc) {}
+      try { material.needsUpdate = true; } catch (_eNu) {}
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function _hasReceiverSoftPatch(material) {
+    try {
+      return !!(material && material.defines && material.defines.SOLID_SHADOW_SOFT_RECEIVER === 1);
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function _shouldEnsureReceiverSoftPatch() {
+    try {
+      if (!previewEnabled) return false;
+      const mainLight = getMainLight();
+      if (!mainLight || mainLight.isDirectionalLight) return false;
+      const wantWalls = _receiverSoftShadowWallsEnabled();
+      const wantModels = _receiverSoftShadowModelsEnabled();
+      if (!wantWalls && !wantModels) return false;
+
+      if (wantWalls) {
+        const walls = getWalls();
+        if (walls && Array.isArray(walls)) {
+          for (let wi = 0; wi < walls.length; wi++) {
+            const w = walls[wi];
+            if (!w || !w.isMesh || !w.material) continue;
+            const mats = Array.isArray(w.material) ? w.material : [w.material];
+            for (let mi = 0; mi < mats.length; mi++) {
+              const mat = mats[mi];
+              if (!mat) continue;
+              const canPatch = !!(mat.isMeshPhysicalMaterial || mat.isMeshStandardMaterial);
+              if (!canPatch) continue;
+              if (!_hasReceiverSoftPatch(mat)) return true;
+            }
+          }
+        }
+      }
+
+      if (wantModels) {
+        const sg = getSceneGroup();
+        if (sg && sg.traverse) {
+          let need = false;
+          sg.traverse((obj) => {
+            if (need) return;
+            if (!obj || !obj.isMesh || !obj.receiveShadow) return;
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            for (let mi = 0; mi < mats.length; mi++) {
+              const mat = mats[mi];
+              if (!mat) continue;
+              const canPatch = !!(mat.isMeshPhysicalMaterial || mat.isMeshStandardMaterial);
+              if (!canPatch) continue;
+              if (!_hasReceiverSoftPatch(mat)) { need = true; return; }
+            }
+          });
+          if (need) return true;
+        }
+      }
+      return false;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function _receiverWallsSignature() {
+    try {
+      const walls = getWalls();
+      if (!walls || !Array.isArray(walls)) return 'nw';
+      const ids = [];
+      for (let wi = 0; wi < walls.length; wi++) {
+        const w = walls[wi];
+        if (!w || !w.isMesh || !w.material) continue;
+        const mats = Array.isArray(w.material) ? w.material : [w.material];
+        for (let mi = 0; mi < mats.length; mi++) {
+          const mat = mats[mi];
+          if (!mat) continue;
+          ids.push(String(mat.uuid || ('idx' + wi + '_' + mi)));
+        }
+      }
+      ids.sort();
+      return ids.join('|');
+    } catch (_e) {
+      return 'errw';
+    }
+  }
+
+  function _receiverModelsSignature() {
+    try {
+      const sg = getSceneGroup();
+      if (!sg || !sg.traverse) return 'nm';
+      const ids = [];
+      sg.traverse((obj) => {
+        if (!obj || !obj.isMesh || !obj.receiveShadow) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (let mi = 0; mi < mats.length; mi++) {
+          const mat = mats[mi];
+          if (!mat) continue;
+          ids.push(String(mat.uuid || ('midx' + mi)));
+        }
+      });
+      ids.sort();
+      return ids.join('|');
+    } catch (_e) {
+      return 'errm';
     }
   }
 
@@ -507,6 +628,43 @@ export function createSolidPreviewLightingManager(opts) {
       if (ud.uSolidContactPatchEnable) ud.uSolidContactPatchEnable.value = _contactPatchEnabled() ? 1.0 : 0.0;
       if (ud.uSolidSphereDebug) ud.uSolidSphereDebug.value = _contactPatchDebugAllEnabled() ? 1.0 : 0.0;
       if (ud.uSolidDbgForceRed) ud.uSolidDbgForceRed.value = _contactPatchForceRedEnabled() ? 1.0 : 0.0;
+
+      // Deterministic auto-heal:
+      // - immediate re-arm when receiver material signature changes
+      // - throttled safety check for unexpected missing patch
+      try {
+        if (!_receiverEnsureBusy) {
+          const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          const mainLight = getMainLight();
+          const isDir = !!(mainLight && mainLight.isDirectionalLight);
+          const wantWalls = _receiverSoftShadowWallsEnabled();
+          const wantModels = _receiverSoftShadowModelsEnabled();
+          let changed = false;
+
+          if (!isDir && wantWalls) {
+            const sigW = _receiverWallsSignature();
+            if (sigW !== _receiverWallsSigLast) {
+              _receiverWallsSigLast = sigW;
+              changed = true;
+            }
+          }
+          if (!isDir && wantModels) {
+            const sigM = _receiverModelsSignature();
+            if (sigM !== _receiverModelsSigLast) {
+              _receiverModelsSigLast = sigM;
+              changed = true;
+            }
+          }
+
+          const needByThrottle = (now - _receiverPatchLastEnsureAt) > 380 && _shouldEnsureReceiverSoftPatch();
+          if (changed || needByThrottle) {
+            _receiverEnsureBusy = true;
+            try { syncShadows(); } catch (_eReSync) {}
+            _receiverPatchLastEnsureAt = now;
+            _receiverEnsureBusy = false;
+          }
+        }
+      } catch (_eEnsure) {}
 
       const lp = new THREE.Vector3();
       mainLight.getWorldPosition(lp);
@@ -1484,8 +1642,18 @@ export function createSolidPreviewLightingManager(opts) {
         const mainLight = getMainLight();
         const sharedUd = ground && ground.material && ground.material.userData ? ground.material.userData : null;
         const okShared = !!(sharedUd && sharedUd.uSolidShadowAnchorCount && sharedUd.uSolidShadowAnchors && sharedUd.uSolidShadowSoftRange);
+        const shouldSoftWalls = _receiverSoftShadowWallsEnabled() && okShared && walls && Array.isArray(walls) && !(mainLight && mainLight.isDirectionalLight);
+        if (walls && Array.isArray(walls) && !shouldSoftWalls) {
+          // Ensure we revert to legacy shaders when disabling/when switching to directional.
+          for (let wi = 0; wi < walls.length; wi++) {
+            const w = walls[wi];
+            if (!w || !w.isMesh || !w.material) continue;
+            const mats = Array.isArray(w.material) ? w.material : [w.material];
+            for (let mi = 0; mi < mats.length; mi++) _clearReceiverSoftShadowPatch(mats[mi]);
+          }
+        }
         // Directional light: keep legacy projection behavior (no receiver softening).
-        if (_receiverSoftShadowWallsEnabled() && okShared && walls && Array.isArray(walls) && !(mainLight && mainLight.isDirectionalLight)) {
+        if (shouldSoftWalls) {
           const mob = (isMobile || isIosHost);
           const g = mob ? RASTER_SHADOW_GAUSS_PARAMS.mobile : RASTER_SHADOW_GAUSS_PARAMS.desktop;
           for (let wi = 0; wi < walls.length; wi++) {
@@ -1508,7 +1676,18 @@ export function createSolidPreviewLightingManager(opts) {
         const sharedUd = ground && ground.material && ground.material.userData ? ground.material.userData : null;
         const okShared = !!(sharedUd && sharedUd.uSolidShadowAnchorCount && sharedUd.uSolidShadowAnchors && sharedUd.uSolidShadowSoftRange);
         const sg = getSceneGroup();
-        if (_receiverSoftShadowModelsEnabled() && okShared && sg && sg.traverse && !(mainLight && mainLight.isDirectionalLight)) {
+        const shouldSoftModels = _receiverSoftShadowModelsEnabled() && okShared && sg && sg.traverse && !(mainLight && mainLight.isDirectionalLight);
+        if (sg && sg.traverse && !shouldSoftModels) {
+          // Ensure we revert to legacy shaders when disabling/when switching to directional.
+          sg.traverse((obj) => {
+            try {
+              if (!obj || !obj.isMesh) return;
+              const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+              for (let mi = 0; mi < mats.length; mi++) _clearReceiverSoftShadowPatch(mats[mi]);
+            } catch (_eC) {}
+          });
+        }
+        if (shouldSoftModels) {
           const mob = (isMobile || isIosHost);
           const g = mob ? RASTER_SHADOW_GAUSS_PARAMS.mobile : RASTER_SHADOW_GAUSS_PARAMS.desktop;
           sg.traverse((obj) => {
@@ -1718,7 +1897,18 @@ export function createSolidPreviewLightingManager(opts) {
   }
 
   function onSceneChanged(reason) {
-    // For now: just force a near-term env refresh; layout will adapt to new bounds.
+    // Scene load/apply may create/replace receiver materials asynchronously.
+    // Re-arm shadow receiver patch several times in a short window, so first entry
+    // gets soft receivers without requiring a manual light-type toggle.
+    try {
+      if (previewEnabled) {
+        syncShadows();
+        try { requestAnimationFrame(() => { try { if (previewEnabled) syncShadows(); } catch (_eRaf1) {} }); } catch (_eRaf0) {}
+        try { setTimeout(() => { try { if (previewEnabled) syncShadows(); } catch (_eT1) {} }, 80); } catch (_eT0) {}
+        try { setTimeout(() => { try { if (previewEnabled) syncShadows(); } catch (_eT2) {} }, 220); } catch (_eT00) {}
+      }
+    } catch (_e) {}
+    // For now: force a near-term env refresh; layout will adapt to new bounds.
     requestEnvProbe(reason || 'scene_changed');
   }
 
