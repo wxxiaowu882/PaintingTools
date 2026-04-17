@@ -1143,7 +1143,7 @@
             try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('build_environment'); } catch(_eP) {}
         }
         }
-        function updateLightPosition() { const { x, y, z } = computeSolidMainLightCartesianPosition(THREE, state); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') { mainLight.lookAt(0, 1, 0); } mainLight.updateMatrixWorld();
+        function updateLightPosition() { const { x, y, z } = computeSolidMainLightCartesianPosition(THREE, state); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) { mainLight.target.position.set(0, 1, 0); mainLight.target.updateMatrixWorld(true); } if (lightType === 'rect') { mainLight.lookAt(0, 1, 0); } mainLight.updateMatrixWorld();
         try { _solidRefreshRasterShadowAfterLightMove(); } catch(_eRf) {}
         // 光栅态：阴影软化参数由 SolidPreviewLighting 统一管理（syncShadows），避免滑块交互时出现“参数被覆盖→阴影突然变硬”。
         try { _solidSyncGroundShadowUniforms(); } catch (_eSyncL) {}

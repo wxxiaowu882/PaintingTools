@@ -196,6 +196,9 @@ export function createSolidMainLight(THREE, { lightType, color, intensitySlider,
   } else if (lightType === 'dir') {
     light = new THREE.DirectionalLight(color, getSolidMainLightIntensityScalar('dir', false, val));
     light.radius = lSize;
+    // Keep directional light direction pipeline identical to spot:
+    // target participates in scene graph and world-matrix updates.
+    addSpotTargetToScene = true;
   } else if (lightType === 'rect') {
     if (useAdvancedRender) {
       const intensity = getSolidMainLightIntensityScalar('rect', true, val);
