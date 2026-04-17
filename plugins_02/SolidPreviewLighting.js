@@ -4,7 +4,7 @@
 // 生产端页面（如石膏人像沙盒）请与 Solid.html 一致：只 import 本模块并 wiring install/setEnabled/syncShadows，
 // 不要在页面内复制地面阴影的 onBeforeCompile / ShaderChunk 改写逻辑。
 
-import { SOLID_RASTER_SHADOW_PERF } from '../js/PaintingConfig.js';
+import { SOLID_RASTER_SHADOW_PERF, SOLID_RASTER_BOUNCE_APPROX } from '../js/PaintingConfig.js';
 
 /**
  * 与 Solid.html 中 shouldSkipEnvProbe 条件一致，供消费端与生产端共用，避免各写一套导致行为分叉。
@@ -45,6 +45,7 @@ export function createSolidPreviewLightingManager(opts) {
   const getIsMobile = typeof opts.getIsMobile === 'function' ? opts.getIsMobile : (() => !!opts.isMobile);
   const getIsIosHost = typeof opts.getIsIosHost === 'function' ? opts.getIsIosHost : (() => !!opts.isIosHost);
   const getLightState = typeof opts.getLightState === 'function' ? opts.getLightState : (() => opts.lightState || null); // expects { radius?: number }
+  const getInteractionState = typeof opts.getInteractionState === 'function' ? opts.getInteractionState : (() => false);
   const shouldSkipEnvProbe = typeof opts.shouldSkipEnvProbe === 'function' ? opts.shouldSkipEnvProbe : () => false;
 
   let previewEnabled = true;
@@ -1887,6 +1888,170 @@ export function createSolidPreviewLightingManager(opts) {
   const debounceMs = typeof opts.envDebounceMs === 'number' ? opts.envDebounceMs : 220;
   const cubeSize = typeof opts.envCubeSize === 'number' ? opts.envCubeSize : (getIsMobile() ? 48 : 64);
   const probeCount = 3;
+  const _tmpBounceColorA = new THREE.Color();
+  const _tmpBounceColorB = new THREE.Color();
+  const _tmpBounceColorC = new THREE.Color();
+
+  function _isBounceTargetMaterial(m) {
+    if (!m) return false;
+    if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) return true;
+    const cfg = SOLID_RASTER_BOUNCE_APPROX || {};
+    return !!(cfg.nonPbrFallback && (m.isMeshPhongMaterial || m.isMeshLambertMaterial));
+  }
+
+  function _resolveBounceCfg() {
+    try {
+      const root = SOLID_RASTER_BOUNCE_APPROX || {};
+      if (!root.enabled) return null;
+      const presets = root.presets || {};
+      const key = root.qualityPreset || 'balanced';
+      const preset = presets[key] || presets.balanced || presets.low || null;
+      if (!preset) return null;
+      const mobileScale = getIsMobile() ? Number(root.mobileScale || 1) : 1;
+      const interactiveScale = getInteractionState() ? Number(root.interactiveScale || 1) : 1;
+      return { root, preset, scale: Math.max(0, mobileScale * interactiveScale) };
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  function _mixColorWithSaturation(base, sat) {
+    const hsl = { h: 0, s: 0, l: 0 };
+    base.getHSL(hsl);
+    hsl.s = Math.min(1, Math.max(0, hsl.s * sat));
+    base.setHSL(hsl.h, hsl.s, hsl.l);
+    return base;
+  }
+
+  function _computeModelAverageColor(maxSamples) {
+    const sceneGroup = getSceneGroup();
+    const out = new THREE.Color(0.5, 0.5, 0.5);
+    if (!sceneGroup || !sceneGroup.traverse) return out;
+    const limit = Math.max(1, Number(maxSamples) || 24);
+    let n = 0;
+    const acc = new THREE.Color(0, 0, 0);
+    try {
+      sceneGroup.traverse((obj) => {
+        if (n >= limit) return;
+        if (!obj || !obj.isMesh) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (let i = 0; i < mats.length; i++) {
+          if (n >= limit) break;
+          const m = mats[i];
+          if (!m || !m.color) continue;
+          acc.r += m.color.r;
+          acc.g += m.color.g;
+          acc.b += m.color.b;
+          n += 1;
+        }
+      });
+    } catch (_e) {}
+    if (n > 0) out.setRGB(acc.r / n, acc.g / n, acc.b / n);
+    return out;
+  }
+
+  function _restoreBounceApproxOnMaterials() {
+    const targets = [];
+    const sg = getSceneGroup();
+    if (sg && sg.traverse) {
+      try { sg.traverse((obj) => { if (obj && obj.isMesh) targets.push(obj); }); } catch (_e) {}
+    }
+    const g = getGround();
+    if (g && g.isMesh) targets.push(g);
+    const ws = getWalls();
+    if (ws && Array.isArray(ws)) ws.forEach((w) => { if (w && w.isMesh) targets.push(w); });
+    targets.forEach((obj) => {
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (let i = 0; i < mats.length; i++) {
+        const m = mats[i];
+        if (!m || !m.userData) continue;
+        const ud = m.userData;
+        if (ud.__solidBounceOrigEmissive && m.emissive && m.emissive.copy) m.emissive.copy(ud.__solidBounceOrigEmissive);
+        if (typeof ud.__solidBounceOrigEmissiveIntensity === 'number') m.emissiveIntensity = ud.__solidBounceOrigEmissiveIntensity;
+        delete ud.__solidBounceOrigEmissive;
+        delete ud.__solidBounceOrigEmissiveIntensity;
+        m.needsUpdate = true;
+      }
+    });
+  }
+
+  function _applyBounceApproxToMesh(obj, receiverScale, cfg, tintColor) {
+    if (!obj || !obj.isMesh || !cfg || !tintColor) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    const preset = cfg.preset;
+    for (let i = 0; i < mats.length; i++) {
+      const m = mats[i];
+      if (!_isBounceTargetMaterial(m)) continue;
+      if (!m.userData) m.userData = {};
+      if (!m.userData.__solidBounceOrigEmissive && m.emissive && m.emissive.clone) m.userData.__solidBounceOrigEmissive = m.emissive.clone();
+      if (typeof m.userData.__solidBounceOrigEmissiveIntensity !== 'number') m.userData.__solidBounceOrigEmissiveIntensity = Number(m.emissiveIntensity || 1);
+      if (!m.emissive || !m.emissive.copy) continue;
+      const rough = Math.min(1, Math.max(0, Number(m.roughness) || 0.65));
+      const darkStart = Math.min(1, Math.max(0, Number(preset.darkBandStart) || 0.2));
+      const darkEnd = Math.min(1, Math.max(darkStart + 0.0001, Number(preset.darkBandEnd) || 0.72));
+      const darkFactor = Math.min(1, Math.max(0, (rough - darkStart) / (darkEnd - darkStart)));
+      const baseEnergy = Number(preset.baseIntensity || 0.06) * cfg.scale;
+      const bounceMix = (
+        Number(preset.groundBounceWeight || 0) +
+        Number(preset.wallBounceWeight || 0) +
+        Number(preset.modelBounceWeight || 0)
+      ) / 3;
+      let energy = baseEnergy * bounceMix * darkFactor * Math.max(0, Number(receiverScale || 1));
+      const eMin = Number(preset.energyClampMin || 0);
+      const eMax = Math.max(eMin, Number(preset.energyClampMax || 0.12));
+      energy = Math.min(eMax, Math.max(eMin, energy));
+      const gain = Math.max(0, Number(preset.emissiveGain || 1));
+      const add = _tmpBounceColorC.copy(tintColor).multiplyScalar(energy);
+      const origE = m.userData.__solidBounceOrigEmissive || _tmpBounceColorA.setRGB(0, 0, 0);
+      m.emissive.copy(origE).add(add);
+      m.emissiveIntensity = (Number(m.userData.__solidBounceOrigEmissiveIntensity || 1)) * (1 + energy * gain);
+      m.needsUpdate = true;
+    }
+  }
+
+  function _applyBounceApprox() {
+    const cfg = _resolveBounceCfg();
+    if (!cfg) {
+      _restoreBounceApproxOnMaterials();
+      return;
+    }
+    const g = getGround();
+    const ws = getWalls();
+    const gCol = (g && g.material && g.material.color) ? _tmpBounceColorA.copy(g.material.color) : _tmpBounceColorA.set('#cccccc');
+    const wCol = (() => {
+      if (ws && Array.isArray(ws)) {
+        for (let i = 0; i < ws.length; i++) {
+          const w = ws[i];
+          if (w && w.material && w.material.color) return _tmpBounceColorB.copy(w.material.color);
+        }
+      }
+      return _tmpBounceColorB.copy(gCol);
+    })();
+    const mCol = _computeModelAverageColor(cfg.preset.maxModelColorSamples);
+    const tint = new THREE.Color(0, 0, 0);
+    const wg = Math.max(0, Number(cfg.preset.groundBounceWeight || 0));
+    const ww = Math.max(0, Number(cfg.preset.wallBounceWeight || 0));
+    const wm = Math.max(0, Number(cfg.preset.modelBounceWeight || 0));
+    const wsum = Math.max(0.0001, wg + ww + wm);
+    tint.add(gCol.clone().multiplyScalar(wg / wsum));
+    tint.add(wCol.clone().multiplyScalar(ww / wsum));
+    tint.add(mCol.clone().multiplyScalar(wm / wsum));
+    _mixColorWithSaturation(tint, Math.max(0, Number(cfg.preset.colorBleedSaturation || 0.45)));
+
+    const sceneGroup = getSceneGroup();
+    if (sceneGroup && sceneGroup.traverse) {
+      try {
+        sceneGroup.traverse((obj) => {
+          if (!obj || !obj.isMesh) return;
+          _applyBounceApproxToMesh(obj, Number(cfg.preset.receiverScaleModel || 1), cfg, tint);
+        });
+      } catch (_e) {}
+    }
+    if (g && g.isMesh) _applyBounceApproxToMesh(g, Number(cfg.preset.receiverScaleGround || 0.55), cfg, tint);
+    if (ws && Array.isArray(ws)) {
+      ws.forEach((w) => { if (w && w.isMesh) _applyBounceApproxToMesh(w, Number(cfg.preset.receiverScaleWall || 0.65), cfg, tint); });
+    }
+  }
 
   function _disposeEnvProbe() {
     try {
@@ -1909,13 +2074,14 @@ export function createSolidPreviewLightingManager(opts) {
             const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
             for (let mi = 0; mi < mats.length; mi++) {
               const m = mats[mi];
-              if (!m || !(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial)) continue;
+              if (!_isBounceTargetMaterial(m)) continue;
               m.envMap = null;
               m.needsUpdate = true;
             }
           });
         }
       } catch (_e5) {}
+      _restoreBounceApproxOnMaterials();
     } catch (_e) {}
   }
 
@@ -2047,6 +2213,7 @@ export function createSolidPreviewLightingManager(opts) {
       }
 
       _applyMultiEnvProbesToSceneGroup();
+      _applyBounceApprox();
       log('[RasterEnvProbe] multi updated (' + (reason || 'unknown') + '), cube=' + cubeSize + ' x3');
     } catch (e) {
       log('[RasterEnvProbe] failed: ' + (e && e.message ? e.message : e));

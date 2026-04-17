@@ -103,7 +103,9 @@
     import { installSolidAtmosphereHostBindings } from '../../plugins_02/SolidAtmosphereControlShared.js';
     import { installSolidAssistHostBindings } from '../../plugins_02/SolidAssistControlShared.js';
     import { computeSolidMainLightCartesianPosition, createSolidMainLight, installSolidMainLightSliderBindings, solidGetTempColorFromKelvin100 } from '../../plugins_02/SolidLightControlShared.js';
+    import { SOLID_PATH_TRACER_QUALITY } from '../../js/PaintingConfig.js';
     window.skyEnvLightMatchMainRect = true; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.producer) ? SOLID_PATH_TRACER_QUALITY.producer : {};
     let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false;
     // 视角锁定（生产端）：状态持久化 + UI 同步
     const SOLID_CREATE_CAMERA_LOCK_KEY = 'SolidCreatePortrait_CameraLock_v1';
@@ -171,7 +173,7 @@
     try { if (typeof obj.dispose === 'function') obj.dispose(); } catch(e) { console.warn("静默拦截销毁错误:", e); } }
     // 补回渲染控制停止功能
     window.stopRender = function() { window.useAdvancedRender = false; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
-    if (renderer) renderer.toneMappingExposure = 0.7;
+    if (renderer) renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureBase || 0.7);
     try { if (typeof buildEnvironment === 'function') buildEnvironment(); } catch (_eBe) {}
     try { _solidEnableRasterShadowsOnce(); } catch (_ePl) {}
     try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('stop_render'); } catch (_eP) {}
@@ -184,10 +186,10 @@
         if (pathTracer) return true;
         try {
             pathTracer = new WebGLPathTracer(renderer);
-            pathTracer.multipleImportanceSampling = true;
-            pathTracer.bounces = 3;
-            pathTracer.renderScale = isMobile ? 0.38 : 0.62;
-            if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = 1.0;
+            pathTracer.multipleImportanceSampling = _solidPtCfg.multipleImportanceSampling !== false;
+            pathTracer.bounces = Number(_solidPtCfg.bounces || 3);
+            pathTracer.renderScale = isMobile ? Number(_solidPtCfg.renderScaleMobile || 0.38) : Number(_solidPtCfg.renderScaleDesktop || 0.62);
+            if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = Number(_solidPtCfg.filterGlossyFactor || 1.0);
             return true;
         } catch (e) {
             try { triggerUnsupported(); } catch (_e2) {}
@@ -233,6 +235,7 @@
     getWalls: () => window.walls,
     getIsMobile: () => isMobile,
     getIsIosHost: () => isIosPosterizeHost,
+    getInteractionState: () => !!window._orbitInteracting || !!(transformControl && transformControl.dragging) || !!(window._planeXZDrag && window._planeXZDrag.active),
     getLightState: () => state,
     shouldSkipEnvProbe: solidRasterPreviewShouldSkipEnvProbe(() => ({
             useAdvancedRender: window.useAdvancedRender,
@@ -674,7 +677,7 @@
     }
     } catch (_ePl) {}
     solidCreateSceneLoadUxMarkRasterDone();
-    try { if (renderer && scene && camera) { renderer.toneMappingExposure = 0.7; renderer.render(scene, camera); } } catch (_eR) {}
+    try { if (renderer && scene && camera) { renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureBase || 0.7); renderer.render(scene, camera); } } catch (_eR) {}
     setTimeout(() => { try { window.setMode(window.currentEditorMode); } catch(_e) {} }, 100); _draftDirty = false; _perfEnd(_pm); solidCreateSceneLoadUxFinish(); }
     async function autoRestoreDraftIfNeeded() { if (window.__solidCreateHasExplicitScene) return; if (!editorGroup || (editorGroup.children && editorGroup.children.length > 0)) return; const payload = await draftGet();
     if (!payload || !payload.data) return; window._solidCreateDraftFileName = payload.fileName ? String(payload.fileName) : null; applySceneDataToEditor(payload.data, '✅ 已自动恢复草稿'); // 恢复草稿后，尽量把“正在编辑的文件”绑定回来，避免保存时误新建
@@ -1239,7 +1242,7 @@
         window.__solidPreviewLighting.onSceneChanged('new_scene');
         }
         } catch (_ePlNs) {}
-        try { if (renderer && scene && camera) { renderer.toneMappingExposure = 0.7; renderer.render(scene, camera); } } catch (_eRNs) {}
+        try { if (renderer && scene && camera) { renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureBase || 0.7); renderer.render(scene, camera); } } catch (_eRNs) {}
         window.hwLog("已清空画布，进入新建场景状态"); needsUpdate = true; lightMoved = true; 
         // 【加载唤醒】：新建场景后，重新刷新一次当前的激活模式
         setTimeout(() => { window.setMode(window.currentEditorMode); }, 100); };
@@ -1791,12 +1794,12 @@
         camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); try {
         renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: true });
         RectAreaLightUniformsLib.init();
-        renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.2) : window.devicePixelRatio); renderer.setSize(window.innerWidth, window.innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.7;
+        renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.2) : window.devicePixelRatio); renderer.setSize(window.innerWidth, window.innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureBase || 0.7);
         renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); addHwLog('Context Lost'); triggerUnsupported(); }, false); container.appendChild(renderer.domElement); try {
         try { if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); } catch(_e) {}
         // 默认不创建光追器（更流畅）。需要高质量时由“开启渲染/高质量”按钮创建。
         pathTracer = null;
-        try { window._solidPt = window._solidPt || {}; window._solidPt.targetSamples = isMobile ? 120 : 160; } catch (_ePtS) {}
+        try { window._solidPt = window._solidPt || {}; window._solidPt.targetSamples = isMobile ? Number(_solidPtCfg.targetSamplesMobile || 120) : Number(_solidPtCfg.targetSamplesDesktop || 160); } catch (_ePtS) {}
         try { window._solidGroundShadowDirty = true; } catch (_eGs0) {}
         } catch (ptErr) { triggerUnsupported(); return; } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
         if (window.DoFManager) window.DoFManager.init(camera, scene, renderer.domElement);
@@ -2116,7 +2119,7 @@
         scene.add(transformControl); pathTracer.reset(); lightMoved = false; lightPosUpdated = false; needsUpdate = false; window.sumDuration = 0; }
         const pBar = document.getElementById('render-progress-bar'); const targetSamples = (window._solidPt && window._solidPt.targetSamples) ? window._solidPt.targetSamples : 160; const currentSamples = pathTracer.samples;
         if (pBar) { const progressPct = Math.min(100, (currentSamples / targetSamples) * 100); pBar.style.width = progressPct + '%'; pBar.style.opacity = (currentSamples >= targetSamples) ? '0' : '1'; }
-        if (currentSamples < 4) { renderer.toneMappingExposure = 0.4; } else { renderer.toneMappingExposure = 0.7; }
+        if (currentSamples < Number(_solidPtCfg.warmupSampleThreshold || 4)) { renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureWarmup || 0.4); } else { renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureBase || 0.7); }
         if (currentSamples < targetSamples) {
         const dofOn = window.DoFManager ? window.DoFManager.enabled : false;
         if (window.AtmosphereManager && (window.isFogEnabled || dofOn)) window.AtmosphereManager.render(pathTracer, renderer, scene, camera); else pathTracer.renderSample();

@@ -138,15 +138,17 @@
         installSolidMainLightSliderBindings,
         solidGetTempColorFromKelvin100,
     } from './plugins_02/SolidLightControlShared.js';
+    import { SOLID_PATH_TRACER_QUALITY } from './js/PaintingConfig.js';
     window.skyEnvLightMatchMainRect = true; // 【试验·抗黑点噪点】true=更干净（更慢），false=更快（更噪）
-    const SOLID_PT_ANTI_SPECKLE_TEST = true; // 方案C（完成时降噪）效果不稳，默认关闭；若要再试，改为 true
-    const SOLID_MOBILE_DENOISE = false; const _solidPt = SOLID_PT_ANTI_SPECKLE_TEST
-    ? { targetSamples: 380, renderScaleMobile: 0.45, renderScaleDesktop: 0.82, filterGlossyFactor: 0.78, expRamp: 28, expLo: 0.63, expHi: 0.74, toneMappingExposureBase: 0.72 }
-    : { targetSamples: 200, renderScaleMobile: 0.42, renderScaleDesktop: 0.75, filterGlossyFactor: 1, expRamp: 24, expLo: 0.55, expHi: 0.7, toneMappingExposureBase: 0.7 }; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.consumer) ? SOLID_PATH_TRACER_QUALITY.consumer : {};
+    const _solidPtProfileMap = _solidPtCfg.profiles || {};
+    const _solidPtProfileKey = _solidPtCfg.useAntiSpeckleProfile ? 'antiSpeckle' : 'default';
+    const _solidPt = _solidPtProfileMap[_solidPtProfileKey] || _solidPtProfileMap.default || { targetSamples: 200, renderScaleMobile: 0.42, renderScaleDesktop: 0.75, filterGlossyFactor: 1, expRamp: 24, expLo: 0.55, expHi: 0.7, toneMappingExposureBase: 0.7 };
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     /** PC：PathTracer 首帧会触发大量 HLSL 编译，ANGLE/D3D 上易 GL_OUT_OF_MEMORY；桌面端略降内部分辨率换稳定性 */
     function _solidPathTracerRenderScale() {
         if (isMobile) return _solidPt.renderScaleMobile;
-        return Math.min(_solidPt.renderScaleDesktop, 0.64);
+        return Math.min(_solidPt.renderScaleDesktop, Number(_solidPtCfg.desktopRenderScaleCap || 0.64));
     }
     const isIosPosterizeHost = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false; let solidAnimRafId = 0; window.sumDuration = 0;
@@ -258,7 +260,7 @@
     window.__solidTryRecoverPathTracer = function(reason) { if (window._solidHardwareUnsupported) return false; if (window._solidRecovering) return false; if (!renderer || !scene || !camera) return false; window._solidRecovering = true; let recovered = false; try {
     const gl = renderer.getContext ? renderer.getContext() : null; if (!gl) throw new Error('WebGL 上下文为空');
     if (typeof gl.isContextLost === 'function' && gl.isContextLost()) throw new Error('WebGL 上下文尚未恢复');
-    if (!pathTracer) { pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = _solidPathTracerRenderScale(); if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; }
+    if (!pathTracer) { pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = _solidPtCfg.multipleImportanceSampling !== false; pathTracer.bounces = Number(_solidPtCfg.bounces || 3); pathTracer.renderScale = _solidPathTracerRenderScale(); if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; }
     if (pathTracer.setScene) pathTracer.setScene(scene, camera);
     pathTracer.reset(); lightMoved = true; needsUpdate = true; window.sumDuration = 0; window.lastRenderTime = 0; window.isUnsupported = false; window._solidContextLost = false; window.useAdvancedRender = true; window._solidSampleTimeout = false; window.__solidLastResetAt = performance.now(); window._solidPerfSoftFail = false;
     const msg = document.getElementById('fallback-msg'); if (msg) msg.style.display = 'none'; const pw = document.getElementById('persistent-warning'); if (pw) pw.style.display = 'none'; const cc = document.getElementById('canvas-container'); if (cc) cc.style.opacity = '1'; const mp = document.getElementById('main-panel'); if (mp) { mp.style.opacity = '1'; mp.style.pointerEvents = 'auto'; }
@@ -534,7 +536,7 @@
     window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none'; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
     document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1';
     document.getElementById('main-panel').style.pointerEvents = 'auto'; window.isLoadingScene = false; if (!pathTracer && renderer) { try {
-    pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = _solidPathTracerRenderScale();
+    pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = _solidPtCfg.multipleImportanceSampling !== false; pathTracer.bounces = Number(_solidPtCfg.bounces || 3); pathTracer.renderScale = _solidPathTracerRenderScale();
     if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; } catch(e) { triggerUnsupported('forceReRender_path_tracer', e.message); return; } }
     if(pathTracer) { needsUpdate = true; lightMoved = true; window.sumDuration = 0; window.lastRenderTime = 0; pathTracer.updateMaterials(); pathTracer.updateLights(); pathTracer.reset(); window.isUnsupported = false; window._solidContextLost = false; window._solidSampleTimeout = false; window.__solidLastResetAt = performance.now(); window._solidPerfSoftFail = false;
     if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); }
@@ -593,6 +595,7 @@
         getWalls: () => window.walls,
         getIsMobile: () => isMobile,
         getIsIosHost: () => isIosPosterizeHost,
+        getInteractionState: () => !!window._orbitInteracting,
         getLightState: () => state,
         shouldSkipEnvProbe: solidRasterPreviewShouldSkipEnvProbe(() => ({
             useAdvancedRender: window.useAdvancedRender,
@@ -1010,7 +1013,7 @@
         requestAnimationFrame(() => { try { window.hwLog("[Init] 推迟一帧再启动渲染（先让加载层绘制，略缩短首屏等待）");
         if (window._solidHardwareUnsupported) { window.hwLog("[Init] 静态检测不通过，跳过 PathTracer 实例化"); }
         else { try { window.hwLog("[Init] 准备实例化 WebGLPathTracer...");
-        pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = _solidPathTracerRenderScale();
+        pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = _solidPtCfg.multipleImportanceSampling !== false; pathTracer.bounces = Number(_solidPtCfg.bounces || 3); pathTracer.renderScale = _solidPathTracerRenderScale();
         if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; window.hwLog("[Init] WebGLPathTracer 实例化完成"); } catch (ptErr) { window.hwLog("[Init] WebGLPathTracer 拒绝启动: " + ptErr.message);
         triggerUnsupported('init_path_tracer_reject', ptErr.message); return; } } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
         if (window.DoFManager) window.DoFManager.init(camera, scene, renderer.domElement);
