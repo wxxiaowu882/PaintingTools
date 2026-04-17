@@ -2,11 +2,11 @@
 // 轨道位置、色温表、尺寸防抖与强度拖动策略。**强度倍率与灯体角度/尺寸公式仅允许在本文件常量区维护。**
 // 拖动强度时只改 three.js Light.intensity，避免每帧销毁 shadow map / 整灯重建；松手 change 再完整 buildEnvironment。
 
-/** 与控制面板 `lightIntensity` range（min 0.2 max 5）一致 */
+/** 与控制面板 `lightIntensity` range（min 0.2 max 8）一致 */
 export function clampSolidLightIntensitySlider(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 1.7;
-  return Math.max(0.2, Math.min(5, n));
+  return Math.max(0.2, Math.min(8, n));
 }
 
 const SOLID_SPOT_ANGLE = Math.PI / 5.5;

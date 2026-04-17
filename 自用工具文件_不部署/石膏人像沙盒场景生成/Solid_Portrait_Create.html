@@ -84,7 +84,7 @@
     <button onclick="closeBuiltinModal()" style="background:rgba(231,76,60,0.2); border:1px solid #e74c3c; color:#e74c3c; padding:6px 16px; border-radius:6px; cursor:pointer; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='#e74c3c'; this.style.color='#fff';" onmouseout="this.style.background='rgba(231,76,60,0.2)'; this.style.color='#e74c3c';">关闭面板 ✕</button></div></div>
     <div id="builtin-grid-container" style="flex:1; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); border-radius:8px; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,0.8); padding:20px; display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:15px; align-content:start;"></div></div>
     <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">渲染时遇到问题</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">当前设备不支持高级渲染，导致不能出现投影和散射光，想要获得更高级的体验，请去电脑端网页版获得更好的功能体验。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
-    <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div class="w-3 h-3 rounded-full bg-white/70 animate-pulse mb-6"></div> <div class="font-hairline text-[20px] tracking-[0.4em] text-white/40 uppercase animate-pulse">物理光追引擎初始化中...</div> </div>
+    <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;max-width:min(88vw,340px);width:100%;padding:0 20px;box-sizing:border-box;"> <div class="w-3 h-3 rounded-full bg-white/70 animate-pulse"></div> <div id="scene-load-pct" style="font-size:11px;color:rgba(255,255,255,0.42);font-variant-numeric:tabular-nums;letter-spacing:0.12em;font-weight:200;">0%</div> <div style="width:100%;height:2px;background:rgba(255,255,255,0.1);border-radius:1px;overflow:hidden;"><div id="scene-load-bar-fill" style="display:block;height:100%;width:100%;background:rgba(255,255,255,0.55);transform-origin:left center;transform:scaleX(0);will-change:transform;"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">物理光追引擎初始化中...</div> </div> </div>
     <svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true"> <filter id="posterize-filter" color-interpolation-filters="sRGB">
     <feColorMatrix in="SourceGraphic" type="matrix" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0" result="gray"/>
     <feComponentTransfer in="gray" id="posterize-transfer" result="posterizedGray">
@@ -482,7 +482,7 @@
             return [url];
         }
     }
-    function solidCreateLoadGlbWithFallback(url, onLoad, onError) {
+    function solidCreateLoadGlbWithFallback(url, onLoad, onError, onProgress) {
         const candidates = solidCreateBuildModelUrlCandidates(url);
         if (!candidates.length) { if (onError) onError(new Error('GLB URL 为空')); return; }
         solidCreateDebugLog(`[GLB-Fallback] 开始加载: ${String(url || '')}`);
@@ -495,7 +495,9 @@
                 try { gltf.__solidLoadedUrl = currentUrl; } catch (_e) {}
                 solidCreateDebugLog(`[GLB-Fallback] 加载成功: ${currentUrl}`);
                 onLoad(gltf);
-            }, undefined, (err) => {
+            }, (evt) => {
+                if (onProgress) onProgress(evt);
+            }, (err) => {
                 idx++;
                 if (idx < candidates.length) {
                     solidCreateDebugLog(`[GLB-Fallback] 加载失败，重试下一候选: ${currentUrl}`);
@@ -524,6 +526,21 @@
             return url;
         }
     }
+    function solidCreateSetLoaderText(msg) { const el = document.getElementById('loader-text'); if (el) el.innerText = String(msg || ''); }
+    function solidCreateSetLoaderProgressNow(p) { const v = Math.max(0, Math.min(100, Math.round(Number(p) || 0))); const fill = document.getElementById('scene-load-bar-fill'); const pct = document.getElementById('scene-load-pct'); if (fill) fill.style.transform = 'scaleX(' + (v / 100) + ')'; if (pct) pct.textContent = v + '%'; }
+    function solidCreateLoaderShow() { const el = document.getElementById('scene-loader'); if (!el) return; el.style.display = 'flex'; el.style.opacity = '1'; }
+    function solidCreateLoaderHide() { const el = document.getElementById('scene-loader'); if (!el) return; el.style.opacity = '0'; setTimeout(() => { if (el) el.style.display = 'none'; }, 380); }
+    window.__solidCreateSceneLoadUx = { running: false, target: 0, display: 0, raf: 0, timer: 0, timeoutTimer: 0, stepDone: 0, totalItems: 0, glbSlotProgress: [], glbDone: 0 };
+    function solidCreateSceneLoadUxTick() { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; ux.display += (ux.target - ux.display) * 0.17; if (Math.abs(ux.target - ux.display) < 0.08) ux.display = ux.target; solidCreateSetLoaderProgressNow(ux.display); ux.raf = requestAnimationFrame(solidCreateSceneLoadUxTick); }
+    function solidCreateSceneLoadUxStart(totalItems, glbCount) { const ux = window.__solidCreateSceneLoadUx; try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e0) {} try { if (ux.timer) clearInterval(ux.timer); } catch (_e1) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e2) {} ux.running = true; ux.target = 1; ux.display = 0; ux.stepDone = 0; ux.totalItems = Math.max(0, Number(totalItems) || 0); ux.glbSlotProgress = Array.from({ length: Math.max(0, Number(glbCount) || 0) }, () => 0); ux.glbDone = 0; solidCreateLoaderShow(); solidCreateSetLoaderText('清理旧场景...'); solidCreateSetLoaderProgressNow(0); ux.raf = requestAnimationFrame(solidCreateSceneLoadUxTick); ux.timer = setInterval(() => { if (!ux.running) return; const fallback = Math.max(ux.target, Math.min(95, ux.display + 0.25)); ux.target = fallback; }, 420); ux.timeoutTimer = setTimeout(() => { if (!ux.running) return; solidCreateSetLoaderText('正在优化显示，马上完成...'); ux.target = Math.max(ux.target, 95); }, 10000); }
+    function solidCreateSceneLoadUxSetTarget(p, text) { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; const v = Math.max(0, Math.min(99, Number(p) || 0)); ux.target = Math.max(ux.target, v); if (text) solidCreateSetLoaderText(text); }
+    function solidCreateSceneLoadUxMarkClearDone() { solidCreateSceneLoadUxSetTarget(8, '读取场景配置...'); }
+    function solidCreateSceneLoadUxUpdateAssetProgress(doneItems) { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; const total = Math.max(1, ux.totalItems); let glbAvg = 0; if (ux.glbSlotProgress && ux.glbSlotProgress.length) { glbAvg = ux.glbSlotProgress.reduce((a, b) => a + (Number(b) || 0), 0) / ux.glbSlotProgress.length; } const ratio = Math.max(0, Math.min(1, ((Number(doneItems) || 0) / total) * 0.8 + glbAvg * 0.2)); solidCreateSceneLoadUxSetTarget(8 + ratio * 55, '加载模型资源...'); }
+    function solidCreateSceneLoadUxSetGlbSlot(slotIdx, ratio) { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; if (!ux.glbSlotProgress || !ux.glbSlotProgress.length) return; if (slotIdx < 0 || slotIdx >= ux.glbSlotProgress.length) return; ux.glbSlotProgress[slotIdx] = Math.max(0, Math.min(1, Number(ratio) || 0)); }
+    function solidCreateSceneLoadUxMarkElementsDone() { solidCreateSceneLoadUxSetTarget(83, '恢复标注与场景元素...'); }
+    function solidCreateSceneLoadUxMarkRasterDone() { solidCreateSceneLoadUxSetTarget(95, '构建光栅光影...'); }
+    function solidCreateSceneLoadUxFinish() { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; ux.target = 100; solidCreateSetLoaderText('加载完成'); setTimeout(() => { try { if (ux.timer) clearInterval(ux.timer); } catch (_e0) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e1) {} ux.running = false; try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e2) {} solidCreateSetLoaderProgressNow(100); solidCreateLoaderHide(); }, 260); }
+    function solidCreateSceneLoadUxFail(msg) { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; solidCreateSetLoaderText(msg || '加载失败'); ux.target = Math.max(ux.target, 100); setTimeout(() => { try { if (ux.timer) clearInterval(ux.timer); } catch (_e0) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e1) {} ux.running = false; try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e2) {} solidCreateSetLoaderProgressNow(100); solidCreateLoaderHide(); }, 520); }
 
     async function maybeSaveDraft(force) { if (window.__isPageUnloading) return; if (_draftSaving) return; if (!force && !_draftDirty) return; if (!scene || !camera || !controls || !editorGroup) return; const now = Date.now();
     if (!force && now - _draftLastSavedAt < 1200) return; _draftSaving = true; try { const data = buildDraftSceneData();
@@ -560,7 +577,7 @@
     _flushDisposeQueue();
     try { if (window.PluginManager) window.PluginManager.trigger('onClearScene'); } catch (_e) {} _perfEnd(_pm); }
 
-    async function applySceneDataToEditor(data, label) { const _pm = _perfMark('applySceneDataToEditor(total)'); clearEditorSceneForRestore(); const sceneLoadGen = window._editorSceneLoadGen; if (data && data.name) {
+    async function applySceneDataToEditor(data, label) { const _pm = _perfMark('applySceneDataToEditor(total)'); const _itemsForProgress = (data && Array.isArray(data.items)) ? data.items : []; const _glbCountForProgress = _itemsForProgress.filter(it => it && it.type === 'glb').length; solidCreateSceneLoadUxStart(_itemsForProgress.length, _glbCountForProgress); clearEditorSceneForRestore(); solidCreateSceneLoadUxMarkClearDone(); const sceneLoadGen = window._editorSceneLoadGen; if (data && data.name) {
     const pureName = String(data.name).replace(/_[0-9]{10}$/, ''); const nameEl = document.getElementById('scene-name-input'); if (nameEl) nameEl.value = pureName; }
     const _d = document.getElementById('scene-meta-detail-input');
     if (_d) { try { _d.value = (data && data.meta && data.meta.detail != null) ? String(data.meta.detail) : ''; } catch(_e) { _d.value = ''; } }
@@ -585,7 +602,7 @@
     document.getElementById('lightDistance').value = state.radius; document.getElementById('distanceVal').innerText = state.radius;
     document.getElementById('lightTemp').value = state.lightTemp; document.getElementById('tempVal').innerText = state.lightTemp * 100;
     document.getElementById('lightSize').value = state.lightSize; document.getElementById('sizeVal').innerText = state.lightSize;
-    const _li = Math.max(0.2, Math.min(5, Number(data.light.intensity) || 1.7)); document.getElementById('lightIntensity').value = _li; document.getElementById('intensityVal').innerText = _li.toFixed(1);
+    const _li = Math.max(0.2, Math.min(8, Number(data.light.intensity) || 1.7)); document.getElementById('lightIntensity').value = _li; document.getElementById('intensityVal').innerText = _li.toFixed(1);
     const typeMap = {'spot':'聚光灯', 'point':'点光源', 'dir':'平行光', 'rect':'面积光'};
     document.getElementById('light-trigger').innerText = typeMap[lightType] || '聚光灯';
     document.querySelectorAll('#light-options .custom-option').forEach(opt => opt.classList.remove('selected'));
@@ -594,6 +611,7 @@
     buildEnvironment();
     _perfEnd(_pmEnv);
     if (window.PluginManager) window.PluginManager.trigger('onClearScene'); if (data && data.items && data.items.length > 0) {
+    let _assetDone = 0; let _glbSlot = 0;
     solidCreateDebugLog(`[SceneLoad] 开始恢复场景 items: ${data.items.length}`);
     for (let ii = 0; ii < data.items.length; ii++) {
     const item = data.items[ii];
@@ -607,8 +625,9 @@
     obj.updateWorldMatrix(true, true);
     snapBuiltinRootBottomToGround(obj);
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj, itemData: item });
+    _assetDone++; solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
     } else if (item.type === 'glb') {
-    solidCreateDebugLog(`[SceneLoad] 发现GLB item[${ii}] url=${item && item.url ? item.url : '(empty)'}`);
+    solidCreateDebugLog(`[SceneLoad] 发现GLB item[${ii}] url=${item && item.url ? item.url : '(empty)'}`); const _slot = _glbSlot++;
     solidCreateLoadGlbWithFallback(item.url, (gltf) => {
     if (sceneLoadGen !== window._editorSceneLoadGen) { disposeLoadedGltfRoot(gltf.scene); return; }
     const model = gltf.scene;
@@ -620,23 +639,27 @@
     editorGroup.add(model);
     solidCreateDebugLog(`[SceneLoad] GLB入场成功 item[${ii}] loadedUrl=${gltf && gltf.__solidLoadedUrl ? gltf.__solidLoadedUrl : '(unknown)'}`);
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item });
+    _assetDone++; solidCreateSceneLoadUxSetGlbSlot(_slot, 1); solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
     window.changeMat(window.matType);
     lightMoved = true;
     markDraftDirty();
     }, (err) => {
-    try { if (window.hwLog) window.hwLog(`[GLB-LoadFail] 生产端重载失败: ${item && item.url ? item.url : '(unknown)'} / ${err && err.message ? err.message : err}`); } catch (_e) {}
+    try { if (window.hwLog) window.hwLog(`[GLB-LoadFail] 生产端重载失败: ${item && item.url ? item.url : '(unknown)'} / ${err && err.message ? err.message : err}`); } catch (_e) {} _assetDone++; solidCreateSceneLoadUxSetGlbSlot(_slot, 1); solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
+    }, (evt) => {
+    if (evt && evt.total > 0) solidCreateSceneLoadUxSetGlbSlot(_slot, Math.min(1, evt.loaded / evt.total));
+    solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
     });
     }
     // 分帧：每处理 2 个 item 让出一帧，避免大场景卡死
     if ((ii % 2) === 1) { await new Promise(r => requestAnimationFrame(r)); }
     }
     }
-    if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data }); transformControl.detach();
+    if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data }); solidCreateSceneLoadUxMarkElementsDone(); transformControl.detach();
     window.changeMat(window.matType); if(window.changePosterize) window.changePosterize(window.posterizeLevel || 0);
     if(window.changeAtmosphere) window.changeAtmosphere(window.isFogEnabled || false, window.fogDensity !== undefined ? window.fogDensity : 0.02);
-    const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.disabled = !window.isFogEnabled; fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); }
+    const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); }
     if(window.toggleFogAdvanced) window.toggleFogAdvanced(!!window.isFogEnabled);
-    const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.disabled = !(window.posterizeLevel > 0); pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } }
+    const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity();
     needsUpdate = true; lightMoved = true; window.sumDuration = 0; if (label) window.hwLog(label);
     window.useAdvancedRender = false;
     if (pathTracer) { try { safeDispose(pathTracer); } catch (_ePt) {} pathTracer = null; }
@@ -650,8 +673,9 @@
     window.__solidPreviewLighting.onSceneChanged('apply_scene_data');
     }
     } catch (_ePl) {}
+    solidCreateSceneLoadUxMarkRasterDone();
     try { if (renderer && scene && camera) { renderer.toneMappingExposure = 0.7; renderer.render(scene, camera); } } catch (_eR) {}
-    setTimeout(() => { try { window.setMode(window.currentEditorMode); } catch(_e) {} }, 100); _draftDirty = false; _perfEnd(_pm); }
+    setTimeout(() => { try { window.setMode(window.currentEditorMode); } catch(_e) {} }, 100); _draftDirty = false; _perfEnd(_pm); solidCreateSceneLoadUxFinish(); }
     async function autoRestoreDraftIfNeeded() { if (window.__solidCreateHasExplicitScene) return; if (!editorGroup || (editorGroup.children && editorGroup.children.length > 0)) return; const payload = await draftGet();
     if (!payload || !payload.data) return; window._solidCreateDraftFileName = payload.fileName ? String(payload.fileName) : null; applySceneDataToEditor(payload.data, '✅ 已自动恢复草稿'); // 恢复草稿后，尽量把“正在编辑的文件”绑定回来，避免保存时误新建
     try { await autoMountLastWorkDir(); } catch(_e) {}
@@ -918,7 +942,7 @@
         if (window.syncEnvColorPickers) window.syncEnvColorPickers();
         const cb = document.getElementById('crop-box'); if(data.crop) { cb.style.display = data.crop.display || 'none'; cb.style.left = data.crop.left || 'calc(50% - 128px)'; cb.style.top = data.crop.top || 'calc(50% - 128px)'; cb.style.width = data.crop.width || '256px'; cb.style.height = data.crop.height || '256px'; } else { cb.style.display = 'none'; cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; } localStorage.setItem('solidCropBoxCache', JSON.stringify({left: cb.style.left, top: cb.style.top, width: cb.style.width, height: cb.style.height})); if(data.light) { lightType = data.light.type; state.azimuth = data.light.azimuth; document.getElementById('lightAzimuth').value = state.azimuth; document.getElementById('azimuthVal').innerText = state.azimuth; state.elevation = data.light.elevation; document.getElementById('lightElevation').value = state.elevation; document.getElementById('elevationVal').innerText = state.elevation; state.radius = data.light.distance; document.getElementById('lightDistance').value = state.radius; document.getElementById('distanceVal').innerText = state.radius; state.lightTemp = data.light.temp; document.getElementById('lightTemp').value = state.lightTemp; document.getElementById('tempVal').innerText = state.lightTemp * 100; state.lightSize = data.light.size; document.getElementById('lightSize').value = state.lightSize; document.getElementById('sizeVal').innerText = state.lightSize; const _li = Math.max(0.2, Math.min(5, Number(data.light.intensity) || 1.7)); document.getElementById('lightIntensity').value = _li; document.getElementById('intensityVal').innerText = _li.toFixed(1); const typeMap = {'spot':'聚光灯', 'point':'点光源', 'dir':'平行光', 'rect':'面积光'}; document.getElementById('light-trigger').innerText = typeMap[lightType] || '聚光灯'; document.querySelectorAll('#light-options .custom-option').forEach(opt => opt.classList.remove('selected')); const matchedLightOpt = document.querySelector(`#light-options .custom-option[onclick*="'${lightType}'"]`); if(matchedLightOpt) matchedLightOpt.classList.add('selected'); updateDirTriggerByValues(); } buildEnvironment(); if(window.PluginManager) window.PluginManager.trigger('onClearScene'); if(data.items && data.items.length > 0) { data.items.forEach(item => { if(item.type === 'builtin') { document.getElementById('obj-color-picker').value = item.color || '#e8e8e8'; window.addEditorBuiltin(item.shape || 'cube'); const obj = editorGroup.children[editorGroup.children.length - 1]; obj.position.set(item.pos[0], item.pos[1], item.pos[2]); obj.rotation.set(item.rot[0], item.rot[1], item.rot[2]); obj.scale.set(item.scale[0], item.scale[1], item.scale[2]); obj.updateWorldMatrix(true, true); snapBuiltinRootBottomToGround(obj); if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj, itemData: item }); } else if(item.type === 'glb') { gltfLoader.load(item.url, (gltf) => { if (sceneLoadGen !== window._editorSceneLoadGen) { disposeLoadedGltfRoot(gltf.scene); return; } const model = gltf.scene; model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); }); model.userData = { type: 'glb', url: item.url }; model.position.set(item.pos[0], item.pos[1], item.pos[2]); model.rotation.set(item.rot[0], item.rot[1], item.rot[2]); model.scale.set(item.scale[0], item.scale[1], item.scale[2]); editorGroup.add(model); if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); window.changeMat(window.matType); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('json_glb_item'); } catch (_eGlb) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }); } }); }
         if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data });
-        transformControl.detach(); window.changeMat(window.matType); if(window.changePosterize) window.changePosterize(window.posterizeLevel || 0); if(window.changeAtmosphere) window.changeAtmosphere(window.isFogEnabled || false, window.fogDensity !== undefined ? window.fogDensity : 0.02); const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.disabled = !window.isFogEnabled; fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); } if(window.toggleFogAdvanced) window.toggleFogAdvanced(!!window.isFogEnabled); const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.disabled = !(window.posterizeLevel > 0); pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } needsUpdate = true; lightMoved = true; window.sumDuration = 0; document.getElementById('btn-save-direct').innerText = '💾 覆写选中项'; Array.from(document.getElementById('file-list-container').children).forEach(el => { el.style.borderLeft = el.querySelector('span') && el.querySelector('span').innerText === fileHandle.name ? '3px solid #2ecc71' : 'none'; }); window.hwLog("已加载场景: " + fileHandle.name); 
+        transformControl.detach(); window.changeMat(window.matType); if(window.changePosterize) window.changePosterize(window.posterizeLevel || 0); if(window.changeAtmosphere) window.changeAtmosphere(window.isFogEnabled || false, window.fogDensity !== undefined ? window.fogDensity : 0.02); const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); } if(window.toggleFogAdvanced) window.toggleFogAdvanced(!!window.isFogEnabled); const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity(); needsUpdate = true; lightMoved = true; window.sumDuration = 0; document.getElementById('btn-save-direct').innerText = '💾 覆写选中项'; Array.from(document.getElementById('file-list-container').children).forEach(el => { el.style.borderLeft = el.querySelector('span') && el.querySelector('span').innerText === fileHandle.name ? '3px solid #2ecc71' : 'none'; }); window.hwLog("已加载场景: " + fileHandle.name); 
         // 【加载唤醒】：场景读取完毕后，重新刷新一次当前的激活模式
         setTimeout(() => { window.setMode(window.currentEditorMode); }, 100);
         window.useAdvancedRender = false;
@@ -1281,7 +1305,7 @@
         const targetMat = window.initialMatType || 'origin'; // 【修复】：重置为JSON原本加载的材质
         const matchedMatOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${targetMat}'"]`);
         if(matchedMatOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedMatOpt.innerText; document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedMatOpt.classList.add('selected'); }
-        window.changeMat(targetMat); window.changePosterize(window.posterizeLevel || 0); window.changeAtmosphere(window.isFogEnabled || false, window.fogDensity !== undefined ? window.fogDensity : 0.02); const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.disabled = !window.isFogEnabled; fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); } if(window.toggleFogAdvanced) window.toggleFogAdvanced(!!window.isFogEnabled); const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.disabled = !(window.posterizeLevel > 0); pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } }
+        window.changeMat(targetMat); window.changePosterize(window.posterizeLevel || 0); window.changeAtmosphere(window.isFogEnabled || false, window.fogDensity !== undefined ? window.fogDensity : 0.02); const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); } if(window.toggleFogAdvanced) window.toggleFogAdvanced(!!window.isFogEnabled); const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity();
         camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); controls.target.set(0, 0, 0); controls.update(); buildEnvironment(); if(pathTracer && pathTracer.updateMaterials) pathTracer.updateMaterials(); lightMoved = true; };
         window.togglePanel = function(){ const panel = document.getElementById('main-panel'); panel.classList.toggle('minimized'); document.getElementById('toggle-icon').innerText = panel.classList.contains('minimized') ? '▲' : '✕'; };
         let lastWinW = window.innerWidth, lastWinH = window.innerHeight; function onWindowResize() {

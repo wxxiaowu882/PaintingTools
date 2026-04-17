@@ -120,7 +120,7 @@ window.ControlPanel = {
                             </div> 
                             <div class="flex gap-2">
                                 <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">大小</span><input type="range" id="lightSize" min="1.0" max="4.0" step="0.1" value="1.9"><span id="sizeVal" class="slider-val">1.9</span></div>
-                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">强度</span><input type="range" id="lightIntensity" min="0.2" max="5" step="0.1" value="1.7"><span id="intensityVal" class="slider-val">1.7</span></div>
+                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">强度</span><input type="range" id="lightIntensity" min="0.2" max="8" step="0.1" value="1.7"><span id="intensityVal" class="slider-val">1.7</span></div>
                             </div>
                         </div>
 
@@ -167,7 +167,7 @@ window.ControlPanel = {
                                 </div>
                                 <div class="slider-row" style="margin-bottom:0;">
                                     <span class="slider-label" style="width:28px;">浓度</span>
-                                    <input type="range" id="fogSlider" min="0" max="0.3" step="0.001" value="0.02" oninput="window.updateFogUI()" disabled style="opacity:0.3;">
+                                    <input type="range" id="fogSlider" min="0" max="0.3" step="0.001" value="0.02" oninput="window.onFogSliderInput()" style="opacity:0.3;">
                                     <span id="fogVal" class="slider-val" style="width:22px;">0.02</span>
                                 </div>
                                 <div id="fog-advanced-panel" style="display:none; flex-direction:column; gap:2px; margin-top:2px; padding-top:0; border-top:none;">
@@ -195,13 +195,13 @@ window.ControlPanel = {
                                 <div style="display:flex; gap:6px; align-items:stretch; width:100%; box-sizing:border-box;">
                                     <div class="slider-row dof-slider-col" style="margin-bottom:0; flex:1 1 0; min-width:0;">
                                         <span class="slider-label" style="width:28px; flex:none;">光圈</span>
-                                        <input type="range" id="dofApertureSlider" min="0.1" max="16" step="0.1" value="2.8" oninput="window.updateDoFUI()" disabled style="opacity:0.3; flex:1; min-width:0;">
+                                        <input type="range" id="dofApertureSlider" min="0.1" max="16" step="0.1" value="2.8" oninput="window.onDoFSliderInput()" style="opacity:0.3; flex:1; min-width:0;">
                                         <span id="dofApertureVal" class="slider-val" style="width:30px; flex:none;">f/2.8</span>
                                     </div>
                                     <div id="dof-advanced-panel" style="display:none; flex:1 1 0; min-width:0; margin:0; padding:0; border:none;">
                                         <div class="slider-row dof-slider-col" style="margin-bottom:0;">
                                             <span class="slider-label" style="width:28px; flex:none;">焦距</span>
-                                            <input type="range" id="dofFocusSlider" min="0.1" max="40" step="0.1" value="10" oninput="window.updateDoFUI()" style="flex:1; min-width:0;">
+                                            <input type="range" id="dofFocusSlider" min="0.1" max="40" step="0.1" value="10" oninput="window.onDoFSliderInput()" style="flex:1; min-width:0;">
                                             <span id="dofFocusVal" class="slider-val" style="width:30px; flex:none;">10.0</span>
                                         </div>
                                     </div>
@@ -231,7 +231,7 @@ window.ControlPanel = {
                                         <input type="checkbox" id="posterizeEnable" onchange="window.togglePosterize(this.checked)" class="flat-checkbox" style="width:14px; height:14px; margin-right:6px;"> 
                                         <span style="color:rgba(255,255,255,0.8); font-size:11px; font-weight:bold; white-space:nowrap;">色阶概括</span>
                                     </label>
-                                    <input type="range" id="posterizeSlider" min="0" max="19" step="1" value="0" oninput="window.updatePosterizeVal(this)" onchange="window.updatePosterizeVal(this)" disabled style="opacity:0.3; margin-left:0;">
+                                    <input type="range" id="posterizeSlider" min="0" max="19" step="1" value="0" oninput="window.onPosterizeSliderInput(this)" onchange="window.onPosterizeSliderInput(this)" style="opacity:0.3; margin-left:0;">
                                     <span id="posterizeVal" class="slider-val" style="width:30px;">无</span>
                                 </div>
                             </div>
@@ -273,6 +273,34 @@ window.ControlPanel = {
             if (activeContent) activeContent.classList.add('active');
         };
 
+        // 防回归约束：主滑块（fog/posterize）不允许再由入口层置 disabled。
+        // 这里只做交互状态收敛：强制保持可拖动，checkbox 仅决定视觉与功能开关。
+        function syncAtmosAndPosterizeSliderInteractivity() {
+            const fogCheckbox = document.getElementById('fogEnable');
+            const fogSlider = document.getElementById('fogSlider');
+            if (fogSlider) {
+                fogSlider.disabled = false;
+                fogSlider.style.opacity = (fogCheckbox && fogCheckbox.checked) ? '1' : '0.3';
+            }
+            const posterizeCheckbox = document.getElementById('posterizeEnable');
+            const posterizeSlider = document.getElementById('posterizeSlider');
+            if (posterizeSlider) {
+                posterizeSlider.disabled = false;
+                posterizeSlider.style.opacity = (posterizeCheckbox && posterizeCheckbox.checked) ? '1' : '0.3';
+            }
+        }
+        window.syncAtmosAndPosterizeSliderInteractivity = syncAtmosAndPosterizeSliderInteractivity;
+
+        function __ensurePosterizeEnabledBySlider() {
+            const checkbox = document.getElementById('posterizeEnable');
+            const slider = document.getElementById('posterizeSlider');
+            if (!checkbox || !slider) return;
+            if (checkbox.checked) return;
+            checkbox.checked = true;
+            slider.disabled = false;
+            slider.style.opacity = '1';
+            syncAtmosAndPosterizeSliderInteractivity();
+        }
         window.updatePosterizeVal = function(slider) { 
             const val = parseInt(slider.value); let levels = 0; let text = "无"; 
             if (val > 0) { levels = 21 - val; text = levels + "阶"; }
@@ -281,12 +309,16 @@ window.ControlPanel = {
             if(window.changePosterize) window.changePosterize(levels); 
             window.posterizeLevel = levels; window.needsUpdate = true; 
         }; 
+        window.onPosterizeSliderInput = function(slider) {
+            __ensurePosterizeEnabledBySlider();
+            window.updatePosterizeVal(slider);
+        };
         
         window.togglePosterize = function(checked) { 
             const slider = document.getElementById('posterizeSlider'); const valDisp = document.getElementById('posterizeVal'); 
             if(window.hwLog) window.hwLog(`[UI-触发] 色阶Checkbox点击: checked=${checked}`);
             if(slider) { 
-                slider.disabled = !checked; slider.style.opacity = checked ? '1' : '0.3'; 
+                slider.style.opacity = checked ? '1' : '0.3'; 
                 const savedVal = slider.value; const savedText = valDisp ? valDisp.innerText : "无"; 
                 if (!checked) { 
                     if(window.changePosterize) window.changePosterize(0); 
@@ -295,6 +327,7 @@ window.ControlPanel = {
                     window.updatePosterizeVal(slider); 
                 } 
             } 
+            syncAtmosAndPosterizeSliderInteractivity();
         };
         
         if(typeof window.currentFogType === 'undefined') window.currentFogType = 'basic';
@@ -302,13 +335,14 @@ window.ControlPanel = {
             const slider = document.getElementById('fogSlider'); const panel = document.getElementById('fog-advanced-panel');
             const colorPicker = document.getElementById('fogColorPicker');
             const extraControls = document.getElementById('fog-extra-controls');
-            if(slider) { slider.disabled = !checked; slider.style.opacity = checked ? '1' : '0.3'; }
+            if(slider) { slider.style.opacity = checked ? '1' : '0.3'; }
             if(colorPicker) { colorPicker.disabled = !checked; }
             if(extraControls) {
                 extraControls.style.display = checked ? 'flex' : 'none';
                 extraControls.style.pointerEvents = checked ? 'auto' : 'none';
             }
             if(panel) { panel.style.display = checked ? 'flex' : 'none'; }
+            syncAtmosAndPosterizeSliderInteractivity();
             window.updateFogUI(); 
         };
         
@@ -355,11 +389,20 @@ window.ControlPanel = {
             if (_fogRaf) return;
             _fogRaf = requestAnimationFrame(_flushFogUI);
         };
+        window.onFogSliderInput = function() {
+            const checkbox = document.getElementById('fogEnable');
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+                window.toggleFogAdvanced(true);
+            }
+            syncAtmosAndPosterizeSliderInteractivity();
+            window.updateFogUI();
+        };
 
         window.toggleDoF = function(checked) {
             const apertureSlider = document.getElementById('dofApertureSlider');
             const panel = document.getElementById('dof-advanced-panel');
-            if(apertureSlider) { apertureSlider.disabled = !checked; apertureSlider.style.opacity = checked ? '1' : '0.3'; }
+            if(apertureSlider) { apertureSlider.style.opacity = checked ? '1' : '0.3'; }
             if(panel) {
                 panel.style.display = checked ? 'flex' : 'none';
                 panel.style.flex = '1 1 0';
@@ -388,6 +431,15 @@ window.ControlPanel = {
             if (_dofRaf) return;
             _dofRaf = requestAnimationFrame(_flushDoFUI);
         };
+        window.onDoFSliderInput = function() {
+            const checkbox = document.getElementById('dofEnable');
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+                window.toggleDoF(true);
+            }
+            window.updateDoFUI();
+        };
+        syncAtmosAndPosterizeSliderInteractivity();
         
         if(window.hwLog) window.hwLog(`[UI] 控制面板已动态注入 (${mode} 模式)`); 
     } 

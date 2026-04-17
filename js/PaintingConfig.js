@@ -26,7 +26,7 @@ export const SOLID_RASTER_SHADOW_PERF = {
       // 电脑端：停着时阴影“细腻程度”（越大越细腻，但更吃性能；建议 16~28）。
       tapsDesktop: 24,
       // 手机端：停着时阴影“细腻程度”（越大越细腻，但更吃性能；建议 8~16）。
-      tapsMobile: 12,
+      tapsMobile: 24,
       // 去条纹：1=更不容易出现一圈圈/条纹；0=可能更容易出条纹（一般别关）。
       rotate: 1,
     },
@@ -34,7 +34,7 @@ export const SOLID_RASTER_SHADOW_PERF = {
       // 电脑端：动的时候临时阴影质量（越小越流畅，但越“糊/粗”）。建议 8~14。
       tapsDesktop: 12,
       // 手机端：动的时候临时阴影质量（越小越流畅，但越“糊/粗”）。建议 6~10。
-      tapsMobile: 8,
+      tapsMobile: 12,
       // 去条纹：建议保持 1。
       rotate: 1,
     },
