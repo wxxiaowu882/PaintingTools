@@ -738,6 +738,20 @@
     const dirKey = `${state.azimuth},${state.elevation}`; const dirName = presetMap[dirKey] || '自定义'; document.getElementById('dir-trigger').innerText = dirName;
     document.querySelectorAll('#dir-options .custom-option').forEach(opt => opt.classList.remove('selected')); const matchedOpt = document.querySelector(`#dir-options .custom-option[onclick*="'${dirKey}'"]`);
     if(matchedOpt) matchedOpt.classList.add('selected'); }
+    // 兼容历史 JSON（../../docs/model/...）与规范 JSON（docs/model/...）的 GLB 路径写法。
+    function solidResolveSceneModelUrl(url) {
+    try {
+    const s = String(url || '').trim(); if (!s) return s;
+    if (/^(https?:|data:|blob:|file:)/i.test(s)) return s;
+    let x = s.replace(/\\/g, '/');
+    if (x.startsWith('docs/model/')) return './' + x;
+    if (x.startsWith('./docs/model/')) return x;
+    if (x.startsWith('../../docs/model/')) return './' + x.substring(6);
+    if (x.startsWith('../docs/model/')) return './' + x.substring(3);
+    if (x.startsWith('/docs/model/')) return '.' + x;
+    return x;
+    } catch (_e) { return url; }
+    }
     window.resetAll = function() { if(!window.currentSceneData) return; const data = window.currentSceneData; if(data.light) {
     state.azimuth = data.light.azimuth; document.getElementById('lightAzimuth').value = state.azimuth; document.getElementById('azimuthVal').innerText = state.azimuth;
     state.elevation = data.light.elevation; document.getElementById('lightElevation').value = state.elevation; document.getElementById('elevationVal').innerText = state.elevation;
@@ -814,7 +828,7 @@
     if (s === 'sphere') { try { _solidSnapBuiltinSphereToGroundIfNear(obj3d); } catch(_eSnap) {} }
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj3d, itemData: item }); } }
     // 解析外部导入的 GLB
-    else if(item.type === 'glb') { const _slot = _glbSlotI++; promises.push(new Promise((resolve) => { gltfLoader.load(item.url, (gltf) => { glbSlots[_slot].done = true; if (glbSlots[_slot].total <= 0 && glbSlots[_slot].loaded <= 0) { glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1; } updateSceneGlbProgress(); const model = gltf.scene;
+    else if(item.type === 'glb') { const _slot = _glbSlotI++; promises.push(new Promise((resolve) => { const _modelUrl = solidResolveSceneModelUrl(item.url); gltfLoader.load(_modelUrl, (gltf) => { glbSlots[_slot].done = true; if (glbSlots[_slot].total <= 0 && glbSlots[_slot].loaded <= 0) { glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1; } updateSceneGlbProgress(); const model = gltf.scene;
     model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); });
     model.position.set(...item.pos); model.rotation.set(...item.rot); model.scale.set(...item.scale); model.userData = { type: 'glb', url: item.url }; sceneGroup.add(model);
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); resolve(); }, (evt) => { if (evt && evt.lengthComputable && evt.total > 0) { glbSlots[_slot].loaded = evt.loaded; glbSlots[_slot].total = evt.total; } else if (evt && evt.loaded > 0) { glbSlots[_slot].loaded = evt.loaded; if (evt.total > 0) glbSlots[_slot].total = evt.total; } updateSceneGlbProgress(); }, (e) => { addHwLog("GLB加载失败: " + e.message); glbSlots[_slot].done = true; updateSceneGlbProgress(); resolve(); }); })); } });

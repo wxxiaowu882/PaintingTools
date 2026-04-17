@@ -726,10 +726,9 @@ export function createSolidPreviewLightingManager(opts) {
             const isIosHost = !!getIsIosHost();
             _perfApplyUniformQuality(ud, isMobile, isIosHost);
             _perfTierLastApplied = _perfTier;
-            // When recovering to idle, force one full sync to guarantee final quality state.
-            if (_perfTier === 'idle') {
-              try { syncShadows(); } catch (_eSyncIdle) {}
-            }
+            // IMPORTANT: do NOT call syncShadows() on tier transitions.
+            // syncShadows() may bump ground program cache key and trigger shader recompilation,
+            // which causes a visible hitch during interaction. Tiering here is uniform-only.
           }
         }
       } catch (_eTier) {}
@@ -1079,12 +1078,17 @@ export function createSolidPreviewLightingManager(opts) {
           if (!m.userData.uSolidShadowGaussRotate) m.userData.uSolidShadowGaussRotate = { value: 1.0 };
           _perfApplyUniformQuality(m.userData, isMobile, isIosHost);
 
-          m.userData._solidShadowSoftVer = (m.userData._solidShadowSoftVer || 0) + 1;
-          const _ver = m.userData._solidShadowSoftVer;
-          m.customProgramCacheKey = function() { return 'solid_shadow_soft_ground_v' + _ver; };
+          // Avoid recompiling ground shader on every syncShadows() call.
+          // Only bump version when the ground patch is not armed yet (or has been cleared).
           if (!m.defines) m.defines = {};
-          m.defines.SOLID_SHADOW_SOFT_GROUND = 1;
-          m.defines.SOLID_SHADOW_SOFT_GROUND_VER = _ver;
+          const alreadyArmed = !!m.defines.SOLID_SHADOW_SOFT_GROUND;
+          if (!alreadyArmed) {
+            m.userData._solidShadowSoftVer = (m.userData._solidShadowSoftVer || 0) + 1;
+            const _ver = m.userData._solidShadowSoftVer;
+            m.customProgramCacheKey = function() { return 'solid_shadow_soft_ground_v' + _ver; };
+            m.defines.SOLID_SHADOW_SOFT_GROUND = 1;
+            m.defines.SOLID_SHADOW_SOFT_GROUND_VER = _ver;
+          }
 
           // bbox metrics (shared by anchors & softening params)
           let diagXZ = 12.0;
@@ -1788,7 +1792,12 @@ export function createSolidPreviewLightingManager(opts) {
             }
           };
 
-          log('[RasterShadowSoft] ground patch armed v' + _ver);
+          try {
+            const v = (m && m.userData && m.userData._solidShadowSoftVer) ? m.userData._solidShadowSoftVer : _ver;
+            log('[RasterShadowSoft] ground patch armed v' + v);
+          } catch (_eDbgV) {
+            log('[RasterShadowSoft] ground patch armed');
+          }
           m.needsUpdate = true;
         }
       } catch (_eGs) {}

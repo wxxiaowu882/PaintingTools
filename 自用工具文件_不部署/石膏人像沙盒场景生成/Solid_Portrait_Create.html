@@ -141,7 +141,8 @@
         try { localStorage.setItem(SOLID_CREATE_CAMERA_LOCK_KEY, window.isCameraLocked ? '1' : '0'); } catch (_e) {}
         solidCreateSyncCameraLockUI();
     };
-    window.sumDuration = 0; window.useAdvancedRender = true; window.isExporting = false; window.hasAutoStopped = false; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
+    // 生产端策略：默认走“光栅预览”更流畅；需要高质量时再手动开启渲染。
+    window.sumDuration = 0; window.useAdvancedRender = false; window.isExporting = false; window.hasAutoStopped = true; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
     window.updateDoFUIFromRaycaster = function(focusDist) { const slider = document.getElementById('dofFocusSlider');
     if(slider) { slider.value = focusDist; if(window.updateDoFUI) window.updateDoFUI(); } };
     if (window.PosterizeShared && typeof window.PosterizeShared.init === 'function') {
@@ -153,6 +154,13 @@
     // window.changePosterize 已由 SolidAssistControlShared 注入
     window._logCache = []; window.addHwLog = function(msg) { const panel = document.getElementById('debug-log-panel'); const content = document.getElementById('log-content'); if (panel && localStorage.getItem('SolidCreateDebugUI') === '1') panel.style.display = 'block'; const time = new Date().toLocaleTimeString(); window._logCache.push(`[${time}] ${msg}`); if(window._logCache.length > 50) window._logCache.shift(); if (content) { content.value = window._logCache.join('\n'); content.scrollTop = content.scrollHeight; } console.log(`[HW-LOG] ${msg}`); };
     window.diagnosticPanelLog = function(msg) { const panel = document.getElementById('debug-log-panel'); const content = document.getElementById('log-content'); if (panel) panel.style.display = 'block'; const time = new Date().toLocaleTimeString(); window._logCache.push(`[${time}] ${msg}`); if (window._logCache.length > 80) window._logCache.shift(); if (content) { content.value = window._logCache.join('\n'); content.scrollTop = content.scrollHeight; } };
+    function solidCreateDebugLog(msg) {
+        try { if (window.diagnosticPanelLog) window.diagnosticPanelLog(String(msg)); } catch (_e0) {}
+        try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e1) {}
+    }
+    // 调试默认开启：避免出现“有错误但看不到日志”的黑盒状态。
+    try { localStorage.setItem('SolidCreateDebugUI', '1'); } catch (_eDbg) {}
+    try { const _p = document.getElementById('debug-log-panel'); if (_p) _p.style.display = 'block'; } catch (_eDbg2) {}
     window.copyDebugLog = function() { const content = document.getElementById('log-content'); content.select(); try { document.execCommand('copy'); alert("成功复制日志！请粘贴发给我。"); } catch(e) { alert("自动复制失败，请在文本框内全选文字手动复制"); } }; window.hwLog = window.addHwLog;
     window.addEventListener('error', e => window.hwLog('WinErr: ' + e.message)); window.addEventListener('unhandledrejection', e => window.hwLog('PromiseRej: ' + e.reason));
     const originalConsoleError = console.error; console.error = function(...args) {
@@ -169,15 +177,49 @@
     try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('stop_render'); } catch (_eP) {}
     renderer.render(scene, camera); hwLog("已停止渲染，当前为预览模式。点击“开启渲染”可再次尝试。");
     const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0'; }; // 补回强制重新启动渲染引擎的功能
+
+    function _solidEnsurePathTracer() {
+        if (window.isUnsupported) return false;
+        if (!renderer) return false;
+        if (pathTracer) return true;
+        try {
+            pathTracer = new WebGLPathTracer(renderer);
+            pathTracer.multipleImportanceSampling = true;
+            pathTracer.bounces = 3;
+            pathTracer.renderScale = isMobile ? 0.38 : 0.62;
+            if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = 1.0;
+            return true;
+        } catch (e) {
+            try { triggerUnsupported(); } catch (_e2) {}
+            return false;
+        }
+    }
+
     window.forceReRender = function() { if (window.isUnsupported) return;
     try { if (window.__solidPreviewLighting) { window.__solidPreviewLighting.setEnabled(false); window.__solidPreviewLighting.dispose(); } } catch (_e0) {}
     window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none';
     document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1';
     document.getElementById('main-panel').style.pointerEvents = 'auto'; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
-    try { pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? 0.42 : 0.75;
-    if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = 1.0; } catch(e) { triggerUnsupported(); return; }
+    if (!_solidEnsurePathTracer()) return;
     needsUpdate = true; lightMoved = true; window.sumDuration = 0; pathTracer.updateMaterials(); pathTracer.updateLights(); pathTracer.reset(); if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
-    hwLog("已尝试开启渲染并重建状态"); }; window.toggleAdvancedRender = function(val) { window.useAdvancedRender = val; needsUpdate = true; try { if (!val) { _solidEnableRasterShadowsOnce(); if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('toggle_advanced_off'); } else if (val && window.__solidPreviewLighting) { window.__solidPreviewLighting.setEnabled(false); window.__solidPreviewLighting.dispose(); } } catch (_ePl) {} }; // 编辑器专属核心变量
+    hwLog("已尝试开启渲染并重建状态"); };
+
+    window.toggleAdvancedRender = function(val) {
+        window.useAdvancedRender = val;
+        needsUpdate = true;
+        try {
+            if (!val) {
+                _solidEnableRasterShadowsOnce();
+                if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('toggle_advanced_off');
+                return;
+            }
+            // 开启高质量：此时才创建 PathTracer，避免首次进入/切场景卡顿。
+            if (val) {
+                try { if (window.__solidPreviewLighting) { window.__solidPreviewLighting.setEnabled(false); window.__solidPreviewLighting.dispose(); } } catch (_e0) {}
+                _solidEnsurePathTracer();
+            }
+        } catch (_ePl) {}
+    }; // 编辑器专属核心变量
     let editorGroup, transformControl, gltfLoader; let plasterMat, flatMat, sphereMat; let startScale = new THREE.Vector3(); const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
     const isIosPosterizeHost = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const __solidPreviewLighting = createSolidPreviewLightingManager({
@@ -342,7 +384,8 @@
     if (editorGroup && editorGroup.children) { editorGroup.children.forEach(child => { const pos = [parseFloat(child.position.x.toFixed(3)), parseFloat(child.position.y.toFixed(3)), parseFloat(child.position.z.toFixed(3))];
     const rot = [parseFloat(child.rotation.x.toFixed(3)), parseFloat(child.rotation.y.toFixed(3)), parseFloat(child.rotation.z.toFixed(3))];
     const scale = [parseFloat(child.scale.x.toFixed(3)), parseFloat(child.scale.y.toFixed(3)), parseFloat(child.scale.z.toFixed(3))];
-    const itemData = { type: child.userData.type, url: child.userData.url, shape: child.userData.shape, pos, rot, scale, color: child.userData.customColor };
+    const _jsonUrl = (child && child.userData && child.userData.type === 'glb') ? solidCreateNormalizeModelUrlForJson(child.userData.url) : child.userData.url;
+    const itemData = { type: child.userData.type, url: _jsonUrl, shape: child.userData.shape, pos, rot, scale, color: child.userData.customColor };
     try { if (window.PluginManager) window.PluginManager.trigger('onSaveItemData', { obj: child, itemData }); } catch (_e) {}
     items.push(itemData); }); }
     const sceneDataTemp = {};
@@ -354,16 +397,170 @@
     fogDensity: window.fogDensity, wallColor: window.envWallColor, groundColor: window.envGroundColor, skyColor: window.envSkyColor, skyLightScale: window.envSkyLightScale }, crop, items,
     groundAnnotations: sceneDataTemp.groundAnnotations || [], groundNormArrows: sceneDataTemp.groundNormArrows || [], groundPolygon3ds: sceneDataTemp.groundPolygon3ds || [],
     groundColorSampleAnnotations: sceneDataTemp.groundColorSampleAnnotations || [] }; if (_metaDetail.trim() !== '') nodeData.meta = { detail: _metaDetail }; return nodeData; }
+    // ---------------------------
+    // 性能打点（默认关闭）
+    // 打开方式（任选其一）：
+    // 1) 控制台执行：localStorage.setItem('SolidCreatePerfLog','1'); 刷新
+    // 2) 代码里临时：window.__solidCreatePerfLog = true
+    // ---------------------------
+    function _perfEnabled() {
+        try {
+            if (typeof window === 'undefined') return false;
+            if (window.__solidCreatePerfLog != null) return !!window.__solidCreatePerfLog;
+            return localStorage.getItem('SolidCreatePerfLog') === '1';
+        } catch (_e) { return false; }
+    }
+    function _perfNow() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
+    function _perfMark(label) {
+        if (!_perfEnabled()) return null;
+        return { label: String(label || ''), t: _perfNow() };
+    }
+    function _perfEnd(mark) {
+        if (!_perfEnabled() || !mark) return;
+        const dt = _perfNow() - (mark.t || 0);
+        try { window.hwLog(`[Perf] ${mark.label}: ${dt.toFixed(1)}ms`); } catch (_e) {}
+    }
+
+    // 生产端兼容：消费端场景里常见的 url 是“以仓库根目录为基准”的相对路径（例如 docs/model/xxx.glb）。
+    // 但本页在子目录里，直接 load 会找错位置；这里仅在“加载时”做兼容补前缀，不改变保存到 JSON 的原始 url。
+    function solidCreateResolveModelUrl(url) {
+        try {
+            const s = String(url || '').trim();
+            if (!s) return s;
+            // 已经是绝对/特殊协议的，直接返回
+            if (/^(https?:|data:|blob:|file:)/i.test(s)) return s;
+            // 已带相对前缀（./ 或 ../）的，认为作者已显式写过
+            if (s.startsWith('./') || s.startsWith('../')) return s;
+            // 其它情况：按“仓库根目录相对路径”处理，补 ../../
+            return '../../' + s;
+        } catch (_e) {
+            return url;
+        }
+    }
+    function solidCreateBuildModelUrlCandidates(url) {
+        try {
+            const s = String(url || '').trim();
+            if (!s) return [];
+            if (/^(https?:|data:|blob:|file:)/i.test(s)) return [s];
+            const x = s.replace(/\\/g, '/');
+            const out = [];
+            const push = (v) => { if (!v) return; if (!out.includes(v)) out.push(v); };
+            if (x.startsWith('/docs/model/')) {
+                const tail = x.substring(1);
+                push('/' + tail);
+                push('../../' + tail);
+                push('./' + tail);
+                push(tail);
+            } else if (x.startsWith('docs/model/')) {
+                // 优先绝对路径，避免被拼到当前目录（.../石膏人像沙盒场景生成/docs/model/*）
+                push('/' + x);
+                push('../../' + x);
+                push('./' + x);
+                push(x);
+            } else if (x.startsWith('./docs/model/')) {
+                const tail = x.substring(2);
+                push('/' + tail);
+                push('../../' + tail);
+                push(tail);
+            } else if (x.startsWith('../docs/model/')) {
+                const tail = x.substring(3);
+                push('/' + tail);
+                push('../../' + tail);
+                push(tail);
+            } else if (x.startsWith('../../docs/model/')) {
+                const tail = x.replace(/^(\.\.\/)+/, '');
+                push('/' + tail);
+                push('./' + tail);
+                push(tail);
+            } else {
+                // 非约定路径才保留原样优先，避免影响其它资源策略
+                push(x);
+                push('../../' + x.replace(/^\/+/, ''));
+            }
+            return out;
+        } catch (_e) {
+            return [url];
+        }
+    }
+    function solidCreateLoadGlbWithFallback(url, onLoad, onError) {
+        const candidates = solidCreateBuildModelUrlCandidates(url);
+        if (!candidates.length) { if (onError) onError(new Error('GLB URL 为空')); return; }
+        solidCreateDebugLog(`[GLB-Fallback] 开始加载: ${String(url || '')}`);
+        solidCreateDebugLog(`[GLB-Fallback] 候选列表: ${candidates.join(' | ')}`);
+        let idx = 0;
+        const tryLoad = () => {
+            const currentUrl = candidates[idx];
+            solidCreateDebugLog(`[GLB-Fallback] 尝试候选(${idx + 1}/${candidates.length}): ${currentUrl}`);
+            gltfLoader.load(currentUrl, (gltf) => {
+                try { gltf.__solidLoadedUrl = currentUrl; } catch (_e) {}
+                solidCreateDebugLog(`[GLB-Fallback] 加载成功: ${currentUrl}`);
+                onLoad(gltf);
+            }, undefined, (err) => {
+                idx++;
+                if (idx < candidates.length) {
+                    solidCreateDebugLog(`[GLB-Fallback] 加载失败，重试下一候选: ${currentUrl}`);
+                    tryLoad();
+                    return;
+                }
+                solidCreateDebugLog(`[GLB-Fallback] 全部候选失败: ${String(url || '')}`);
+                if (onError) onError(err || new Error('GLB 加载失败'));
+            });
+        };
+        tryLoad();
+    }
+    // 统一写入 JSON 的 GLB 路径：保存为站点根绝对（/docs/model/...），避免不同页面层级下相对路径漂移。
+    function solidCreateNormalizeModelUrlForJson(url) {
+        try {
+            const s = String(url || '').trim();
+            if (!s) return s;
+            if (/^(https?:|data:|blob:|file:)/i.test(s)) return s;
+            let x = s.replace(/\\/g, '/');
+            x = x.replace(/^(\.\.\/)+docs\/model\//i, 'docs/model/');
+            x = x.replace(/^\.\//, '');
+            if (x.startsWith('/docs/model/')) return x;
+            if (x.startsWith('docs/model/')) return '/' + x;
+            return '/docs/model/' + x.replace(/^\/+/, '');
+        } catch (_e) {
+            return url;
+        }
+    }
+
     async function maybeSaveDraft(force) { if (window.__isPageUnloading) return; if (_draftSaving) return; if (!force && !_draftDirty) return; if (!scene || !camera || !controls || !editorGroup) return; const now = Date.now();
     if (!force && now - _draftLastSavedAt < 1200) return; _draftSaving = true; try { const data = buildDraftSceneData();
     await draftPut({ v: 1, savedAt: now, fileName: (window.currentFileHandle && window.currentFileHandle.name) ? window.currentFileHandle.name : null, data }); _draftDirty = false; _draftLastSavedAt = now; } catch (_e) {
     // ignore: quota/blocked
     } finally { _draftSaving = false; } }
-    function clearEditorSceneForRestore() { window._editorSceneLoadGen++; try { transformControl.detach(); } catch (_e) {}
+    // 分帧清场：先快速 remove，让界面立即恢复响应；真正销毁(dispose)分批做，避免一次性卡死。
+    let _pendingDisposeQueue = [];
+    let _pendingDisposeRaf = 0;
+    function _flushDisposeQueue() {
+        if (_pendingDisposeRaf) return;
+        _pendingDisposeRaf = requestAnimationFrame(function() {
+            _pendingDisposeRaf = 0;
+            const t0 = _perfNow();
+            const budgetMs = 6.5; // 每帧最多花这么多时间做销毁，避免卡顿
+            while (_pendingDisposeQueue.length) {
+                const node = _pendingDisposeQueue.shift();
+                try { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(node); } catch (_e) {}
+                if ((_perfNow() - t0) > budgetMs) break;
+            }
+            if (_pendingDisposeQueue.length) _flushDisposeQueue();
+        });
+    }
+
+    function clearEditorSceneForRestore() { const _pm = _perfMark('clearEditorSceneForRestore(total)'); window._editorSceneLoadGen++; try { transformControl.detach(); } catch (_e) {}
     try { if (window.AnnotationManager) window.AnnotationManager.clearAll(); } catch (_e) {}
-    const children = editorGroup ? [...editorGroup.children] : []; children.forEach(child => { try { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); } catch (_e) {} });
-    try { if (window.PluginManager) window.PluginManager.trigger('onClearScene'); } catch (_e) {} }
-    function applySceneDataToEditor(data, label) { const sceneLoadGen = ++window._editorSceneLoadGen; clearEditorSceneForRestore(); if (data && data.name) {
+    const children = editorGroup ? [...editorGroup.children] : [];
+    // 先 remove，马上让主线程轻一点
+    children.forEach(child => { try { editorGroup.remove(child); } catch (_e) {} });
+    // 再分批 dispose
+    const _pm2 = _perfMark('clearEditorSceneForRestore(dispose(deferred))');
+    _pendingDisposeQueue = _pendingDisposeQueue.concat(children);
+    _perfEnd(_pm2);
+    _flushDisposeQueue();
+    try { if (window.PluginManager) window.PluginManager.trigger('onClearScene'); } catch (_e) {} _perfEnd(_pm); }
+
+    async function applySceneDataToEditor(data, label) { const _pm = _perfMark('applySceneDataToEditor(total)'); clearEditorSceneForRestore(); const sceneLoadGen = window._editorSceneLoadGen; if (data && data.name) {
     const pureName = String(data.name).replace(/_[0-9]{10}$/, ''); const nameEl = document.getElementById('scene-name-input'); if (nameEl) nameEl.value = pureName; }
     const _d = document.getElementById('scene-meta-detail-input');
     if (_d) { try { _d.value = (data && data.meta && data.meta.detail != null) ? String(data.meta.detail) : ''; } catch(_e) { _d.value = ''; } }
@@ -393,14 +590,47 @@
     document.getElementById('light-trigger').innerText = typeMap[lightType] || '聚光灯';
     document.querySelectorAll('#light-options .custom-option').forEach(opt => opt.classList.remove('selected'));
     const matchedLightOpt = document.querySelector(`#light-options .custom-option[onclick*="'${lightType}'"]`); if(matchedLightOpt) matchedLightOpt.classList.add('selected'); updateDirTriggerByValues(); }
-    buildEnvironment(); if (window.PluginManager) window.PluginManager.trigger('onClearScene'); if (data && data.items && data.items.length > 0) { data.items.forEach(item => {
-    if (item.type === 'builtin') { document.getElementById('obj-color-picker').value = item.color || '#e8e8e8'; window.addEditorBuiltin(item.shape || 'cube');
-    const obj = editorGroup.children[editorGroup.children.length - 1]; obj.position.set(item.pos[0], item.pos[1], item.pos[2]); obj.rotation.set(item.rot[0], item.rot[1], item.rot[2]); obj.scale.set(item.scale[0], item.scale[1], item.scale[2]);
-    obj.updateWorldMatrix(true, true); snapBuiltinRootBottomToGround(obj); if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj, itemData: item });
-    } else if (item.type === 'glb') { gltfLoader.load(item.url, (gltf) => { if (sceneLoadGen !== window._editorSceneLoadGen) { disposeLoadedGltfRoot(gltf.scene); return; }
-    const model = gltf.scene; model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); }); model.userData = { type: 'glb', url: item.url };
-    model.position.set(item.pos[0], item.pos[1], item.pos[2]); model.rotation.set(item.rot[0], item.rot[1], item.rot[2]); model.scale.set(item.scale[0], item.scale[1], item.scale[2]); editorGroup.add(model);
-    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); window.changeMat(window.matType); lightMoved = true; markDraftDirty(); }); } }); }
+    const _pmEnv = _perfMark('applySceneDataToEditor(buildEnvironment)');
+    buildEnvironment();
+    _perfEnd(_pmEnv);
+    if (window.PluginManager) window.PluginManager.trigger('onClearScene'); if (data && data.items && data.items.length > 0) {
+    solidCreateDebugLog(`[SceneLoad] 开始恢复场景 items: ${data.items.length}`);
+    for (let ii = 0; ii < data.items.length; ii++) {
+    const item = data.items[ii];
+    if (item.type === 'builtin') {
+    document.getElementById('obj-color-picker').value = item.color || '#e8e8e8';
+    window.addEditorBuiltin(item.shape || 'cube');
+    const obj = editorGroup.children[editorGroup.children.length - 1];
+    obj.position.set(item.pos[0], item.pos[1], item.pos[2]);
+    obj.rotation.set(item.rot[0], item.rot[1], item.rot[2]);
+    obj.scale.set(item.scale[0], item.scale[1], item.scale[2]);
+    obj.updateWorldMatrix(true, true);
+    snapBuiltinRootBottomToGround(obj);
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj, itemData: item });
+    } else if (item.type === 'glb') {
+    solidCreateDebugLog(`[SceneLoad] 发现GLB item[${ii}] url=${item && item.url ? item.url : '(empty)'}`);
+    solidCreateLoadGlbWithFallback(item.url, (gltf) => {
+    if (sceneLoadGen !== window._editorSceneLoadGen) { disposeLoadedGltfRoot(gltf.scene); return; }
+    const model = gltf.scene;
+    model.traverse(child => { if (child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); });
+    model.userData = { type: 'glb', url: item.url };
+    model.position.set(item.pos[0], item.pos[1], item.pos[2]);
+    model.rotation.set(item.rot[0], item.rot[1], item.rot[2]);
+    model.scale.set(item.scale[0], item.scale[1], item.scale[2]);
+    editorGroup.add(model);
+    solidCreateDebugLog(`[SceneLoad] GLB入场成功 item[${ii}] loadedUrl=${gltf && gltf.__solidLoadedUrl ? gltf.__solidLoadedUrl : '(unknown)'}`);
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item });
+    window.changeMat(window.matType);
+    lightMoved = true;
+    markDraftDirty();
+    }, (err) => {
+    try { if (window.hwLog) window.hwLog(`[GLB-LoadFail] 生产端重载失败: ${item && item.url ? item.url : '(unknown)'} / ${err && err.message ? err.message : err}`); } catch (_e) {}
+    });
+    }
+    // 分帧：每处理 2 个 item 让出一帧，避免大场景卡死
+    if ((ii % 2) === 1) { await new Promise(r => requestAnimationFrame(r)); }
+    }
+    }
     if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data }); transformControl.detach();
     window.changeMat(window.matType); if(window.changePosterize) window.changePosterize(window.posterizeLevel || 0);
     if(window.changeAtmosphere) window.changeAtmosphere(window.isFogEnabled || false, window.fogDensity !== undefined ? window.fogDensity : 0.02);
@@ -414,12 +644,14 @@
     try {
     if (window.__solidPreviewLighting) {
     window.__solidPreviewLighting.setEnabled(true);
+    const _pmSh = _perfMark('applySceneDataToEditor(syncShadows)');
     window.__solidPreviewLighting.syncShadows();
+    _perfEnd(_pmSh);
     window.__solidPreviewLighting.onSceneChanged('apply_scene_data');
     }
     } catch (_ePl) {}
     try { if (renderer && scene && camera) { renderer.toneMappingExposure = 0.7; renderer.render(scene, camera); } } catch (_eR) {}
-    setTimeout(() => { try { window.setMode(window.currentEditorMode); } catch(_e) {} }, 100); _draftDirty = false; }
+    setTimeout(() => { try { window.setMode(window.currentEditorMode); } catch(_e) {} }, 100); _draftDirty = false; _perfEnd(_pm); }
     async function autoRestoreDraftIfNeeded() { if (window.__solidCreateHasExplicitScene) return; if (!editorGroup || (editorGroup.children && editorGroup.children.length > 0)) return; const payload = await draftGet();
     if (!payload || !payload.data) return; window._solidCreateDraftFileName = payload.fileName ? String(payload.fileName) : null; applySceneDataToEditor(payload.data, '✅ 已自动恢复草稿'); // 恢复草稿后，尽量把“正在编辑的文件”绑定回来，避免保存时误新建
     try { await autoMountLastWorkDir(); } catch(_e) {}
@@ -659,7 +891,19 @@
         if(window.currentFileHandle) { Array.from(container.children).forEach(el => { const span = el.querySelector('span'); if(span && span.innerText === window.currentFileHandle.name) el.style.borderLeft = '3px solid #2ecc71'; }); }
         await window.syncQuickDirButtons();
         };
-        window.loadJSONFromFileHandle = async function(fileHandle) { window.currentFileHandle = fileHandle; try { window._solidCreateDraftFileName = fileHandle && fileHandle.name ? String(fileHandle.name) : null; solidCreateSyncSaveButtonText(); const file = await fileHandle.getFile(); if (window.currentFileHandle !== fileHandle) return; const text = await file.text(); if (window.currentFileHandle !== fileHandle) return; const data = JSON.parse(text); if (Array.isArray(data)) { window.showToast("该文件是统合JSON，无法读取！", true); window.currentFileHandle = null; solidCreateSyncSaveButtonText(); return; } const sceneLoadGen = ++window._editorSceneLoadGen; transformControl.detach(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); if(data.name) { const pureName = data.name.replace(/_[0-9]{10}$/, ''); document.getElementById('scene-name-input').value = pureName; } const _d = document.getElementById('scene-meta-detail-input'); if (_d) { try { _d.value = (data && data.meta && data.meta.detail != null) ? String(data.meta.detail) : ''; } catch(_e) { _d.value = ''; } } if(data.camera) { camera.position.set(data.camera.pos[0], data.camera.pos[1], data.camera.pos[2]); controls.target.set(data.camera.target[0], data.camera.target[1], data.camera.target[2]); camera.zoom = data.camera.zoom || 0.52; camera.updateProjectionMatrix(); controls.update(); } if(data.env) {
+        window.loadJSONFromFileHandle = async function(fileHandle) { window.currentFileHandle = fileHandle; try { window._solidCreateDraftFileName = fileHandle && fileHandle.name ? String(fileHandle.name) : null; solidCreateSyncSaveButtonText(); const file = await fileHandle.getFile(); if (window.currentFileHandle !== fileHandle) return; const text = await file.text(); if (window.currentFileHandle !== fileHandle) return; const data = JSON.parse(text); if (Array.isArray(data)) { window.showToast("该文件是统合JSON，无法读取！", true); window.currentFileHandle = null; solidCreateSyncSaveButtonText(); return; }
+
+        // 统一走新的切场景逻辑（分帧清场/分帧加载/环境复用/阴影去重）
+        try { window.__solidCreateHasExplicitScene = true; } catch(_e) {}
+        try {
+            await applySceneDataToEditor(data, '已加载场景: ' + (fileHandle && fileHandle.name ? fileHandle.name : ''));
+            try { document.getElementById('btn-save-direct').innerText = '💾 覆写选中项'; } catch(_e) {}
+            try { Array.from(document.getElementById('file-list-container').children).forEach(el => { el.style.borderLeft = (el.querySelector('span') && el.querySelector('span').innerText === fileHandle.name) ? '3px solid #2ecc71' : 'none'; }); } catch(_e) {}
+            setTimeout(() => { try { window.setMode(window.currentEditorMode); } catch(_e) {} }, 100);
+        } catch(err2) { console.error(err2); window.showToast("读取或解析失败！", true); }
+        return;
+
+        const sceneLoadGen = ++window._editorSceneLoadGen; transformControl.detach(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); if(data.name) { const pureName = data.name.replace(/_[0-9]{10}$/, ''); document.getElementById('scene-name-input').value = pureName; } const _d = document.getElementById('scene-meta-detail-input'); if (_d) { try { _d.value = (data && data.meta && data.meta.detail != null) ? String(data.meta.detail) : ''; } catch(_e) { _d.value = ''; } } if(data.camera) { camera.position.set(data.camera.pos[0], data.camera.pos[1], data.camera.pos[2]); controls.target.set(data.camera.target[0], data.camera.target[1], data.camera.target[2]); camera.zoom = data.camera.zoom || 0.52; camera.updateProjectionMatrix(); controls.update(); } if(data.env) {
         window.__solidCreateHasExplicitScene = true;
         if(data.env.hasWall !== undefined) { window.hasWall = data.env.hasWall; const btn = document.getElementById('wall-btn'); btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; }
         window.matType = data.env.defaultMat !== undefined ? data.env.defaultMat : 'origin'; window.posterizeLevel = data.env.posterizeLevel !== undefined ? data.env.posterizeLevel : 0; window.isFogEnabled = data.env.fogEnabled || false; window.fogDensity = data.env.fogDensity !== undefined ? data.env.fogDensity : 0.02;
@@ -909,7 +1153,8 @@
         const items = []; editorGroup.children.forEach(child => { const pos = [parseFloat(child.position.x.toFixed(3)), parseFloat(child.position.y.toFixed(3)), parseFloat(child.position.z.toFixed(3))];
         const rot = [parseFloat(child.rotation.x.toFixed(3)), parseFloat(child.rotation.y.toFixed(3)), parseFloat(child.rotation.z.toFixed(3))];
         const scale = [parseFloat(child.scale.x.toFixed(3)), parseFloat(child.scale.y.toFixed(3)), parseFloat(child.scale.z.toFixed(3))];
-        const itemData = { type: child.userData.type, url: child.userData.url, shape: child.userData.shape, pos: pos, rot: rot, scale: scale, color: child.userData.customColor }; // 【解耦写入】：通过总线通知各插件把自己的数据附着到 itemData 上
+        const _jsonUrl = (child && child.userData && child.userData.type === 'glb') ? solidCreateNormalizeModelUrlForJson(child.userData.url) : child.userData.url;
+        const itemData = { type: child.userData.type, url: _jsonUrl, shape: child.userData.shape, pos: pos, rot: rot, scale: scale, color: child.userData.customColor }; // 【解耦写入】：通过总线通知各插件把自己的数据附着到 itemData 上
         if (window.PluginManager) window.PluginManager.trigger('onSaveItemData', { obj: child, itemData: itemData }); items.push(itemData); }); const sceneDataTemp = {}; // 【解耦写入】：通过总线通知各插件把地面数据附着到 sceneDataTemp 上
         if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onSaveGroundData', { obj: ground, sceneData: sceneDataTemp });
         const groundAnnos = sceneDataTemp.groundAnnotations || []; const groundNormArrows = sceneDataTemp.groundNormArrows || []; const groundPolys = sceneDataTemp.groundPolygon3ds || []; const groundColorSamples = sceneDataTemp.groundColorSampleAnnotations || [];
@@ -1402,11 +1647,11 @@
         const iframe = document.getElementById('glb-manager-iframe'); if (!iframe.src || iframe.src === window.location.href) { iframe.src = '../GBL管理器/Glb管理器.html'; }
         modal.style.display = 'flex'; }; window.closeGlbManagerModal = function() { document.getElementById('glb-manager-modal').style.display = 'none'; };
         window.addEventListener('message', function(event) { if (event.data && event.data.type === 'INSERT_GLB') { window.closeGlbManagerModal(); const basePath = '../../docs/model/';
-        const fullUrl = basePath + event.data.path; window.addEditorGLB(fullUrl); } }); window.addEditorGLB = function(url) { if (!url) return; const glbGen = ++window._editorGlbInsertGen; addHwLog("尝试从资产库加载 GLB: " + url); gltfLoader.load(url, (gltf) => {
+        const relPath = String(event.data.path || '').replace(/\\/g, '/').replace(/^\/+/, ''); const fullUrl = basePath + relPath; window.addEditorGLB(fullUrl); } }); window.addEditorGLB = function(url) { if (!url) return; const glbGen = ++window._editorGlbInsertGen; addHwLog("尝试从资产库加载 GLB: " + url); solidCreateLoadGlbWithFallback(url, (gltf) => {
         if (glbGen !== window._editorGlbInsertGen) { disposeLoadedGltfRoot(gltf.scene); return; }
         const model = gltf.scene; model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); }); const box = new THREE.Box3().setFromObject(model); const size = box.getSize(new THREE.Vector3()); if (size.y > 0.001) { const scaleFactor = 4.0 / size.y; model.scale.set(scaleFactor, scaleFactor, scaleFactor); }
         box.setFromObject(model); const center = box.getCenter(new THREE.Vector3()); const minY = box.min.y; model.position.x -= center.x; model.position.z -= center.z; model.position.y -= minY;
-        model.userData = { type: 'glb', url: url }; editorGroup.add(model); transformControl.attach(model); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_glb'); } catch (_ePl) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }, undefined, (error) => { alert("模型加载失败，请检查路径是否对应 '../../docs/model/' 目录"); }); };
+        model.userData = { type: 'glb', url: solidCreateNormalizeModelUrlForJson(url) }; editorGroup.add(model); transformControl.attach(model); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_glb'); } catch (_ePl) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }, (error) => { alert("模型加载失败，请检查路径是否对应 '../../docs/model/' 目录"); }); };
         window.currentEditorMode = 'translate'; window.setMode = function(mode) { 
         // 【优化1】：支持点击已激活的变换按钮取消激活（最多只有一个激活，也可以全不激活）
         if (window.currentEditorMode === mode && ['translate', 'rotate', 'scale'].includes(mode)) { mode = 'none'; }
@@ -1525,10 +1770,11 @@
         renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.2) : window.devicePixelRatio); renderer.setSize(window.innerWidth, window.innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.7;
         renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); addHwLog('Context Lost'); triggerUnsupported(); }, false); container.appendChild(renderer.domElement); try {
         try { if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); } catch(_e) {}
-        pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = true; pathTracer.bounces = 3; pathTracer.renderScale = isMobile ? 0.38 : 0.62;
+        // 默认不创建光追器（更流畅）。需要高质量时由“开启渲染/高质量”按钮创建。
+        pathTracer = null;
         try { window._solidPt = window._solidPt || {}; window._solidPt.targetSamples = isMobile ? 120 : 160; } catch (_ePtS) {}
         try { window._solidGroundShadowDirty = true; } catch (_eGs0) {}
-        if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = 1.0; } catch (ptErr) { triggerUnsupported(); return; } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
+        } catch (ptErr) { triggerUnsupported(); return; } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
         if (window.DoFManager) window.DoFManager.init(camera, scene, renderer.domElement);
         const canvasContainerForEvents = document.getElementById('canvas-container');
         // 【优化3核心】：仅将场景控制器挂载到父级 container 上，接收穿透冒泡的拖拽旋转事件！
@@ -1538,6 +1784,7 @@
         let _orbitStartPos = null, _orbitStartTarget = null, _orbitStartQuat = null, _orbitStartZoom = 0;
         controls.addEventListener('start', () => {
             window._orbitInteracting = true;
+            try { window._solidLastInteractAt = performance.now(); } catch (_e) {}
             // 仅用于判断“纯点击”不触发重渲染
             _orbitStartPos = camera.position.clone();
             _orbitStartTarget = controls.target.clone();
@@ -1556,7 +1803,7 @@
                     || Math.abs((camera.zoom || 0) - (_orbitStartZoom || 0)) > 1e-6);
             if (moved) { needsUpdate = true; try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('orbit_end'); } catch (_eP) {} }
         });
-        controls.addEventListener('change', () => { if (window._orbitInteracting) return; const now = performance.now(); if (now - _orbitNeedsThrottle < 100) return; _orbitNeedsThrottle = now; needsUpdate = true; });
+        controls.addEventListener('change', () => { try { window._solidLastInteractAt = performance.now(); } catch (_e) {} if (window._orbitInteracting) return; const now = performance.now(); if (now - _orbitNeedsThrottle < 100) return; _orbitNeedsThrottle = now; needsUpdate = true; });
         gltfLoader = new GLTFLoader(); const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'); gltfLoader.setDRACOLoader(dracoLoader); editorGroup = new THREE.Group(); scene.add(editorGroup);
         // 【优化2修复】：将变换控制器重新挂载回底层 canvas，解决激活状态下坐标辅助图形隐形的问题！
         transformControl = new TransformControls(camera, renderer.domElement); // 【极其重要的优化】：获取并记录模型的“绝对底边”，这保证了后续放大时，模型永远紧贴地面！
@@ -1676,9 +1923,7 @@
         window.syncEnvColorPickers = function() { const w = document.getElementById('env-wall-color'); const g = document.getElementById('env-ground-color'); const s = document.getElementById('env-sky-color');
         if (w) w.value = window.envWallColor || '#cccccc'; if (g) g.value = window.envGroundColor || '#cccccc'; if (s) s.value = window.envSkyColor || '#0d0d0f';
         if (window.SkyEnvLight && window.SkyEnvLight.syncUI) window.SkyEnvLight.syncUI(); };
-        // 须先于首次 buildEnvironment：否则主光按“光追”口径创建（如 rect→RectAreaLight），随后 stopRender 只 sync 不重绑，光栅无投影。
-        window.hasAutoStopped = true;
-        try { window.useAdvancedRender = false; } catch (_eUar0) {}
+        // 默认走光栅预览（useAdvancedRender 已在脚本顶部设为 false）
         buildEnvironment(); window.syncEnvColorPickers();
         const _f0 = document.getElementById('fogEnable'); if (window.toggleFogAdvanced && _f0) window.toggleFogAdvanced(_f0.checked);
         setupUIControls(); window.applyCameraLockState(); window.addEventListener('resize', function() { onWindowResize(); try { if (typeof window.syncPosterize2dLayout === 'function') window.syncPosterize2dLayout(); } catch(_e0) {} try { if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); } catch(_e) {} });
@@ -1690,8 +1935,7 @@
         })();
         // 生产端策略 A：页面重载时默认不启动光追采样，避免自动刷新导致 GPU/Shader 编译卡死（useAdvancedRender 已在首次 buildEnvironment 前置为 false）
         setTimeout(() => { if (!window.isUnsupported) { const loader = document.getElementById('scene-loader'); if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.style.display = 'none', 1000); } } }, 500);
-        // 下一帧立刻释放光追器（如已创建），只保留普通预览渲染；需要高质量时手动点“重新渲染”
-        setTimeout(() => { try { if (!window.isUnsupported && typeof window.stopRender === 'function') window.stopRender(); } catch(_e) {} }, 0);
+        // 默认即为光栅预览，无需再 stopRender（避免重复重建环境/阴影导致卡顿）。
         // 自动回挂载目录 + 自动恢复草稿 + 低频自动保存草稿
         setTimeout(() => { try { void autoMountLastWorkDir(); } catch(_e) {} }, 60);
         setTimeout(() => { try { void autoRestoreDraftIfNeeded(); } catch(_e) {} }, 120);
@@ -1712,31 +1956,74 @@
         try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('visibility_visible'); } catch (_eP) {}
         }); });
         if (!portraitAnimRafId && !document.hidden) portraitAnimRafId = requestAnimationFrame(animate);
-        }); function buildEnvironment() { if (mainLight) {
+        });
+
+        // 环境复用：尽量不销毁/重建（切场景更顺滑）
+        let _solidEnvLightType = null;
+        function buildEnvironment() {
+        // 主光：同类型只更新参数；类型改变才重建
+        if (mainLight && _solidEnvLightType && _solidEnvLightType !== lightType) {
         try { if (mainLight.shadow && mainLight.shadow.map) safeDispose(mainLight.shadow.map); } catch(_eSm) {}
         try { if (mainLight.shadow && mainLight.shadow.mapPass) safeDispose(mainLight.shadow.mapPass); } catch(_eSmp) {}
-        scene.remove(mainLight); if (mainLight.target) scene.remove(mainLight.target); }
+        try { scene.remove(mainLight); } catch(_eRm) {}
+        try { if (mainLight.target) scene.remove(mainLight.target); } catch(_eRmt) {}
+        try { mainLight = null; } catch(_eN) {}
+        }
         const val = parseFloat(document.getElementById('lightIntensity').value);
         const tempEl = document.getElementById('lightTemp'); const sizeEl = document.getElementById('lightSize');
         if (tempEl && tempEl.value !== '') { const tv = parseFloat(tempEl.value); if (Number.isFinite(tv)) state.lightTemp = Math.max(30, Math.min(90, tv)); }
         if (sizeEl && sizeEl.value !== '') { const sv = parseFloat(sizeEl.value); if (Number.isFinite(sv)) state.lightSize = Math.max(1, Math.min(4, sv)); }
         const lSize = state.lightSize; const col = solidGetTempColorFromKelvin100(THREE, state.lightTemp * 100);
+        if (!mainLight) {
         const _main = createSolidMainLight(THREE, { lightType, color: col, intensitySlider: val, lightSize: lSize, useAdvancedRender: window.useAdvancedRender });
         mainLight = _main.light;
+        _solidEnvLightType = lightType;
         if (_main.addSpotTargetToScene && mainLight.target) scene.add(mainLight.target);
-        scene.add(mainLight); const gCol = new THREE.Color(window.envGroundColor || '#cccccc');
+        scene.add(mainLight);
+        } else {
+        // 同类型：尽量不重建灯，只把用户会改的参数同步过去
+        try { mainLight.color && mainLight.color.copy && mainLight.color.copy(col); } catch(_eC) {}
+        try {
+        const _tmp = createSolidMainLight(THREE, { lightType, color: col, intensitySlider: val, lightSize: lSize, useAdvancedRender: window.useAdvancedRender });
+        const tl = _tmp && _tmp.light;
+        if (tl) {
+        try { if (typeof tl.intensity === 'number') mainLight.intensity = tl.intensity; } catch(_eI) {}
+        try { if (typeof tl.distance === 'number') mainLight.distance = tl.distance; } catch(_eD) {}
+        try { if (typeof tl.decay === 'number') mainLight.decay = tl.decay; } catch(_eDe) {}
+        try { if (typeof tl.angle === 'number') mainLight.angle = tl.angle; } catch(_eA) {}
+        try { if (typeof tl.penumbra === 'number') mainLight.penumbra = tl.penumbra; } catch(_eP) {}
+        try { if (typeof tl.radius === 'number') mainLight.radius = tl.radius; } catch(_eR) {}
+        }
+        } catch(_eSyncL) {}
+        }
+        const gCol = new THREE.Color(window.envGroundColor || '#cccccc');
         if (!ground) { ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhysicalMaterial({ color: gCol, roughness: 1.0, metalness: 0.0 })); ground.rotation.x = -Math.PI / 2; scene.add(ground); }
         else if (ground.material) ground.material.color.copy(gCol);
-        if (window.walls) { window.walls.forEach(w => { scene.remove(w); safeDispose(w.geometry); safeDispose(w.material); }); window.walls = null; }
-        if (window.hasWall) { const wCol = new THREE.Color(window.envWallColor || '#cccccc'); const wallMat = new THREE.MeshPhysicalMaterial({ color: wCol, roughness: 1.0, metalness: 0.0 }); const wall1 = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), wallMat); wall1.position.set(0, 50, -6); const wall2 = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), wallMat); wall2.rotation.y = Math.PI / 2; wall2.position.set(-8, 50, 0); window.walls = [wall1, wall2]; scene.add(wall1); scene.add(wall2); }
+        // 墙：复用 mesh，只切 visible 与颜色
+        if (!window.walls) window.walls = null;
+        if (!window.walls && window.hasWall) {
+        const wCol = new THREE.Color(window.envWallColor || '#cccccc');
+        const wallMat = new THREE.MeshPhysicalMaterial({ color: wCol, roughness: 1.0, metalness: 0.0 });
+        const wall1 = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), wallMat); wall1.position.set(0, 50, -6);
+        const wall2 = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), wallMat.clone()); wall2.rotation.y = Math.PI / 2; wall2.position.set(-8, 50, 0);
+        window.walls = [wall1, wall2];
+        scene.add(wall1); scene.add(wall2);
+        }
+        if (window.walls && Array.isArray(window.walls)) {
+        const wCol = new THREE.Color(window.envWallColor || '#cccccc');
+        window.walls.forEach(w => {
+        if (!w) return;
+        w.visible = !!window.hasWall;
+        try { if (w.material && w.material.color) w.material.color.copy(wCol); } catch(_eWc) {}
+        });
+        }
         updateLightPosition();
         if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
         else { scene.background = new THREE.Color(window.envSkyColor || '#0d0d0f'); scene.backgroundIntensity = 1; }
-        try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('build_environment'); } catch (_ePl) {}
+        // 阴影同步去重：buildEnvironment 只做“环境参数更新”，不在这里强制 syncShadows/onSceneChanged。
+        // 切场景结束时由 applySceneDataToEditor 统一做一次强制同步，避免重复卡顿。
         if (!window.useAdvancedRender) {
         try { window._solidFallbackRenderAt = 0; } catch(_e) {}
-        try { _solidEnableRasterShadowsOnce(); } catch(_e2) {}
-        try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('build_environment'); } catch(_eP) {}
         }
         try { window._solidGroundShadowDirty = true; } catch (_eGsb) {} }
         function updateLightPosition() { const { x, y, z } = computeSolidMainLightCartesianPosition(THREE, state); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') mainLight.lookAt(0, 1, 0); mainLight.updateMatrixWorld();

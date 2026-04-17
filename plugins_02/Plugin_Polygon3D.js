@@ -81,8 +81,22 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     data.anchorObj.getWorldPosition(this._tempV); if (data.anchorObj.userData.localNormal) { this._normalMatrix.getNormalMatrix(data.anchorObj.parent.matrixWorld);
     this._currentWorldNormal.copy(data.anchorObj.userData.localNormal).applyMatrix3(this._normalMatrix).normalize(); this._viewDir.copy(camera.position).sub(this._tempV).normalize(); 
     const dot = this._currentWorldNormal.dot(this._viewDir);
-    data.isOccluded = dot < -0.05; 
-    if (data.isSelected) { /* 仅对选中的面片打印调试，防止日志刷屏 */ console.log(`[Poly-Render] ID:${data.id} dot:${dot.toFixed(3)} occluded:${data.isOccluded}`); }
+    data.isOccluded = dot < -0.05;
+    // 选中面片的调试日志：默认关闭（否则每帧刷屏会拖慢页面）。
+    // 打开方式：localStorage.setItem('SolidPoly3DDbg','1') 然后刷新。
+    if (data.isSelected) {
+        try {
+            const dbgOn = localStorage.getItem('SolidPoly3DDbg') === '1';
+            if (dbgOn) {
+                if (!this._dbgLastAt) this._dbgLastAt = 0;
+                const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                if (now - this._dbgLastAt > 500) {
+                    this._dbgLastAt = now;
+                    console.log(`[Poly-Render] ID:${data.id} dot:${dot.toFixed(3)} occluded:${data.isOccluded}`);
+                }
+            }
+        } catch (_eDbg) {}
+    }
     } else { data.isOccluded = false; }
     // 【彻底对齐原案逻辑】：只要被遮挡（转到背面），面片透明度强制归零（直接消失），杜绝任何灰黑实心块！
     const finalSvgAlpha = data.isOccluded ? 0 : (data.isSelected ? 1.0 : 0.85); let pointsStr = ""; let allBehind = true; data.points.forEach(pt => {
