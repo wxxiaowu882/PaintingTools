@@ -143,6 +143,8 @@ export function createSolidPreviewLightingManager(opts) {
         let minZ = Infinity;
         let maxZ = -Infinity;
         let nHit = 0;
+        let sumX = 0.0;
+        let sumZ = 0.0;
         const stride = Math.max(1, Math.floor(count / 14000));
         const m = node.matrixWorld;
         for (let vi = 0; vi < count; vi += stride) {
@@ -154,10 +156,34 @@ export function createSolidPreviewLightingManager(opts) {
             if (vx > maxX) maxX = vx;
             if (vz < minZ) minZ = vz;
             if (vz > maxZ) maxZ = vz;
+            sumX += vx;
+            sumZ += vz;
             nHit++;
           }
         }
-        if (nHit >= 2 && maxX > minX && maxZ > minZ) {
+        if (nHit >= 3) {
+          // 用底部顶点带的均值作为圆心，再取最大半径（对圆锥/圆柱底面更贴合，避免 bbox 中心偏移造成“补丁两侧冒出”）
+          const inv = 1.0 / nHit;
+          const cxMean = sumX * inv;
+          const czMean = sumZ * inv;
+          let maxD2 = 0.0;
+          for (let vi = 0; vi < count; vi += stride) {
+            _tmpFootprintV.fromBufferAttribute(posAttr, vi).applyMatrix4(m);
+            if (_tmpFootprintV.y <= yCut + 1e-5) {
+              const dx = _tmpFootprintV.x - cxMean;
+              const dz = _tmpFootprintV.z - czMean;
+              const d2 = dx * dx + dz * dz;
+              if (d2 > maxD2) maxD2 = d2;
+            }
+          }
+          const rr = Math.sqrt(Math.max(0.0, maxD2));
+          if (rr > 1e-6) {
+            cx = cxMean;
+            cz = czMean;
+            r = Math.min(rFallback, Math.max(0.04, rr));
+          }
+        } else if (nHit >= 2 && maxX > minX && maxZ > minZ) {
+          // 退回：仍用底部顶点带 bbox 的内外接混合（比纯外接圆紧）
           const frx = 0.5 * (maxX - minX);
           const frz = 0.5 * (maxZ - minZ);
           cx = 0.5 * (minX + maxX);
@@ -922,7 +948,10 @@ export function createSolidPreviewLightingManager(opts) {
                     '\t\tfloat sh0 = getShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord );\n' +
                     '\t\tsh0 = solidSeamFix2D( shadowMap, shadowMapSize, shadowBias, shadowCoord, sh0 );\n' +
                     '\t\tsh0 = solidApplySpherePatchGated( shadowMap, shadowMapSize, shadowBias, shadowCoord, sh0 );\n' +
-                    '\t\treturn min( sh0, solidSphereOcclusionFaded( vSolidShadowGroundPos ) );\n' +
+                    '\t\t// IMPORTANT: gate occlusion to dark-side only; proxy spheres must not create lit-side black rims.\n' +
+                    '\t\tfloat gate0 = solidShadowAvgGate2D( shadowMap, shadowMapSize, shadowBias, shadowCoord );\n' +
+                    '\t\tfloat occ0 = solidSphereOcclusionFaded( vSolidShadowGroundPos );\n' +
+                    '\t\treturn min( sh0, mix( 1.0, occ0, gate0 ) );\n' +
                     '\t}\n' +
                     '\tfloat dSolidSh = 1e9;\n' +
                     '\tfor ( int i = 0; i < 8; i++ ) {\n' +
@@ -937,13 +966,17 @@ export function createSolidPreviewLightingManager(opts) {
                     '\tfloat shadowOut = solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius, shadowBias, solidPull );\n' +
                     '\tfloat occ = solidSphereOcclusion( vSolidShadowGroundPos );\n' +
                     '\tfloat kOcc = pow( 1.0 - tSolidSh, 1.8 );\n' +
-                    '\tshadowOut = min( shadowOut, mix( 1.0, occ, kOcc ) );\n' +
+                    '\t// IMPORTANT: gate occlusion to dark-side only; otherwise proxy spheres may cause a thin black rim on lit contact.\n' +
+                    '\tfloat gateOcc = solidShadowAvgGate2D( shadowMap, shadowMapSize, shadowBias, shadowCoord );\n' +
+                    '\tshadowOut = min( shadowOut, mix( 1.0, occ, kOcc * gateOcc ) );\n' +
                     '\treturn shadowOut;\n' +
                     '}\n' +
                     '\n' +
                     'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n' +
                     '\tfloat sh0 = getPointShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord, shadowCameraNear, shadowCameraFar );\n' +
-                    '\treturn min( sh0, solidSphereOcclusionFaded( vSolidShadowGroundPos ) );\n' +
+                    '\t// Cube shadow sampling differs; gate occlusion using sh0 itself to avoid lit-side dark rims.\n' +
+                    '\tfloat g0 = clamp( ( 0.98 - sh0 ) / 0.35, 0.0, 1.0 );\n' +
+                    '\treturn min( sh0, mix( 1.0, solidSphereOcclusionFaded( vSolidShadowGroundPos ), g0 ) );\n' +
                     '}\n';
 
                   const endifIdx = chunk.lastIndexOf('#endif');
