@@ -130,6 +130,7 @@
     import './plugins_02/Plugin_DepthOfField.js'; // 📷 同步接入景深虚实插件
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from './plugins_02/SolidPreviewLighting.js';
     import { createSolidRasterPreviewComposer } from './plugins_02/SolidRasterPreviewComposer.js';
+    import { attachSolidBuiltinSphereShadowCore } from './plugins_02/solidBuiltinSphereShadowCore.js';
     import { installSolidEnvHostBindings } from './plugins_02/SolidEnvControlShared.js';
     import { installSolidAtmosphereHostBindings } from './plugins_02/SolidAtmosphereControlShared.js';
     import { installSolidAssistHostBindings } from './plugins_02/SolidAssistControlShared.js';
@@ -740,6 +741,7 @@
     window.togglePanel = function() { const panel = document.getElementById('main-panel'); panel.classList.toggle('minimized'); document.getElementById('toggle-icon').innerText = panel.classList.contains('minimized') ? '▲' : '✕'; };
     window.changeMat = function(val) { window.isLoadingScene = true; window.matType = val; const roughs = [0.95, 0.15, 0.3, 0.05, 0.4]; const metals = [0.0, 0.0, 0.85, 0.0, 0.0]; const trans = [0.0, 0.0, 0.0, 1.0, 1.0];
     sceneGroup.traverse(child => { if (child.isMesh) {
+    if (child.userData && child.userData.solidShadowCore) return;
     if (child.material && child.material !== child.userData.originalMaterial && child.material !== sysMaterials.flat && child.material !== sysMaterials.sphere && child.material !== sysMaterials.plaster) { safeDispose(child.material); }
     if (window.matType === 'origin') { if (child.userData.originalMaterial) { child.material = child.userData.originalMaterial; }
     else { child.material = child.userData.isFlat ? sysMaterials.flat.clone() : (child.userData.shape==='sphere' ? sysMaterials.sphere.clone() : sysMaterials.plaster.clone()); if(child.userData.customColor) child.material.color.set(child.userData.customColor); }
@@ -882,16 +884,7 @@
     if(s === 'sphere') mat.roughness = 0.6; obj3d = new THREE.Mesh(geo, mat); if(s === 'pyramid' || s === 'pyramid6') obj3d.rotation.y = Math.PI/4;
     if(s === 'torus') obj3d.rotation.x = -Math.PI/2;
     obj3d.userData = { type: 'builtin', shape: s, isFlat: isFlat, customColor: item.color }; obj3d.material.color.set(item.color); obj3d.traverse(c => { if(c.isMesh) c.userData.customColor = item.color; });
-    if (s === 'sphere') { try {
-      const innerR = 2.0 * 0.99;
-      const innerGeo = new THREE.SphereGeometry(innerR, 48, 48);
-      const innerMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: true, depthTest: true });
-      try { innerMat.colorWrite = false; } catch (_cw) {}
-      const inner = new THREE.Mesh(innerGeo, innerMat);
-      inner.userData = { type: 'builtinInnerOccluder', solidShadowCore: true };
-      inner.castShadow = true; inner.receiveShadow = false;
-      obj3d.add(inner);
-    } catch (_eIn) {} }
+    if (s === 'sphere') { attachSolidBuiltinSphereShadowCore(obj3d, THREE); }
     obj3d.position.set(...item.pos); obj3d.rotation.set(...item.rot); obj3d.scale.set(...item.scale); sceneGroup.add(obj3d);
     if (s === 'sphere') { try { _solidSnapBuiltinSphereToGroundIfNear(obj3d); } catch(_eSnap) {} }
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj3d, itemData: item }); _assetDone++; updateSceneAssetProgress(); } }

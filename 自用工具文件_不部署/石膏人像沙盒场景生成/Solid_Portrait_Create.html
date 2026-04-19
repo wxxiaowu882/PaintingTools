@@ -100,6 +100,7 @@
     import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js';import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js';
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from '../../plugins_02/SolidPreviewLighting.js';
     import { createSolidRasterPreviewComposer } from '../../plugins_02/SolidRasterPreviewComposer.js';
+    import { attachSolidBuiltinSphereShadowCore } from '../../plugins_02/solidBuiltinSphereShadowCore.js';
     import { installSolidEnvHostBindings } from '../../plugins_02/SolidEnvControlShared.js';
     import { installSolidAtmosphereHostBindings } from '../../plugins_02/SolidAtmosphereControlShared.js';
     import { installSolidAssistHostBindings } from '../../plugins_02/SolidAssistControlShared.js';
@@ -1300,6 +1301,7 @@
         window.changeMat = function(val) { window.matType = val; const roughs = [0.95, 0.15, 0.3, 0.05, 0.4]; const metals = [0.0, 0.0, 0.85, 0.0, 0.0]; const trans = [0.0, 0.0, 0.0, 1.0, 1.0]; // 彻底解禁调色板：满足标注与模型全局调色需求
         const picker = document.getElementById('obj-color-picker'); if (picker) { picker.style.opacity = '1'; picker.style.cursor = 'pointer'; picker.disabled = false; }
         editorGroup.traverse(child => { if (child.isMesh) {
+        if (child.userData && child.userData.solidShadowCore) return;
         if (child.material && child.material !== child.userData.originalMaterial && child.material !== flatMat && child.material !== sphereMat && child.material !== plasterMat) { safeDispose(child.material); }
         if (window.matType === 'origin') { if (child.userData.originalMaterial) { child.material = child.userData.originalMaterial; } else {
         child.material = child.userData.isFlat ? flatMat.clone() : (child.userData.shape==='sphere' ? sphereMat.clone() : plasterMat.clone());
@@ -1566,6 +1568,7 @@
         if (shapeStr === 'dodecahedron' || shapeStr === 'icosahedron' || shapeStr === 'octahedron' || shapeStr === 'tetrahedron') { groundPlatonicMeshFlatOnXZ(obj3d); }
         else { obj3d.position.set(0, 0, 0); }
         obj3d.userData = { type: 'builtin', shape: shapeStr, isFlat: isFlat, customColor: col }; obj3d.material.color.set(col); obj3d.traverse(c => { if(c.isMesh) c.userData.customColor = col; });
+        if (shapeStr === 'sphere') { attachSolidBuiltinSphereShadowCore(obj3d, THREE); }
         }
         snapBuiltinRootBottomToGround(obj3d);
         if (localStorage.getItem('SolidCreateBuiltinDebug') === '1') {

@@ -160,6 +160,26 @@ export function createSolidRasterPreviewComposer(opts) {
   }
 
   /**
+   * EffectComposer 在离屏 RT 上渲染主场景时，Plugin_Atmosphere 对 renderer.render 的补丁（需 getRenderTarget()===null）不会叠雾/景深；
+   * 交互时 skipComposer 走 forward 才会生效。雾/景深开启时强制 forward，与交互路径一致。
+   */
+  function _atmosphereRasterNeedsForward() {
+    try {
+      const g = typeof globalThis !== 'undefined' ? globalThis : {};
+      const am = g.AtmosphereManager;
+      if (am && am.postMaterial && am.postMaterial.uniforms) {
+        const u = am.postMaterial.uniforms;
+        const fogU = u.fogEnabled && u.fogEnabled.value;
+        const dofU = u.dofEnabled && u.dofEnabled.value;
+        return !!(fogU || dofU);
+      }
+      return !!(g.isFogEnabled || (g.DoFManager && g.DoFManager.enabled));
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  /**
    * @returns {boolean} true 表示已绘制（composer 或 forward），调用方勿再 renderer.render
    */
   function tryRender() {
@@ -169,6 +189,13 @@ export function createSolidRasterPreviewComposer(opts) {
     const scene = getScene();
     const camera = getCamera();
     if (!renderer || !scene || !camera) return false;
+
+    if (_atmosphereRasterNeedsForward()) {
+      try {
+        renderer.render(scene, camera);
+      } catch (_eAtm) {}
+      return true;
+    }
 
     if (cfg.skipComposerWhileInteracting !== false && getInteractionState()) {
       try {

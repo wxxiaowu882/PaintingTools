@@ -115,6 +115,7 @@ export const SOLID_PATH_TRACER_QUALITY = {
  * - 仅 `useAdvancedRender === false` 时由宿主（Solid / Portrait）走 EffectComposer；与 PathTracer 真值层分离。
  * - `blendIntensity` 控制 AO 乘到整幅画面的强度：略低于 1 可减轻「直射区被二次压暗」观感（仍非严格分离直射/间接的物理分解）。
  * - `resolutionScale*`：GTAO 内部分辨率相对画布比例，<1 省 GPU、略糊。
+ * - 与空气透视/景深：`SolidRasterPreviewComposer` 在雾或景深开启时走 forward render（不叠 GTAO），以便 AtmosphereManager 的 renderer 补丁能生效；关雾关景深后仍走本配置的 GTAO 链。
  */
 export const SOLID_RASTER_PREVIEW_AO = {
   enabled: true,
