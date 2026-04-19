@@ -110,62 +110,121 @@ export const SOLID_PATH_TRACER_QUALITY = {
   },
 };
 
-// 光栅“互照近似”配置（非重型GI）：用于模拟墙/地/模型之间的微妙反射影响。
-export const SOLID_RASTER_BOUNCE_APPROX = {
-  enabled: true, // 总开关：false=完全关闭互照近似并回退到当前纯环境反射逻辑。
-  qualityPreset: 'balanced', // 一键档位：'low'|'balanced'|'high'，只改这一行即可切整套强度策略。
-  interactiveScale: 0.72, // 交互时强度缩放：拖拽/旋转时自动乘这个系数，保证流畅与稳定。
-  mobileScale: 0.78, // 移动端额外缩放：手机默认再降一点，减少发灰和性能波动。
-  nonPbrFallback: false, // 非PBR兜底：true 时也会给 Phong/Lambert 注入轻量互照（默认保守关闭）。
-  presets: {
-    low: {
-      baseIntensity: 0.045, // 基础互照能量：越大暗部越“活”，但过高会漂灰。
-      energyClampMin: 0.0, // 能量下限：通常保持 0 即可。
-      energyClampMax: 0.075, // 能量上限：防止补偿过强导致“假亮”。
-      darkBandStart: 0.22, // 暗部起始阈值（0~1）：越小覆盖范围越大。
-      darkBandEnd: 0.68, // 暗部结束阈值（0~1）：与 start 共同控制作用带宽。
-      groundBounceWeight: 1.0, // 地面反照贡献权重：影响模型下半部的柔和回光感。
-      wallBounceWeight: 0.85, // 墙面反照贡献权重：影响侧面/背光侧的环境互照感。
-      modelBounceWeight: 0.55, // 模型间互照权重：多物体场景中的互相“串光”强度。
-      colorBleedSaturation: 0.35, // 颜色互染饱和度：越大墙地颜色越会“染”到模型暗部。
-      receiverScaleGround: 0.45, // 地面作为接收体的强度缩放：通常低于模型，避免地面发脏。
-      receiverScaleWall: 0.52, // 墙面作为接收体的强度缩放：略高于地面，保留空间包裹感。
-      receiverScaleModel: 1.0, // 模型作为接收体的强度缩放：主受益对象，建议保持 1。
-      emissiveGain: 0.9, // 写入 emissiveIntensity 的增益：越高互照越明显。
-      maxModelColorSamples: 28, // 统计模型平均颜色采样数：越大越稳定但更耗CPU。
-    },
-    balanced: {
-      baseIntensity: 0.07, // 均衡档基础互照能量：兼顾“机制感”和写生审美。
-      energyClampMin: 0.0, // 能量下限：通常保持 0。
-      energyClampMax: 0.115, // 能量上限：限制过亮，避免暗部失去体积。
-      darkBandStart: 0.18, // 暗部起始阈值：中等覆盖，主要作用在半暗/暗部。
-      darkBandEnd: 0.72, // 暗部结束阈值：与 start 形成柔和过渡带。
-      groundBounceWeight: 1.0, // 地面贡献权重。
-      wallBounceWeight: 0.95, // 墙面贡献权重。
-      modelBounceWeight: 0.7, // 模型间贡献权重。
-      colorBleedSaturation: 0.48, // 颜色互染强度：保留微妙冷暖互染但不过分。
-      receiverScaleGround: 0.56, // 地面接收体缩放。
-      receiverScaleWall: 0.64, // 墙面接收体缩放。
-      receiverScaleModel: 1.0, // 模型接收体缩放。
-      emissiveGain: 1.0, // emissive 增益。
-      maxModelColorSamples: 36, // 模型颜色采样数。
-    },
-    high: {
-      baseIntensity: 0.095, // 高质档基础互照能量：更接近真实互照，但更需限幅控制。
-      energyClampMin: 0.0, // 能量下限。
-      energyClampMax: 0.145, // 能量上限：高质档也要控住，避免“提亮滤镜感”。
-      darkBandStart: 0.14, // 暗部起始阈值：覆盖更广，细节更丰富。
-      darkBandEnd: 0.78, // 暗部结束阈值：让半明部也有少量互照连续性。
-      groundBounceWeight: 1.0, // 地面贡献权重。
-      wallBounceWeight: 1.05, // 墙面贡献权重：高质档略高，增强空间包裹感。
-      modelBounceWeight: 0.9, // 模型间贡献权重：多物体时互照更可见。
-      colorBleedSaturation: 0.62, // 颜色互染强度：高质档可更明显，但仍保持克制。
-      receiverScaleGround: 0.66, // 地面接收体缩放。
-      receiverScaleWall: 0.76, // 墙面接收体缩放。
-      receiverScaleModel: 1.05, // 模型接收体缩放：略高以强调结构体块。
-      emissiveGain: 1.08, // emissive 增益。
-      maxModelColorSamples: 48, // 模型颜色采样数。
-    },
-  },
+/**
+ * 光栅预览：屏幕空间 GTAO（Ground Truth Ambient Occlusion）
+ * - 仅 `useAdvancedRender === false` 时由宿主（Solid / Portrait）走 EffectComposer；与 PathTracer 真值层分离。
+ * - `blendIntensity` 控制 AO 乘到整幅画面的强度：略低于 1 可减轻「直射区被二次压暗」观感（仍非严格分离直射/间接的物理分解）。
+ * - `resolutionScale*`：GTAO 内部分辨率相对画布比例，<1 省 GPU、略糊。
+ */
+export const SOLID_RASTER_PREVIEW_AO = {
+  enabled: true,
+  blendIntensity: 0.62, // 0~1：越大缝/角越暗，过大易让受光面发闷。
+  resolutionScaleDesktop: 1.0,
+  resolutionScaleMobile: 0.55,
+  /** 轨道拖拽时跳过 composer，直接 forward render，减轻交互尖峰 */
+  skipComposerWhileInteracting: true,
+  /** GTAO 核参数（与 three.js webgl_postprocessing_gtao 示例同源命名） */
+  radius: 0.22,
+  distanceExponent: 1.1,
+  thickness: 1.0,
+  scale: 1.0,
+  samples: 12,
+  distanceFallOff: 1.0,
+  screenSpaceRadius: false,
+  pdLumaPhi: 10,
+  pdDepthPhi: 2,
+  pdNormalPhi: 3,
+  pdRadius: 6,
+  pdRadiusExponent: 2,
+  pdRings: 2,
+  pdSamples: 12,
+  /** SH（SOLID_RASTER_IRRADIANCE_PROBES）同开时略降 GTAO 叠加强度，减轻与低频漫反射「双压暗」（仍非严格的直射/间接分解）。 */
+  blendIntensityScaleWhenIrradianceSh: 0.9,
 };
 
+/**
+ * 光栅预览合成预设：改此处后刷新页面即可做 A/B。
+ * - balanced：默认（尊重各块 enabled 与 blend 数值）。
+ * - ao_only：关掉 SH 路径，仅 PMREM + GTAO + 直射，AO 主导缝/角。
+ * - ao_soft_sh：保留 SH，略压 diffuse 与 AO，减轻叠暗。
+ */
+export const SOLID_RASTER_PREVIEW_LIGHTING_PRESET = 'ao_only';
+
+export function getSolidRasterPreviewLightingDerived() {
+  const preset = String(SOLID_RASTER_PREVIEW_LIGHTING_PRESET || 'balanced');
+  const irr = SOLID_RASTER_IRRADIANCE_PROBES || {};
+  const baseSh = !!irr.enabled;
+  if (preset === 'ao_only') {
+    return {
+      shActive: false,
+      aoBlendMultiplier: 1.06,
+      diffuseMixMultiplier: 1,
+    };
+  }
+  if (preset === 'ao_soft_sh') {
+    return {
+      shActive: baseSh,
+      aoBlendMultiplier: 0.9,
+      diffuseMixMultiplier: 0.88,
+    };
+  }
+  return {
+    shActive: baseSh,
+    aoBlendMultiplier: 1,
+    diffuseMixMultiplier: 1,
+  };
+}
+
+// 光栅预览：空间 L2 球谐漫反射（与多 Cube 环境探针配套，非路径追踪）
+// - 通俗：在「模型 + 地面 + 墙」上按世界位置混合多套 SH，逼近漫反射半球积分的低频部分；高光仍主要走 envMap/PMREM。
+// - 与 SOLID_RASTER_PREVIEW_AO：同开时易叠暗，用 `diffuseMixScaleWhenScreenAo` 略压 SH 权重，避免缝内死黑。
+// 性能：`debounceMaxMs` 防止加载阶段连续 request 把探针饿死；`shPixelStride` 降低 readPixels 之后的 CPU 积分量；换场景会重置节流（见 SolidPreviewLighting）。
+// 观感：`diffuseMix` / `envIblDiffuseScale` / `diffuseMixScaleWhenScreenAo` 决定「是否发灰、发亮」。
+export const SOLID_RASTER_IRRADIANCE_PROBES = {
+  enabled: true, // 总开关：false 时不算 SH、不注入 shader，仅保留现有多 PMREM 行为。
+  diffuseMix: 0.52, // SH 漫反射注入强度：与 GTAO 同开时略低于旧默认，减轻与屏幕 AO 叠暗。
+  envIblDiffuseScale: 0.5, // 压低 MeshStandard/Physical 的 iblIrradiance，减轻与 SH 重复计数。
+  /** SOLID_RASTER_PREVIEW_AO.enabled 时，将有效 diffuseMix 乘该系数（仅 JS 侧 uniform，不重编 shader）。 */
+  diffuseMixScaleWhenScreenAo: 0.9,
+  weightPower: 2.2, // 探针混合：反距离权重的指数，越大越接近「最近探针」。
+  minWeight: 0.08, // 混合下限，避免某探针权重为 0 导致不连续。
+  cubeSizeIdle: 56, // 静止立方体贴图边长：64→56 略减 GPU+readPixels 量，仍够 SH 低频。
+  cubeSizeInteractive: 32, // 交互时边长：略小于 40，减轻拖拽/轨道时每轮 3×Cube+PMREM 的尖峰。
+  minIntervalMsIdle: 2800, // 静止时最短刷新间隔(ms)。
+  minIntervalMsInteractive: 5600, // 交互时更长间隔，减少与轨道抢同一帧的尖峰。
+  freezeShWhileInteractive: true, // true=交互时不重算 SH 系数（沿用上一轮），只跑 cube+PMREM。
+  /** 探针调度：仅 debounce 时，若短时间大量 request，会一直推迟；设上限后最迟也会执行一轮。 */
+  envDebounceMs: 200,
+  debounceMaxMs: 850,
+  /** 从 cubemap 积 SH 时对像素步进采样：1=最准最慢，2≈1/4 像素循环量，3 更快略噪。 */
+  shPixelStride: 2,
+  /** 上一轮 SH 无效(readPixels/尺寸失败)时，允许用更短间隔重试，避免长时间停留在「无 SH」状态。 */
+  shRetryMinIntervalMs: 420,
+  /**
+   * 地面接触区对「探针间接漫反射」的近似压暗（非 SSAO，不能替代离线 AO）。
+   * 低阶 SH 无法表达缝里的高频遮挡；仅用「离地高度」线性 smoothstep 在 h→0 处梯度弱，仍像「远近」而非「开口变小、单位面积入射变少」。
+   * 用缝宽启发式 gapRaw = H/(H+h) 再 pow：h 很小时 gap→1，随缝变宽平滑下降，更接近「立体角/入射功率」直觉。
+   * norBindPow：用 max(法线朝地项, gap^α) 绑定权重，减轻接触环带插值法线偏弱导致的「缝仍亮」。
+   * crevice*：在 occ 之外再乘一条纯 gap 的线，大关系上强制缝内 SH/IBL 远弱于开口区（宁可粗，不可亮缝）。
+   */
+  groundShOcclusionEnabled: true,
+  groundShOcclusionHeight: 0.2, // 特征缝宽 H；略大则「近地一条带」都按缝处理，大关系更稳
+  groundShOcclusionCavityPow: 3.45, // solidNearGr = gapRaw^pow，越大贴缝越暗
+  groundShOcclusionNorBindPow: 0.34, // ndEff = max(nd, gapRaw^该值)，建议 0.25~0.45
+  groundShOcclusionNormalExp: 2.55,
+  groundShOcclusionMinFactor: 0.003, // occ 全满时 SH 乘子下限（易出噪则回调到 0.01）
+  groundShOcclusionAmount: 1.0,
+  groundShCrevicePow: 2.65, // pow(gapRaw,·) 专用于 crevice 线
+  groundShCreviceShMul: 0.028, // 缝内再乘到 SH 上（相对开口区）
+  groundShCreviceIblMul: 0.14,
+  groundShCreviceAmount: 1.0, // 0 关闭 crevice 线，仅保留 occ
+  /** 同上几何权重，额外压低 iblIrradiance（IBL 也常把亮地卷进底侧）。 */
+  groundIblOcclusionAmount: 0.62,
+  groundIblOcclusionMinFactor: 0.12,
+};
+
+// 消费端 Solid.html / 生产端 Solid_Portrait_Create.html 共用：排错日志 + #debug-log-panel
+// false：hwLog/addHwLog/diagnosticPanelLog 不输出（含 console）、排错面板强制隐藏；true：输出并显示面板。
+export const SOLID_DEBUG_PANEL = {
+  enabled: false,
+};

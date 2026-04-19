@@ -110,7 +110,7 @@
     <div id="persistent-warning" style="display:none;position:fixed;top:0;left:0;width:100%;background:rgba(0,0,0,0.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);text-align:center;padding:6px 10px;font-size:9px;z-index:6000;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;"> 设备原因导致没有投影和反光，请换高性能设备获得更好的效果。 </div>
     <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">渲染时遇到问题</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">当前设备不支持高级渲染，导致不能出现投影和散射光，想要获得更高级的体验，请去电脑端网页版获得更好的功能体验。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
     <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div id="scene-loader-inner"> <div id="scene-load-pct">0%</div> <div class="scene-load-bar-track" aria-hidden="true"><div id="scene-load-bar-fill" class="scene-load-bar-fill"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">系统环境初始化中...</div> </div> </div>
-    <div id="debug-log-panel" style="display:none; position:fixed; top:10px; left:10px; width:280px; max-height:200px; background:rgba(0,0,0,0.85); border:1px solid #ff4444; border-radius:6px; z-index:9999; padding:10px; font-family:monospace; font-size:10px; color:#fff; overflow-y:auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);"> <div style="display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #333; padding-bottom:3px;"> <span style="color:#ff4444; font-weight:bold;">DEBUG LOG (排错模式)</span> <button onclick="copyDebugLog()" style="background:#444; border:none; color:#fff; padding:2px 6px; border-radius:3px; cursor:pointer; font-size:9px;">复制日志</button> </div> <div id="log-content" style="white-space:pre-wrap; line-height:1.4;"></div> </div>
+    <div id="debug-log-panel" style="display:none; position:fixed; top:10px; left:10px; width:300px; max-height:220px; background:rgba(0,0,0,0.85); border:1px solid #ff4444; border-radius:6px; z-index:9999; padding:10px; font-family:monospace; font-size:10px; color:#fff; overflow-y:auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);"> <div style="display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #333; padding-bottom:3px; align-items:center; gap:6px; flex-wrap:wrap;"> <span style="color:#ff4444; font-weight:bold;">DEBUG LOG (排错模式)</span> <button onclick="copyDebugLog()" style="background:#444; border:none; color:#fff; padding:2px 6px; border-radius:3px; cursor:pointer; font-size:9px;">复制日志</button> </div> <div id="log-content" style="white-space:pre-wrap; line-height:1.4;"></div> </div>
     <div id="perf-test-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:5550; flex-direction:column; align-items:center; justify-content:center;"> <div class="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin mb-4"></div> <div class="font-hairline text-[10px] tracking-[0.2em] text-white/80">正在测试设备渲染性能...</div> <div class="text-[8px] text-white/40 mt-2">首次进入时安全审计，即将完成</div> </div>
     <div id="top-left-scene-btn" style="position:fixed; top:20px; left:20px; z-index:5000; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:8px 14px; border-radius:10px; display:flex; align-items:center; gap:10px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="document.getElementById('scene-grid-modal').style.display='flex'"> <span style="color:#fff; font-size:14px; font-weight:400; letter-spacing:1px;">场景：</span>
     <span id="scene-trigger-top" style="color:#fff; font-size:14px; font-weight:normal; max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">点击选择...</span> <span style="color:#666; font-size:10px;">▼</span> </div>
@@ -129,6 +129,7 @@
     import './plugins_02/Plugin_Atmosphere.js'; // ☁️ 同步接入大气透视插件
     import './plugins_02/Plugin_DepthOfField.js'; // 📷 同步接入景深虚实插件
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from './plugins_02/SolidPreviewLighting.js';
+    import { createSolidRasterPreviewComposer } from './plugins_02/SolidRasterPreviewComposer.js';
     import { installSolidEnvHostBindings } from './plugins_02/SolidEnvControlShared.js';
     import { installSolidAtmosphereHostBindings } from './plugins_02/SolidAtmosphereControlShared.js';
     import { installSolidAssistHostBindings } from './plugins_02/SolidAssistControlShared.js';
@@ -138,7 +139,7 @@
         installSolidMainLightSliderBindings,
         solidGetTempColorFromKelvin100,
     } from './plugins_02/SolidLightControlShared.js';
-    import { SOLID_PATH_TRACER_QUALITY } from './js/PaintingConfig.js';
+    import { SOLID_PATH_TRACER_QUALITY, SOLID_DEBUG_PANEL } from './Config/PaintingConfig.js';
     window.skyEnvLightMatchMainRect = true; // 【试验·抗黑点噪点】true=更干净（更慢），false=更快（更噪）
     const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.consumer) ? SOLID_PATH_TRACER_QUALITY.consumer : {};
     const _solidPtProfileMap = _solidPtCfg.profiles || {};
@@ -165,13 +166,17 @@
     window.refreshIosPosterizeOverlayFromWebGL = function() { if (window.PosterizeShared && window.PosterizeShared.refreshOverlayFromWebGL) window.PosterizeShared.refreshOverlayFromWebGL(); };
     // changePosterize/changeAtmosphere/changeDoF/setEnvColor/setSkyLightScale/toggleWall 由 shared 胶水统一注入
     window._logCache = [];
+    window.__solidDebugPanelEnabled = !!(SOLID_DEBUG_PANEL && SOLID_DEBUG_PANEL.enabled);
+    try { const _dp = document.getElementById('debug-log-panel'); if (_dp && !window.__solidDebugPanelEnabled) _dp.style.display = 'none'; } catch (_eDp) {}
     window.addHwLog = function(msg) {
+        if (!window.__solidDebugPanelEnabled) return;
         const panel = document.getElementById('debug-log-panel');
         const content = document.getElementById('log-content');
         const time = new Date().toLocaleTimeString();
         const s = String(msg);
         window._logCache.push(`[${time}] ${s}`);
         if (window._logCache.length > 50) window._logCache.shift();
+        if (panel) panel.style.display = 'block';
         if (content) {
             content.innerText = window._logCache.join('\n');
             if (panel) panel.scrollTop = panel.scrollHeight;
@@ -248,10 +253,10 @@
         try { window.hwLog('[Diag] ' + JSON.stringify(d)); } catch (_e) { try { console.log('[Solid][Diag]', d); } catch (_e2) {} }
         return d;
     };
-    window.addEventListener('error', e => { window.hwLog('WinErr: ' + e.message); });
-    window.addEventListener('unhandledrejection', e => { window.hwLog('PromiseRej: ' + e.reason); }); const originalConsoleError = console.error; console.error = function(...args) {
+    window.addEventListener('error', e => { if (window.__solidDebugPanelEnabled) window.hwLog('WinErr: ' + e.message); });
+    window.addEventListener('unhandledrejection', e => { if (window.__solidDebugPanelEnabled) window.hwLog('PromiseRej: ' + e.reason); }); const originalConsoleError = console.error; console.error = function(...args) {
     originalConsoleError.apply(console, args); const msg = args.join(' ').toLowerCase();
-    if (/shader|webgl|gl_|framebuffer|context|three\.webgl/i.test(msg)) { try { window.hwLog('[ConsoleError] ' + args.join(' ')); } catch (_e) {} }
+    if (window.__solidDebugPanelEnabled && /shader|webgl|gl_|framebuffer|context|three\.webgl/i.test(msg)) { try { window.hwLog('[ConsoleError] ' + args.join(' ')); } catch (_e) {} }
     if (msg.includes('context lost') && !/recover|restore/i.test(msg)) { window._solidContextLost = true; window.useAdvancedRender = false; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('console_context_lost'); return; }
     if (msg.includes('could not compile shader') || msg.includes('gl_invalid_operation') || msg.includes('failed to create') || msg.includes('framebuffer incomplete') || msg.includes('feedback loop')) {
     if (typeof triggerUnsupported === 'function') triggerUnsupported('console_gl_fatal', args.join(' ')); } }; function safeDispose(obj) { if (!obj) return; if (Array.isArray(obj)) { obj.forEach(m => safeDispose(m)); return; }
@@ -516,9 +521,9 @@
     } catch (_eSnap2) {}
     _solidEnableRasterShadowsOnce();
     try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('stop_render'); } catch(_eP) {}
-    _solidDismissRenderToast(); if (renderer) { try { renderer.render(scene, camera); } catch (_eSr) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
+    _solidDismissRenderToast(); if (renderer) { try { _solidTryRasterPreviewDraw(); } catch (_eSr) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
     // 再补一帧：确保 shadowMap 在 render 前后状态切换完全生效（修复“必须切灯才出投影”）
-    try { requestAnimationFrame(() => { if (renderer) { try { renderer.render(scene, camera); } catch (_e2) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); } 
+    try { requestAnimationFrame(() => { if (renderer) { try { _solidTryRasterPreviewDraw(); } catch (_e2) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); } 
         // 取证：球体底部亮斑 shadow probe（仅在 ?shadowProbe=1 或手动调用时运行）
         try {
             const qs = new URLSearchParams(window.location.search || '');
@@ -576,11 +581,20 @@
         requestAnimationFrame(function() {
             try {
                 if (typeof _solidIsGlContextLost === 'function' && _solidIsGlContextLost()) { window.hwLog('[acknowledgeFallback] WebGL 仍处 context lost，光栅无法恢复，请刷新或重启浏览器'); return; }
-                if (renderer && scene && camera) { renderer.render(scene, camera); if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
+                if (renderer && scene && camera) { _solidTryRasterPreviewDraw(); if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
             } catch (_eAckR) { window.hwLog('[acknowledgeFallback] 补帧失败: ' + (_eAckR && _eAckR.message)); }
         });
     } catch (_eAck) {} };
-    window.toggleAdvancedRender = function(val) { window.useAdvancedRender = val; needsUpdate = true; }; const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
+    window.toggleAdvancedRender = function(val) {
+        if (val && window.__solidRasterPreviewComposer) {
+            try {
+                window.__solidRasterPreviewComposer.dispose();
+            } catch (_eD) {}
+        }
+        window.useAdvancedRender = val;
+        needsUpdate = true;
+    };
+    const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
     window.hasWall = false; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
     window.matType = 'origin'; window.customScenes = []; window.currentSceneIndex = -1; window.currentSceneData = null; let sceneGroup = new THREE.Group(); let gltfLoader, sysMaterials;
     // 预览模式光影（投影 + 回光/反射近似）共用模块：生产/消费一致
@@ -608,8 +622,44 @@
     });
     try { __solidPreviewLighting.install(); } catch (_e) {}
     try { window.__solidPreviewLighting = __solidPreviewLighting; } catch (_e) {}
+    try {
+        window.__solidRasterPreviewComposer = createSolidRasterPreviewComposer({
+            THREE,
+            getRenderer: () => renderer,
+            getScene: () => scene,
+            getCamera: () => camera,
+            getIsMobile: () => isMobile,
+            getInteractionState: () => !!window._orbitInteracting,
+            getUseAdvancedRender: () => !!window.useAdvancedRender,
+            getSceneGroup: () => sceneGroup,
+        });
+    } catch (_eCmp) {
+        window.__solidRasterPreviewComposer = null;
+    }
+
+    /** 光栅预览：可选 GTAO composer，否则 forward render。光追开启时仅 forward。 */
+    function _solidTryRasterPreviewDraw() {
+        if (!renderer || !scene || !camera) return;
+        if (typeof _solidIsGlContextLost === 'function' && _solidIsGlContextLost()) return;
+        if (window.useAdvancedRender) {
+            try {
+                renderer.render(scene, camera);
+            } catch (_ePt) {}
+            return;
+        }
+        try {
+            const c = window.__solidRasterPreviewComposer;
+            if (c && c.tryRender()) return;
+        } catch (_eC) {}
+        try {
+            renderer.render(scene, camera);
+        } catch (_eR) {}
+    }
 
     function _solidDisposeRasterEnvProbe() {
+        try {
+            if (window.__solidRasterPreviewComposer && window.__solidRasterPreviewComposer.dispose) window.__solidRasterPreviewComposer.dispose();
+        } catch (_e1) {}
         try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.dispose) window.__solidPreviewLighting.dispose(); } catch (_e0) {}
     }
 
@@ -715,12 +765,12 @@
     if (!window.useAdvancedRender) {
     try { window._solidFallbackRenderAt = 0; } catch(_e) {}
     try { _solidEnableRasterShadowsOnce(); } catch(_e2) {}
-    try { requestAnimationFrame(() => { if (renderer) { try { renderer.render(scene, camera); } catch(_e3) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_type'); } catch(_eP) {} } }); } catch(_e4) {}
+    try { requestAnimationFrame(() => { if (renderer) { try { _solidTryRasterPreviewDraw(); } catch(_e3) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_type'); } catch(_eP) {} } }); } catch(_e4) {}
     } else {
     // 光追模式下切灯：先给一小段“光栅预览”，避免 reset 后画面瞬间发黑影响体验
     try { window._solidPtRasterPreviewUntil = performance.now() + 850; } catch(_ePv) { window._solidPtRasterPreviewUntil = Date.now() + 850; }
-    try { if (renderer) { renderer.toneMappingExposure = _solidPt.expHi || renderer.toneMappingExposure; renderer.render(scene, camera); } } catch(_eR0) {}
-    try { requestAnimationFrame(() => { try { if (renderer) renderer.render(scene, camera); } catch(_eR1) {} }); } catch(_eRaf) {}
+    try { if (renderer) { renderer.toneMappingExposure = _solidPt.expHi || renderer.toneMappingExposure; _solidTryRasterPreviewDraw(); } } catch(_eR0) {}
+    try { requestAnimationFrame(() => { try { if (renderer) _solidTryRasterPreviewDraw(); } catch(_eR1) {} }); } catch(_eRaf) {}
     }
     }
     else if (type === 'mat') {
@@ -832,6 +882,16 @@
     if(s === 'sphere') mat.roughness = 0.6; obj3d = new THREE.Mesh(geo, mat); if(s === 'pyramid' || s === 'pyramid6') obj3d.rotation.y = Math.PI/4;
     if(s === 'torus') obj3d.rotation.x = -Math.PI/2;
     obj3d.userData = { type: 'builtin', shape: s, isFlat: isFlat, customColor: item.color }; obj3d.material.color.set(item.color); obj3d.traverse(c => { if(c.isMesh) c.userData.customColor = item.color; });
+    if (s === 'sphere') { try {
+      const innerR = 2.0 * 0.99;
+      const innerGeo = new THREE.SphereGeometry(innerR, 48, 48);
+      const innerMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: true, depthTest: true });
+      try { innerMat.colorWrite = false; } catch (_cw) {}
+      const inner = new THREE.Mesh(innerGeo, innerMat);
+      inner.userData = { type: 'builtinInnerOccluder', solidShadowCore: true };
+      inner.castShadow = true; inner.receiveShadow = false;
+      obj3d.add(inner);
+    } catch (_eIn) {} }
     obj3d.position.set(...item.pos); obj3d.rotation.set(...item.rot); obj3d.scale.set(...item.scale); sceneGroup.add(obj3d);
     if (s === 'sphere') { try { _solidSnapBuiltinSphereToGroundIfNear(obj3d); } catch(_eSnap) {} }
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj3d, itemData: item }); _assetDone++; updateSceneAssetProgress(); } }
@@ -972,7 +1032,7 @@
         container.appendChild(item);
         });
         }
-        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); lightMoved = true; if(window.AtmosphereManager) window.AtmosphereManager.resize(renderer); if (typeof window.syncPosterize2dLayout === 'function') window.syncPosterize2dLayout(); }
+        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); lightMoved = true; try { if (window.__solidRasterPreviewComposer && window.__solidRasterPreviewComposer.setSize) window.__solidRasterPreviewComposer.setSize(window.innerWidth, window.innerHeight); } catch (_eSz) {} if(window.AtmosphereManager) window.AtmosphereManager.resize(renderer); if (typeof window.syncPosterize2dLayout === 'function') window.syncPosterize2dLayout(); }
     
         // 统一“引线长度”口径：以实际画布大小为准（解决生产端/消费端、PC/手机比例不一致）
         window.__solidSyncAnnoViewport = function() {
@@ -993,7 +1053,7 @@
         renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: true }); } catch(err1) {
         window.hwLog(`[Init] 高精度实例化异常 (${err1.message})，降级为基础实例...`); renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true }); }
         if (!renderer || !renderer.getContext()) { throw new Error("当前设备或浏览器完全拒绝创建 WebGL 上下文"); }
-        window.hwLog("[Init] WebGLRenderer 实例化完毕"); renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window._solidContextLost = true; window.useAdvancedRender = false; window.hwLog(`Context Lost 事件: ${e.statusMessage || 'GPU运算超时或系统强制回收'}（常见原因：显存不足/驱动编译失败；恢复将在 webglcontextrestored 后进行，请勿在丢失期间重建 PathTracer）`); if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); } }, false);
+        window.hwLog("[Init] WebGLRenderer 实例化完毕"); renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window._solidContextLost = true; window.useAdvancedRender = false; try { if (window.__solidRasterPreviewComposer && window.__solidRasterPreviewComposer.dispose) window.__solidRasterPreviewComposer.dispose(); } catch (_eAoL) {} window.hwLog(`Context Lost 事件: ${e.statusMessage || 'GPU运算超时或系统强制回收'}（常见原因：显存不足/驱动编译失败；恢复将在 webglcontextrestored 后进行，请勿在丢失期间重建 PathTracer）`); if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); } }, false);
         renderer.domElement.addEventListener('webglcontextrestored', () => { window.hwLog('Context Restored 事件: 准备恢复渲染'); window._solidContextLost = false; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('event_context_restored'); }, false);
         scene = new THREE.Scene(); scene.add(sceneGroup); scene.backgroundRotation = new THREE.Euler(); scene.environmentRotation = new THREE.Euler();
         camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix();
@@ -1230,13 +1290,13 @@
                     }
                 } else {
                     window._solidLoggedRasterContextLost = false;
-                    renderer.render(scene, camera);
+                    _solidTryRasterPreviewDraw();
                 }
             } catch (err) {
                 const _tn = performance.now();
                 if (!window._solidLastRasterErrLog || (_tn - window._solidLastRasterErrLog) > 4000) {
                     window._solidLastRasterErrLog = _tn;
-                    window.hwLog('[RasterFallback] renderer.render 失败: ' + (err && err.message ? err.message : err));
+                    window.hwLog('[RasterFallback] 光栅预览绘制失败: ' + (err && err.message ? err.message : err));
                 }
             }
             if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL();
@@ -1249,17 +1309,17 @@
         }
         // 【消费端 UX 修复】：未选择场景前禁止开始光追采样（避免列表页空转烧 GPU）
         if (!isTesting && (!window.currentSceneData || (window.currentSceneIndex == null) || window.currentSceneIndex < 0)) {
-            try { if (renderer) renderer.render(scene, camera); } catch(_e) {}
+            try { if (renderer) _solidTryRasterPreviewDraw(); } catch(_e) {}
             if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL();
             if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
             return;
         }
-        if (pathTracer) { if (window.isLoadingScene) { try { renderer.render(scene, camera); } catch(err) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
+        if (pathTracer) { if (window.isLoadingScene) { try { _solidTryRasterPreviewDraw(); } catch(err) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
         // 光追切灯/切环境后的即时体验：短暂显示光栅预览，避免 reset 后画面瞬间发黑
         try {
         const _pvUntil = window._solidPtRasterPreviewUntil || 0;
         if (_pvUntil && performance.now() < _pvUntil) {
-        if (renderer) { try { renderer.render(scene, camera); } catch(_ePvR) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); }
+        if (renderer) { try { _solidTryRasterPreviewDraw(); } catch(_ePvR) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); }
         return;
         }
         } catch(_ePv) {}

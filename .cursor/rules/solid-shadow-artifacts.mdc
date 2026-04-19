@@ -1,6 +1,6 @@
 ---
 description: Solid 光栅态阴影伪影（球体底部亮斑）根因与修复约束
-globs: Solid.html
+globs: Solid.html,plugins_02/SolidPreviewLighting.js
 alwaysApply: false
 ---
 
@@ -15,6 +15,11 @@ alwaysApply: false
 - **先取证**：用 `?shadowProbe=1` 在 stopRender 后记录 `gap` / `bias` / `normalBias` / `contactPull`。
 - **若 gap 明显 > 0**：先修几何（贴地吸附/布局对齐），不要只靠 bias/pull 硬扛。
 - **若 gap 已接近 0 仍亮**：在 **ground receiver 的阴影计算**中加入 **解析几何遮挡兜底**（ray-sphere occlusion），并且要用 **ShaderChunk 内注入**保证在不同 three/iOS 变体下仍然命中（不要依赖编译后 shader 文本的脆弱字符串匹配）。
+
+## 备忘：内置球底部光斑（已验证）
+
+- **做法**：在 `Solid.html` 为 **builtin 球**（`SphereGeometry` 半径 2）增加 **略小的同心子网格**（约 `0.99×` 半径），材质透明/不写颜色、`castShadow: true`，`userData` 使用 **`solidShadowCore: true`**，且 **`type` 不要用 `builtin` + `shape: 'sphere'`**，避免与外层球重复计入地面 shader 的代理球数量。
+- **插件侧**：`SolidPreviewLighting.js` 中凡对场景网格统一设 `receiveShadow`、收集 **锚点**、统计 **uSolidSphere\***、环境探针目标网格 等处，需 **跳过 `userData.solidShadowCore`**，避免内球误接收阴影、占锚点或进 footprint 近似。
 
 ## 禁止事项
 

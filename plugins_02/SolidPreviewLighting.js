@@ -4,7 +4,15 @@
 // 生产端页面（如石膏人像沙盒）请与 Solid.html 一致：只 import 本模块并 wiring install/setEnabled/syncShadows，
 // 不要在页面内复制地面阴影的 onBeforeCompile / ShaderChunk 改写逻辑。
 
-import { SOLID_RASTER_SHADOW_PERF, SOLID_RASTER_BOUNCE_APPROX } from '../js/PaintingConfig.js';
+import {
+  SOLID_RASTER_SHADOW_PERF,
+  SOLID_RASTER_IRRADIANCE_PROBES,
+  SOLID_RASTER_PREVIEW_AO,
+  getSolidRasterPreviewLightingDerived,
+} from '../Config/PaintingConfig.js';
+
+/** 地面 SOLID_SHADOW_SOFT_GROUND 片元补丁修订号：递增可强制清缓存重编译（勿随意改）。 */
+const SOLID_GROUND_SHADOW_PATCH_REVISION = 10;
 
 /**
  * 与 Solid.html 中 shouldSkipEnvProbe 条件一致，供消费端与生产端共用，避免各写一套导致行为分叉。
@@ -848,6 +856,7 @@ export function createSolidPreviewLightingManager(opts) {
                 continue;
               }
             } catch (_eBs) {}
+            if (node.userData && node.userData.solidShadowCore) continue;
 
             // Pass #2: collect others for footprint approximation (filled after spheres).
             if (n < 8) otherCandidates.push(node);
@@ -1009,15 +1018,14 @@ export function createSolidPreviewLightingManager(opts) {
         sh.normalBias = 0.014 * _nbBoost;
         if (isMobile || isIosHost) sh.normalBias = Math.min(sh.normalBias, 0.022);
       } else if (shadowLight.isDirectionalLight) {
-        sh.bias = (isMobile || isIosHost) ? -0.00005 : -0.000025;
-        // Same tightening for directional shadows (ground + model receivers).
-        sh.normalBias = 0.014 * _nbBoost;
+        // Ortho + large lit planes: low normalBias → shadow acne / horizontal banding on flats & cylinders.
+        sh.bias = (isMobile || isIosHost) ? -0.000045 : -0.000022;
+        sh.normalBias = 0.020 * _nbBoost;
+        if (isMobile || isIosHost) sh.normalBias = Math.min(sh.normalBias, 0.028);
       } else if (shadowLight.isPointLight) {
-        // Point/cube shadow: textured surfaces are prone to shadow acne “interference stripes”.
-        // Raise normalBias significantly for point lights to suppress self-shadow moiré.
-        // (Contact gap is handled elsewhere; we prioritize removing model-surface artifacts here.)
-        sh.bias = (isMobile || isIosHost) ? -0.00004 : -0.00003;
-        sh.normalBias = (isMobile || isIosHost) ? 0.040 : 0.032;
+        // Cube shadow：normalBias 过低易摩尔纹，过高易亮缝（peter panning）。锚点球 min(occ) 曾误伤受光侧地面，已撤；此处用折中 bias。
+        sh.bias = (isMobile || isIosHost) ? -0.000038 : -0.00003;
+        sh.normalBias = (isMobile || isIosHost) ? 0.036 : 0.028;
       }
 
       if (ground) { ground.receiveShadow = true; ground.castShadow = false; }
@@ -1027,6 +1035,11 @@ export function createSolidPreviewLightingManager(opts) {
       if (sceneGroup && sceneGroup.traverse) {
         sceneGroup.traverse(obj => {
           if (!obj || !obj.isMesh) return;
+          if (obj.userData && obj.userData.solidShadowCore) {
+            obj.receiveShadow = false;
+            obj.castShadow = true;
+            return;
+          }
           obj.receiveShadow = true;
           obj.castShadow = true;
         });
@@ -1082,6 +1095,15 @@ export function createSolidPreviewLightingManager(opts) {
           // Avoid recompiling ground shader on every syncShadows() call.
           // Only bump version when the ground patch is not armed yet (or has been cleared).
           if (!m.defines) m.defines = {};
+          try {
+            if (m.userData._solidGroundShadowPatchRevision !== SOLID_GROUND_SHADOW_PATCH_REVISION) {
+              if (m.defines.SOLID_SHADOW_SOFT_GROUND) {
+                delete m.defines.SOLID_SHADOW_SOFT_GROUND;
+                delete m.defines.SOLID_SHADOW_SOFT_GROUND_VER;
+              }
+              m.userData._solidGroundShadowPatchRevision = SOLID_GROUND_SHADOW_PATCH_REVISION;
+            }
+          } catch (_eRev) {}
           const alreadyArmed = !!m.defines.SOLID_SHADOW_SOFT_GROUND;
           if (!alreadyArmed) {
             m.userData._solidShadowSoftVer = (m.userData._solidShadowSoftVer || 0) + 1;
@@ -1119,6 +1141,7 @@ export function createSolidPreviewLightingManager(opts) {
                 if (nA >= 8) return;
                 if (!obj || !obj.isMesh) return;
                 if (!obj.castShadow) return;
+                if (obj.userData && obj.userData.solidShadowCore) return;
                 try {
                   box.setFromObject(obj);
                   const minY = (box.min && box.min.y != null) ? box.min.y : 1e9;
@@ -1249,6 +1272,7 @@ export function createSolidPreviewLightingManager(opts) {
                     continue;
                   }
                 } catch (_eBs) {}
+                if (node.userData && node.userData.solidShadowCore) continue;
                 if (n < 8) otherCandidates.push(node);
               }
               for (let si = 0; si < otherCandidates.length && n < 8; si++) {
@@ -1323,7 +1347,8 @@ export function createSolidPreviewLightingManager(opts) {
                     '\tfloat c3 = texture2DCompare( shadowMap, sc.xy + vec2( 0.0, texel.y ), sc.z );\n' +
                     '\tfloat c4 = texture2DCompare( shadowMap, sc.xy - vec2( 0.0, texel.y ), sc.z );\n' +
                     '\tfloat avg = ( c0 + c1 + c2 + c3 + c4 ) * 0.2;\n' +
-                    '\treturn clamp( ( 0.92 - avg ) / 0.30, 0.0, 1.0 );\n' +
+                    '\t// 略提高对「偏亮 avg」的敏感度，放大锚球漏光修补在明暗交界与浅影区的权重（减轻残漏）。\n' +
+                    '\treturn clamp( ( 0.935 - avg ) / 0.27, 0.0, 1.0 );\n' +
                     '}\n' +
                     'float solidApplyWedgePatch2D( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, vec4 shadowCoord, float sh0 ) {\n' +
                     '\tif ( uSolidContactPatchEnable < 0.5 ) return sh0;\n' +
@@ -1554,7 +1579,7 @@ export function createSolidPreviewLightingManager(opts) {
                     '\tfloat gate = solidShadowAvgGate2D( shadowMap, shadowMapSize, shadowBias, shadowCoord );\n' +
                     '\tfloat occ = solidSphereOcclusionFadedBuiltin( vSolidShadowGroundPos );\n' +
                     '\tfloat a = clamp( 1.0 - occ, 0.0, 1.0 );\n' +
-                    '\tfloat k = gate;\n' +
+                    '\tfloat k = min( 1.0, gate * 1.12 );\n' +
                     '\tfloat outSh = sh0;\n' +
                     '\toutSh = clamp( outSh * ( 1.0 - k * a ), 0.0, 1.0 );\n' +
                     '\treturn outSh;\n' +
@@ -1578,6 +1603,12 @@ export function createSolidPreviewLightingManager(opts) {
                     '\t\tif ( uSolidContactPatchEnable < 0.5 ) return sh0;\n' +
                     '\t\tsh0 = solidSeamFix2D( shadowMap, shadowMapSize, shadowBias, shadowCoord, sh0 );\n' +
                     '\t\tsh0 = solidApplyBuiltinSpherePatchGated( shadowMap, shadowMapSize, shadowBias, shadowCoord, sh0 );\n' +
+                    '\t\tsh0 = solidApplySpherePatchGated( shadowMap, shadowMapSize, shadowBias, shadowCoord, sh0 );\n' +
+                    '\t\t// 锚球 occ 按 gate 混（4aa85f9）；略加强 gate 权重压残漏；builtin 底再 min(FadedBuiltin) 消球下光斑（历史 b95d2ec）。\n' +
+                    '\t\tfloat gate0 = solidShadowAvgGate2D( shadowMap, shadowMapSize, shadowBias, shadowCoord );\n' +
+                    '\t\tfloat occ0 = solidSphereOcclusionFaded( vSolidShadowGroundPos );\n' +
+                    '\t\tfloat gLeak = min( 1.0, gate0 * 1.28 );\n' +
+                    '\t\tsh0 = min( sh0, mix( 1.0, occ0, gLeak ) );\n' +
                     '\t\treturn min( sh0, solidSphereOcclusionFadedBuiltin( vSolidShadowGroundPos ) );\n' +
                     '\t}\n' +
                     '\tfloat dSolidSh = 1e9;\n' +
@@ -1593,18 +1624,48 @@ export function createSolidPreviewLightingManager(opts) {
                     '\tfloat solidPullUse = ( uSolidContactPatchEnable < 0.5 ) ? 0.0 : solidPull;\n' +
                     '\tfloat shadowOut = solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius, shadowBias, solidPullUse );\n' +
                     '\tif ( uSolidContactPatchEnable < 0.5 ) return shadowOut;\n' +
-                    '\tif ( uSolidBuiltinSphereCount <= 0 ) return shadowOut;\n' +
-                    '\tfloat occB = solidSphereOcclusionBuiltin( vSolidShadowGroundPos );\n' +
-                    '\tfloat kOccB = pow( 1.0 - tSolidSh, 1.8 );\n' +
-                    '\tshadowOut = min( shadowOut, mix( 1.0, occB, kOccB ) );\n' +
+                    '\t// 聚光/Rect 光栅降级：锚球 occ 乘 gateOcc，暗侧补压漏光，受光侧不误伤（同 4aa85f9）。\n' +
+                    '\tfloat occ = solidSphereOcclusion( vSolidShadowGroundPos );\n' +
+                    '\tfloat kOcc = pow( 1.0 - tSolidSh, 1.8 );\n' +
+                    '\tfloat gateOcc = solidShadowAvgGate2D( shadowMap, shadowMapSize, shadowBias, shadowCoord );\n' +
+                    '\tshadowOut = min( shadowOut, mix( 1.0, occ, min( 1.0, kOcc * gateOcc * 1.28 ) ) );\n' +
+                    '\t// 内置球心部亮斑：径向圆盘与解析 ob 融合 + 贴图 gate（曾出现扇形硬边；回退供对比是否仍有光斑）。\n' +
+                    '\tif ( uSolidBuiltinSphereCount > 0 ) {\n' +
+                    '\t\tfloat diskMax = 0.0;\n' +
+                    '\t\tfor ( int bi = 0; bi < 8; bi++ ) {\n' +
+                    '\t\t\tif ( bi >= uSolidBuiltinSphereCount ) break;\n' +
+                    '\t\t\tfloat rB = max( 0.0001, uSolidSphereRadii[bi] );\n' +
+                    '\t\t\tfloat dB = length( vSolidShadowGroundPos.xz - uSolidSphereCenters[bi].xz );\n' +
+                    '\t\t\tfloat disk = 1.0 - smoothstep( rB * 0.905, rB * 0.992, dB );\n' +
+                    '\t\t\tdisk *= disk * ( 3.0 - 2.0 * disk );\n' +
+                    '\t\t\tdiskMax = max( diskMax, disk );\n' +
+                    '\t\t}\n' +
+                    '\t\tif ( diskMax > 1e-4 ) {\n' +
+                    '\t\t\tfloat gateMap = smoothstep( 0.46, 0.91, 1.0 - shadowOut );\n' +
+                    '\t\t\tfloat ob = solidSphereOcclusionBuiltin( vSolidShadowGroundPos );\n' +
+                    '\t\t\tfloat obCirc = 0.0;\n' +
+                    '\t\t\tfor ( int bj = 0; bj < 8; bj++ ) {\n' +
+                    '\t\t\t\tif ( bj >= uSolidBuiltinSphereCount ) break;\n' +
+                    '\t\t\t\tfloat r2 = max( 0.0001, uSolidSphereRadii[bj] );\n' +
+                    '\t\t\t\tfloat d2 = length( vSolidShadowGroundPos.xz - uSolidSphereCenters[bj].xz );\n' +
+                    '\t\t\t\tobCirc = max( obCirc, 1.0 - smoothstep( r2 * 0.88, r2 * 0.975, d2 ) );\n' +
+                    '\t\t\t}\n' +
+                    '\t\t\tfloat obFused = mix( ob, obCirc, 0.78 );\n' +
+                    '\t\t\tfloat w = diskMax * diskMax * gateMap;\n' +
+                    '\t\t\tfloat target = shadowOut * mix( 1.0, max( obFused, 0.22 ), 0.88 );\n' +
+                    '\t\t\tshadowOut = mix( shadowOut, target, w );\n' +
+                    '\t\t}\n' +
+                    '\t}\n' +
                     '\treturn shadowOut;\n' +
                     '}\n' +
                     '\n' +
                     'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n' +
                     '\tfloat sh0 = getPointShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord, shadowCameraNear, shadowCameraFar );\n' +
                     '\tif ( uSolidContactPatchEnable < 0.5 ) return sh0;\n' +
-                    '\tif ( uSolidBuiltinSphereCount <= 0 ) return sh0;\n' +
-                    '\treturn min( sh0, solidSphereOcclusionFadedBuiltin( vSolidShadowGroundPos ) );\n' +
+                    '\t// 立方体阴影：锚球混光 + builtin 底 min（与平行光一致，压 builtin 球下光斑）。\n' +
+                    '\tfloat g0 = clamp( ( 0.99 - sh0 ) / 0.26, 0.0, 1.0 );\n' +
+                    '\tfloat sh1 = min( sh0, mix( 1.0, solidSphereOcclusionFaded( vSolidShadowGroundPos ), g0 ) );\n' +
+                    '\treturn min( sh1, solidSphereOcclusionFadedBuiltin( vSolidShadowGroundPos ) );\n' +
                     '}\n';
 
                   const endifIdx = chunk.lastIndexOf('#endif');
@@ -1875,7 +1936,12 @@ export function createSolidPreviewLightingManager(opts) {
     } catch (_e) {}
   }
 
-  // ---------- Preview env probes (consumer extracted) ----------
+  // ---------- Preview env probes（光栅预览环境采样；术语勿与 three.LightProbe 混淆）----------
+  // 1) 多探针 PMREM：3 个 CubeCamera 位姿 _computeProbeLayout → 每点拍 cubemap → PMREMGenerator.fromCubemap；
+  //    scene.environment 用探针 0；各网格按包围球中心 _pickNearestProbeIndex 指到最近 pmrem 作 material.envMap（IBL 高光/反射为主）。
+  // 2) 空间 SH 漫反射（可选）：SOLID_RASTER_IRRADIANCE_PROBES.enabled 时，每探针从同一 cubemap readPixels 积 L2 系数，
+  //    片段着色器按世界坐标混合三套系数并写入 irradiance，并缩放 iblIrradiance 减轻与 PMREM 漫反射重复；非场景里挂多盏 LightProbe。
+  // 3) 屏幕空间 AO 由宿主 SolidRasterPreviewComposer（GTAO）处理，与 SH 能量在 PaintingConfig 中 `diffuseMixScaleWhenScreenAo` 协调。
   let pmremGen = null;
   let cubeRT = null;
   let cubeCam = null;
@@ -1883,180 +1949,445 @@ export function createSolidPreviewLightingManager(opts) {
   let pmremRTs = [null, null, null];
   let probePositions = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
   let envProbeTimer = 0;
+  let envProbeMaxTimer = 0;
   let lastRunAt = 0;
   const minIntervalMs = typeof opts.envMinIntervalMs === 'number' ? opts.envMinIntervalMs : 2600;
   const debounceMs = typeof opts.envDebounceMs === 'number' ? opts.envDebounceMs : 220;
   const cubeSize = typeof opts.envCubeSize === 'number' ? opts.envCubeSize : (getIsMobile() ? 48 : 64);
   const probeCount = 3;
-  const _tmpBounceColorA = new THREE.Color();
-  const _tmpBounceColorB = new THREE.Color();
-  const _tmpBounceColorC = new THREE.Color();
+  /** 上一轮 SH 系数是否已填满。 */
+  let _solidShLastValid = false;
+  const _SOLID_SH_PATCH_VER = 6;
+  const _solidShPatchedMaterials = new Set();
+  /** 每探针 9×vec3 线性系数（与 Three LightProbe / shGetIrradianceAt 一致），按行主序 r,g,b 交错存于 27 长度数组。 */
+  const _probeShFlat = [new Float32Array(27), new Float32Array(27), new Float32Array(27)];
+  const _shBasisScratch = new Array(9).fill(0);
+  const _shCoord = new THREE.Vector3();
+  const _shDir = new THREE.Vector3();
+  const _shColor = new THREE.Color();
+  let _lastCubeRtSize = 0;
+  const _tmpSolidGroundWorld = new THREE.Vector3();
 
-  function _isBounceTargetMaterial(m) {
-    if (!m) return false;
-    if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) return true;
-    const cfg = SOLID_RASTER_BOUNCE_APPROX || {};
-    return !!(cfg.nonPbrFallback && (m.isMeshPhongMaterial || m.isMeshLambertMaterial));
+  const _shAcc9 = (function () {
+    const a = [];
+    for (let i = 0; i < 9; i++) a.push(new THREE.Vector3());
+    return a;
+  })();
+
+  function _irrCfg() {
+    return SOLID_RASTER_IRRADIANCE_PROBES || {};
   }
 
-  function _resolveBounceCfg() {
+  function _solidShIrrEnabled() {
     try {
-      const root = SOLID_RASTER_BOUNCE_APPROX || {};
-      if (!root.enabled) return null;
-      const presets = root.presets || {};
-      const key = root.qualityPreset || 'balanced';
-      const preset = presets[key] || presets.balanced || presets.low || null;
-      if (!preset) return null;
-      const mobileScale = getIsMobile() ? Number(root.mobileScale || 1) : 1;
-      const interactiveScale = getInteractionState() ? Number(root.interactiveScale || 1) : 1;
-      return { root, preset, scale: Math.max(0, mobileScale * interactiveScale) };
+      const drv = getSolidRasterPreviewLightingDerived();
+      return !!previewEnabled && !!drv.shActive;
     } catch (_e) {
-      return null;
+      return false;
     }
   }
 
-  function _mixColorWithSaturation(base, sat) {
-    const hsl = { h: 0, s: 0, l: 0 };
-    base.getHSL(hsl);
-    hsl.s = Math.min(1, Math.max(0, hsl.s * sat));
-    base.setHSL(hsl.h, hsl.s, hsl.l);
-    return base;
-  }
-
-  function _computeModelAverageColor(maxSamples) {
-    const sceneGroup = getSceneGroup();
-    const out = new THREE.Color(0.5, 0.5, 0.5);
-    if (!sceneGroup || !sceneGroup.traverse) return out;
-    const limit = Math.max(1, Number(maxSamples) || 24);
-    let n = 0;
-    const acc = new THREE.Color(0, 0, 0);
+  function _solidConvertShPixelToLinear(color, colorSpace) {
     try {
-      sceneGroup.traverse((obj) => {
-        if (n >= limit) return;
-        if (!obj || !obj.isMesh) return;
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        for (let i = 0; i < mats.length; i++) {
-          if (n >= limit) break;
-          const m = mats[i];
-          if (!m || !m.color) continue;
-          acc.r += m.color.r;
-          acc.g += m.color.g;
-          acc.b += m.color.b;
-          n += 1;
-        }
-      });
+      if (colorSpace === THREE.SRGBColorSpace) color.convertSRGBToLinear();
     } catch (_e) {}
-    if (n > 0) out.setRGB(acc.r / n, acc.g / n, acc.b / n);
-    return out;
+    return color;
   }
 
-  function _restoreBounceApproxOnMaterials() {
-    const targets = [];
-    const sg = getSceneGroup();
-    if (sg && sg.traverse) {
-      try { sg.traverse((obj) => { if (obj && obj.isMesh) targets.push(obj); }); } catch (_e) {}
+  /**
+   * 从 CubeRenderTarget 读回像素并投影到 L2 球谐（与 three/examples LightProbeGenerator.fromCubeRenderTarget 同序）。
+   * 结果写入 out27：9 个 vec3 按 band 顺序展开为 [r0,g0,b0, …, r8,g8,b8]。
+   */
+  function _computeShFromCubeRenderTarget(renderer, cubeRT, out27) {
+    if (!renderer || !cubeRT || !cubeRT.isWebGLCubeRenderTarget || !out27) return false;
+    const SH3 = THREE.SphericalHarmonics3;
+    if (!SH3 || typeof SH3.getBasisAt !== 'function') return false;
+    const HalfFloatType = THREE.HalfFloatType;
+    const DataUtils = THREE.DataUtils;
+    const imageWidth = cubeRT.width;
+    if (!imageWidth || imageWidth < 4) return false;
+    const dataType = cubeRT.texture.type;
+    let totalWeight = 0;
+    for (let j = 0; j < 9; j++) _shAcc9[j].set(0, 0, 0);
+    let shStride = 1;
+    try {
+      const irrS = _irrCfg();
+      shStride = Math.max(1, Math.floor(Number(irrS.shPixelStride) || 1));
+    } catch (_eSt) {
+      shStride = 1;
     }
-    const g = getGround();
-    if (g && g.isMesh) targets.push(g);
-    const ws = getWalls();
-    if (ws && Array.isArray(ws)) ws.forEach((w) => { if (w && w.isMesh) targets.push(w); });
-    targets.forEach((obj) => {
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-      for (let i = 0; i < mats.length; i++) {
-        const m = mats[i];
-        if (!m || !m.userData) continue;
-        const ud = m.userData;
-        if (ud.__solidBounceOrigEmissive && m.emissive && m.emissive.copy) m.emissive.copy(ud.__solidBounceOrigEmissive);
-        if (typeof ud.__solidBounceOrigEmissiveIntensity === 'number') m.emissiveIntensity = ud.__solidBounceOrigEmissiveIntensity;
-        delete ud.__solidBounceOrigEmissive;
-        delete ud.__solidBounceOrigEmissiveIntensity;
-        m.needsUpdate = true;
+    const pixelSize = 2 / imageWidth;
+    for (let faceIndex = 0; faceIndex < 6; faceIndex++) {
+      let data;
+      if (dataType === HalfFloatType) {
+        data = new Uint16Array(imageWidth * imageWidth * 4);
+      } else {
+        data = new Uint8Array(imageWidth * imageWidth * 4);
       }
+      try {
+        renderer.readRenderTargetPixels(cubeRT, 0, 0, imageWidth, imageWidth, data, faceIndex);
+      } catch (_eRead) {
+        return false;
+      }
+      for (let py = 0; py < imageWidth; py += shStride) {
+        for (let px = 0; px < imageWidth; px += shStride) {
+          const pixelIndex = py * imageWidth + px;
+          const i = pixelIndex * 4;
+        let r; let g; let b;
+        if (dataType === HalfFloatType) {
+          if (!DataUtils || typeof DataUtils.fromHalfFloat !== 'function') return false;
+          r = DataUtils.fromHalfFloat(data[i]);
+          g = DataUtils.fromHalfFloat(data[i + 1]);
+          b = DataUtils.fromHalfFloat(data[i + 2]);
+        } else {
+          r = data[i] / 255;
+          g = data[i + 1] / 255;
+          b = data[i + 2] / 255;
+        }
+        _shColor.setRGB(r, g, b);
+        _solidConvertShPixelToLinear(_shColor, cubeRT.texture.colorSpace);
+        const col = -1 + (px + 0.5) * pixelSize;
+        const row = 1 - (py + 0.5) * pixelSize;
+        switch (faceIndex) {
+          case 0: _shCoord.set(1, row, -col); break;
+          case 1: _shCoord.set(-1, row, col); break;
+          case 2: _shCoord.set(col, 1, -row); break;
+          case 3: _shCoord.set(col, -1, row); break;
+          case 4: _shCoord.set(col, row, 1); break;
+          case 5: _shCoord.set(-col, row, -1); break;
+          default: _shCoord.set(0, 1, 0);
+        }
+        const lengthSq = _shCoord.lengthSq();
+        if (lengthSq < 1e-10) continue;
+        const weight = 4 / (Math.sqrt(lengthSq) * lengthSq);
+        totalWeight += weight;
+        _shDir.copy(_shCoord).normalize();
+        SH3.getBasisAt(_shDir, _shBasisScratch);
+        for (let j = 0; j < 9; j++) {
+          const bj = _shBasisScratch[j];
+          _shAcc9[j].x += bj * _shColor.r * weight;
+          _shAcc9[j].y += bj * _shColor.g * weight;
+          _shAcc9[j].z += bj * _shColor.b * weight;
+        }
+        }
+      }
+    }
+    if (totalWeight <= 1e-10) return false;
+    const norm = (4 * Math.PI) / totalWeight;
+    for (let j = 0; j < 9; j++) {
+      out27[j * 3] = _shAcc9[j].x * norm;
+      out27[j * 3 + 1] = _shAcc9[j].y * norm;
+      out27[j * 3 + 2] = _shAcc9[j].z * norm;
+    }
+    return true;
+  }
+
+  function _solidShCoeffUniformName(probeIndex, coeffIndex) {
+    return 'uSolidSH' + probeIndex + 'c' + coeffIndex;
+  }
+
+  function _solidShEnsureUniforms(material) {
+    try {
+      const legacy = material.userData._solidShUni;
+      if (legacy && !legacy[_solidShCoeffUniformName(0, 0)]) delete material.userData._solidShUni;
+    } catch (_eL) {}
+    if (!material.userData._solidShUni) {
+      const u = {};
+      u.uSolidProbePos0 = { value: new THREE.Vector3() };
+      u.uSolidProbePos1 = { value: new THREE.Vector3() };
+      u.uSolidProbePos2 = { value: new THREE.Vector3() };
+      for (let pi = 0; pi < probeCount; pi++) {
+        for (let j = 0; j < 9; j++) {
+          u[_solidShCoeffUniformName(pi, j)] = { value: new THREE.Vector3() };
+        }
+      }
+      u.uSolidShDiffuseMix = { value: 0 };
+      u.uSolidEnvIblDiffuseScale = { value: 1 };
+      u.uSolidShWeightPow = { value: 2.2 };
+      u.uSolidShMinWt = { value: 0.08 };
+      u.uSolidGroundY = { value: 0 };
+      u.uSolidGroundOcclH = { value: 0.15 };
+      u.uSolidGroundOcclCavityPow = { value: 2.6 };
+      u.uSolidGroundNorBindPow = { value: 0.35 };
+      u.uSolidGroundOcclNExp = { value: 2.0 };
+      u.uSolidGroundOcclMin = { value: 0.08 };
+      u.uSolidGroundOcclAmt = { value: 0 };
+      u.uSolidGroundIblMin = { value: 0.4 };
+      u.uSolidGroundIblOccAmt = { value: 0 };
+      u.uSolidGroundCrevicePow = { value: 2.5 };
+      u.uSolidGroundCreviceShMul = { value: 0.05 };
+      u.uSolidGroundCreviceIblMul = { value: 0.2 };
+      u.uSolidGroundCreviceAmt = { value: 0 };
+      material.userData._solidShUni = u;
+    }
+    const u2 = material.userData._solidShUni;
+    if (u2 && !u2.uSolidGroundY) {
+      u2.uSolidGroundY = { value: 0 };
+      u2.uSolidGroundOcclH = { value: 0.15 };
+      u2.uSolidGroundOcclCavityPow = { value: 2.6 };
+      u2.uSolidGroundNorBindPow = { value: 0.35 };
+      u2.uSolidGroundOcclNExp = { value: 2.0 };
+      u2.uSolidGroundOcclMin = { value: 0.08 };
+      u2.uSolidGroundOcclAmt = { value: 0 };
+      u2.uSolidGroundIblMin = { value: 0.4 };
+      u2.uSolidGroundIblOccAmt = { value: 0 };
+      u2.uSolidGroundCrevicePow = { value: 2.5 };
+      u2.uSolidGroundCreviceShMul = { value: 0.05 };
+      u2.uSolidGroundCreviceIblMul = { value: 0.2 };
+      u2.uSolidGroundCreviceAmt = { value: 0 };
+    }
+    if (u2 && !u2.uSolidGroundOcclCavityPow) u2.uSolidGroundOcclCavityPow = { value: 2.6 };
+    if (u2 && !u2.uSolidGroundNorBindPow) u2.uSolidGroundNorBindPow = { value: 0.35 };
+    if (u2 && !u2.uSolidGroundCrevicePow) u2.uSolidGroundCrevicePow = { value: 2.5 };
+    if (u2 && !u2.uSolidGroundCreviceShMul) u2.uSolidGroundCreviceShMul = { value: 0.05 };
+    if (u2 && !u2.uSolidGroundCreviceIblMul) u2.uSolidGroundCreviceIblMul = { value: 0.2 };
+    if (u2 && !u2.uSolidGroundCreviceAmt) u2.uSolidGroundCreviceAmt = { value: 0 };
+    return material.userData._solidShUni;
+  }
+
+  function _solidShPushUniformsFromState() {
+    const irr = _irrCfg();
+    let mix = _solidShIrrEnabled() && _solidShLastValid ? Math.max(0, Number(irr.diffuseMix) || 0) : 0;
+    try {
+      const drv = getSolidRasterPreviewLightingDerived();
+      mix *= Math.max(0, Math.min(1, Number(drv.diffuseMixMultiplier) || 1));
+    } catch (_eDm) {}
+    try {
+      const aoCfg = SOLID_RASTER_PREVIEW_AO || {};
+      if (aoCfg.enabled) {
+        const shAoMul = Math.max(0.25, Math.min(1, Number(irr.diffuseMixScaleWhenScreenAo ?? 1)));
+        mix *= shAoMul;
+      }
+    } catch (_eAo) {}
+    const envScale = _solidShIrrEnabled() && _solidShLastValid ? Math.max(0.05, Math.min(1, Number(irr.envIblDiffuseScale) ?? 1)) : 1;
+    const wp = Math.max(0.5, Number(irr.weightPower) || 2);
+    const mw = Math.max(0, Number(irr.minWeight) || 0);
+    let groundY = 0;
+    let hasGround = false;
+    try {
+      const gnd = getGround && getGround();
+      if (gnd && typeof gnd.getWorldPosition === 'function') {
+        gnd.getWorldPosition(_tmpSolidGroundWorld);
+        groundY = Number(_tmpSolidGroundWorld.y) || 0;
+        hasGround = true;
+      } else if (gnd && gnd.position) {
+        groundY = Number(gnd.position.y) || 0;
+        hasGround = true;
+      }
+    } catch (_eGy) {}
+    const gocOn = irr.groundShOcclusionEnabled !== false && hasGround && mix > 1e-6;
+    const gocAmt = gocOn ? Math.max(0, Math.min(1, Number(irr.groundShOcclusionAmount ?? 1))) : 0;
+    const gocH = Math.max(1e-4, Number(irr.groundShOcclusionHeight) || 0.16);
+    const gocCavityPow = Math.max(0.25, Number(irr.groundShOcclusionCavityPow) || 2.6);
+    const gNorBindPow = Math.max(0.08, Math.min(2, Number(irr.groundShOcclusionNorBindPow) || 0.34));
+    const gocNExp = Math.max(0.5, Number(irr.groundShOcclusionNormalExp) || 2);
+    const gocMin = Math.max(0, Math.min(1, Number(irr.groundShOcclusionMinFactor) ?? 0.06));
+    const gIblAmt = gocOn ? Math.max(0, Math.min(1, Number(irr.groundIblOcclusionAmount) || 0)) : 0;
+    const gIblMin = Math.max(0, Math.min(1, Number(irr.groundIblOcclusionMinFactor) ?? 0.35));
+    const gCrevPow = Math.max(0.2, Number(irr.groundShCrevicePow) || 2.5);
+    const gCrevShMul = Math.max(0, Math.min(1, Number(irr.groundShCreviceShMul) ?? 0.05));
+    const gCrevIblMul = Math.max(0, Math.min(1, Number(irr.groundShCreviceIblMul) ?? 0.2));
+    const gCrevAmt = gocOn ? Math.max(0, Math.min(1, Number(irr.groundShCreviceAmount ?? 1))) : 0;
+    _solidShPatchedMaterials.forEach((m) => {
+      try {
+        const u = m && m.userData && m.userData._solidShUni;
+        if (!u) return;
+        u.uSolidProbePos0.value.copy(probePositions[0]);
+        u.uSolidProbePos1.value.copy(probePositions[1]);
+        u.uSolidProbePos2.value.copy(probePositions[2]);
+        for (let pi = 0; pi < probeCount; pi++) {
+          const flat = _probeShFlat[pi];
+          for (let j = 0; j < 9; j++) {
+            const key = _solidShCoeffUniformName(pi, j);
+            const uv = u[key];
+            if (uv && uv.value && uv.value.set) {
+              uv.value.set(flat[j * 3], flat[j * 3 + 1], flat[j * 3 + 2]);
+            }
+          }
+        }
+        u.uSolidShDiffuseMix.value = mix;
+        u.uSolidEnvIblDiffuseScale.value = envScale;
+        u.uSolidShWeightPow.value = wp;
+        u.uSolidShMinWt.value = mw;
+        if (u.uSolidGroundY) u.uSolidGroundY.value = groundY;
+        if (u.uSolidGroundOcclH) u.uSolidGroundOcclH.value = gocH;
+        if (u.uSolidGroundOcclCavityPow) u.uSolidGroundOcclCavityPow.value = gocCavityPow;
+        if (u.uSolidGroundNorBindPow) u.uSolidGroundNorBindPow.value = gNorBindPow;
+        if (u.uSolidGroundOcclNExp) u.uSolidGroundOcclNExp.value = gocNExp;
+        if (u.uSolidGroundOcclMin) u.uSolidGroundOcclMin.value = gocMin;
+        if (u.uSolidGroundOcclAmt) u.uSolidGroundOcclAmt.value = gocAmt;
+        if (u.uSolidGroundIblMin) u.uSolidGroundIblMin.value = gIblMin;
+        if (u.uSolidGroundIblOccAmt) u.uSolidGroundIblOccAmt.value = gIblAmt;
+        if (u.uSolidGroundCrevicePow) u.uSolidGroundCrevicePow.value = gCrevPow;
+        if (u.uSolidGroundCreviceShMul) u.uSolidGroundCreviceShMul.value = gCrevShMul;
+        if (u.uSolidGroundCreviceIblMul) u.uSolidGroundCreviceIblMul.value = gCrevIblMul;
+        if (u.uSolidGroundCreviceAmt) u.uSolidGroundCreviceAmt.value = gCrevAmt;
+      } catch (_e) {}
     });
   }
 
-  function _applyBounceApproxToMesh(obj, receiverScale, cfg, tintColor) {
-    if (!obj || !obj.isMesh || !cfg || !tintColor) return;
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    const preset = cfg.preset;
-    for (let i = 0; i < mats.length; i++) {
-      const m = mats[i];
-      if (!_isBounceTargetMaterial(m)) continue;
-      if (!m.userData) m.userData = {};
-      if (!m.userData.__solidBounceOrigEmissive && m.emissive && m.emissive.clone) m.userData.__solidBounceOrigEmissive = m.emissive.clone();
-      if (typeof m.userData.__solidBounceOrigEmissiveIntensity !== 'number') m.userData.__solidBounceOrigEmissiveIntensity = Number(m.emissiveIntensity || 1);
-      if (!m.emissive || !m.emissive.copy) continue;
-      const rough = Math.min(1, Math.max(0, Number(m.roughness) || 0.65));
-      const darkStart = Math.min(1, Math.max(0, Number(preset.darkBandStart) || 0.2));
-      const darkEnd = Math.min(1, Math.max(darkStart + 0.0001, Number(preset.darkBandEnd) || 0.72));
-      const darkFactor = Math.min(1, Math.max(0, (rough - darkStart) / (darkEnd - darkStart)));
-      const baseEnergy = Number(preset.baseIntensity || 0.06) * cfg.scale;
-      const bounceMix = (
-        Number(preset.groundBounceWeight || 0) +
-        Number(preset.wallBounceWeight || 0) +
-        Number(preset.modelBounceWeight || 0)
-      ) / 3;
-      let energy = baseEnergy * bounceMix * darkFactor * Math.max(0, Number(receiverScale || 1));
-      const eMin = Number(preset.energyClampMin || 0);
-      const eMax = Math.max(eMin, Number(preset.energyClampMax || 0.12));
-      energy = Math.min(eMax, Math.max(eMin, energy));
-      const gain = Math.max(0, Number(preset.emissiveGain || 1));
-      const add = _tmpBounceColorC.copy(tintColor).multiplyScalar(energy);
-      const origE = m.userData.__solidBounceOrigEmissive || _tmpBounceColorA.setRGB(0, 0, 0);
-      m.emissive.copy(origE).add(add);
-      m.emissiveIntensity = (Number(m.userData.__solidBounceOrigEmissiveIntensity || 1)) * (1 + energy * gain);
-      m.needsUpdate = true;
-    }
+  function _solidShDisposeUniformMix() {
+    _solidShLastValid = false;
+    _solidShPatchedMaterials.forEach((m) => {
+      try {
+        const u = m && m.userData && m.userData._solidShUni;
+        if (u && u.uSolidShDiffuseMix) u.uSolidShDiffuseMix.value = 0;
+        if (u && u.uSolidEnvIblDiffuseScale) u.uSolidEnvIblDiffuseScale.value = 1;
+        if (u && u.uSolidGroundOcclAmt) u.uSolidGroundOcclAmt.value = 0;
+        if (u && u.uSolidGroundIblOccAmt) u.uSolidGroundIblOccAmt.value = 0;
+        if (u && u.uSolidGroundCreviceAmt) u.uSolidGroundCreviceAmt.value = 0;
+      } catch (_e) {}
+    });
   }
 
-  function _applyBounceApprox() {
-    const cfg = _resolveBounceCfg();
-    if (!cfg) {
-      _restoreBounceApproxOnMaterials();
-      return;
+  function _solidShEnsureDiffusePatch(material) {
+    if (!material || (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial)) return;
+    if (!_solidShIrrEnabled()) return;
+    if (material.userData.__solidShPatchVer === _SOLID_SH_PATCH_VER) return;
+    if (typeof material.userData._solidShOrigBeforeCompile !== 'function' && typeof material.onBeforeCompile === 'function') {
+      material.userData._solidShOrigBeforeCompile = material.onBeforeCompile;
     }
-    const g = getGround();
-    const ws = getWalls();
-    const gCol = (g && g.material && g.material.color) ? _tmpBounceColorA.copy(g.material.color) : _tmpBounceColorA.set('#cccccc');
-    const wCol = (() => {
-      if (ws && Array.isArray(ws)) {
-        for (let i = 0; i < ws.length; i++) {
-          const w = ws[i];
-          if (w && w.material && w.material.color) return _tmpBounceColorB.copy(w.material.color);
-        }
-      }
-      return _tmpBounceColorB.copy(gCol);
-    })();
-    const mCol = _computeModelAverageColor(cfg.preset.maxModelColorSamples);
-    const tint = new THREE.Color(0, 0, 0);
-    const wg = Math.max(0, Number(cfg.preset.groundBounceWeight || 0));
-    const ww = Math.max(0, Number(cfg.preset.wallBounceWeight || 0));
-    const wm = Math.max(0, Number(cfg.preset.modelBounceWeight || 0));
-    const wsum = Math.max(0.0001, wg + ww + wm);
-    tint.add(gCol.clone().multiplyScalar(wg / wsum));
-    tint.add(wCol.clone().multiplyScalar(ww / wsum));
-    tint.add(mCol.clone().multiplyScalar(wm / wsum));
-    _mixColorWithSaturation(tint, Math.max(0, Number(cfg.preset.colorBleedSaturation || 0.45)));
-
-    const sceneGroup = getSceneGroup();
-    if (sceneGroup && sceneGroup.traverse) {
+    const prevCompile = material.userData._solidShOrigBeforeCompile;
+    if (typeof material.userData._solidShOrigCacheKey !== 'function' && typeof material.customProgramCacheKey === 'function') {
+      material.userData._solidShOrigCacheKey = material.customProgramCacheKey;
+    }
+    const prevCacheKey = material.userData._solidShOrigCacheKey;
+    material.userData.__solidShPatchVer = _SOLID_SH_PATCH_VER;
+    material.customProgramCacheKey = function () {
+      const base = (typeof prevCacheKey === 'function') ? String(prevCacheKey.call(this)) : '';
+      return base + '_solidShProbe_v' + _SOLID_SH_PATCH_VER;
+    };
+    material.onBeforeCompile = (shader) => {
+      if (typeof prevCompile === 'function') prevCompile(shader);
       try {
-        sceneGroup.traverse((obj) => {
-          if (!obj || !obj.isMesh) return;
-          _applyBounceApproxToMesh(obj, Number(cfg.preset.receiverScaleModel || 1), cfg, tint);
+        const u = _solidShEnsureUniforms(material);
+        Object.keys(u).forEach((k) => {
+          shader.uniforms[k] = u[k];
         });
-      } catch (_e) {}
-    }
-    if (g && g.isMesh) _applyBounceApproxToMesh(g, Number(cfg.preset.receiverScaleGround || 0.55), cfg, tint);
-    if (ws && Array.isArray(ws)) {
-      ws.forEach((w) => { if (w && w.isMesh) _applyBounceApproxToMesh(w, Number(cfg.preset.receiverScaleWall || 0.65), cfg, tint); });
-    }
+        if (shader.vertexShader && !shader.vertexShader.includes('vSolidWorldPos')) {
+          shader.vertexShader = 'varying vec3 vSolidWorldPos;\n' + shader.vertexShader;
+          if (shader.vertexShader.includes('#include <worldpos_vertex>')) {
+            shader.vertexShader = shader.vertexShader.replace(
+              '#include <worldpos_vertex>',
+              '#include <worldpos_vertex>\n\tvSolidWorldPos = worldPosition.xyz;'
+            );
+          } else if (shader.vertexShader.includes('#include <begin_vertex>')) {
+            shader.vertexShader = shader.vertexShader.replace(
+              '#include <begin_vertex>',
+              '#include <begin_vertex>\n\tvSolidWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;'
+            );
+          }
+        }
+        const glslMix = (
+          'vec3 solidShEvalIrr9( vec3 normalWorld, vec3 c0, vec3 c1, vec3 c2, vec3 c3, vec3 c4, vec3 c5, vec3 c6, vec3 c7, vec3 c8 ) {\n' +
+          '\tfloat x = normalWorld.x, y = normalWorld.y, z = normalWorld.z;\n' +
+          '\tvec3 irr = c0 * 0.886227;\n' +
+          '\tirr += c1 * ( 2.0 * 0.511664 * y );\n' +
+          '\tirr += c2 * ( 2.0 * 0.511664 * z );\n' +
+          '\tirr += c3 * ( 2.0 * 0.511664 * x );\n' +
+          '\tirr += c4 * ( 2.0 * 0.429043 * x * y );\n' +
+          '\tirr += c5 * ( 2.0 * 0.429043 * y * z );\n' +
+          '\tirr += c6 * ( 0.743125 * z * z - 0.247708 );\n' +
+          '\tirr += c7 * ( 2.0 * 0.429043 * x * z );\n' +
+          '\tirr += c8 * ( 0.429043 * ( x * x - y * y ) );\n' +
+          '\treturn irr;\n' +
+          '}\n'
+        );
+        let fragShDecl = '';
+        let shMixLines = '';
+        for (let pi = 0; pi < probeCount; pi++) {
+          for (let j = 0; j < 9; j++) {
+            fragShDecl += 'uniform vec3 ' + _solidShCoeffUniformName(pi, j) + ';\n';
+          }
+        }
+        for (let j = 0; j < 9; j++) {
+          shMixLines +=
+            '\tvec3 m' + j + ' = ' + _solidShCoeffUniformName(0, j) + '*w0+' +
+            _solidShCoeffUniformName(1, j) + '*w1+' +
+            _solidShCoeffUniformName(2, j) + '*w2;\n';
+        }
+        // 函数必须放在全局作用域（与 uniform 一起、在 lights_pars_begin 之前）。
+        // 若插在 lights_fragment_end 前，会紧跟 lights_fragment_maps 的 #endif，部分驱动会误判为块内函数定义而报 '{' syntax error。
+        const glslBlock =
+          '{\n' +
+          '\tvec3 p = vSolidWorldPos;\n' +
+          '\tfloat d0 = length( p - uSolidProbePos0 );\n' +
+          '\tfloat d1 = length( p - uSolidProbePos1 );\n' +
+          '\tfloat d2 = length( p - uSolidProbePos2 );\n' +
+          '\tfloat w0 = 1.0 / ( pow( max( d0, 1e-3 ), uSolidShWeightPow ) + uSolidShMinWt );\n' +
+          '\tfloat w1 = 1.0 / ( pow( max( d1, 1e-3 ), uSolidShWeightPow ) + uSolidShMinWt );\n' +
+          '\tfloat w2 = 1.0 / ( pow( max( d2, 1e-3 ), uSolidShWeightPow ) + uSolidShMinWt );\n' +
+          '\tfloat ws = w0 + w1 + w2;\n' +
+          '\tw0 /= ws; w1 /= ws; w2 /= ws;\n' +
+          '\tvec3 nW = inverseTransformDirection( normal, viewMatrix );\n' +
+          shMixLines +
+          '\tvec3 shIrr = solidShEvalIrr9( nW, m0, m1, m2, m3, m4, m5, m6, m7, m8 );\n' +
+          '\tfloat solidH = max( vSolidWorldPos.y - uSolidGroundY, 0.0 );\n' +
+          '\tfloat solidGapRaw = uSolidGroundOcclH / ( uSolidGroundOcclH + solidH );\n' +
+          '\tfloat solidNearGr = pow( solidGapRaw, uSolidGroundOcclCavityPow );\n' +
+          '\tfloat solidNd = pow( max( 0.0, -nW.y ), uSolidGroundOcclNExp );\n' +
+          '\tfloat solidNdEff = max( solidNd, pow( max( solidGapRaw, 1e-4 ), uSolidGroundNorBindPow ) );\n' +
+          '\tfloat solidOccW = clamp( solidNearGr * solidNdEff, 0.0, 1.0 );\n' +
+          '\tfloat solidShOcc = mix( 1.0, uSolidGroundOcclMin, solidOccW * uSolidGroundOcclAmt );\n' +
+          '\tfloat solidIblOcc = mix( 1.0, uSolidGroundIblMin, solidOccW * uSolidGroundIblOccAmt );\n' +
+          '\tfloat solidCrev = pow( max( solidGapRaw, 1e-4 ), uSolidGroundCrevicePow );\n' +
+          '\tfloat solidShLine = mix( 1.0, uSolidGroundCreviceShMul, solidCrev * uSolidGroundCreviceAmt );\n' +
+          '\tfloat solidIblLine = mix( 1.0, uSolidGroundCreviceIblMul, solidCrev * uSolidGroundCreviceAmt );\n' +
+          '\tirradiance += shIrr * uSolidShDiffuseMix * solidShOcc * solidShLine;\n' +
+          '\tiblIrradiance *= uSolidEnvIblDiffuseScale * solidIblOcc * solidIblLine;\n' +
+          '}\n';
+        const fragPars =
+          glslMix +
+          'uniform vec3 uSolidProbePos0;\n' +
+          'uniform vec3 uSolidProbePos1;\n' +
+          'uniform vec3 uSolidProbePos2;\n' +
+          fragShDecl +
+          'uniform float uSolidShDiffuseMix;\n' +
+          'uniform float uSolidEnvIblDiffuseScale;\n' +
+          'uniform float uSolidShWeightPow;\n' +
+          'uniform float uSolidShMinWt;\n' +
+          'uniform float uSolidGroundY;\n' +
+          'uniform float uSolidGroundOcclH;\n' +
+          'uniform float uSolidGroundOcclCavityPow;\n' +
+          'uniform float uSolidGroundNorBindPow;\n' +
+          'uniform float uSolidGroundOcclNExp;\n' +
+          'uniform float uSolidGroundOcclMin;\n' +
+          'uniform float uSolidGroundOcclAmt;\n' +
+          'uniform float uSolidGroundIblMin;\n' +
+          'uniform float uSolidGroundIblOccAmt;\n' +
+          'uniform float uSolidGroundCrevicePow;\n' +
+          'uniform float uSolidGroundCreviceShMul;\n' +
+          'uniform float uSolidGroundCreviceIblMul;\n' +
+          'uniform float uSolidGroundCreviceAmt;\n' +
+          'varying vec3 vSolidWorldPos;\n';
+        if (shader.fragmentShader && !shader.fragmentShader.includes('uSolidShDiffuseMix')) {
+          if (shader.fragmentShader.includes('#include <lights_pars_begin>')) {
+            shader.fragmentShader = shader.fragmentShader.replace('#include <lights_pars_begin>', fragPars + '\n#include <lights_pars_begin>');
+          } else {
+            shader.fragmentShader = fragPars + shader.fragmentShader;
+          }
+          const endTag = '#include <lights_fragment_end>';
+          if (shader.fragmentShader.includes(endTag)) {
+            shader.fragmentShader = shader.fragmentShader.replace(endTag, glslBlock + endTag);
+          }
+        }
+      } catch (_eSh) {}
+    };
+    try {
+      material.needsUpdate = true;
+    } catch (_eNu) {}
+    _solidShPatchedMaterials.add(material);
+  }
+
+  function _isEnvMapClearTargetMaterial(m) {
+    if (!m) return false;
+    return !!(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial);
   }
 
   function _disposeEnvProbe() {
     try {
+      _solidShDisposeUniformMix();
       const scene = getScene();
-      const sceneGroup = getSceneGroup();
       const sameAs0 = (basePmremRT && pmremRTs[0] && basePmremRT === pmremRTs[0]);
       if (basePmremRT && !sameAs0) { try { safeDispose(basePmremRT); } catch (_e0) {} }
       basePmremRT = null;
@@ -2068,20 +2399,19 @@ export function createSolidPreviewLightingManager(opts) {
       cubeCam = null;
       try { if (scene) { scene.environment = null; scene.environmentIntensity = 1; } } catch (_e4) {}
       try {
-        if (sceneGroup && sceneGroup.traverse) {
-          sceneGroup.traverse((obj) => {
-            if (!obj || !obj.isMesh) return;
-            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-            for (let mi = 0; mi < mats.length; mi++) {
-              const m = mats[mi];
-              if (!_isBounceTargetMaterial(m)) continue;
-              m.envMap = null;
-              m.needsUpdate = true;
-            }
-          });
+        const targets = _collectEnvProbeTargetMeshes();
+        for (let ti = 0; ti < targets.length; ti++) {
+          const obj = targets[ti];
+          if (!obj || !obj.isMesh) continue;
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          for (let mi = 0; mi < mats.length; mi++) {
+            const m = mats[mi];
+            if (!_isEnvMapClearTargetMaterial(m)) continue;
+            m.envMap = null;
+            m.needsUpdate = true;
+          }
         }
       } catch (_e5) {}
-      _restoreBounceApproxOnMaterials();
     } catch (_e) {}
   }
 
@@ -2129,12 +2459,33 @@ export function createSolidPreviewLightingManager(opts) {
     return best;
   }
 
-  function _applyMultiEnvProbesToSceneGroup() {
+  function _collectEnvProbeTargetMeshes() {
+    const out = [];
     const sceneGroup = getSceneGroup();
-    if (!sceneGroup || !sceneGroup.traverse) return;
+    if (sceneGroup && sceneGroup.traverse) {
+      try {
+        sceneGroup.traverse((obj) => {
+          if (obj && obj.isMesh && !(obj.userData && obj.userData.solidShadowCore)) out.push(obj);
+        });
+      } catch (_e) {}
+    }
+    const g = getGround();
+    if (g && g.isMesh) out.push(g);
+    const ws = getWalls();
+    if (ws && Array.isArray(ws)) {
+      ws.forEach((w) => {
+        if (w && w.isMesh) out.push(w);
+      });
+    }
+    return out;
+  }
+
+  function _applyMultiEnvProbesToSceneGroup() {
+    const targets = _collectEnvProbeTargetMeshes();
     const tmp = new THREE.Vector3();
-    sceneGroup.traverse((obj) => {
-      if (!obj || !obj.isMesh) return;
+    for (let oi = 0; oi < targets.length; oi++) {
+      const obj = targets[oi];
+      if (!obj || !obj.isMesh) continue;
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
       for (let i = 0; i < mats.length; i++) {
         const m = mats[i];
@@ -2155,8 +2506,9 @@ export function createSolidPreviewLightingManager(opts) {
           m.envMapIntensity = _envIntensityForMaterial(m);
           m.needsUpdate = true;
         }
+        _solidShEnsureDiffusePatch(m);
       }
-    });
+    }
   }
 
   function _updateEnvProbeNow(reason) {
@@ -2169,15 +2521,52 @@ export function createSolidPreviewLightingManager(opts) {
       const sceneGroup = getSceneGroup();
       if (!renderer || !scene || !camera || !sceneGroup) return;
 
-      const now = performance.now();
-      if (lastRunAt && (now - lastRunAt) < minIntervalMs) return;
+      const irr = _irrCfg();
+      const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      _perfUpdateTier(now);
+      const interact = (!!getInteractionState()) || _perfIsInteractive(now);
+      let minIv = minIntervalMs;
+      if (irr && typeof irr.minIntervalMsIdle === 'number') {
+        minIv = interact ? (Number(irr.minIntervalMsInteractive) || minIntervalMs) : (Number(irr.minIntervalMsIdle) || minIntervalMs);
+      }
+      if (_solidShIrrEnabled() && irr && !_solidShLastValid) {
+        const retryIv = Math.max(120, Math.floor(Number(irr.shRetryMinIntervalMs) || 420));
+        minIv = Math.min(minIv, retryIv);
+      }
+      if (lastRunAt && (now - lastRunAt) < minIv) return;
       lastRunAt = now;
 
+      let effectiveCubeSize = cubeSize;
+      if (_solidShIrrEnabled() && irr) {
+        effectiveCubeSize = interact
+          ? Math.max(16, Math.floor(Number(irr.cubeSizeInteractive) || 40))
+          : Math.max(16, Math.floor(Number(irr.cubeSizeIdle) || 64));
+      } else if (typeof opts.envCubeSize === 'number') {
+        effectiveCubeSize = opts.envCubeSize;
+      } else {
+        effectiveCubeSize = getIsMobile() ? 48 : 64;
+      }
+
       if (!pmremGen) pmremGen = new THREE.PMREMGenerator(renderer);
-      if (!cubeRT) cubeRT = new THREE.WebGLCubeRenderTarget(cubeSize, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+      if (!cubeRT || cubeRT.width !== effectiveCubeSize) {
+        try { if (cubeRT) safeDispose(cubeRT); } catch (_eCr) {}
+        cubeRT = null;
+        cubeCam = null;
+        cubeRT = new THREE.WebGLCubeRenderTarget(effectiveCubeSize, {
+          type: THREE.HalfFloatType,
+          generateMipmaps: true,
+          minFilter: THREE.LinearMipmapLinearFilter,
+        });
+        _lastCubeRtSize = effectiveCubeSize;
+      }
       if (!cubeCam) {
         cubeCam = new THREE.CubeCamera(0.08, 160, cubeRT);
         cubeCam.renderTarget.texture.name = 'SolidRasterEnvCubeRT';
+      }
+
+      if (!_solidShIrrEnabled()) {
+        _solidShLastValid = false;
+        _solidShDisposeUniformMix();
       }
 
       _computeProbeLayout();
@@ -2185,15 +2574,29 @@ export function createSolidPreviewLightingManager(opts) {
       scene.environmentIntensity = 1;
 
       const prevPos = cubeCam.position.clone();
+      const shFreeze = _solidShIrrEnabled() && !!(irr && irr.freezeShWhileInteractive) && interact;
+      let shAllOk = true;
       for (let pi = 0; pi < probeCount; pi++) {
         cubeCam.position.copy(probePositions[pi]);
         cubeCam.updateMatrixWorld(true);
         cubeCam.update(renderer, scene);
+        if (_solidShIrrEnabled()) {
+          if (!shFreeze) {
+            const ok = _computeShFromCubeRenderTarget(renderer, cubeRT, _probeShFlat[pi]);
+            if (!ok) shAllOk = false;
+          }
+        }
         if (pmremRTs[pi]) { try { safeDispose(pmremRTs[pi]); } catch (_eD) {} pmremRTs[pi] = null; }
         pmremRTs[pi] = pmremGen.fromCubemap(cubeRT.texture);
       }
       cubeCam.position.copy(prevPos);
       cubeCam.updateMatrixWorld(true);
+
+      if (_solidShIrrEnabled()) {
+        _solidShLastValid = shFreeze ? _solidShLastValid : shAllOk;
+      } else {
+        _solidShLastValid = false;
+      }
 
       try {
         const baseSrc = pmremRTs[0];
@@ -2213,8 +2616,8 @@ export function createSolidPreviewLightingManager(opts) {
       }
 
       _applyMultiEnvProbesToSceneGroup();
-      _applyBounceApprox();
-      log('[RasterEnvProbe] multi updated (' + (reason || 'unknown') + '), cube=' + cubeSize + ' x3');
+      if (_solidShIrrEnabled()) _solidShPushUniformsFromState();
+      log('[RasterEnvProbe] multi updated (' + (reason || 'unknown') + '), cube=' + effectiveCubeSize + ' x3 sh=' + (_solidShIrrEnabled() ? (_solidShLastValid ? '1' : '0') : 'off'));
     } catch (e) {
       log('[RasterEnvProbe] failed: ' + (e && e.message ? e.message : e));
       _disposeEnvProbe();
@@ -2223,11 +2626,29 @@ export function createSolidPreviewLightingManager(opts) {
 
   function requestEnvProbe(reason) {
     if (!previewEnabled) return;
+    const r = String(reason || '');
+    // 换场景/增删物体后若仍沿用旧的 lastRunAt，会把首轮探针推迟整整一个 minInterval，表现为「SH 很久才出来」。
+    if (/scene_loaded|scene_changed|apply_scene|json_loaded|new_scene|delete_selected|add_builtin|add_glb/i.test(r)) {
+      lastRunAt = 0;
+    }
+    const irr = _irrCfg();
+    const deb = Math.max(0, typeof irr.envDebounceMs === 'number' ? irr.envDebounceMs : debounceMs);
+    const debMax = Math.max(0, Number(irr.debounceMaxMs) || 0);
+
     if (envProbeTimer) { clearTimeout(envProbeTimer); envProbeTimer = 0; }
     envProbeTimer = setTimeout(() => {
       envProbeTimer = 0;
+      if (envProbeMaxTimer) { clearTimeout(envProbeMaxTimer); envProbeMaxTimer = 0; }
       _updateEnvProbeNow(reason);
-    }, debounceMs);
+    }, deb);
+
+    if (debMax > 0 && !envProbeMaxTimer) {
+      envProbeMaxTimer = setTimeout(() => {
+        envProbeMaxTimer = 0;
+        if (envProbeTimer) { clearTimeout(envProbeTimer); envProbeTimer = 0; }
+        _updateEnvProbeNow(reason);
+      }, debMax);
+    }
   }
 
   function onSceneChanged(reason) {
@@ -2249,6 +2670,7 @@ export function createSolidPreviewLightingManager(opts) {
   function dispose() {
     try {
       if (envProbeTimer) { clearTimeout(envProbeTimer); envProbeTimer = 0; }
+      if (envProbeMaxTimer) { clearTimeout(envProbeMaxTimer); envProbeMaxTimer = 0; }
     } catch (_e) {}
     _disposeEnvProbe();
   }
