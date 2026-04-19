@@ -61,6 +61,12 @@ export function createSolidPreviewLightingManager(opts) {
   let _receiverEnsureBusy = false;
   let _receiverWallsSigLast = '';
   let _receiverModelsSigLast = '';
+  let _receiverWallsSigCache = { sig: '', at: 0 };
+  let _receiverModelsSigCache = { sig: '', at: 0 };
+  let _sceneChangedSyncToken = 0;
+  let _sceneChangedSyncRaf = 0;
+  let _sceneChangedSyncTimer80 = 0;
+  let _sceneChangedSyncTimer220 = 0;
 
   // ---------- Perf tiering (interactive vs idle) ----------
   // We only adjust uniforms (taps/rotate) during interaction to avoid shader recompiles.
@@ -120,6 +126,20 @@ export function createSolidPreviewLightingManager(opts) {
     const cfg = SOLID_RASTER_SHADOW_PERF || {};
     const t = (cfg.cpuThrottle && cfg.cpuThrottle[_perfTier]) ? cfg.cpuThrottle[_perfTier] : null;
     return t || (cfg.cpuThrottle ? cfg.cpuThrottle.idle : null) || null;
+  }
+
+  function _receiverSigCacheMs() {
+    try {
+      const cpuCfg = _perfCpuCfg() || {};
+      const ms = Number(cpuCfg.receiverSigCacheMs);
+      if (Number.isFinite(ms) && ms >= 0) return ms;
+    } catch (_e) {}
+    return _perfTier === 'interactive' ? 120 : 40;
+  }
+
+  function _bumpReceiverSignatureCaches() {
+    _receiverWallsSigCache.at = 0;
+    _receiverModelsSigCache.at = 0;
   }
 
   function _perfApplyUniformQuality(sharedUd, isMobile, isIosHost) {
@@ -489,8 +509,15 @@ export function createSolidPreviewLightingManager(opts) {
 
   function _receiverWallsSignature() {
     try {
+      const now = _perfNow();
+      const cacheMs = _receiverSigCacheMs();
+      if (_receiverWallsSigCache.sig && (now - _receiverWallsSigCache.at) <= cacheMs) return _receiverWallsSigCache.sig;
       const walls = getWalls();
-      if (!walls || !Array.isArray(walls)) return 'nw';
+      if (!walls || !Array.isArray(walls)) {
+        _receiverWallsSigCache.sig = 'nw';
+        _receiverWallsSigCache.at = now;
+        return _receiverWallsSigCache.sig;
+      }
       const ids = [];
       for (let wi = 0; wi < walls.length; wi++) {
         const w = walls[wi];
@@ -503,7 +530,9 @@ export function createSolidPreviewLightingManager(opts) {
         }
       }
       ids.sort();
-      return ids.join('|');
+      _receiverWallsSigCache.sig = ids.join('|');
+      _receiverWallsSigCache.at = now;
+      return _receiverWallsSigCache.sig;
     } catch (_e) {
       return 'errw';
     }
@@ -511,8 +540,15 @@ export function createSolidPreviewLightingManager(opts) {
 
   function _receiverModelsSignature() {
     try {
+      const now = _perfNow();
+      const cacheMs = _receiverSigCacheMs();
+      if (_receiverModelsSigCache.sig && (now - _receiverModelsSigCache.at) <= cacheMs) return _receiverModelsSigCache.sig;
       const sg = getSceneGroup();
-      if (!sg || !sg.traverse) return 'nm';
+      if (!sg || !sg.traverse) {
+        _receiverModelsSigCache.sig = 'nm';
+        _receiverModelsSigCache.at = now;
+        return _receiverModelsSigCache.sig;
+      }
       const ids = [];
       sg.traverse((obj) => {
         if (!obj || !obj.isMesh || !obj.receiveShadow) return;
@@ -524,7 +560,9 @@ export function createSolidPreviewLightingManager(opts) {
         }
       });
       ids.sort();
-      return ids.join('|');
+      _receiverModelsSigCache.sig = ids.join('|');
+      _receiverModelsSigCache.at = now;
+      return _receiverModelsSigCache.sig;
     } catch (_e) {
       return 'errm';
     }
@@ -537,6 +575,20 @@ export function createSolidPreviewLightingManager(opts) {
    */
   function _computeFootprintSphereOnGround(node, groundY, groundEps, tmpBox, tmpSize) {
     try {
+      if (!node.userData) node.userData = {};
+      const cache = node.userData._solidFootprintCache;
+      const geom = node.geometry;
+      const posAttr = geom && geom.attributes ? geom.attributes.position : null;
+      const posVersion = posAttr && posAttr.version != null ? posAttr.version : 0;
+      const worldMatrix = node.matrixWorld;
+      const me = worldMatrix && worldMatrix.elements ? worldMatrix.elements : null;
+      if (cache && cache.matrix && me && cache.posVersion === posVersion && cache.groundY === groundY && cache.groundEps === groundEps) {
+        let same = true;
+        for (let i = 0; i < 16; i++) {
+          if (cache.matrix[i] !== me[i]) { same = false; break; }
+        }
+        if (same) return cache.fp;
+      }
       tmpBox.setFromObject(node);
       if (!tmpBox || tmpBox.isEmpty()) return null;
       const minY = (tmpBox.min && tmpBox.min.y != null) ? tmpBox.min.y : 1e9;
@@ -556,7 +608,6 @@ export function createSolidPreviewLightingManager(opts) {
       // 比纯外接圆紧：长短轴混合（细长物体明显缩小）
       let r = Math.max(0.04, 0.62 * halfMin + 0.38 * halfMax);
 
-      const geom = node.geometry;
       const canSampleVerts =
         geom &&
         geom.attributes &&
@@ -624,9 +675,78 @@ export function createSolidPreviewLightingManager(opts) {
         }
       }
 
-      return { cx, cz, r };
+      const fp = { cx, cz, r };
+      if (me) {
+        const matCopy = cache && cache.matrix ? cache.matrix : new Float32Array(16);
+        for (let i = 0; i < 16; i++) matCopy[i] = me[i];
+        node.userData._solidFootprintCache = {
+          matrix: matCopy,
+          posVersion,
+          groundY,
+          groundEps,
+          fp,
+        };
+      }
+      return fp;
     } catch (_eFp) {
       return null;
+    }
+  }
+
+  function _fillGroundSphereUniforms(sharedUd, sceneGroup, groundY, epsY) {
+    try {
+      if (!sharedUd || !sharedUd.uSolidSphereCenters || !sharedUd.uSolidSphereRadii || !sharedUd.uSolidSphereCount) return false;
+      let n = 0;
+      let nBuiltin = 0;
+      const tmpPos = new THREE.Vector3();
+      const tmpScale = new THREE.Vector3();
+      const tmpBox = new THREE.Box3();
+      const tmpSize = new THREE.Vector3();
+      if (sceneGroup) {
+        const stack = [sceneGroup];
+        const otherCandidates = [];
+        while (stack.length) {
+          const node = stack.pop();
+          if (!node) continue;
+          const children = node.children;
+          if (children && children.length) {
+            for (let ci = 0; ci < children.length; ci++) stack.push(children[ci]);
+          }
+          if (!node.isMesh) continue;
+          if (!node.castShadow) continue;
+          try {
+            if (node.userData && node.userData.type === 'builtin' && node.userData.shape === 'sphere') {
+              if (n < 8) {
+                node.getWorldPosition(tmpPos);
+                node.getWorldScale(tmpScale);
+                const r0 = Math.max(0.0001, Math.abs(tmpScale.y) * 2.0);
+                sharedUd.uSolidSphereCenters.value[n].copy(tmpPos);
+                sharedUd.uSolidSphereRadii.value[n] = r0;
+                n++;
+                nBuiltin++;
+              }
+              continue;
+            }
+          } catch (_eBs) {}
+          if (node.userData && node.userData.solidShadowCore) continue;
+          if (n < 8) otherCandidates.push(node);
+        }
+        for (let si = 0; si < otherCandidates.length && n < 8; si++) {
+          const node = otherCandidates[si];
+          try {
+            const fp = _computeFootprintSphereOnGround(node, groundY, epsY, tmpBox, tmpSize);
+            if (!fp) continue;
+            sharedUd.uSolidSphereCenters.value[n].set(fp.cx, groundY, fp.cz);
+            sharedUd.uSolidSphereRadii.value[n] = fp.r;
+            n++;
+          } catch (_eS) {}
+        }
+      }
+      sharedUd.uSolidSphereCount.value = n;
+      if (sharedUd.uSolidBuiltinSphereCount) sharedUd.uSolidBuiltinSphereCount.value = nBuiltin;
+      return true;
+    } catch (_eFill) {
+      return false;
     }
   }
 
@@ -817,64 +937,9 @@ export function createSolidPreviewLightingManager(opts) {
         if (sphereEveryMs > 0 && (nowPerf - _perfLastSphereUpdateAt) < sphereEveryMs) return;
         _perfLastSphereUpdateAt = nowPerf;
 
-        let n = 0;
-        let nBuiltin = 0;
-        const tmpBox = new THREE.Box3();
-        const tmpSize = new THREE.Vector3();
-        const tmpCenter = new THREE.Vector3();
-        const tmpPos = new THREE.Vector3();
-        const tmpScale = new THREE.Vector3();
         const groundY = (ground && ground.position) ? ground.position.y : 0;
         const epsY = 0.12; // tolerant: many assets float slightly; keep in sync with syncShadows()
-        // Manual traversal allows early-exit once we've got enough spheres.
-        // We do two passes in one walk: (1) builtin spheres (exact center/radius), (2) other near-ground casters (footprint spheres).
-        if (sceneGroup) {
-          const stack = [sceneGroup];
-          const otherCandidates = [];
-          while (stack.length) {
-            const node = stack.pop();
-            if (!node) continue;
-            const children = node.children;
-            if (children && children.length) {
-              for (let i = 0; i < children.length; i++) stack.push(children[i]);
-            }
-            if (!node.isMesh) continue;
-            if (!node.castShadow) continue;
-
-            // Pass #1: keep builtin spheres exact (historical behavior: fixes sphere shadow position/size).
-            try {
-              if (node.userData && node.userData.type === 'builtin' && node.userData.shape === 'sphere') {
-                if (n < 8) {
-                  node.getWorldPosition(tmpPos);
-                  node.getWorldScale(tmpScale);
-                  const r = Math.max(0.0001, Math.abs(tmpScale.y) * 2.0); // SphereGeometry radius=2
-                  ud.uSolidSphereCenters.value[n].copy(tmpPos);
-                  ud.uSolidSphereRadii.value[n] = r;
-                  n++;
-                  nBuiltin++;
-                }
-                continue;
-              }
-            } catch (_eBs) {}
-            if (node.userData && node.userData.solidShadowCore) continue;
-
-            // Pass #2: collect others for footprint approximation (filled after spheres).
-            if (n < 8) otherCandidates.push(node);
-          }
-
-          for (let i = 0; i < otherCandidates.length && n < 8; i++) {
-            const node = otherCandidates[i];
-            try {
-              const fp = _computeFootprintSphereOnGround(node, groundY, epsY, tmpBox, tmpSize);
-              if (!fp) continue;
-              ud.uSolidSphereCenters.value[n].set(fp.cx, groundY, fp.cz);
-              ud.uSolidSphereRadii.value[n] = fp.r;
-              n++;
-            } catch (_eS) {}
-          }
-        }
-        ud.uSolidSphereCount.value = n;
-        if (ud.uSolidBuiltinSphereCount) ud.uSolidBuiltinSphereCount.value = nBuiltin;
+        _fillGroundSphereUniforms(ud, sceneGroup, groundY, epsY);
       }
     } catch (_e) {}
   }
@@ -927,21 +992,27 @@ export function createSolidPreviewLightingManager(opts) {
       };
 
       if ((mainLight && mainLight.isRectAreaLight) || !mainLight.shadow) {
-        renderer.shadowMap.enabled = false;
-        renderer.shadowMap.needsUpdate = true;
+        if (renderer.shadowMap.enabled) {
+          renderer.shadowMap.enabled = false;
+          renderer.shadowMap.needsUpdate = true;
+        }
         try { mainLight.castShadow = false; } catch (_e) {}
         clearGroundSoftPatch();
         if (dbg) log('[RasterShadowSoft] skip: rect/no-shadow light');
         return;
       }
 
-      renderer.shadowMap.enabled = true;
+      if (!renderer.shadowMap.enabled) {
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.needsUpdate = true;
+      }
       // IMPORTANT: three r164 `SHADOWMAP_TYPE_PCF_SOFT` ignores `shadowRadius`.
       // Our “distance-based blur” is implemented by scaling `shadowRadius` inside getShadow/getPointShadow,
       // so we must use PCFShadowMap here to make the blur visible.
-      renderer.shadowMap.type = THREE.PCFShadowMap;
-      renderer.shadowMap.needsUpdate = true;
-      try { renderer.shadowMap.needsUpdate = true; } catch (_e) {}
+      if (renderer.shadowMap.type !== THREE.PCFShadowMap) {
+        renderer.shadowMap.type = THREE.PCFShadowMap;
+        renderer.shadowMap.needsUpdate = true;
+      }
       try { if (typeof window !== 'undefined' && window._solidFallbackRenderAt !== undefined) window._solidFallbackRenderAt = 0; } catch (_eFb) {}
 
       // Physical: point/directional/spot cast shadows on themselves (no shadow proxy light).
@@ -1237,57 +1308,9 @@ export function createSolidPreviewLightingManager(opts) {
 
           // spheres（与 syncGroundShadowUniforms 相同：builtin 优先，再其它近地投射体；脚印半径见 _computeFootprintSphereOnGround）
           try {
-            let n = 0;
-            let nBuiltin = 0;
-            const tmpPos = new THREE.Vector3();
-            const tmpScale = new THREE.Vector3();
-            const tmpBox = new THREE.Box3();
-            const tmpSize = new THREE.Vector3();
-            const tmpCenter = new THREE.Vector3();
             const groundY = (ground && ground.position) ? ground.position.y : 0;
             const epsY = 0.12; // tolerant: many assets float slightly; keep in sync with syncGroundShadowUniforms()
-            if (sceneGroup) {
-              const stack = [sceneGroup];
-              const otherCandidates = [];
-              while (stack.length) {
-                const node = stack.pop();
-                if (!node) continue;
-                const children = node.children;
-                if (children && children.length) {
-                  for (let ci = 0; ci < children.length; ci++) stack.push(children[ci]);
-                }
-                if (!node.isMesh) continue;
-                if (!node.castShadow) continue;
-                try {
-                  if (node.userData && node.userData.type === 'builtin' && node.userData.shape === 'sphere') {
-                    if (n < 8) {
-                      node.getWorldPosition(tmpPos);
-                      node.getWorldScale(tmpScale);
-                      const r0 = Math.max(0.0001, Math.abs(tmpScale.y) * 2.0);
-                      m.userData.uSolidSphereCenters.value[n].copy(tmpPos);
-                      m.userData.uSolidSphereRadii.value[n] = r0;
-                      n++;
-                      nBuiltin++;
-                    }
-                    continue;
-                  }
-                } catch (_eBs) {}
-                if (node.userData && node.userData.solidShadowCore) continue;
-                if (n < 8) otherCandidates.push(node);
-              }
-              for (let si = 0; si < otherCandidates.length && n < 8; si++) {
-                const node = otherCandidates[si];
-                try {
-                  const fp = _computeFootprintSphereOnGround(node, groundY, epsY, tmpBox, tmpSize);
-                  if (!fp) continue;
-                  m.userData.uSolidSphereCenters.value[n].set(fp.cx, groundY, fp.cz);
-                  m.userData.uSolidSphereRadii.value[n] = fp.r;
-                  n++;
-                } catch (_eS) {}
-              }
-            }
-            m.userData.uSolidSphereCount.value = n;
-            m.userData.uSolidBuiltinSphereCount.value = nBuiltin;
+            _fillGroundSphereUniforms(m.userData, sceneGroup, groundY, epsY);
           } catch (_eSc) {
             try { m.userData.uSolidSphereCount.value = 0; } catch (_e2) {}
             try { m.userData.uSolidBuiltinSphereCount.value = 0; } catch (_e3) {}
@@ -1965,6 +1988,9 @@ export function createSolidPreviewLightingManager(opts) {
   const _shCoord = new THREE.Vector3();
   const _shDir = new THREE.Vector3();
   const _shColor = new THREE.Color();
+  let _shReadbackU8 = null;
+  let _shReadbackU16 = null;
+  let _shReadbackSize = 0;
   let _lastCubeRtSize = 0;
   const _tmpSolidGroundWorld = new THREE.Vector3();
 
@@ -2007,6 +2033,7 @@ export function createSolidPreviewLightingManager(opts) {
     const imageWidth = cubeRT.width;
     if (!imageWidth || imageWidth < 4) return false;
     const dataType = cubeRT.texture.type;
+    const pixelCount = imageWidth * imageWidth * 4;
     let totalWeight = 0;
     for (let j = 0; j < 9; j++) _shAcc9[j].set(0, 0, 0);
     let shStride = 1;
@@ -2020,10 +2047,13 @@ export function createSolidPreviewLightingManager(opts) {
     for (let faceIndex = 0; faceIndex < 6; faceIndex++) {
       let data;
       if (dataType === HalfFloatType) {
-        data = new Uint16Array(imageWidth * imageWidth * 4);
+        if (!_shReadbackU16 || _shReadbackSize !== imageWidth) _shReadbackU16 = new Uint16Array(pixelCount);
+        data = _shReadbackU16;
       } else {
-        data = new Uint8Array(imageWidth * imageWidth * 4);
+        if (!_shReadbackU8 || _shReadbackSize !== imageWidth) _shReadbackU8 = new Uint8Array(pixelCount);
+        data = _shReadbackU8;
       }
+      _shReadbackSize = imageWidth;
       try {
         renderer.readRenderTargetPixels(cubeRT, 0, 0, imageWidth, imageWidth, data, faceIndex);
       } catch (_eRead) {
@@ -2407,8 +2437,10 @@ export function createSolidPreviewLightingManager(opts) {
           for (let mi = 0; mi < mats.length; mi++) {
             const m = mats[mi];
             if (!_isEnvMapClearTargetMaterial(m)) continue;
-            m.envMap = null;
-            m.needsUpdate = true;
+            if (m.envMap) {
+              m.envMap = null;
+              m.needsUpdate = true;
+            }
           }
         }
       } catch (_e5) {}
@@ -2449,6 +2481,46 @@ export function createSolidPreviewLightingManager(opts) {
     probePositions[2].set(center.x - radius * 0.58, yLo, center.z - radius * 0.36);
   }
 
+  function _scheduleSceneChangedSyncShadows() {
+    _sceneChangedSyncToken++;
+    const token = _sceneChangedSyncToken;
+    if (_sceneChangedSyncRaf) {
+      try { cancelAnimationFrame(_sceneChangedSyncRaf); } catch (_eRafCancel) {}
+      _sceneChangedSyncRaf = 0;
+    }
+    if (_sceneChangedSyncTimer80) {
+      clearTimeout(_sceneChangedSyncTimer80);
+      _sceneChangedSyncTimer80 = 0;
+    }
+    if (_sceneChangedSyncTimer220) {
+      clearTimeout(_sceneChangedSyncTimer220);
+      _sceneChangedSyncTimer220 = 0;
+    }
+
+    try { syncShadows(); } catch (_eNow) {}
+    try {
+      _sceneChangedSyncRaf = requestAnimationFrame(() => {
+        _sceneChangedSyncRaf = 0;
+        if (!previewEnabled || token !== _sceneChangedSyncToken) return;
+        try { syncShadows(); } catch (_eRafRun) {}
+      });
+    } catch (_eRaf) {}
+    try {
+      _sceneChangedSyncTimer80 = setTimeout(() => {
+        _sceneChangedSyncTimer80 = 0;
+        if (!previewEnabled || token !== _sceneChangedSyncToken) return;
+        try { syncShadows(); } catch (_eT1) {}
+      }, 80);
+    } catch (_eT0) {}
+    try {
+      _sceneChangedSyncTimer220 = setTimeout(() => {
+        _sceneChangedSyncTimer220 = 0;
+        if (!previewEnabled || token !== _sceneChangedSyncToken) return;
+        try { syncShadows(); } catch (_eT2) {}
+      }, 220);
+    } catch (_eT00) {}
+  }
+
   function _pickNearestProbeIndex(p) {
     let best = 0;
     let bestD = Infinity;
@@ -2486,25 +2558,29 @@ export function createSolidPreviewLightingManager(opts) {
     for (let oi = 0; oi < targets.length; oi++) {
       const obj = targets[oi];
       if (!obj || !obj.isMesh) continue;
+      let idx = 0;
+      try {
+        obj.updateWorldMatrix(true, false);
+        const g = (obj.geometry && obj.geometry.boundingSphere) ? obj.geometry.boundingSphere : null;
+        if (g) tmp.copy(g.center).applyMatrix4(obj.matrixWorld);
+        else obj.getWorldPosition(tmp);
+      } catch (_eP) {
+        try { obj.getWorldPosition(tmp); } catch (_e2) { tmp.set(0, 1, 0); }
+      }
+      idx = _pickNearestProbeIndex(tmp);
+      const pm = pmremRTs[idx];
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
       for (let i = 0; i < mats.length; i++) {
         const m = mats[i];
         if (!m) continue;
         if (!(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial)) continue;
-        try {
-          obj.updateWorldMatrix(true, false);
-          const g = (obj.geometry && obj.geometry.boundingSphere) ? obj.geometry.boundingSphere : null;
-          if (g) tmp.copy(g.center).applyMatrix4(obj.matrixWorld);
-          else obj.getWorldPosition(tmp);
-        } catch (_eP) {
-          try { obj.getWorldPosition(tmp); } catch (_e2) { tmp.set(0, 1, 0); }
-        }
-        const idx = _pickNearestProbeIndex(tmp);
-        const pm = pmremRTs[idx];
         if (pm && pm.texture) {
-          m.envMap = pm.texture;
-          m.envMapIntensity = _envIntensityForMaterial(m);
-          m.needsUpdate = true;
+          const nextIntensity = _envIntensityForMaterial(m);
+          const envChanged = m.envMap !== pm.texture;
+          const intensityChanged = m.envMapIntensity !== nextIntensity;
+          if (envChanged) m.envMap = pm.texture;
+          if (intensityChanged) m.envMapIntensity = nextIntensity;
+          if (envChanged) m.needsUpdate = true;
         }
         _solidShEnsureDiffusePatch(m);
       }
@@ -2657,10 +2733,8 @@ export function createSolidPreviewLightingManager(opts) {
     // gets soft receivers without requiring a manual light-type toggle.
     try {
       if (previewEnabled) {
-        syncShadows();
-        try { requestAnimationFrame(() => { try { if (previewEnabled) syncShadows(); } catch (_eRaf1) {} }); } catch (_eRaf0) {}
-        try { setTimeout(() => { try { if (previewEnabled) syncShadows(); } catch (_eT1) {} }, 80); } catch (_eT0) {}
-        try { setTimeout(() => { try { if (previewEnabled) syncShadows(); } catch (_eT2) {} }, 220); } catch (_eT00) {}
+        _bumpReceiverSignatureCaches();
+        _scheduleSceneChangedSyncShadows();
       }
     } catch (_e) {}
     // For now: force a near-term env refresh; layout will adapt to new bounds.
