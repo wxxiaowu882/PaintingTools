@@ -168,7 +168,7 @@ export const SOLID_RASTER_PREVIEW_AA = {
  */
 export const SOLID_RASTER_PREVIEW_CANVAS_FILTER = {
   enabled: true,
-  blurPx: 1, // 建议 0~2.5；值越大越朦胧
+  blurPx: 0.9, // 建议 0~2.5；值越大越朦胧
   skipWhileInteracting: false, // 交互时临时关闭，优先流畅
 };
 
