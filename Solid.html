@@ -140,7 +140,7 @@
         installSolidMainLightSliderBindings,
         solidGetTempColorFromKelvin100,
     } from './plugins_02/SolidLightControlShared.js';
-    import { SOLID_PATH_TRACER_QUALITY, SOLID_DEBUG_PANEL } from './Config/PaintingConfig.js';
+    import { SOLID_PATH_TRACER_QUALITY, SOLID_DEBUG_PANEL, SOLID_RASTER_PREVIEW_CANVAS_FILTER } from './Config/PaintingConfig.js';
     window.skyEnvLightMatchMainRect = true; // 【试验·抗黑点噪点】true=更干净（更慢），false=更快（更噪）
     const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.consumer) ? SOLID_PATH_TRACER_QUALITY.consumer : {};
     const _solidPtProfileMap = _solidPtCfg.profiles || {};
@@ -292,7 +292,16 @@
         if (gl2 && typeof gl2.isContextLost === 'function' && gl2.isContextLost()) return;
     } catch (_eGl2) {}
     if (window._solidContextLost || window.isUnsupported) triggerUnsupported('recover_exhausted', (reason || '') + ' retries done'); }; setTimeout(function() { run(0); }, delays[0]); };
-    function _solidDismissRenderToast() { var t = document.getElementById('render-toast'); if (t) { if (t.__hideTimer) { clearTimeout(t.__hideTimer); t.__hideTimer = 0; } t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; } if (renderer && renderer.domElement) renderer.domElement.style.filter = ''; }
+    function _solidDismissRenderToast() {
+        var t = document.getElementById('render-toast');
+        if (t) {
+            if (t.__hideTimer) { clearTimeout(t.__hideTimer); t.__hideTimer = 0; }
+            t.style.opacity = '0';
+            t.style.transform = 'translateY(6px)';
+        }
+        // 仅在高级渲染时清空 canvas filter；光栅态下由 _solidApplyRasterCanvasCssFilter 管理。
+        if (renderer && renderer.domElement && window.useAdvancedRender) renderer.domElement.style.filter = '';
+    }
 
     /** 光栅阴影 frustum：逻辑在 plugins_02/SolidPreviewLighting.js，与生产端共用实现。 */
     function _solidFitRasterShadowFrustumForSceneGroup() {
@@ -639,6 +648,17 @@
     }
 
     /** 光栅预览：可选 GTAO composer，否则 forward render。光追开启时仅 forward。 */
+    function _solidApplyRasterCanvasCssFilter() {
+        try {
+            if (!renderer || !renderer.domElement) return;
+            const cfg = SOLID_RASTER_PREVIEW_CANVAS_FILTER || {};
+            if (!cfg.enabled) { renderer.domElement.style.filter = ''; return; }
+            if (cfg.skipWhileInteracting !== false && window._orbitInteracting) { renderer.domElement.style.filter = ''; return; }
+            const px = Math.max(0, Math.min(6, Number(cfg.blurPx) || 0));
+            renderer.domElement.style.filter = px > 0 ? ('blur(' + px.toFixed(1) + 'px)') : '';
+        } catch (_eF) {}
+    }
+
     function _solidTryRasterPreviewDraw() {
         if (!renderer || !scene || !camera) return;
         if (typeof _solidIsGlContextLost === 'function' && _solidIsGlContextLost()) return;
@@ -646,14 +666,16 @@
             try {
                 renderer.render(scene, camera);
             } catch (_ePt) {}
+            try { if (renderer && renderer.domElement) renderer.domElement.style.filter = ''; } catch (_eClr) {}
             return;
         }
         try {
             const c = window.__solidRasterPreviewComposer;
-            if (c && c.tryRender()) return;
+            if (c && c.tryRender()) { _solidApplyRasterCanvasCssFilter(); return; }
         } catch (_eC) {}
         try {
             renderer.render(scene, camera);
+            _solidApplyRasterCanvasCssFilter();
         } catch (_eR) {}
     }
 
@@ -1261,7 +1283,7 @@
         if (window._solidPerfHardwareT0 && window.PerfTester && window.PerfTester.isTesting) tickSolidPerfHardwareProgress();
         if (window.isUnsupported || !window.useAdvancedRender) {
         if (renderer) renderer.toneMappingExposure = 0.7;
-        if (renderer && renderer.domElement && renderer.domElement.style.filter) renderer.domElement.style.filter = '';
+        // 光栅态滤镜由 _solidApplyRasterCanvasCssFilter 控制，避免每帧先清空导致“静止后模糊消失”。
         if (controls && !controls.enabled) controls.enabled = true;
         if (controls) controls.update();
         if (window.PluginManager) { try { window.PluginManager.trigger('onUpdate', { camera, scene, renderer, pathTracer: null }); } catch(_e) {} }

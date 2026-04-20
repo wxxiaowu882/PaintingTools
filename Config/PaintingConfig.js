@@ -141,6 +141,35 @@ export const SOLID_RASTER_PREVIEW_AO = {
   pdSamples: 12,
   /** SH（SOLID_RASTER_IRRADIANCE_PROBES）同开时略降 GTAO 叠加强度，减轻与低频漫反射「双压暗」（仍非严格的直射/间接分解）。 */
   blendIntensityScaleWhenIrradianceSh: 0.9,
+  /** 仅雾气生效：true 时雾气开启也优先走 composer（可保留抗锯齿）；景深仍强制走 forward 以保证滑块生效。 */
+  allowComposerWhenAtmosphereEnabled: false,
+};
+
+/**
+ * 光栅预览：仅 3D 主画面的边缘抗锯齿（不影响 HTML/SVG 标注与文案层）
+ * - 当前实现为 SMAA（后处理 pass），作用于 composer 的 3D 结果纹理。
+ * - `softness` 为无极档：0~1，越大越柔和（主要建议调这个）。
+ * - `interactionQualityPolicy: 'adaptive'`：交互中降级，停下后延迟恢复。
+ */
+export const SOLID_RASTER_PREVIEW_AA = {
+  enabled: true,
+  mode: 'smaa',
+  softness: 0.9, // 无极档（0~1）：越大越柔和；推荐 0.65~0.92
+  mobileEnabled: true,
+  skipWhileInteracting: true,
+  interactionQualityPolicy: 'adaptive', // 'adaptive' | 'always_on'
+  restoreDelayMs: 120,
+};
+
+/**
+ * 光栅预览：对 WebGL canvas 直接施加 CSS blur（与追光初期体验优化同思路）
+ * - 仅影响 3D 画布，不影响独立 HTML/SVG 标注层。
+ * - 用于快速获得“朦胧”观感；不是几何边缘级抗锯齿。
+ */
+export const SOLID_RASTER_PREVIEW_CANVAS_FILTER = {
+  enabled: true,
+  blurPx: 1, // 建议 0~2.5；值越大越朦胧
+  skipWhileInteracting: false, // 交互时临时关闭，优先流畅
 };
 
 /**

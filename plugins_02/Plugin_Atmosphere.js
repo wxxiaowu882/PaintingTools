@@ -18,7 +18,7 @@ window.AtmosphereManager = {
         const h = window.innerHeight * dpr;
 
         this.ptTarget = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType });
-        
+
         this.depthTarget = new THREE.WebGLRenderTarget(w, h);
         this.depthTarget.depthTexture = new THREE.DepthTexture();
         this.depthTarget.depthTexture.type = THREE.FloatType;
@@ -44,10 +44,9 @@ window.AtmosphereManager = {
                 dofEnabled: { value: false }, 
                 focusDistance: { value: 10.0 },
                 aperture: { value: 2.8 },
-                isPreview: { value: true },
-                // 【修复核心】：改名为 uExposure，彻底避开 Three.js 的 toneMappingExposure 保留字冲突！
-                uExposure: { value: 0.7 } 
             },
+            // 与内置材质一致：由 #include tonemapping_fragment / colorspace_fragment 完成曝光映射与输出色彩空间
+            toneMapped: true,
             vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position, 1.0); }`,
             fragmentShader: `
                 #include <packing>
@@ -59,7 +58,6 @@ window.AtmosphereManager = {
                 uniform int fogType; uniform float fogParam1; uniform float fogParam2; uniform float time;
                 
                 uniform bool dofEnabled; uniform float focusDistance; uniform float aperture;
-                uniform bool isPreview; uniform float uExposure;
 
                 float hash12(vec2 p) {
                     vec3 p3  = fract(vec3(p.xyx) * .1031);
@@ -138,18 +136,9 @@ window.AtmosphereManager = {
                     vec3 outColor = finalColor.rgb;
                     outColor = max(outColor, vec3(0.0));
 
-                    if (!isPreview) {
-                        outColor *= uExposure; // 替换为安全的 uExposure
-                        outColor = clamp((outColor * (2.51 * outColor + 0.03)) / (outColor * (2.43 * outColor + 0.59) + 0.14), 0.0, 1.0);
-                    }
-
-                    vec3 srgbCondition = step(outColor, vec3(0.0031308));
-                    vec3 srgbHigher = pow(outColor, vec3(0.41666)) * 1.055 - vec3(0.055);
-                    vec3 srgbLower = outColor * 12.92;
-                    
-                    outColor = mix(srgbHigher, srgbLower, srgbCondition);
-
                     gl_FragColor = vec4(outColor, finalColor.a);
+                    #include <tonemapping_fragment>
+                    #include <colorspace_fragment>
                 }
             `
         });
@@ -185,9 +174,6 @@ window.AtmosphereManager = {
                         sceneToRender.background = oldBg;
                         
                         window.AtmosphereManager.postMaterial.uniforms.time.value = window.AtmosphereManager.fogTime;
-                        // 更新安全命名的 uExposure
-                        window.AtmosphereManager.postMaterial.uniforms.uExposure.value = renderer.toneMappingExposure;
-                        window.AtmosphereManager.postMaterial.uniforms.isPreview.value = true;
 
                         this.setRenderTarget(null);
                         originalRender.call(this, window.AtmosphereManager.postScene, window.AtmosphereManager.postCamera);
@@ -247,9 +233,6 @@ window.AtmosphereManager = {
         
         if (this.postMaterial) {
             this.postMaterial.uniforms.time.value = this.fogTime;
-            // 更新安全命名的 uExposure
-            this.postMaterial.uniforms.uExposure.value = renderer.toneMappingExposure;
-            this.postMaterial.uniforms.isPreview.value = false;
             this.postMaterial.uniforms.cameraProjectionMatrixInverse.value.copy(camera.projectionMatrixInverse);
             this.postMaterial.uniforms.cameraWorldMatrix.value.copy(camera.matrixWorld);
         }
