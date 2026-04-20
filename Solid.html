@@ -31,7 +31,7 @@
     .scene-load-bar-track{width:100%;height:2px;background:rgba(255,255,255,0.1);border-radius:1px;overflow:hidden;}
     .scene-load-bar-fill{display:block;height:100%;width:100%;background:rgba(255,255,255,0.55);transform-origin:left center;transform:scaleX(0);will-change:transform;}
     /* 可视化场景网格弹窗 UI */
-    #scene-grid-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9000; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); flex-direction:column; padding:30px 20px; }
+    #scene-grid-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9000; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); flex-direction:column; box-sizing:border-box; min-height:100vh; min-height:-webkit-fill-available; min-height:100dvh; padding:max(30px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(30px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px)); }
     .modal-header { display:flex; justify-content:space-between; align-items:center; color:#fff; margin-bottom:20px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.1); }
     .modal-title { font-size:16px; font-weight:300; letter-spacing:2px; }
     .modal-close { cursor:pointer; width:32px; height:32px; flex-shrink:0; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.08); border:none; border-radius:10px; font-size:18px; line-height:1; position:relative; z-index:9001; pointer-events:auto; color:rgba(255,255,255,0.7); user-select:none; -webkit-tap-highlight-color:transparent; }
@@ -59,6 +59,11 @@
     /* v2：避免卡片上移导致顶部描边被遮挡 */
     html.solid-scene-list-v2 .scene-item:hover, html.solid-scene-list-v2 .scene-item.active { transform:none; }
     html.solid-scene-list-v2 .scene-item.active::after { inset:1px; }
+    /* 移动端：避免 flex + overflow:hidden 裁切多行详情；全宽卡片；缩略图单独圆角裁剪 */
+    @media (max-width: 899px) {
+    html.solid-scene-list-v2 .scene-item { align-self:stretch; width:100%; box-sizing:border-box; overflow:visible; min-height:min-content; }
+    html.solid-scene-list-v2 .scene-thumb { overflow:hidden; flex-shrink:0; }
+    }
     /* PC 端：能放下两列就两列；右端碰到浏览器边界就自动回落单列（纯 CSS，无 JS 判定） */
     @media (min-width: 900px) { html.solid-scene-list-v2 .scene-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(620px, 100%), 1fr)); gap: 14px; max-width: 1440px; margin: 0 auto; }
     /* 单列卡片宽度：占列宽 90%，居中对齐 */
