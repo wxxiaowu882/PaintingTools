@@ -9,6 +9,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
   SOLID_RASTER_IRRADIANCE_PROBES,
+  SOLID_RASTER_AREA_LIGHT_RIG,
   SOLID_RASTER_PREVIEW_AA,
   SOLID_RASTER_PREVIEW_AO,
   getSolidRasterPreviewLightingDerived,
@@ -30,6 +31,7 @@ export function createSolidRasterPreviewComposer(opts) {
   const getRenderer = opts.getRenderer;
   const getScene = opts.getScene;
   const getCamera = opts.getCamera;
+  const getLightState = typeof opts.getLightState === 'function' ? opts.getLightState : () => null;
   const getIsMobile = typeof opts.getIsMobile === 'function' ? opts.getIsMobile : () => false;
   const getInteractionState = typeof opts.getInteractionState === 'function' ? opts.getInteractionState : () => false;
   const getUseAdvancedRender = opts.getUseAdvancedRender;
@@ -81,6 +83,29 @@ export function createSolidRasterPreviewComposer(opts) {
       }
     } catch (_e) {}
     return tuned;
+  }
+
+  function _sizeT() {
+    try {
+      const st = getLightState ? (getLightState() || {}) : {};
+      const cfg = SOLID_RASTER_AREA_LIGHT_RIG || {};
+      const sMin = Number(cfg.sizeMin || 1.0);
+      const sMax = Number(cfg.sizeMax || 15.0);
+      const s = Number(st.lightSize);
+      if (!Number.isFinite(s)) return 0.0;
+      return Math.max(0, Math.min(1, (s - sMin) / Math.max(1e-6, sMax - sMin)));
+    } catch (_e) {
+      return 0.0;
+    }
+  }
+
+  function _aoTerminatorProtectedBlend(baseBi) {
+    const bi0 = Number.isFinite(baseBi) ? baseBi : 0;
+    const t = _sizeT();
+    const te = Math.pow(t, 0.62);
+    // 极值抑制：size 越大，AO 越少压死交界线；保留最小结构对比
+    const mul = Math.max(0.08, 1.0 - 0.82 * te);
+    return Math.max(0, Math.min(1, bi0 * mul));
   }
 
   function dispose() {
@@ -170,7 +195,7 @@ export function createSolidRasterPreviewComposer(opts) {
     if (drv.shActive && irr.enabled) {
       bi *= Math.max(0.2, Math.min(1, Number(cfg.blendIntensityScaleWhenIrradianceSh ?? 1)));
     }
-    gtaoPass.blendIntensity = Math.max(0, Math.min(1, bi));
+    gtaoPass.blendIntensity = _aoTerminatorProtectedBlend(bi);
 
     const samp = mobile
       ? Math.max(4, Math.min(24, Math.floor(Number(cfg.samplesMobile ?? cfg.samples ?? 8))))
@@ -298,6 +323,17 @@ export function createSolidRasterPreviewComposer(opts) {
     const c = _ensureComposer(enableSmaa);
     if (!c) return false;
     try {
+      // dynamic AO blend (size-driven): no composer rebuild required.
+      if (gtaoPass) {
+        const cfg2 = _aoCfg();
+        const drv2 = getSolidRasterPreviewLightingDerived();
+        const irr2 = SOLID_RASTER_IRRADIANCE_PROBES || {};
+        let bi2 = Number(cfg2.blendIntensity ?? 0.62) * drv2.aoBlendMultiplier;
+        if (drv2.shActive && irr2.enabled) {
+          bi2 *= Math.max(0.2, Math.min(1, Number(cfg2.blendIntensityScaleWhenIrradianceSh ?? 1)));
+        }
+        gtaoPass.blendIntensity = _aoTerminatorProtectedBlend(bi2);
+      }
       _syncClipBox();
       c.render();
     } catch (_eR) {

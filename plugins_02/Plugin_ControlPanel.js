@@ -119,7 +119,7 @@ window.ControlPanel = {
                                 <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">色温</span><input type="range" id="lightTemp" min="30" max="90" value="38"><span id="tempVal" class="slider-val">3800</span></div>
                             </div> 
                             <div class="flex gap-2">
-                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">大小</span><input type="range" id="lightSize" min="1.0" max="4.0" step="0.1" value="1.9"><span id="sizeVal" class="slider-val">1.9</span></div>
+                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">大小</span><input type="range" id="lightSize" min="1.0" max="15.0" step="0.1" value="1.9"><span id="sizeVal" class="slider-val">1.9</span></div>
                                 <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">强度</span><input type="range" id="lightIntensity" min="0.2" max="8" step="0.1" value="1.7"><span id="intensityVal" class="slider-val">1.7</span></div>
                             </div>
                         </div>

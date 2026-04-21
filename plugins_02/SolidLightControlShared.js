@@ -9,10 +9,67 @@ export function clampSolidLightIntensitySlider(value) {
   return Math.max(0.2, Math.min(8, n));
 }
 
+/** 与控制面板 `lightSize` range（min 1 max 15）一致 */
+export function clampSolidLightSizeSlider(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1.9;
+  return Math.max(1, Math.min(15, n));
+}
+
+/** 与控制面板 `lightTemp` range（min 30 max 90）一致 */
+export function clampSolidLightTempSlider(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 38;
+  return Math.max(30, Math.min(90, n));
+}
+
+/** 光栅交互态统一口径（消费/生产一致） */
+export function getSolidUnifiedInteractionState() {
+  try {
+    const w = (typeof window !== 'undefined') ? window : null;
+    if (!w) return false;
+    return !!(
+      w._orbitInteracting ||
+      (w.transformControl && w.transformControl.dragging) ||
+      (w._planeXZDrag && w._planeXZDrag.active)
+    );
+  } catch (_e) {
+    return false;
+  }
+}
+
 const SOLID_SPOT_ANGLE = Math.PI / 5.5;
 const SOLID_SPOT_PENUMBRA = 0.5;
 const SOLID_RECT_RASTER_SPOT_ANGLE = Math.PI / 3.2;
 const SOLID_RECT_RASTER_SPOT_PENUMBRA = 0.75;
+
+function _clamp01(v) {
+  return Math.max(0, Math.min(1, v));
+}
+
+function _sizeT(lightSize) {
+  const n = Number(lightSize);
+  if (!Number.isFinite(n)) return 0.3;
+  return _clamp01((n - 1.0) / 3.0);
+}
+
+/**
+ * 光栅单主光近似：size 增大时优先拓宽受光面过渡（spot/rect-raster 的 cone soft-edge），
+ * 同时做轻微能量补偿，避免“越大越亮”。
+ */
+function _applySolidRasterPhysicalSizeApprox(light, lightType, lightSize, useAdvancedRender) {
+  if (!light || useAdvancedRender) return;
+  const t = _sizeT(lightSize);
+  if (lightType === 'spot' || (lightType === 'rect' && light.isSpotLight)) {
+    const baseA = lightType === 'rect' ? SOLID_RECT_RASTER_SPOT_ANGLE : SOLID_SPOT_ANGLE;
+    const baseP = lightType === 'rect' ? SOLID_RECT_RASTER_SPOT_PENUMBRA : SOLID_SPOT_PENUMBRA;
+    const angScale = 1.0 + 0.14 * t;
+    light.angle = Math.min(Math.PI / 2 - 0.02, baseA * angScale);
+    light.penumbra = Math.min(0.96, baseP + 0.36 * t);
+    // 轻微补偿防止 cone 扩展造成主观变亮
+    light.intensity = light.intensity * (1.0 - 0.16 * t);
+  }
+}
 
 /**
  * 传给 `new *Light(color, intensity)` 的标量（与历史三处逻辑一致）。
@@ -221,6 +278,8 @@ export function createSolidMainLight(THREE, { lightType, color, intensitySlider,
     light.radius = lSize;
     addSpotTargetToScene = true;
   }
+
+  _applySolidRasterPhysicalSizeApprox(light, lightType, lSize, !!useAdvancedRender);
 
   return { light, addSpotTargetToScene };
 }

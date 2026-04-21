@@ -178,7 +178,80 @@ export const SOLID_RASTER_PREVIEW_CANVAS_FILTER = {
  * - ao_only：关掉 SH 路径，仅 PMREM + GTAO + 直射，AO 主导缝/角。
  * - ao_soft_sh：保留 SH，略压 diffuse 与 AO，减轻叠暗。
  */
-export const SOLID_RASTER_PREVIEW_LIGHTING_PRESET = 'ao_only';
+export const SOLID_RASTER_PREVIEW_LIGHTING_PRESET = 'balanced';
+
+// 光栅模式「大光盘」双灯耦合（方案 B）配置
+// - enabled=false：保持当前单灯行为（可一键回滚）
+// - enabled=true：在光栅模式启用“照明灯+投影灯”双灯
+export const SOLID_RASTER_AREA_LIGHT_RIG = {
+  enabled: true, // 生产端与消费端同步启用；异常可一键回退为 false。
+  mode: 'single_main', // single_main=单主光物理近似；dual=双灯（保留兼容，不作为默认）
+  sizeMin: 1.0,
+  sizeMax: 15.0,
+  // 严格守恒映射：size 增大时，shadowLight 直射下降，emitLight 直射上升，二者总量保持近似恒定。
+  conservativeEnergy: {
+    enabled: false,
+    curve: 'smoothstep',
+    // shadowFactor = shadowAtMin + (shadowAtMax - shadowAtMin) * curveT
+    // emitFactor = emitAtMin + (emitAtMax - emitAtMin) * curveT
+    // 两者按灯型校准，避免“叠加光”感与交界线台阶。
+    factors: {
+      // 大尺寸端更激进地把能量迁移到 emit，减少“双过渡叠加”产生的台阶感。
+      spot: { shadowAtMin: 1.0, shadowAtMax: 0.24, emitAtMin: 0.02, emitAtMax: 0.78 },
+      dir: { shadowAtMin: 1.0, shadowAtMax: 0.28, emitAtMin: 0.02, emitAtMax: 0.72 },
+      point: { shadowAtMin: 1.0, shadowAtMax: 0.34, emitAtMin: 0.01, emitAtMax: 0.66 },
+      rect: { shadowAtMin: 1.0, shadowAtMax: 0.38, emitAtMin: 0.01, emitAtMax: 0.62 },
+    },
+  },
+  // 受光柔化：额外 RectAreaLight（仅照明，不投影）
+  emitLight: {
+    enabled: false, // 单主光模式下不参与照明
+    widthBase: 8.0,
+    heightBase: 8.0,
+    sizeScale: 0.5,
+    sizeBias: 0.1,
+    minIntensity: 0.0,
+    maxIntensity: 8.0,
+    yOffset: 0.0,
+    // 全端同代码路径，不同平台上限
+    maxFactorDesktop: 0.0,
+    maxFactorMobile: 0.0,
+  },
+  // 投影柔化：仅强化远端半影，不放大接触区软化
+  shadowSoftness: {
+    enabled: true,
+    contactGuard: true, // true=限制接触区增强，降低亮缝回归风险
+    spotDefault: 1.4,
+    dirDefault: 1.4,
+    pointDefault: 2.2,
+    spotMaxDesktop: 2.0,
+    dirMaxDesktop: 1.95,
+    pointMaxDesktop: 2.4,
+    spotMaxMobile: 1.65,
+    dirMaxMobile: 1.6,
+    pointMaxMobile: 1.95,
+    blurSamplesMinDesktop: 16,
+    blurSamplesMaxDesktop: 22,
+    blurSamplesMinMobile: 12,
+    blurSamplesMaxMobile: 16,
+    // 拖动时对样本数应用迟滞，减少离散跳变
+    blurSampleHysteresis: 1.25,
+  },
+  // 模型明暗交界线 soft-terminator（物理灯盘近似）：两端统一由 size 驱动
+  terminator: {
+    enabled: true,
+    // 强度：1=完全采用“灯盘角度积分”近似（更接近物理）
+    strengthDesktop: 1.0,
+    strengthMobile: 1.0,
+    // 等效灯盘半角（弧度）：size 越大，采样方向锥越宽，交界线自然变宽
+    widthMin: 0.04,
+    widthMax: 0.42,
+    // sizeT 曲线（<1：高区间增益更明显）
+    curvePow: 0.55,
+    // 调试：打印命中/兜底次数（默认关）
+    debugLog: true,
+  },
+};
 
 export function getSolidRasterPreviewLightingDerived() {
   const preset = String(SOLID_RASTER_PREVIEW_LIGHTING_PRESET || 'balanced');
@@ -256,5 +329,5 @@ export const SOLID_RASTER_IRRADIANCE_PROBES = {
 // 消费端 Solid.html / 生产端 Solid_Portrait_Create.html 共用：排错日志 + #debug-log-panel
 // false：hwLog/addHwLog/diagnosticPanelLog 不输出（含 console）、排错面板强制隐藏；true：输出并显示面板。
 export const SOLID_DEBUG_PANEL = {
-  enabled: true,
+  enabled: false,
 };

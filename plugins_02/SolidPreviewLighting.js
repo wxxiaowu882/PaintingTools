@@ -8,6 +8,7 @@ import {
   SOLID_RASTER_SHADOW_PERF,
   SOLID_RASTER_IRRADIANCE_PROBES,
   SOLID_RASTER_PREVIEW_AO,
+  SOLID_RASTER_AREA_LIGHT_RIG,
   getSolidRasterPreviewLightingDerived,
 } from '../Config/PaintingConfig.js';
 
@@ -43,7 +44,7 @@ export function createSolidPreviewLightingManager(opts) {
   const getScene = opts.getScene || (() => opts.scene);
   const getCamera = opts.getCamera || (() => opts.camera);
   const getSceneGroup = opts.getSceneGroup || (() => opts.sceneGroup);
-  const getMainLight = opts.getMainLight || (() => opts.mainLight);
+  const getShadowLight = opts.getShadowLight || opts.getMainLight || (() => opts.mainLight);
   const getGround = opts.getGround || (() => opts.ground);
   const getWalls = opts.getWalls || (() => opts.walls);
 
@@ -204,6 +205,354 @@ export function createSolidPreviewLightingManager(opts) {
     // Mobile: fewer taps to keep it fast.
     mobile: { taps: 12, rotate: 1 },
   };
+  let _lastBlurSamplesApplied = 0;
+
+  function _clamp(v, lo, hi) {
+    return Math.max(lo, Math.min(hi, v));
+  }
+
+  function _sizeEffectT(lightState) {
+    try {
+      const cfg = SOLID_RASTER_AREA_LIGHT_RIG || {};
+      const sMin = Number(cfg.sizeMin || 1.0);
+      const sMax = Number(cfg.sizeMax || 15.0);
+      const s = Number(lightState && lightState.lightSize);
+      if (!Number.isFinite(s)) return 0.0;
+      return _clamp((s - sMin) / Math.max(1e-6, sMax - sMin), 0, 1);
+    } catch (_e) {
+      return 0.0;
+    }
+  }
+
+  function _sizeDrivenShadowSoftness(shadowLight, isMobile, lightState) {
+    // 优先读取共享 Rig 计算结果，确保消费/生产与桌面/移动走同一映射真源。
+    try {
+      const pkg = shadowLight && shadowLight.userData && shadowLight.userData.solidAreaShadowSoft;
+      if (pkg && Number.isFinite(pkg.radiusTarget)) {
+        const radius = Number(pkg.radiusTarget);
+        const minB = Number(pkg.blurMin || (isMobile ? 12 : 18));
+        const maxB = Number(pkg.blurMax || (isMobile ? 18 : 24));
+        const t = _clamp(Number(pkg.t || 0), 0, 1);
+        const target = _clamp(minB + (maxB - minB) * t, Math.min(minB, maxB), Math.max(minB, maxB));
+        let blurSamples = Math.round(target);
+        const hysteresis = Math.max(0, Number(pkg.blurSampleHysteresis || 1.25));
+        const interacting = !!getInteractionState();
+        if (_lastBlurSamplesApplied <= 0) _lastBlurSamplesApplied = blurSamples;
+        if (interacting) {
+          const diff = target - _lastBlurSamplesApplied;
+          if (Math.abs(diff) >= hysteresis) _lastBlurSamplesApplied += (diff > 0 ? 1 : -1);
+          blurSamples = Math.round(_lastBlurSamplesApplied);
+        } else {
+          _lastBlurSamplesApplied = blurSamples;
+        }
+        return { radius, blurSamples, contactGuard: !!pkg.contactGuard };
+      }
+    } catch (_ePkg) {}
+
+    const cfg = SOLID_RASTER_AREA_LIGHT_RIG;
+    const sc = cfg && cfg.shadowSoftness;
+    if (!cfg || !sc || !sc.enabled || !shadowLight) return null;
+
+    const s = Number(lightState && lightState.lightSize);
+    if (!Number.isFinite(s)) return null;
+    const sizeMin = Number(sc.sizeMin || 1.0);
+    const sizeMax = Number(sc.sizeMax || (cfg && cfg.sizeMax) || 15.0);
+    const t = _clamp((s - sizeMin) / Math.max(1e-6, sizeMax - sizeMin), 0, 1);
+
+    let defR = 1.4;
+    let maxR = isMobile ? Number(sc.spotMaxMobile || 2.2) : Number(sc.spotMaxDesktop || 3.0);
+    if (shadowLight.isDirectionalLight) {
+      defR = Number(sc.dirDefault || 1.4);
+      maxR = isMobile ? Number(sc.dirMaxMobile || 2.1) : Number(sc.dirMaxDesktop || 2.8);
+    } else if (shadowLight.isPointLight) {
+      defR = Number(sc.pointDefault || 2.2);
+      maxR = isMobile ? Number(sc.pointMaxMobile || 2.6) : Number(sc.pointMaxDesktop || 3.4);
+    } else if (shadowLight.isSpotLight) {
+      defR = Number(sc.spotDefault || 1.4);
+      maxR = isMobile ? Number(sc.spotMaxMobile || 2.2) : Number(sc.spotMaxDesktop || 3.0);
+    }
+
+    const radius = _clamp(defR + (maxR - defR) * t, Math.min(defR, maxR), Math.max(defR, maxR));
+    const bsMin = isMobile ? Number(sc.blurSamplesMinMobile || 12) : Number(sc.blurSamplesMinDesktop || 16);
+    const bsMax = isMobile ? Number(sc.blurSamplesMaxMobile || 16) : Number(sc.blurSamplesMaxDesktop || 22);
+    const target = _clamp(bsMin + (bsMax - bsMin) * t, Math.min(bsMin, bsMax), Math.max(bsMin, bsMax));
+    let blurSamples = Math.round(target);
+    const hysteresis = Math.max(0, Number(sc.blurSampleHysteresis || 1.25));
+    const interacting = !!getInteractionState();
+    if (_lastBlurSamplesApplied <= 0) _lastBlurSamplesApplied = blurSamples;
+    if (interacting) {
+      const diff = target - _lastBlurSamplesApplied;
+      if (Math.abs(diff) >= hysteresis) _lastBlurSamplesApplied += (diff > 0 ? 1 : -1);
+      blurSamples = Math.round(_lastBlurSamplesApplied);
+    } else {
+      _lastBlurSamplesApplied = blurSamples;
+    }
+
+    return { radius, blurSamples, contactGuard: !!(sc && sc.contactGuard) };
+  }
+
+  // ---------- Model soft-terminator (direct lighting) ----------
+  const SOLID_TERM_PATCH_REVISION = 2;
+  let _termDbgLastAt = 0;
+  let _termDbgLastRepl = { mats: 0, repl: 0, zero: 0, pending: 0, fallback: 0, chunk: 0 };
+
+  function _termCfg() {
+    try {
+      const rig = SOLID_RASTER_AREA_LIGHT_RIG || {};
+      return (rig && rig.terminator) ? rig.terminator : {};
+    } catch (_e) {
+      return {};
+    }
+  }
+
+  function _termSizeT(st) {
+    const tCfg = _termCfg();
+    const p = _clamp(Number(tCfg.curvePow || 0.72), 0.05, 3.0);
+    return Math.pow(_sizeEffectT(st), p);
+  }
+
+  function _applySolidTerminatorShaderPatch(shader, ud) {
+    try {
+      if (!shader || !ud) return;
+      shader.uniforms.uSolidTermSizeT = ud.uSolidTermSizeT;
+      shader.uniforms.uSolidTermStrength = ud.uSolidTermStrength;
+      shader.uniforms.uSolidTermWidthMin = ud.uSolidTermWidthMin;
+      shader.uniforms.uSolidTermWidthMax = ud.uSolidTermWidthMax;
+      shader.uniforms.uSolidTermLightType = ud.uSolidTermLightType;
+      shader.uniforms.uSolidTermLightPos = ud.uSolidTermLightPos;
+      shader.uniforms.uSolidTermLightDir = ud.uSolidTermLightDir;
+
+      const fs0 = shader.fragmentShader || '';
+      let fs1 = fs0;
+      const hookTag = '#include <lights_fragment_end>';
+      const fnMark = 'solidTerminatorFieldFn';
+      const hookMark = 'solidTerminatorFieldApply';
+      let chunkHit = 0;
+      if (!fs1.includes(fnMark)) {
+        const uDecl =
+          'uniform float uSolidTermSizeT;\n' +
+          'uniform float uSolidTermStrength;\n' +
+          'uniform float uSolidTermWidthMin;\n' +
+          'uniform float uSolidTermWidthMax;\n' +
+          'uniform int uSolidTermLightType;\n' +
+          'uniform vec3 uSolidTermLightPos;\n' +
+          'uniform vec3 uSolidTermLightDir;\n' +
+          'varying vec3 vSolidTermWorldPos;\n';
+        const tFunc =
+          '\n// solidTerminatorFieldFn\n' +
+          'vec2 solidTerminatorField( float ndl, float sizeT, float strength ) {\n' +
+          '\tfloat t = clamp( sizeT, 0.0, 1.0 );\n' +
+          '\tfloat s = clamp( strength, 0.0, 1.0 );\n' +
+          '\tfloat w = mix( uSolidTermWidthMin, uSolidTermWidthMax, t );\n' +
+          '\tfloat sigma = max( 0.02, w * 0.28 );\n' +
+          '\tfloat termMask = exp( - ( ndl * ndl ) / max( 1e-5, sigma * sigma ) );\n' +
+          '\tfloat ndlSoft = smoothstep( -w, w, ndl );\n' +
+          '\tfloat ndlHard = step( 0.0, ndl );\n' +
+          '\tfloat gain = mix( ndlHard, ndlSoft, s );\n' +
+          '\tgain = mix( 1.0, gain, clamp(0.35 + 0.65 * t, 0.0, 1.0 ) );\n' +
+          '\treturn vec2( termMask, gain );\n' +
+          '}\n';
+        if (fs1.includes('#include <lights_pars_begin>')) fs1 = fs1.replace('#include <lights_pars_begin>', uDecl + tFunc + '\n#include <lights_pars_begin>');
+        else fs1 = uDecl + tFunc + fs1;
+      }
+      let fallbackHit = 0;
+      if (fs1.includes(hookTag) && !fs1.includes(hookMark)) {
+        const fbCode =
+          '\n// solidTerminatorFieldApply\n' +
+          '{\n' +
+          '\tvec3 solidN = normalize( geometryNormal );\n' +
+          '\tvec3 solidL = (uSolidTermLightType == 0) ? normalize( uSolidTermLightDir ) : normalize( uSolidTermLightPos - vSolidTermWorldPos );\n' +
+          '\tfloat ndl = dot( solidN, solidL );\n' +
+          '\tvec2 tf = solidTerminatorField( ndl, uSolidTermSizeT, uSolidTermStrength );\n' +
+          '\tfloat termMask = tf.x;\n' +
+          '\tfloat termGain = tf.y;\n' +
+          '\tfloat guard = mix( 0.94, 1.0, termMask );\n' +
+          '\treflectedLight.directDiffuse *= clamp( termGain * guard, 0.0, 2.0 );\n' +
+          '}\n';
+        fs1 = fs1.replace(hookTag, fbCode + hookTag);
+        fallbackHit = 1;
+        chunkHit = 1;
+      }
+
+      if (shader.vertexShader && !shader.vertexShader.includes('vSolidTermWorldPos')) {
+        shader.vertexShader = 'varying vec3 vSolidTermWorldPos;\n' + shader.vertexShader;
+        const assign = '\n\tvSolidTermWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;';
+        if (shader.vertexShader.includes('#include <worldpos_vertex>')) {
+          shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>' + assign);
+        } else if (shader.vertexShader.includes('#include <begin_vertex>')) {
+          shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + assign);
+        }
+      }
+
+      shader.fragmentShader = fs1;
+      if (!ud._solidTermDbg) ud._solidTermDbg = { repl: 0, zero: 0, compiled: 0 };
+      ud._solidTermDbg.repl = 0;
+      ud._solidTermDbg.zero = chunkHit ? 0 : 1;
+      ud._solidTermDbg.fallback = fallbackHit;
+      ud._solidTermDbg.chunk = chunkHit;
+      ud._solidTermDbg.termApplied = chunkHit ? 1 : 0;
+      ud._solidTermDbg.termMode = chunkHit ? 'chunk_field' : 'none';
+      ud._solidTermDbg.termHitChunk = chunkHit ? 'lights_fragment_end' : 'none';
+      ud._solidTermDbg.compiled = 1;
+    } catch (_e) {}
+  }
+
+  function _installSolidTerminatorPatch(material) {
+    try {
+      if (!material) return false;
+      if (!material.userData) material.userData = {};
+      const ud = material.userData;
+      // NOTE: Do NOT early-return solely by revision.
+      // Other systems (env probes / SH / receivers) may overwrite material.onBeforeCompile after we install.
+      // We must ensure our wrapper remains attached to the current onBeforeCompile chain tail.
+
+      if (!ud.uSolidTermSizeT) ud.uSolidTermSizeT = { value: 0.0 };
+      if (!ud.uSolidTermStrength) ud.uSolidTermStrength = { value: 0.0 };
+      if (!ud.uSolidTermWidthMin) ud.uSolidTermWidthMin = { value: 0.035 };
+      if (!ud.uSolidTermWidthMax) ud.uSolidTermWidthMax = { value: 0.26 };
+      if (!ud.uSolidTermLightType) ud.uSolidTermLightType = { value: 0 };
+      if (!ud.uSolidTermLightPos) ud.uSolidTermLightPos = { value: new THREE.Vector3(0, 2, 0) };
+      if (!ud.uSolidTermLightDir) ud.uSolidTermLightDir = { value: new THREE.Vector3(0, 1, 0) };
+
+      // Cache key: ensure program recompile only when patch revision changes (uniform-driven otherwise).
+      const prevKey = (typeof ud._solidTermOrigCacheKey === 'function') ? ud._solidTermOrigCacheKey : (typeof material.customProgramCacheKey === 'function' ? material.customProgramCacheKey : null);
+      if (typeof ud._solidTermOrigCacheKey !== 'function' && typeof material.customProgramCacheKey === 'function') ud._solidTermOrigCacheKey = material.customProgramCacheKey;
+      material.customProgramCacheKey = function() {
+        const base = (typeof prevKey === 'function') ? String(prevKey.call(this)) : '';
+        return base + '_solidTerm_v' + SOLID_TERM_PATCH_REVISION;
+      };
+
+      // Arm wrapper at the *tail* of the current onBeforeCompile chain.
+      // If later overwritten by other modules, we re-arm on next sync.
+      const current = (typeof material.onBeforeCompile === 'function') ? material.onBeforeCompile : null;
+      const alreadyWrapped = !!(ud._solidTermWrappedFn && material.onBeforeCompile === ud._solidTermWrappedFn);
+      const alreadyOnCurrent = !!(ud._solidTermWrappedBase && ud._solidTermWrappedBase === current);
+      if (alreadyWrapped && alreadyOnCurrent) {
+        // keep as-is
+      } else {
+        ud._solidTermWrappedBase = current;
+        ud._solidTermWrappedFn = (shader) => {
+          try { if (typeof ud._solidTermWrappedBase === 'function') ud._solidTermWrappedBase(shader); } catch (_ePrev) {}
+          _applySolidTerminatorShaderPatch(shader, ud);
+        };
+        material.onBeforeCompile = ud._solidTermWrappedFn;
+      }
+
+      ud._solidTerminator = { v: SOLID_TERM_PATCH_REVISION };
+      try { material.needsUpdate = true; } catch (_eNu) {}
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function _syncSolidTerminatorForSceneGroup(sceneGroup, st, isMobile, isIosHost) {
+    try {
+      const tCfg = _termCfg();
+      const enabled = !!tCfg.enabled;
+      if (!sceneGroup || !sceneGroup.traverse) return;
+
+      const sizeT = _termSizeT(st);
+      const strength = enabled ? _clamp((isMobile || isIosHost) ? Number(tCfg.strengthMobile || 0.72) : Number(tCfg.strengthDesktop || 0.82), 0, 1) : 0.0;
+      const wMin = Number(tCfg.widthMin || 0.035);
+      const wMax = Number(tCfg.widthMax || 0.26);
+
+      let hit = 0;
+      let replSum = 0;
+      let zeroSum = 0;
+      let pendingSum = 0;
+      let fbSum = 0;
+      let chunkSum = 0;
+      sceneGroup.traverse((obj) => {
+        try {
+          if (!obj || !obj.isMesh) return;
+          if (obj.userData && obj.userData.solidShadowCore) return;
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          for (let mi = 0; mi < mats.length; mi++) {
+            const m = mats[mi];
+            if (!m) continue;
+            // ShaderMaterial opt-in only (avoid breaking custom shaders).
+            if (m.isShaderMaterial && !(m.userData && m.userData.solidTerminatorOptIn)) continue;
+            _installSolidTerminatorPatch(m);
+            if (!m.userData) m.userData = {};
+            if (m.userData.uSolidTermSizeT) m.userData.uSolidTermSizeT.value = sizeT;
+            if (m.userData.uSolidTermStrength) m.userData.uSolidTermStrength.value = strength;
+            if (m.userData.uSolidTermWidthMin) m.userData.uSolidTermWidthMin.value = wMin;
+            if (m.userData.uSolidTermWidthMax) m.userData.uSolidTermWidthMax.value = wMax;
+            try {
+              const lt = getShadowLight ? getShadowLight() : null;
+              if (lt) {
+                const lp = new THREE.Vector3();
+                lt.getWorldPosition(lp);
+                if (m.userData.uSolidTermLightPos) m.userData.uSolidTermLightPos.value.copy(lp);
+                if (m.userData.uSolidTermLightType) m.userData.uSolidTermLightType.value = lt.isDirectionalLight ? 0 : (lt.isSpotLight ? 1 : 2);
+                if (m.userData.uSolidTermLightDir) {
+                  const d = new THREE.Vector3(0, 1, 0);
+                  if (lt.isDirectionalLight && lt.target) {
+                    const tpos = new THREE.Vector3();
+                    lt.target.getWorldPosition(tpos);
+                    d.subVectors(lp, tpos).normalize();
+                  }
+                  m.userData.uSolidTermLightDir.value.copy(d);
+                }
+              }
+            } catch (_eLt) {}
+            hit++;
+            try {
+              const d = m.userData && m.userData._solidTermDbg ? m.userData._solidTermDbg : null;
+              if (d && d.compiled) { replSum += Number(d.repl || 0); zeroSum += Number(d.zero || 0); fbSum += Number(d.fallback || 0); chunkSum += Number(d.chunk || 0); }
+              else pendingSum += 1;
+            } catch (_eAcc) {}
+          }
+        } catch (_eM) {}
+      });
+
+      if (tCfg && tCfg.debugLog) {
+        const now = _perfNow();
+        if ((now - _termDbgLastAt) > 800) {
+          _termDbgLastAt = now;
+          _termDbgLastRepl = { mats: hit, repl: replSum, zero: zeroSum, pending: pendingSum, fallback: fbSum, chunk: chunkSum };
+          try { log('[SolidTerm] enabled=' + enabled + ' hitMats=' + hit + ' repl=' + replSum + ' zero=' + zeroSum + ' pending=' + pendingSum + ' fallback=' + fbSum + ' chunk=' + chunkSum + ' sizeT=' + sizeT.toFixed(3) + ' str=' + strength.toFixed(3) + ' w=' + wMin.toFixed(3) + '->' + wMax.toFixed(3)); } catch (_eLg) {}
+          // Deferred report: onBeforeCompile runs during actual render. If we log immediately inside syncShadows(),
+          // materials may still be "pending" even though the next frame will compile them.
+          try {
+            const raf = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : null;
+            if (raf) {
+              raf(() => {
+                try {
+                  let cHit = 0;
+                  let cRepl = 0;
+                  let cZero = 0;
+                  let cPend = 0;
+                  let cFb = 0;
+                  let cChunk = 0;
+                  if (sceneGroup && sceneGroup.traverse) {
+                    sceneGroup.traverse((obj) => {
+                      try {
+                        if (!obj || !obj.isMesh) return;
+                        if (obj.userData && obj.userData.solidShadowCore) return;
+                        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                        for (let mi = 0; mi < mats.length; mi++) {
+                          const m = mats[mi];
+                          if (!m) continue;
+                          if (m.isShaderMaterial && !(m.userData && m.userData.solidTerminatorOptIn)) continue;
+                          cHit++;
+                          const d = m.userData && m.userData._solidTermDbg ? m.userData._solidTermDbg : null;
+                          if (d && d.compiled) { cRepl += Number(d.repl || 0); cZero += Number(d.zero || 0); cFb += Number(d.fallback || 0); cChunk += Number(d.chunk || 0); }
+                          else cPend += 1;
+                        }
+                      } catch (_eO) {}
+                    });
+                  }
+                  log('[SolidTerm][deferred] enabled=' + enabled + ' hitMats=' + cHit + ' repl=' + cRepl + ' zero=' + cZero + ' pending=' + cPend + ' fallback=' + cFb + ' chunk=' + cChunk + ' sizeT=' + sizeT.toFixed(3) + ' str=' + strength.toFixed(3));
+                } catch (_eD) {}
+              });
+            }
+          } catch (_eRaf) {}
+        }
+      }
+    } catch (_e) {}
+  }
 
   function _rasterShadowDbgEnabled() {
     try { return typeof window !== 'undefined' && localStorage.getItem('SolidRasterShadowDbg') === '1'; }
@@ -408,6 +757,12 @@ export function createSolidPreviewLightingManager(opts) {
           } else if (shader.vertexShader.includes('#include <begin_vertex>')) {
             shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + assign);
           }
+          // Receiver patch may become the final onBeforeCompile in chain; ensure terminator patch also runs here.
+          try {
+            if (ud.uSolidTermSizeT && ud.uSolidTermStrength && ud.uSolidTermWidthMin && ud.uSolidTermWidthMax) {
+              _applySolidTerminatorShaderPatch(shader, ud);
+            }
+          } catch (_eTermRecv) {}
         } catch (_e) {}
       };
 
@@ -458,7 +813,7 @@ export function createSolidPreviewLightingManager(opts) {
   function _shouldEnsureReceiverSoftPatch() {
     try {
       if (!previewEnabled) return false;
-      const mainLight = getMainLight();
+      const mainLight = getShadowLight();
       if (!mainLight || mainLight.isDirectionalLight) return false;
       const wantWalls = _receiverSoftShadowWallsEnabled();
       const wantModels = _receiverSoftShadowModelsEnabled();
@@ -753,7 +1108,7 @@ export function createSolidPreviewLightingManager(opts) {
   // ---------- Shadow soft ground patch (consumer extracted) ----------
   function _fitRasterShadowFrustumForSceneGroup(lightOverride) {
     try {
-      const mainLight = lightOverride || getMainLight();
+      const mainLight = lightOverride || getShadowLight();
       const sceneGroup = getSceneGroup();
       if (!mainLight || !mainLight.shadow || !mainLight.shadow.camera || !sceneGroup) return;
       const sh = mainLight.shadow;
@@ -836,7 +1191,7 @@ export function createSolidPreviewLightingManager(opts) {
           }
         }
       } catch (_eSmType) {}
-      const mainLight = getMainLight();
+      const mainLight = getShadowLight();
       const ground = getGround();
       const sceneGroup = getSceneGroup();
       if (!mainLight || !ground || !ground.material || !ground.material.userData) return;
@@ -878,7 +1233,7 @@ export function createSolidPreviewLightingManager(opts) {
       try {
         if (!_receiverEnsureBusy) {
           const now = nowPerf;
-          const mainLight = getMainLight();
+          const mainLight = getShadowLight();
           const isDir = !!(mainLight && mainLight.isDirectionalLight);
           const wantWalls = _receiverSoftShadowWallsEnabled();
           const wantModels = _receiverSoftShadowModelsEnabled();
@@ -949,7 +1304,7 @@ export function createSolidPreviewLightingManager(opts) {
       if (!previewEnabled) return;
       const renderer = getRenderer();
       const scene = getScene();
-      const mainLight = getMainLight();
+      const mainLight = getShadowLight();
       const ground = getGround();
       const sceneGroup = getSceneGroup();
       const walls = getWalls();
@@ -1079,6 +1434,13 @@ export function createSolidPreviewLightingManager(opts) {
         sh.camera.updateProjectionMatrix();
       }
 
+      const __sizeSoft = _sizeDrivenShadowSoftness(shadowLight, isMobile, st);
+      const __contactGuard = !!(__sizeSoft && __sizeSoft.contactGuard);
+      if (__sizeSoft) {
+        sh.radius = __sizeSoft.radius;
+        sh.blurSamples = __sizeSoft.blurSamples;
+      }
+
       try { if (sceneGroup) sceneGroup.updateMatrixWorld(true); } catch (_eMw) {}
       _fitRasterShadowFrustumForSceneGroup(shadowLight);
 
@@ -1088,15 +1450,18 @@ export function createSolidPreviewLightingManager(opts) {
         // Tighten caster/receiver contact to suppress bright seam lines on pedestal/cylinders.
         sh.normalBias = 0.014 * _nbBoost;
         if (isMobile || isIosHost) sh.normalBias = Math.min(sh.normalBias, 0.022);
+        if (__contactGuard) sh.normalBias = Math.min(sh.normalBias, isMobile || isIosHost ? 0.019 : 0.0165);
       } else if (shadowLight.isDirectionalLight) {
         // Ortho + large lit planes: low normalBias → shadow acne / horizontal banding on flats & cylinders.
         sh.bias = (isMobile || isIosHost) ? -0.000045 : -0.000022;
         sh.normalBias = 0.020 * _nbBoost;
         if (isMobile || isIosHost) sh.normalBias = Math.min(sh.normalBias, 0.028);
+        if (__contactGuard) sh.normalBias = Math.min(sh.normalBias, isMobile || isIosHost ? 0.024 : 0.0215);
       } else if (shadowLight.isPointLight) {
         // Cube shadow：normalBias 过低易摩尔纹，过高易亮缝（peter panning）。锚点球 min(occ) 曾误伤受光侧地面，已撤；此处用折中 bias。
         sh.bias = (isMobile || isIosHost) ? -0.000038 : -0.00003;
         sh.normalBias = (isMobile || isIosHost) ? 0.036 : 0.028;
+        if (__contactGuard) sh.normalBias = Math.min(sh.normalBias, isMobile || isIosHost ? 0.031 : 0.0245);
       }
 
       if (ground) { ground.receiveShadow = true; ground.castShadow = false; }
@@ -1115,6 +1480,9 @@ export function createSolidPreviewLightingManager(opts) {
           obj.castShadow = true;
         });
       }
+
+      // Model terminator softening (direct lighting): must run for both consumer & producer, all light types.
+      try { _syncSolidTerminatorForSceneGroup(sceneGroup, st, isMobile, isIosHost); } catch (_eTerm) {}
 
       // Ground shader patch — keep behavior identical to consumer.
       try {
@@ -1891,7 +2259,7 @@ export function createSolidPreviewLightingManager(opts) {
       try {
         const walls = getWalls();
         const ground = getGround();
-        const mainLight = getMainLight();
+        const mainLight = getShadowLight();
         const sharedUd = ground && ground.material && ground.material.userData ? ground.material.userData : null;
         const okShared = !!(sharedUd && sharedUd.uSolidShadowAnchorCount && sharedUd.uSolidShadowAnchors && sharedUd.uSolidShadowSoftRange);
         const shouldSoftWalls = _receiverSoftShadowWallsEnabled() && okShared && walls && Array.isArray(walls) && !(mainLight && mainLight.isDirectionalLight);
@@ -1923,7 +2291,7 @@ export function createSolidPreviewLightingManager(opts) {
 
       // ---------- Receiver soft shadow (sceneGroup models) ----------
       try {
-        const mainLight = getMainLight();
+        const mainLight = getShadowLight();
         const ground = getGround();
         const sharedUd = ground && ground.material && ground.material.userData ? ground.material.userData : null;
         const okShared = !!(sharedUd && sharedUd.uSolidShadowAnchorCount && sharedUd.uSolidShadowAnchors && sharedUd.uSolidShadowSoftRange);
@@ -2206,18 +2574,19 @@ export function createSolidPreviewLightingManager(opts) {
       }
     } catch (_eGy) {}
     const gocOn = irr.groundShOcclusionEnabled !== false && hasGround && mix > 1e-6;
-    const gocAmt = gocOn ? Math.max(0, Math.min(1, Number(irr.groundShOcclusionAmount ?? 1))) : 0;
+    let gocAmt = gocOn ? Math.max(0, Math.min(1, Number(irr.groundShOcclusionAmount ?? 1))) : 0;
     const gocH = Math.max(1e-4, Number(irr.groundShOcclusionHeight) || 0.16);
     const gocCavityPow = Math.max(0.25, Number(irr.groundShOcclusionCavityPow) || 2.6);
     const gNorBindPow = Math.max(0.08, Math.min(2, Number(irr.groundShOcclusionNorBindPow) || 0.34));
     const gocNExp = Math.max(0.5, Number(irr.groundShOcclusionNormalExp) || 2);
     const gocMin = Math.max(0, Math.min(1, Number(irr.groundShOcclusionMinFactor) ?? 0.06));
-    const gIblAmt = gocOn ? Math.max(0, Math.min(1, Number(irr.groundIblOcclusionAmount) || 0)) : 0;
+    let gIblAmt = gocOn ? Math.max(0, Math.min(1, Number(irr.groundIblOcclusionAmount) || 0)) : 0;
     const gIblMin = Math.max(0, Math.min(1, Number(irr.groundIblOcclusionMinFactor) ?? 0.35));
     const gCrevPow = Math.max(0.2, Number(irr.groundShCrevicePow) || 2.5);
     const gCrevShMul = Math.max(0, Math.min(1, Number(irr.groundShCreviceShMul) ?? 0.05));
     const gCrevIblMul = Math.max(0, Math.min(1, Number(irr.groundShCreviceIblMul) ?? 0.2));
-    const gCrevAmt = gocOn ? Math.max(0, Math.min(1, Number(irr.groundShCreviceAmount ?? 1))) : 0;
+    let gCrevAmt = gocOn ? Math.max(0, Math.min(1, Number(irr.groundShCreviceAmount ?? 1))) : 0;
+    // Keep SH/AO energy stable globally; terminator softening is handled in the terminator field patch.
     _solidShPatchedMaterials.forEach((m) => {
       try {
         const u = m && m.userData && m.userData._solidShUni;

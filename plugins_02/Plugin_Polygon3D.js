@@ -10,8 +10,13 @@ const _poly3dIosGeomShadeCfg = {
     contrast: 1.18,
     lumaSmooth: 0.35,
     lumaMin: 0.10,
-    lumaMax: 0.98
+    lumaMax: 0.98,
+    // iPad 可见性增强：提高渐变底层占比，降低 soft-light 盖层占比，避免“算了但看起来不变”。
+    fillAlpha: 0.58,
+    blendAlpha: 0.52
 };
+// iPad SVG 融合模式：multiply 比 soft-light 更容易“吃进”场景明暗，不只是透明叠色。
+const _poly3dIosBlendMode = 'multiply';
 
 function _poly3dClamp01(x) { return x < 0 ? 0 : (x > 1 ? 1 : x); }
 function _poly3dHexToRgb01(hex) {
@@ -142,7 +147,7 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     const finalGroup = document.createElementNS(ns, "g"); finalGroup.style.pointerEvents = "auto"; finalGroup.style.cursor = "pointer";
     const hitPath = document.createElementNS(ns, "polygon"); hitPath.setAttribute("fill", "transparent"); hitPath.setAttribute("stroke", "transparent"); hitPath.setAttribute("stroke-width", "20");
     const fillPath = document.createElementNS(ns, "polygon"); fillPath.style.pointerEvents = "none";
-    const blendPath = document.createElementNS(ns, "polygon"); blendPath.setAttribute("style", (_poly3dIosLike ? "mix-blend-mode: soft-light; -webkit-mix-blend-mode: soft-light;" : "mix-blend-mode: color;") + " pointer-events: none;");
+    const blendPath = document.createElementNS(ns, "polygon"); blendPath.setAttribute("style", (_poly3dIosLike ? `mix-blend-mode: ${_poly3dIosBlendMode}; -webkit-mix-blend-mode: ${_poly3dIosBlendMode};` : "mix-blend-mode: color;") + " pointer-events: none;");
     const strokePath = document.createElementNS(ns, "polygon"); strokePath.setAttribute("fill", "none"); strokePath.setAttribute("stroke-linejoin", "round"); strokePath.setAttribute("stroke-dasharray", "4,4"); strokePath.style.pointerEvents = "none";
     let grad = null, stopA = null, stopB = null, stopC = null;
     if (_poly3dIosLike && _poly3dIosGeomShadeCfg.enabled) {
@@ -222,6 +227,43 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
         const sm = (typeof prevLuma === 'number') ? (prevLuma + (l - prevLuma) * _poly3dIosGeomShadeCfg.lumaSmooth) : l;
         const rgb = _poly3dHslToRgb01({ h: baseHsl.h, s: baseHsl.s, l: sm });
         return { shadedHex: _poly3dRgb01ToHex(rgb), lumaSmoothed: sm };
+    },
+    _isUnderRoot: function(obj, root) {
+        if (!obj || !root) return false;
+        let p = obj;
+        let guard = 0;
+        while (p && guard++ < 64) {
+            if (p.uuid === root.uuid) return true;
+            p = p.parent;
+        }
+        return false;
+    },
+    _isBlockedByOtherMesh: function(camera, worldPoint, ownerRoot) {
+        try {
+            if (!this._cachedScene || !camera || !worldPoint) return false;
+            if (!this._occRaycaster) this._occRaycaster = new THREE.Raycaster();
+            if (!this._occDir) this._occDir = new THREE.Vector3();
+            if (!this._occCamPos) this._occCamPos = new THREE.Vector3();
+            this._occCamPos.copy(camera.position);
+            this._occDir.copy(worldPoint).sub(this._occCamPos);
+            const dist = this._occDir.length();
+            if (dist < 1e-4) return false;
+            this._occDir.divideScalar(dist);
+            this._occRaycaster.near = 0.02;
+            this._occRaycaster.far = dist - 0.02;
+            this._occRaycaster.set(this._occCamPos, this._occDir);
+            const hits = this._occRaycaster.intersectObjects(this._cachedScene.children, true);
+            for (let i = 0; i < hits.length; i++) {
+                const h = hits[i];
+                const o = h && h.object;
+                if (!o || !o.isMesh || !o.visible) continue;
+                if (o.name === 'transformControl' || (o.name && o.name.includes('helper'))) continue;
+                // 忽略当前片面所属模型自身命中，只拦截“其它模型”的遮挡。
+                if (ownerRoot && this._isUnderRoot(o, ownerRoot)) continue;
+                if (h.distance < dist - 0.02) return true;
+            }
+            return false;
+        } catch (_e) { return false; }
     }, highlightSelected: function() { window.poly3dList.forEach(data => {
     data.isSelected = (this.selectedId === data.id); }); 
     // 【优化3】：专门为3D光影面片恢复选中反向吸色功能，并强制触发 input 事件！
@@ -232,7 +274,8 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     data.anchorObj.getWorldPosition(this._tempV); if (data.anchorObj.userData.localNormal) { this._normalMatrix.getNormalMatrix(data.anchorObj.parent.matrixWorld);
     this._currentWorldNormal.copy(data.anchorObj.userData.localNormal).applyMatrix3(this._normalMatrix).normalize(); this._viewDir.copy(camera.position).sub(this._tempV).normalize(); 
     const dot = this._currentWorldNormal.dot(this._viewDir);
-    data.isOccluded = dot < -0.05;
+    const blockedByOtherMesh = this._isBlockedByOtherMesh(camera, this._tempV, data.anchorObj.parent);
+    data.isOccluded = (dot < -0.05) || blockedByOtherMesh;
     if (_poly3dIosLike && _poly3dIosGeomShadeCfg.enabled) {
         const lightDir = this._resolveMainLightDir(camera);
         const nDotL = Math.max(0, this._currentWorldNormal.dot(lightDir));
@@ -273,6 +316,7 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
         const bright = this._shadeFromLightIntensity(data.color || '#2ecc71', maxI, data._lumaBrightSm); data._lumaBrightSm = bright.lumaSmoothed;
         data._shadeDark = dark.shadedHex; data._shadeMid = mid.shadedHex; data._shadeBright = bright.shadedHex;
         data._gradX1 = minX; data._gradY1 = minY; data._gradX2 = maxX; data._gradY2 = maxY;
+        data._shadeRange = Math.max(0, Math.min(1, maxI - minI));
     }
     if (data._dbgCnt === undefined) data._dbgCnt = 0;
     if (data.svgGroup) {
@@ -280,12 +324,32 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
     data.previewPolyline.style.display = finalSvgAlpha > 0 ? "block" : "none"; data.finalGroup.style.display = "none";
     data.previewPolyline.setAttribute("points", pts); data.previewPolyline.setAttribute("opacity", finalSvgAlpha); } else { data.previewPolyline.style.display = "none";
     if (finalSvgAlpha > 0) { data.finalGroup.style.display = "block"; data.svgHit.setAttribute("points", pts); data.svgFill.setAttribute("points", pts);
-    data.svgBlend.setAttribute("points", pts); data.svgStroke.setAttribute("points", pts); // 【视觉核心突破】：原案的 0.05 在物理光追的深邃阴影下会由于 color 混合导致发灰发黑。这里提升至 0.25，强行注入底色亮度，完美还原旧版的鲜亮质感！
-    // 片面主视觉已迁移到“模型区域变色”插件；此处仅保留交互壳，避免薄片叠加干扰观感。
+    data.svgBlend.setAttribute("points", pts); data.svgStroke.setAttribute("points", pts);
+    // SVG-only + iPad 光影模拟：iOS 使用渐变填充，非 iOS 维持纯色填充
+    if (_poly3dIosLike && _poly3dIosGeomShadeCfg.enabled && data.svgGrad && data.svgGradStopA && data.svgGradStopB && data.svgGradStopC) {
+    const x1 = (typeof data._gradX1 === 'number') ? data._gradX1 : 0;
+    const y1 = (typeof data._gradY1 === 'number') ? data._gradY1 : 0;
+    const x2 = (typeof data._gradX2 === 'number') ? data._gradX2 : 1;
+    const y2 = (typeof data._gradY2 === 'number') ? data._gradY2 : 1;
+    data.svgGrad.setAttribute('x1', String(x1));
+    data.svgGrad.setAttribute('y1', String(y1));
+    data.svgGrad.setAttribute('x2', String(x2));
+    data.svgGrad.setAttribute('y2', String(y2));
+    data.svgGradStopA.setAttribute('stop-color', data._shadeDark || data.color);
+    data.svgGradStopB.setAttribute('stop-color', data._shadeMid || data.color);
+    data.svgGradStopC.setAttribute('stop-color', data._shadeBright || data.color);
+    data.svgFill.setAttribute('fill', `url(#${data.svgGrad.id})`);
+    } else {
     data.svgFill.setAttribute("fill", data.color);
-    data.svgFill.setAttribute("opacity", "0");
-    data.svgBlend.style.display = "none";
-    data.svgBlend.setAttribute("opacity", "0");
+    }
+    const iosRangeBoost = (_poly3dIosLike && _poly3dIosGeomShadeCfg.enabled) ? (0.75 + Math.max(0, Math.min(1, data._shadeRange || 0)) * 0.55) : 1.0;
+    const fillAlpha = (_poly3dIosLike && _poly3dIosGeomShadeCfg.enabled) ? (finalSvgAlpha * _poly3dIosGeomShadeCfg.fillAlpha * iosRangeBoost) : (finalSvgAlpha * 0.22);
+    const blendAlpha = (_poly3dIosLike && _poly3dIosGeomShadeCfg.enabled) ? (finalSvgAlpha * _poly3dIosGeomShadeCfg.blendAlpha * iosRangeBoost) : finalSvgAlpha;
+    data.svgFill.setAttribute("opacity", String(fillAlpha));
+    data.svgBlend.style.display = "block";
+    if (_poly3dIosLike && _poly3dIosGeomShadeCfg.enabled) data.svgBlend.setAttribute("fill", data._shadeMid || data.color);
+    else data.svgBlend.setAttribute("fill", data.color);
+    data.svgBlend.setAttribute("opacity", String(blendAlpha));
     if (data.isSelected) {
     data.svgStroke.style.display = "block"; data.svgStroke.setAttribute("stroke-width", "2"); data.svgStroke.setAttribute("opacity", finalSvgAlpha * 0.8);
     } else { data.svgStroke.style.display = "none"; } } else { // 遮挡时 finalSvgAlpha 为 0，组整体隐藏

@@ -97,15 +97,16 @@
     <div class="mobile-frame-safe" id="mobile-frame-safe"></div> </div> </div>
     <script type="module"> import * as THREE from 'three'; import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { TransformControls } from 'three/addons/controls/TransformControls.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer';
-    import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js'; import '../../plugins_02/Plugin_Polygon3DDecal.js'; import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js';
+    import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js'; import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js';
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from '../../plugins_02/SolidPreviewLighting.js';
+    import { createSolidRasterLightRig } from '../../plugins_02/SolidRasterLightRigShared.js';
     import { createSolidRasterPreviewComposer } from '../../plugins_02/SolidRasterPreviewComposer.js';
     import { attachSolidBuiltinSphereShadowCore } from '../../plugins_02/solidBuiltinSphereShadowCore.js';
     import { installSolidEnvHostBindings } from '../../plugins_02/SolidEnvControlShared.js';
     import { installSolidAtmosphereHostBindings } from '../../plugins_02/SolidAtmosphereControlShared.js';
     import { installSolidAssistHostBindings } from '../../plugins_02/SolidAssistControlShared.js';
-    import { computeSolidMainLightCartesianPosition, createSolidMainLight, installSolidMainLightSliderBindings, solidGetTempColorFromKelvin100 } from '../../plugins_02/SolidLightControlShared.js';
-    import { SOLID_PATH_TRACER_QUALITY, SOLID_DEBUG_PANEL } from '../../Config/PaintingConfig.js';
+    import { computeSolidMainLightCartesianPosition, createSolidMainLight, installSolidMainLightSliderBindings, solidGetTempColorFromKelvin100, clampSolidLightSizeSlider, clampSolidLightTempSlider, getSolidUnifiedInteractionState } from '../../plugins_02/SolidLightControlShared.js';
+    import { SOLID_PATH_TRACER_QUALITY, SOLID_DEBUG_PANEL, SOLID_RASTER_AREA_LIGHT_RIG } from '../../Config/PaintingConfig.js';
     window.skyEnvLightMatchMainRect = true; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.producer) ? SOLID_PATH_TRACER_QUALITY.producer : {};
     let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false;
@@ -226,11 +227,22 @@
     document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1';
     document.getElementById('main-panel').style.pointerEvents = 'auto'; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
     if (!_solidEnsurePathTracer()) return;
-    needsUpdate = true; lightMoved = true; window.sumDuration = 0; pathTracer.updateMaterials(); pathTracer.updateLights(); pathTracer.reset(); if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
+    needsUpdate = true; lightMoved = true; window.sumDuration = 0; pathTracer.updateMaterials(); pathTracer.updateLights(); pathTracer.reset(); if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
     hwLog("已尝试开启渲染并重建状态"); };
 
     window.toggleAdvancedRender = function(val) {
         window.useAdvancedRender = val;
+        try {
+            const _v = parseFloat(document.getElementById('lightIntensity') && document.getElementById('lightIntensity').value);
+            const _col = solidGetTempColorFromKelvin100(THREE, state.lightTemp * 100);
+            __solidRasterLightRig.syncAreaEmitter({
+                lightType,
+                color: _col,
+                intensitySlider: Number.isFinite(_v) ? _v : 1.7,
+                lightSize: state.lightSize,
+                useAdvancedRender: window.useAdvancedRender,
+            });
+        } catch (_eRigSync) {}
         needsUpdate = true;
         try {
             if (!val) {
@@ -247,6 +259,16 @@
         } catch (_ePl) {}
     }; // 编辑器专属核心变量
     let editorGroup, transformControl, gltfLoader; let plasterMat, flatMat, sphereMat; let startScale = new THREE.Vector3(); const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
+    const __solidRasterLightRig = createSolidRasterLightRig({
+    THREE,
+    getScene: () => scene,
+    getIsMobile: () => isMobile,
+    log: (msg) => { try { window.hwLog(String(msg)); } catch (_e) {} },
+    });
+    try { window.__solidRasterLightRig = __solidRasterLightRig; } catch (_eRig) {}
+    if (SOLID_RASTER_AREA_LIGHT_RIG && SOLID_RASTER_AREA_LIGHT_RIG.enabled && window.hwLog) {
+    try { window.hwLog('[RasterAreaRig] 已启用（灰度开关）'); } catch (_eRigLog) {}
+    }
     const isIosPosterizeHost = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const __solidPreviewLighting = createSolidPreviewLightingManager({
     THREE,
@@ -254,12 +276,13 @@
     getScene: () => scene,
     getCamera: () => camera,
     getSceneGroup: () => editorGroup,
-    getMainLight: () => mainLight,
+    getMainLight: () => (__solidRasterLightRig.getShadowLight() || mainLight),
+    getShadowLight: () => (__solidRasterLightRig.getShadowLight() || mainLight),
     getGround: () => ground,
     getWalls: () => window.walls,
     getIsMobile: () => isMobile,
     getIsIosHost: () => isIosPosterizeHost,
-    getInteractionState: () => !!window._orbitInteracting || !!(transformControl && transformControl.dragging) || !!(window._planeXZDrag && window._planeXZDrag.active),
+    getInteractionState: () => getSolidUnifiedInteractionState(),
     getLightState: () => state,
     shouldSkipEnvProbe: solidRasterPreviewShouldSkipEnvProbe(() => ({
             useAdvancedRender: window.useAdvancedRender,
@@ -279,7 +302,7 @@
             getScene: () => scene,
             getCamera: () => camera,
             getIsMobile: () => isMobile,
-            getInteractionState: () => !!window._orbitInteracting || !!(transformControl && transformControl.dragging) || !!(window._planeXZDrag && window._planeXZDrag.active),
+            getInteractionState: () => getSolidUnifiedInteractionState(),
             getUseAdvancedRender: () => !!window.useAdvancedRender,
             getSceneGroup: () => editorGroup,
         });
@@ -649,7 +672,7 @@
     cb.style.width = data.crop.width || '256px'; cb.style.height = data.crop.height || '256px'; } else { cb.style.display = 'none';
     cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }
     try { localStorage.setItem('solidCropBoxCache', JSON.stringify({left: cb.style.left, top: cb.style.top, width: cb.style.width, height: cb.style.height})); } catch(_e) {} }
-    if (data && data.light) { lightType = data.light.type; state.azimuth = data.light.azimuth; state.elevation = data.light.elevation; state.radius = data.light.distance; state.lightTemp = data.light.temp; state.lightSize = data.light.size;
+    if (data && data.light) { lightType = data.light.type; state.azimuth = data.light.azimuth; state.elevation = data.light.elevation; state.radius = data.light.distance; state.lightTemp = clampSolidLightTempSlider(data.light.temp); state.lightSize = clampSolidLightSizeSlider(data.light.size);
     document.getElementById('lightAzimuth').value = state.azimuth; document.getElementById('azimuthVal').innerText = state.azimuth;
     document.getElementById('lightElevation').value = state.elevation; document.getElementById('elevationVal').innerText = state.elevation;
     document.getElementById('lightDistance').value = state.radius; document.getElementById('distanceVal').innerText = state.radius;
@@ -1846,7 +1869,7 @@
         camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); try {
         renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: true });
         RectAreaLightUniformsLib.init();
-        renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.2) : window.devicePixelRatio); renderer.setSize(window.innerWidth, window.innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureBase || 0.7);
+        renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.2) : Math.min(window.devicePixelRatio, 1.5)); renderer.setSize(window.innerWidth, window.innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; if ('outputColorSpace' in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureBase || 0.7);
         renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); try { if (window.__solidRasterPreviewComposer && window.__solidRasterPreviewComposer.dispose) window.__solidRasterPreviewComposer.dispose(); } catch (_eAoL) {} addHwLog('Context Lost'); triggerUnsupported(); }, false); container.appendChild(renderer.domElement); try {
         try { if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); } catch(_e) {}
         // 默认不创建光追器（更流畅）。需要高质量时由“开启渲染/高质量”按钮创建。
@@ -1990,11 +2013,11 @@
         window.setSkyLightScale = function(v) {
         window.envSkyLightScale = Math.min(1, Math.max(0, parseFloat(v) || 0));
         const el = document.getElementById('env-sky-light-val'); if (el) el.textContent = window.envSkyLightScale.toFixed(2);
-        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
+        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
         needsUpdate = true; lightMoved = true; if (pathTracer) { pathTracer.reset(); window.sumDuration = 0; }
         try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('sky_light_scale'); } catch (_eP) {} };
         window.setEnvColor = function(kind, hex) { if (!hex) return; if (kind === 'wall') window.envWallColor = hex; else if (kind === 'ground') window.envGroundColor = hex; else if (kind === 'sky') window.envSkyColor = hex;
-        if (kind === 'sky' && window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
+        if (kind === 'sky' && window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
         else if (kind === 'sky') { scene.background = new THREE.Color(hex); scene.backgroundIntensity = 1; }
         if (kind === 'ground' && ground && ground.material) ground.material.color.set(hex); if (kind === 'wall' && window.walls) window.walls.forEach(w => { if (w.material) w.material.color.set(hex); });
         needsUpdate = true; lightMoved = true; if (pathTracer) { pathTracer.reset(); window.sumDuration = 0; }
@@ -2037,11 +2060,9 @@
         if (!portraitAnimRafId && !document.hidden) portraitAnimRafId = requestAnimationFrame(animate);
         });
 
-        // 环境复用：尽量不销毁/重建（切场景更顺滑）
-        let _solidEnvLightType = null;
+        // 与消费端对齐：主光统一走重建路径，避免“复用参数残留”造成两端观感偏差。
         function buildEnvironment() {
-        // 主光：同类型只更新参数；类型改变才重建
-        if (mainLight && _solidEnvLightType && _solidEnvLightType !== lightType) {
+        if (mainLight) {
         try { if (mainLight.shadow && mainLight.shadow.map) safeDispose(mainLight.shadow.map); } catch(_eSm) {}
         try { if (mainLight.shadow && mainLight.shadow.mapPass) safeDispose(mainLight.shadow.mapPass); } catch(_eSmp) {}
         try { scene.remove(mainLight); } catch(_eRm) {}
@@ -2050,31 +2071,21 @@
         }
         const val = parseFloat(document.getElementById('lightIntensity').value);
         const tempEl = document.getElementById('lightTemp'); const sizeEl = document.getElementById('lightSize');
-        if (tempEl && tempEl.value !== '') { const tv = parseFloat(tempEl.value); if (Number.isFinite(tv)) state.lightTemp = Math.max(30, Math.min(90, tv)); }
-        if (sizeEl && sizeEl.value !== '') { const sv = parseFloat(sizeEl.value); if (Number.isFinite(sv)) state.lightSize = Math.max(1, Math.min(4, sv)); }
+        if (tempEl && tempEl.value !== '') { const tv = parseFloat(tempEl.value); if (Number.isFinite(tv)) state.lightTemp = clampSolidLightTempSlider(tv); }
+        if (sizeEl && sizeEl.value !== '') { const sv = parseFloat(sizeEl.value); if (Number.isFinite(sv)) state.lightSize = clampSolidLightSizeSlider(sv); }
         const lSize = state.lightSize; const col = solidGetTempColorFromKelvin100(THREE, state.lightTemp * 100);
-        if (!mainLight) {
         const _main = createSolidMainLight(THREE, { lightType, color: col, intensitySlider: val, lightSize: lSize, useAdvancedRender: window.useAdvancedRender });
         mainLight = _main.light;
-        _solidEnvLightType = lightType;
         if (_main.addSpotTargetToScene && mainLight.target) scene.add(mainLight.target);
         scene.add(mainLight);
-        } else {
-        // 同类型：尽量不重建灯，只把用户会改的参数同步过去
-        try { mainLight.color && mainLight.color.copy && mainLight.color.copy(col); } catch(_eC) {}
-        try {
-        const _tmp = createSolidMainLight(THREE, { lightType, color: col, intensitySlider: val, lightSize: lSize, useAdvancedRender: window.useAdvancedRender });
-        const tl = _tmp && _tmp.light;
-        if (tl) {
-        try { if (typeof tl.intensity === 'number') mainLight.intensity = tl.intensity; } catch(_eI) {}
-        try { if (typeof tl.distance === 'number') mainLight.distance = tl.distance; } catch(_eD) {}
-        try { if (typeof tl.decay === 'number') mainLight.decay = tl.decay; } catch(_eDe) {}
-        try { if (typeof tl.angle === 'number') mainLight.angle = tl.angle; } catch(_eA) {}
-        try { if (typeof tl.penumbra === 'number') mainLight.penumbra = tl.penumbra; } catch(_eP) {}
-        try { if (typeof tl.radius === 'number') mainLight.radius = tl.radius; } catch(_eR) {}
-        }
-        } catch(_eSyncL) {}
-        }
+        __solidRasterLightRig.setShadowLight(mainLight);
+        __solidRasterLightRig.syncAreaEmitter({
+        lightType,
+        color: col,
+        intensitySlider: val,
+        lightSize: lSize,
+        useAdvancedRender: window.useAdvancedRender,
+        });
         const gCol = new THREE.Color(window.envGroundColor || '#cccccc');
         if (!ground) { ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhysicalMaterial({ color: gCol, roughness: 1.0, metalness: 0.0 })); ground.rotation.x = -Math.PI / 2; scene.add(ground); }
         else if (ground.material) ground.material.color.copy(gCol);
@@ -2097,15 +2108,17 @@
         });
         }
         updateLightPosition();
-        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene });
+        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
         else { scene.background = new THREE.Color(window.envSkyColor || '#0d0d0f'); scene.backgroundIntensity = 1; }
         // 阴影同步去重：buildEnvironment 只做“环境参数更新”，不在这里强制 syncShadows/onSceneChanged。
         // 切场景结束时由 applySceneDataToEditor 统一做一次强制同步，避免重复卡顿。
         if (!window.useAdvancedRender) {
         try { window._solidFallbackRenderAt = 0; } catch(_e) {}
+        try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('build_environment'); } catch(_eP) {}
         }
         try { window._solidGroundShadowDirty = true; } catch (_eGsb) {} }
-        function updateLightPosition() { const { x, y, z } = computeSolidMainLightCartesianPosition(THREE, state); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) mainLight.target.position.set(0, 1, 0); if (lightType === 'rect') mainLight.lookAt(0, 1, 0); mainLight.updateMatrixWorld();
+        function updateLightPosition() { const { x, y, z } = computeSolidMainLightCartesianPosition(THREE, state); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) { mainLight.target.position.set(0, 1, 0); mainLight.target.updateMatrixWorld(true); } if (lightType === 'rect') mainLight.lookAt(0, 1, 0); mainLight.updateMatrixWorld();
+        try { __solidRasterLightRig.syncPose(); } catch (_eRigPose) {}
         try { _solidRefreshRasterShadowAfterLightMove(); } catch(_eRf) {}
         try { _solidSyncGroundShadowUniforms(); } catch (_eSyncL) {}
         } lightPosUpdated = true; try { window._solidGroundShadowDirty = true; } catch (_eGsl) {} }
@@ -2113,7 +2126,7 @@
         installSolidMainLightSliderBindings({
         state,
         getUseAdvancedRender: () => window.useAdvancedRender,
-        getMainLight: () => mainLight,
+        getMainLight: () => (__solidRasterLightRig.getShadowLight() || mainLight),
         getLightType: () => lightType,
         updateDirTriggerByValues,
         buildEnvironment,
