@@ -102,6 +102,7 @@
     import { createSolidRasterLightRig } from '../../plugins_02/SolidRasterLightRigShared.js';
     import { createSolidRasterPreviewComposer } from '../../plugins_02/SolidRasterPreviewComposer.js';
     import { createSolidPathTracerSyncController } from '../../plugins_02/SolidPathTracerSyncShared.js';
+    import { solidIsInRasterPreviewBridge, solidShouldAutoStopRender, solidShouldBlockSamplingWhenPending, solidShouldContinueSampling } from '../../plugins_02/SolidRenderLoopShared.js';
     import { attachSolidBuiltinSphereShadowCore } from '../../plugins_02/solidBuiltinSphereShadowCore.js';
     import { installSolidEnvHostBindings } from '../../plugins_02/SolidEnvControlShared.js';
     import { installSolidAtmosphereHostBindings } from '../../plugins_02/SolidAtmosphereControlShared.js';
@@ -2220,7 +2221,7 @@
         if (window._planeXZDrag && window._planeXZDrag.active) { renderer.render(scene, camera); _refreshPoster(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
         if (window._orbitInteracting) { renderer.render(scene, camera); _refreshPoster(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
         try {
-        if (_solidPtSync.isInRasterPreviewBridge(performance.now())) {
+        if (solidIsInRasterPreviewBridge(_solidPtSync, performance.now())) {
         _solidTryRasterPreviewDraw(); _refreshPoster(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return;
         }
         } catch (_ePv) {}
@@ -2228,15 +2229,15 @@
         if (lightMoved) { pathTracer.setScene(scene, camera); _solidPtSync.queueReset('light_moved'); } else if (lightPosUpdated && pathTracer.updateLights) { pathTracer.updateLights(); _solidPtSync.queueReset('light_updated'); } else { pathTracer.updateCamera(); _solidPtSync.queueReset('camera_update'); }
         scene.add(transformControl); lightMoved = false; lightPosUpdated = false; needsUpdate = false; }
         _solidPtSync.tryReset(pathTracer);
-        if (_solidPtSync.hasPending()) return;
+        if (solidShouldBlockSamplingWhenPending(_solidPtSync)) return;
         const pBar = document.getElementById('render-progress-bar'); const targetSamples = (window._solidPt && window._solidPt.targetSamples) ? window._solidPt.targetSamples : 160; const currentSamples = pathTracer.samples;
         if (pBar) { const progressPct = Math.min(100, (currentSamples / targetSamples) * 100); pBar.style.width = progressPct + '%'; pBar.style.opacity = (currentSamples >= targetSamples) ? '0' : '1'; }
         if (currentSamples < Number(_solidPtCfg.warmupSampleThreshold || 4)) { renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureWarmup || 0.4); } else { renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureBase || 0.7); }
-        if (currentSamples < targetSamples) {
+        if (solidShouldContinueSampling(currentSamples, targetSamples)) {
         const dofOn = window.DoFManager ? window.DoFManager.enabled : false;
         if (window.AtmosphereManager && (window.isFogEnabled || dofOn)) window.AtmosphereManager.render(pathTracer, renderer, scene, camera); else pathTracer.renderSample();
-        // Host-specific (producer): 生产端自动停渲染策略（节能/编辑流畅），保留宿主差异能力。
-        if (!window.hasAutoStopped && pathTracer.samples >= 2) { window.hasAutoStopped = true; setTimeout(() => { window.stopRender(); }, 100); }
+        // Host-specific (producer): 自动停渲由配置驱动，默认关闭以与消费端持续采样语义对齐。
+        if (!window.hasAutoStopped && solidShouldAutoStopRender({ enabled: true, autoStopSamples: Number(_solidPtCfg.autoStopSamples || 0), samples: pathTracer.samples })) { window.hasAutoStopped = true; setTimeout(() => { window.stopRender(); }, 100); }
         _solidLastHeavyFrame = _now;
         } else {
         if (!_interactive && !needsUpdate && (_now - _solidLastCamMotion) >= _idleAfterMs && (_now - _solidLastHeavyFrame) < _idleMinFrameMs) return;

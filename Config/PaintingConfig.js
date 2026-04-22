@@ -116,6 +116,7 @@ export const SOLID_PATH_TRACER_QUALITY = {
     toneMappingExposureBase: 0.7, // 编辑端预览曝光（常态）。
     toneMappingExposureWarmup: 0.4, // 初始少采样阶段临时压暗，减少闪白/噪点感知。
     warmupSampleThreshold: 4, // 小于该采样数时用 warmup 曝光。
+    autoStopSamples: 0, // 自动停渲阈值：0=关闭（与消费端一致持续采样）；>0 表示达到样本数后自动 stopRender。
   },
 };
 
@@ -341,5 +342,5 @@ export const SOLID_RASTER_IRRADIANCE_PROBES = {
 // 消费端 Solid.html / 生产端 Solid_Portrait_Create.html 共用：排错日志 + #debug-log-panel
 // false：hwLog/addHwLog/diagnosticPanelLog 不输出（含 console）、排错面板强制隐藏；true：输出并显示面板。
 export const SOLID_DEBUG_PANEL = {
-  enabled: false,
+  enabled: true,
 };

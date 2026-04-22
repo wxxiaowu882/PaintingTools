@@ -138,6 +138,7 @@
     import { createSolidRasterLightRig } from './plugins_02/SolidRasterLightRigShared.js';
     import { createSolidRasterPreviewComposer } from './plugins_02/SolidRasterPreviewComposer.js';
     import { createSolidPathTracerSyncController } from './plugins_02/SolidPathTracerSyncShared.js';
+    import { solidIsInRasterPreviewBridge, solidShouldBlockSamplingWhenPending, solidShouldContinueSampling } from './plugins_02/SolidRenderLoopShared.js';
     import { attachSolidBuiltinSphereShadowCore } from './plugins_02/solidBuiltinSphereShadowCore.js';
     import { installSolidEnvHostBindings } from './plugins_02/SolidEnvControlShared.js';
     import { installSolidAtmosphereHostBindings } from './plugins_02/SolidAtmosphereControlShared.js';
@@ -1428,7 +1429,7 @@
         if (pathTracer) { if (window.isLoadingScene) { try { _solidTryRasterPreviewDraw(); } catch(err) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
         // 光追切灯/切环境后的即时体验：短暂显示光栅预览，避免 reset 后画面瞬间发黑
         try {
-        if (_solidPtSync.isInRasterPreviewBridge(performance.now())) {
+        if (solidIsInRasterPreviewBridge(_solidPtSync, performance.now())) {
         if (renderer) { try { _solidTryRasterPreviewDraw(); } catch(_ePvR) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); }
         return;
         }
@@ -1440,7 +1441,7 @@
         lightMoved = false; lightPosUpdated = false; needsUpdate = false;
         }
         _solidPtSync.tryReset(pathTracer);
-        if (_solidPtSync.hasPending()) {
+        if (solidShouldBlockSamplingWhenPending(_solidPtSync)) {
             // 场景/灯光已更新但 reset 尚未落地时，禁止继续累计，避免旧样本污染新光照导致整片发黑。
             return;
         }
@@ -1532,7 +1533,7 @@
             }
         })();
         { const _er = _solidPt.expRamp, _elo = _solidPt.expLo, _ehi = _solidPt.expHi; renderer.toneMappingExposure = currentSamples >= _er ? _ehi : _elo + (_ehi - _elo) * (currentSamples / _er); }
-        if (currentSamples < targetSamples) { const _uiBlk = window.solidPathTraceUiBlocksSample && window.solidPathTraceUiBlocksSample(); if (!_uiBlk) { const dofOn = window.DoFManager ? window.DoFManager.enabled : false; if (window.AtmosphereManager && (window.isFogEnabled || dofOn)) window.AtmosphereManager.render(pathTracer, renderer, scene, camera); else pathTracer.renderSample(); } }
+        if (solidShouldContinueSampling(currentSamples, targetSamples)) { const _uiBlk = window.solidPathTraceUiBlocksSample && window.solidPathTraceUiBlocksSample(); if (!_uiBlk) { const dofOn = window.DoFManager ? window.DoFManager.enabled : false; if (window.AtmosphereManager && (window.isFogEnabled || dofOn)) window.AtmosphereManager.render(pathTracer, renderer, scene, camera); else pathTracer.renderSample(); } }
         window._solidAnimErrCount = 0;
         if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL();
         if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
