@@ -1064,7 +1064,23 @@
     if (window.useAdvancedRender && pathTracer) { pathTracer.updateMaterials(); lightPosUpdated = true; _solidPtSync.queueReset('scene_loaded'); }
     window.isLoadingScene = false; // [解锁] 资产与BVH就绪，放行渲染
     try { syncRenderButtons(); } catch (_eBtnScene) {}
-    try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_loaded'); } catch(_eP) {}
+    // 首次入场强制收敛：避免“需要转动一下暗部才跳亮”。
+    try {
+    if (!window.useAdvancedRender) {
+    try { if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); } catch (_eSkyIn) {}
+    try {
+    if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
+    else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed');
+    } catch(_eP0) {}
+    try {
+    requestAnimationFrame(() => {
+    try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD0) {}
+    try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD1) {} }); } catch (_eR1) {}
+    });
+    } catch (_eR0) {}
+    try { setTimeout(() => { try { if (!window.useAdvancedRender && window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed'); } catch (_eProbeIn2) {} }, 240); } catch (_eTIn2) {}
+    }
+    } catch(_eVrIn) {}
     setLoaderProgress(100); solidSceneLoadUxFinish(); document.getElementById('scene-loader').style.opacity = '0'; setTimeout(() => document.getElementById('scene-loader').style.display = 'none', 600); });
     }); }).catch(err => { window.isLoadingScene = false; setLoaderProgress(0); solidSceneLoadUxFinish(); // 异常兜底解锁
     window.hwLog("场景加载致命异常: " + err.message); }); };
@@ -1404,6 +1420,34 @@
         try { _solidSyncGroundShadowUniforms(); } catch (_eSyncL) {}
         } lightPosUpdated = true; }
         function setupUIControls() {
+        let _solidIntensitySkySyncRaf = 0;
+        let _solidIntensityConvergeTimer = 0;
+        let _solidIntensityLastConvergeAt = 0;
+        function _solidSyncSkyEnvLightFast() {
+        if (_solidIntensitySkySyncRaf) return;
+        _solidIntensitySkySyncRaf = requestAnimationFrame(() => {
+        _solidIntensitySkySyncRaf = 0;
+        try { if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); } catch (_eSkyFast) {}
+        });
+        }
+        function _solidForceIntensityConverge() {
+        try {
+        if (window.useAdvancedRender) return;
+        _solidIntensityLastConvergeAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        buildEnvironment();
+        if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
+        else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed');
+        try { _solidTryRasterPreviewDraw(); } catch (_eDraw0) {}
+        try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eDraw1) {} }); } catch (_eDrawRaf) {}
+        } catch (_eConverge) {}
+        }
+        function _solidScheduleIntensityConverge(waitMs) {
+        if (_solidIntensityConvergeTimer) { clearTimeout(_solidIntensityConvergeTimer); _solidIntensityConvergeTimer = 0; }
+        _solidIntensityConvergeTimer = setTimeout(() => {
+        _solidIntensityConvergeTimer = 0;
+        _solidForceIntensityConverge();
+        }, waitMs);
+        }
         installSolidMainLightSliderBindings({
         state,
         getUseAdvancedRender: () => window.useAdvancedRender,
@@ -1414,7 +1458,12 @@
         updateLightPosition,
         getTempColor: (t) => solidGetTempColorFromKelvin100(THREE, t),
         assignPathTracerFlags(f) { if (f.lightPosUpdated) lightPosUpdated = true; if (f.lightMoved) lightMoved = true; },
-        requestRasterProbe(reason) { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe(reason); },
+        requestRasterProbe(reason) {
+            if (window.useAdvancedRender || typeof window._solidRequestRasterEnvProbe !== 'function') return;
+            const r = String(reason || '');
+            if (r === 'light_intensity') { _solidForceIntensityConverge(); return; }
+            window._solidRequestRasterEnvProbe(r);
+        },
         afterLightDirectionInput() {
             try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSs) {}
             try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_dir'); } catch (_eP) {}
@@ -1426,6 +1475,10 @@
         afterLightIntensityInput() {
             try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSi) {}
             try { window._solidGroundShadowDirty = true; } catch (_eGi) {}
+            _solidSyncSkyEnvLightFast();
+            const _now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            if ((_now - _solidIntensityLastConvergeAt) > 180) _solidForceIntensityConverge();
+            else _solidScheduleIntensityConverge(130);
         },
         });
         }
