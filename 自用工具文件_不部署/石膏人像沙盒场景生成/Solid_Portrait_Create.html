@@ -675,7 +675,7 @@
     _flushDisposeQueue();
     try { if (window.PluginManager) window.PluginManager.trigger('onClearScene'); } catch (_e) {} _perfEnd(_pm); }
 
-    async function applySceneDataToEditor(data, label) { const _pm = _perfMark('applySceneDataToEditor(total)'); const _itemsForProgress = (data && Array.isArray(data.items)) ? data.items : []; const _glbCountForProgress = _itemsForProgress.filter(it => it && it.type === 'glb').length; solidCreateSceneLoadUxStart(_itemsForProgress.length, _glbCountForProgress); clearEditorSceneForRestore(); solidCreateSceneLoadUxMarkClearDone(); const sceneLoadGen = window._editorSceneLoadGen; if (data && data.name) {
+    async function applySceneDataToEditor(data, label) { const _pm = _perfMark('applySceneDataToEditor(total)'); window.isLoadingScene = true; if (data) window.currentSceneData = data; if (window.currentSceneIndex == null || window.currentSceneIndex < 0) window.currentSceneIndex = 0; const _itemsForProgress = (data && Array.isArray(data.items)) ? data.items : []; const _glbCountForProgress = _itemsForProgress.filter(it => it && it.type === 'glb').length; solidCreateSceneLoadUxStart(_itemsForProgress.length, _glbCountForProgress); clearEditorSceneForRestore(); solidCreateSceneLoadUxMarkClearDone(); const sceneLoadGen = window._editorSceneLoadGen; if (data && data.name) {
     const pureName = String(data.name).replace(/_[0-9]{10}$/, ''); const nameEl = document.getElementById('scene-name-input'); if (nameEl) nameEl.value = pureName; }
     const _d = document.getElementById('scene-meta-detail-input');
     if (_d) { try { _d.value = (data && data.meta && data.meta.detail != null) ? String(data.meta.detail) : ''; } catch(_e) { _d.value = ''; } }
@@ -773,6 +773,29 @@
     } catch (_ePl) {}
     solidCreateSceneLoadUxMarkRasterDone();
     try { if (renderer && scene && camera) { renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureBase || 0.7); _solidTryRasterPreviewDraw(); } } catch (_eR) {}
+    // 首次入场强制收敛：避免“场景已进来但暗部/地面反光仍停在旧状态”。
+    try {
+    if (!window.useAdvancedRender) {
+    window.isLoadingScene = false;
+    try { if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); } catch (_eSkyIn) {}
+    try {
+    if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
+    else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed');
+    } catch (_eProbeIn) {}
+    try {
+    requestAnimationFrame(() => {
+    try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD0) {}
+    try {
+    requestAnimationFrame(() => {
+    try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD1) {}
+    });
+    } catch (_eR1) {}
+    });
+    } catch (_eR0) {}
+    try { setTimeout(() => { try { if (!window.useAdvancedRender && window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed'); } catch (_eProbeIn2) {} }, 240); } catch (_eTIn2) {}
+    }
+    } catch (_eFirstConverge) {}
+    if (window.useAdvancedRender) window.isLoadingScene = false;
     setTimeout(() => { try { window.setMode(window.currentEditorMode); } catch(_e) {} }, 100); _draftDirty = false; _perfEnd(_pm); solidCreateSceneLoadUxFinish(); }
     async function autoRestoreDraftIfNeeded() { if (window.__solidCreateHasExplicitScene) return; if (!editorGroup || (editorGroup.children && editorGroup.children.length > 0)) return; const payload = await draftGet();
     if (!payload || !payload.data) return; window._solidCreateDraftFileName = payload.fileName ? String(payload.fileName) : null; applySceneDataToEditor(payload.data, '✅ 已自动恢复草稿'); // 恢复草稿后，尽量把“正在编辑的文件”绑定回来，避免保存时误新建
@@ -2153,42 +2176,31 @@
         } lightPosUpdated = true; try { window._solidGroundShadowDirty = true; } catch (_eGsl) {} }
         function setupUIControls() {
         let _solidIntensitySkySyncRaf = 0;
-        let _solidIntensityProbeTimer = 0;
         let _solidIntensityConvergeTimer = 0;
+        let _solidIntensityLastConvergeAt = 0;
         function _solidSyncSkyEnvLightFast() {
         if (_solidIntensitySkySyncRaf) return;
         _solidIntensitySkySyncRaf = requestAnimationFrame(() => {
         _solidIntensitySkySyncRaf = 0;
-        try {
-        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
-        } catch (_eSkyFast) {}
+        try { if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); } catch (_eSkyFast) {}
         });
         }
-        function _solidScheduleIntensityProbe(reason, waitMs) {
-        if (_solidIntensityProbeTimer) { clearTimeout(_solidIntensityProbeTimer); _solidIntensityProbeTimer = 0; }
-        _solidIntensityProbeTimer = setTimeout(() => {
-        _solidIntensityProbeTimer = 0;
+        function _solidForceIntensityConverge() {
         try {
         if (window.useAdvancedRender) return;
-        if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) {
-        // 强制走“立即优先”通道：scene_changed 会重置 lastRunAt，避免强度更新长期被节流吞掉。
-        window.__solidPreviewLighting.requestEnvProbe('scene_changed');
-        return;
-        }
-        if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe(reason);
-        } catch (_eProbeFast) {}
-        }, waitMs);
+        _solidIntensityLastConvergeAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        buildEnvironment();
+        if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
+        else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed');
+        try { _solidTryRasterPreviewDraw(); } catch (_eDraw0) {}
+        try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eDraw1) {} }); } catch (_eDrawRaf) {}
+        } catch (_eConverge) {}
         }
         function _solidScheduleIntensityConverge(waitMs) {
         if (_solidIntensityConvergeTimer) { clearTimeout(_solidIntensityConvergeTimer); _solidIntensityConvergeTimer = 0; }
         _solidIntensityConvergeTimer = setTimeout(() => {
         _solidIntensityConvergeTimer = 0;
-        try {
-        if (window.useAdvancedRender) return;
-        buildEnvironment();
-        if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
-        else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed');
-        } catch (_eConverge) {}
+        _solidForceIntensityConverge();
         }, waitMs);
         }
         installSolidMainLightSliderBindings({
@@ -2205,11 +2217,7 @@
         if (window.useAdvancedRender || typeof window._solidRequestRasterEnvProbe !== 'function') return;
         const r = String(reason || '');
         if (r === 'light_intensity') {
-        try {
-        if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
-        else window._solidRequestRasterEnvProbe('light_intensity');
-        } catch (_eP0) {}
-        _solidScheduleIntensityConverge(0);
+        _solidForceIntensityConverge();
         return;
         }
         window._solidRequestRasterEnvProbe(r);
@@ -2227,8 +2235,9 @@
         try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSi) {}
         try { window._solidGroundShadowDirty = true; } catch (_eGi) {}
         _solidSyncSkyEnvLightFast();
-        _solidScheduleIntensityProbe('light_intensity_drag', 100);
-        _solidScheduleIntensityConverge(140);
+        const _now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        if ((_now - _solidIntensityLastConvergeAt) > 180) _solidForceIntensityConverge();
+        else _solidScheduleIntensityConverge(130);
         },
         });
         const cropBox = document.getElementById('crop-box'), dragH = document.getElementById('crop-drag-handle'), resH = document.getElementById('crop-resize-handle');
