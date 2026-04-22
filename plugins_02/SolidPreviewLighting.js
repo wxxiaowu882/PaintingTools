@@ -2682,15 +2682,16 @@ export function createSolidPreviewLightingManager(opts) {
         });
         if (shader.vertexShader && !shader.vertexShader.includes('vSolidWorldPos')) {
           shader.vertexShader = 'varying vec3 vSolidWorldPos;\n' + shader.vertexShader;
+          const vSolidWorldPosAssign = '\n\tvSolidWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;';
           if (shader.vertexShader.includes('#include <worldpos_vertex>')) {
             shader.vertexShader = shader.vertexShader.replace(
               '#include <worldpos_vertex>',
-              '#include <worldpos_vertex>\n\tvSolidWorldPos = worldPosition.xyz;'
+              '#include <worldpos_vertex>' + vSolidWorldPosAssign
             );
           } else if (shader.vertexShader.includes('#include <begin_vertex>')) {
             shader.vertexShader = shader.vertexShader.replace(
               '#include <begin_vertex>',
-              '#include <begin_vertex>\n\tvSolidWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;'
+              '#include <begin_vertex>' + vSolidWorldPosAssign
             );
           }
         }
