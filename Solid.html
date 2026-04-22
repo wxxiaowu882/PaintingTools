@@ -139,6 +139,7 @@
     import { createSolidRasterPreviewComposer } from './plugins_02/SolidRasterPreviewComposer.js';
     import { createSolidPathTracerSyncController } from './plugins_02/SolidPathTracerSyncShared.js';
     import { solidIsInRasterPreviewBridge, solidShouldBlockSamplingWhenPending, solidShouldContinueSampling } from './plugins_02/SolidRenderLoopShared.js';
+    import { createSolidFrameStageScheduler } from './plugins_02/SolidFrameStageSchedulerShared.js';
     import { attachSolidBuiltinSphereShadowCore } from './plugins_02/solidBuiltinSphereShadowCore.js';
     import { installSolidEnvHostBindings } from './plugins_02/SolidEnvControlShared.js';
     import { installSolidAtmosphereHostBindings } from './plugins_02/SolidAtmosphereControlShared.js';
@@ -166,6 +167,7 @@
     }
     const isIosPosterizeHost = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false; let solidAnimRafId = 0; window.sumDuration = 0;
+    const __solidStage = createSolidFrameStageScheduler({ log: (m) => { try { if (window.hwLog) window.hwLog(String(m)); } catch (_e) {} } });
     const __SOLID_DEGRADE_GUARD_KEY = '__solidDegradedOnce';
     function _solidSetDegradeGuard(reason) {
         try {
@@ -378,6 +380,7 @@
     /** stopRender 内立刻启用光栅阴影并强制更新（否则需要“切换光源类型”触发重建才出现投影）。 */
     function _solidEnableRasterShadowsOnce() {
         try {
+            try { if (__solidStage && __solidStage.cancel) __solidStage.cancel(); } catch (_e0) {}
             if (window.__solidPreviewLighting && window.__solidPreviewLighting.setEnabled) {
                 window.__solidPreviewLighting.setEnabled(!window.useAdvancedRender);
             }
@@ -561,6 +564,8 @@
     window.stopRender = function() { window._solidUserStoppedRender = true; window.useAdvancedRender = false; window.isLoadingScene = false; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
     // 统一“停渲染态”曝光，避免停在不同采样阶段导致色阶显示不一致
     if (renderer) renderer.toneMappingExposure = 0.7;
+    // 关键：停止渲染后必须重建主光（rect 从 RectAreaLight 回到光栅 Spot 口径），否则会无投影/亮度异常。
+    try { if (typeof buildEnvironment === 'function') buildEnvironment(); } catch (_eBeStop) {}
     // 根因修复：停止渲染切到光栅前，再做一次“球体贴地吸附”，抵消后续插件/布局造成的微小离地
     try {
         if (sceneGroup && sceneGroup.traverse) {
@@ -573,6 +578,7 @@
     } catch (_eSnap2) {}
     _solidEnableRasterShadowsOnce();
     try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('stop_render'); } catch(_eP) {}
+    try { _solidScheduleRasterHeavyWarmup('stop_render'); } catch (_eSw) {}
     _solidDismissRenderToast(); if (renderer) { try { _solidTryRasterPreviewDraw(); } catch (_eSr) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); }
     // 再补一帧：确保 shadowMap 在 render 前后状态切换完全生效（修复“必须切灯才出投影”）
     try { requestAnimationFrame(() => { if (renderer) { try { _solidTryRasterPreviewDraw(); } catch (_e2) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); } 
@@ -630,6 +636,7 @@
         try { _solidEnsurePreviewLightingAlive('degrade'); } catch (_ePlR) {}
         try { _solidEnableRasterShadowsOnce(); } catch (_eSh) {}
         try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('degrade'); } catch (_ePr) {}
+        try { _solidScheduleRasterHeavyWarmup('degrade'); } catch (_eSw2) {}
     // 【核心修复 1】：先切断引用，再异步 dispose。同步 dispose 在 Shader 编译/驱动卡顿时会长时间阻塞主线程，导致关 Tab 假死。
     if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); }
     ['scene-loader', 'perf-test-overlay'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); const msg = document.getElementById('fallback-msg'); if(msg) { msg.style.display = 'flex'; msg.style.zIndex = '99999';
@@ -647,6 +654,7 @@
     try { _solidEnsurePreviewLightingAlive('ack_fallback'); } catch (_ePlA) {}
     try { _solidEnableRasterShadowsOnce(); } catch (_eShA) {}
     try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('ack_fallback'); } catch (_ePrA) {}
+    try { _solidScheduleRasterHeavyWarmup('ack_fallback'); } catch (_eSw) {}
     // 【核心修复】：降级后，如果还未成功加载过场景数据，必须强制拉取数据！
     // 否则场景列表为空，且会触发防呆机制导致右上角 X 按钮无法关闭。
     if (!window.customScenes || window.customScenes.length === 0) { sceneGroup.clear(); window.loadJSONData(); }
@@ -808,6 +816,22 @@
             renderer.render(scene, camera);
             _solidApplyRasterCanvasCssFilter();
         } catch (_eR) {}
+    }
+
+    function _solidScheduleRasterHeavyWarmup(reason) {
+        try {
+            try {
+                const qs = new URLSearchParams(window.location.search || '');
+                if (qs.get('noStageWarmup') === '1') return;
+            } catch (_eQ) {}
+            if (!__solidStage || !__solidStage.run) return;
+            __solidStage.run([
+                () => { try { _solidTryRasterPreviewDraw(); } catch (_e0) {} },
+                () => { try { _solidEnableRasterShadowsOnce(); } catch (_e1) {} },
+                () => { try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('stage_' + (reason || 'warmup')); } catch (_e2) {} },
+                () => { try { _solidTryRasterPreviewDraw(); } catch (_e3) {} },
+            ], 'rasterWarmup_' + String(reason || ''));
+        } catch (_e) {}
     }
 
     function _solidDisposeRasterEnvProbe() {

@@ -103,6 +103,7 @@
     import { createSolidRasterPreviewComposer } from '../../plugins_02/SolidRasterPreviewComposer.js';
     import { createSolidPathTracerSyncController } from '../../plugins_02/SolidPathTracerSyncShared.js';
     import { solidIsInRasterPreviewBridge, solidShouldAutoStopRender, solidShouldBlockSamplingWhenPending, solidShouldContinueSampling } from '../../plugins_02/SolidRenderLoopShared.js';
+    import { createSolidFrameStageScheduler } from '../../plugins_02/SolidFrameStageSchedulerShared.js';
     import { attachSolidBuiltinSphereShadowCore } from '../../plugins_02/solidBuiltinSphereShadowCore.js';
     import { installSolidEnvHostBindings } from '../../plugins_02/SolidEnvControlShared.js';
     import { installSolidAtmosphereHostBindings } from '../../plugins_02/SolidAtmosphereControlShared.js';
@@ -120,6 +121,7 @@
     setRasterPreviewUntil: (ts) => { window._solidPtRasterPreviewUntil = ts; },
     });
     let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false;
+    const __solidStage = createSolidFrameStageScheduler({ log: (m) => { try { if (window.hwLog) window.hwLog(String(m)); } catch (_e) {} } });
     // 视角锁定（生产端）：状态持久化 + UI 同步
     const SOLID_CREATE_CAMERA_LOCK_KEY = 'SolidCreatePortrait_CameraLock_v1';
     const SOLID_CREATE_UPDATE_COVER_KEY = 'SolidCreateUpdateCoverOnSave_v1';
@@ -210,6 +212,7 @@
     try { if (typeof buildEnvironment === 'function') buildEnvironment(); } catch (_eBe) {}
     try { _solidEnableRasterShadowsOnce(); } catch (_ePl) {}
     try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('stop_render'); } catch (_eP) {}
+    try { _solidScheduleRasterHeavyWarmup('stop_render'); } catch (_eSw) {}
     try { _solidTryRasterPreviewDraw(); } catch (_eSr) {} hwLog("已停止渲染，当前为预览模式。点击“开启渲染”可再次尝试。");
     const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0'; }; // 补回强制重新启动渲染引擎的功能
 
@@ -341,6 +344,21 @@
             if (c && c.tryRender()) return;
         } catch (_eC) {}
         try { renderer.render(scene, camera); } catch (_eR) {}
+    }
+    function _solidScheduleRasterHeavyWarmup(reason) {
+        try {
+            try {
+                const qs = new URLSearchParams(window.location.search || '');
+                if (qs.get('noStageWarmup') === '1') return;
+            } catch (_eQ) {}
+            if (!__solidStage || !__solidStage.run) return;
+            __solidStage.run([
+                () => { try { _solidTryRasterPreviewDraw(); } catch (_e0) {} },
+                () => { try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_e1) {} },
+                () => { try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('stage_' + (reason || 'warmup')); } catch (_e2) {} },
+                () => { try { _solidTryRasterPreviewDraw(); } catch (_e3) {} },
+            ], 'rasterWarmup_' + String(reason || ''));
+        } catch (_e) {}
     }
     if (typeof window.isLoadingScene === 'undefined') window.isLoadingScene = false;
     if (typeof window.currentSceneData === 'undefined') window.currentSceneData = null;
@@ -1404,8 +1422,8 @@
         });
         installSolidAtmosphereHostBindings({ markNeedsUpdate });
         installSolidAssistHostBindings({ markNeedsUpdate });
-        window.isUnsupported = false; function triggerUnsupported() { if(window.isUnsupported) return; window.isUnsupported = true; document.getElementById('scene-loader').style.display = 'none'; const msg = document.getElementById('fallback-msg'); if(msg) { msg.style.display = 'flex'; msg.style.zIndex = '99999'; } document.getElementById('canvas-container').style.opacity = '0.1'; const mainPanel = document.getElementById('main-panel'); if (mainPanel) { mainPanel.style.opacity = '0.3'; mainPanel.style.pointerEvents = 'none'; } }
-        window.acknowledgeFallback = function() { document.getElementById('fallback-msg').style.display = 'none'; document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1'; document.getElementById('main-panel').style.pointerEvents = 'auto'; };
+        window.isUnsupported = false; function triggerUnsupported() { if(window.isUnsupported) return; window.isUnsupported = true; document.getElementById('scene-loader').style.display = 'none'; const msg = document.getElementById('fallback-msg'); if(msg) { msg.style.display = 'flex'; msg.style.zIndex = '99999'; } document.getElementById('canvas-container').style.opacity = '0.1'; const mainPanel = document.getElementById('main-panel'); if (mainPanel) { mainPanel.style.opacity = '0.3'; mainPanel.style.pointerEvents = 'none'; } try { _solidScheduleRasterHeavyWarmup('degrade'); } catch (_e) {} }
+        window.acknowledgeFallback = function() { document.getElementById('fallback-msg').style.display = 'none'; document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1'; document.getElementById('main-panel').style.pointerEvents = 'auto'; try { _solidScheduleRasterHeavyWarmup('ack_fallback'); } catch (_e) {} };
         window.resetAll = function() { state.azimuth = 113; document.getElementById('lightAzimuth').value = 113; document.getElementById('azimuthVal').innerText = 113; state.elevation = 45; document.getElementById('lightElevation').value = 45; document.getElementById('elevationVal').innerText = 45; state.radius = 21; document.getElementById('lightDistance').value = 21; document.getElementById('distanceVal').innerText = 21; state.lightSize = 1.9; document.getElementById('lightSize').value = 1.9; document.getElementById('sizeVal').innerText = 1.9; document.getElementById('lightIntensity').value = 1.7; document.getElementById('intensityVal').innerText = 1.7; state.lightTemp = 38;     document.getElementById('lightTemp').value = 38; document.getElementById('tempVal').innerText = 3800; window.hasWall = false; document.getElementById('wall-btn').innerText = '☐ 背景墙'; document.getElementById('wall-btn').classList.remove('active'); window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc';     window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1; if (window.syncEnvColorPickers) window.syncEnvColorPickers(); updateDirTriggerByValues();
         const targetMat = window.initialMatType || 'origin'; // 【修复】：重置为JSON原本加载的材质
         const matchedMatOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${targetMat}'"]`);

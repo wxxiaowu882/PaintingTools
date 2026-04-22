@@ -11,6 +11,7 @@ import {
   SOLID_RASTER_AREA_LIGHT_RIG,
   getSolidRasterPreviewLightingDerived,
 } from '../Config/PaintingConfig.js';
+import { solidInstallOnBeforeCompilePatch, solidSyncOnBeforeCompileExternalHead } from './SolidShaderCompilePipelineShared.js';
 
 /** 地面 SOLID_SHADOW_SOFT_GROUND 片元补丁修订号：递增可强制清缓存重编译（勿随意改）。 */
 const SOLID_GROUND_SHADOW_PATCH_REVISION = 10;
@@ -427,32 +428,13 @@ export function createSolidPreviewLightingManager(opts) {
       if (!ud.uSolidTermLightPos) ud.uSolidTermLightPos = { value: new THREE.Vector3(0, 2, 0) };
       if (!ud.uSolidTermLightDir) ud.uSolidTermLightDir = { value: new THREE.Vector3(0, 1, 0) };
 
-      // Cache key: ensure program recompile only when patch revision changes (uniform-driven otherwise).
-      const prevKey = (typeof ud._solidTermOrigCacheKey === 'function') ? ud._solidTermOrigCacheKey : (typeof material.customProgramCacheKey === 'function' ? material.customProgramCacheKey : null);
-      if (typeof ud._solidTermOrigCacheKey !== 'function' && typeof material.customProgramCacheKey === 'function') ud._solidTermOrigCacheKey = material.customProgramCacheKey;
-      material.customProgramCacheKey = function() {
-        const base = (typeof prevKey === 'function') ? String(prevKey.call(this)) : '';
-        return base + '_solidTerm_v' + SOLID_TERM_PATCH_REVISION;
-      };
-
-      // Arm wrapper at the *tail* of the current onBeforeCompile chain.
-      // If later overwritten by other modules, we re-arm on next sync.
-      const current = (typeof material.onBeforeCompile === 'function') ? material.onBeforeCompile : null;
-      const alreadyWrapped = !!(ud._solidTermWrappedFn && material.onBeforeCompile === ud._solidTermWrappedFn);
-      const alreadyOnCurrent = !!(ud._solidTermWrappedBase && ud._solidTermWrappedBase === current);
-      if (alreadyWrapped && alreadyOnCurrent) {
-        // keep as-is
-      } else {
-        ud._solidTermWrappedBase = current;
-        ud._solidTermWrappedFn = (shader) => {
-          try { if (typeof ud._solidTermWrappedBase === 'function') ud._solidTermWrappedBase(shader); } catch (_ePrev) {}
-          _applySolidTerminatorShaderPatch(shader, ud);
-        };
-        material.onBeforeCompile = ud._solidTermWrappedFn;
-      }
+      solidInstallOnBeforeCompilePatch(material, {
+        id: 'solidTerm',
+        ver: SOLID_TERM_PATCH_REVISION,
+        apply: (shader) => _applySolidTerminatorShaderPatch(shader, ud),
+      });
 
       ud._solidTerminator = { v: SOLID_TERM_PATCH_REVISION };
-      try { material.needsUpdate = true; } catch (_eNu) {}
       return true;
     } catch (_e) {
       return false;
@@ -631,22 +613,25 @@ export function createSolidPreviewLightingManager(opts) {
       if (!ud._solidReceiverSoft) ud._solidReceiverSoft = { v: 1 };
       if (!ud.uSolidShadowGaussTaps) ud.uSolidShadowGaussTaps = sharedUd.uSolidShadowGaussTaps || { value: 16.0 };
       if (!ud.uSolidShadowGaussRotate) ud.uSolidShadowGaussRotate = sharedUd.uSolidShadowGaussRotate || { value: 1.0 };
+      if (!ud.uSolidShadowReceiverEnable) ud.uSolidShadowReceiverEnable = { value: 1.0 };
 
       if (!material.defines) material.defines = {};
       material.defines.SOLID_SHADOW_SOFT_RECEIVER = 1;
       material.defines.SOLID_SHADOW_SOFT_RECEIVER_KIND = cfg && cfg.kindTag ? cfg.kindTag : 0;
-      if (material.customProgramCacheKey) {
-        // keep existing if any (ground relies on versioning); receiver uses stable key.
-      } else {
-        material.customProgramCacheKey = function() { return 'solid_shadow_soft_receiver_v1_k' + (cfg && cfg.kindTag ? cfg.kindTag : 0); };
-      }
-
-      material.onBeforeCompile = (shader) => {
-        try {
+      // Install through shared compile pipeline to avoid re-arm fights.
+      const kindTag = cfg && cfg.kindTag ? cfg.kindTag : 0;
+      solidInstallOnBeforeCompilePatch(material, {
+        id: 'solidShadowReceiver',
+        ver: 1,
+        variant: 'k' + String(kindTag),
+        apply: (shader) => {
+          try {
           // --- patch shadow chunk wrappers ---
           let fs = shader.fragmentShader;
           const inc = '#include <shadowmap_pars_fragment>';
           if (!(fs && fs.includes(inc) && THREE.ShaderChunk && THREE.ShaderChunk.shadowmap_pars_fragment)) return;
+          // Idempotent guard: if already patched, only update uniforms.
+          const already = fs.includes('getShadow_orig') && fs.includes('uSolidShadowReceiverEnable');
           let chunk = THREE.ShaderChunk.shadowmap_pars_fragment;
           chunk = chunk.replace(
             'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {',
@@ -723,6 +708,7 @@ export function createSolidPreviewLightingManager(opts) {
             '\treturn (wsum > 0.0) ? (sum / wsum) : 1.0;\n' +
             '}\n' +
             'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {\n' +
+            '\tif ( uSolidShadowReceiverEnable < 0.5 ) return getShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord );\n' +
             '\tfloat dSolidSh = 1e9;\n' +
             '\tfor ( int i = 0; i < 8; i++ ) {\n' +
             '\t\tif ( i >= uSolidShadowAnchorCount ) break;\n' +
@@ -740,7 +726,7 @@ export function createSolidPreviewLightingManager(opts) {
           const endifIdx = chunk.lastIndexOf('#endif');
           if (endifIdx < 0) return;
           chunk = chunk.slice(0, endifIdx) + append + '\n' + chunk.slice(endifIdx);
-          fs = fs.replace(inc, chunk);
+          if (!already) fs = fs.replace(inc, chunk);
 
           shader.uniforms.uSolidShadowAnchorCount = sharedUd.uSolidShadowAnchorCount;
           shader.uniforms.uSolidShadowAnchors = sharedUd.uSolidShadowAnchors;
@@ -749,9 +735,10 @@ export function createSolidPreviewLightingManager(opts) {
           shader.uniforms.uSolidShadowSoftExp = sharedUd.uSolidShadowSoftExp;
           shader.uniforms.uSolidShadowGaussTaps = ud.uSolidShadowGaussTaps;
           shader.uniforms.uSolidShadowGaussRotate = ud.uSolidShadowGaussRotate;
+          shader.uniforms.uSolidShadowReceiverEnable = ud.uSolidShadowReceiverEnable;
 
           // receiver uniforms/varying
-          shader.fragmentShader =
+          if (!already) shader.fragmentShader =
             'varying vec3 vSolidShadowWorldPos;\n' +
             'uniform int uSolidShadowAnchorCount;\n' +
             'uniform vec3 uSolidShadowAnchors[8];\n' +
@@ -760,15 +747,18 @@ export function createSolidPreviewLightingManager(opts) {
             'uniform float uSolidShadowSoftExp;\n' +
             'uniform float uSolidShadowGaussTaps;\n' +
             'uniform float uSolidShadowGaussRotate;\n' +
+            'uniform float uSolidShadowReceiverEnable;\n' +
             fs;
 
           // vertex varying assign
-          shader.vertexShader = 'varying vec3 vSolidShadowWorldPos;\n' + shader.vertexShader;
-          const assign = '\n\tvSolidShadowWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;';
-          if (shader.vertexShader.includes('#include <worldpos_vertex>')) {
-            shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>' + assign);
-          } else if (shader.vertexShader.includes('#include <begin_vertex>')) {
-            shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + assign);
+          if (!already) {
+            shader.vertexShader = 'varying vec3 vSolidShadowWorldPos;\n' + shader.vertexShader;
+            const assign = '\n\tvSolidShadowWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;';
+            if (shader.vertexShader.includes('#include <worldpos_vertex>')) {
+              shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>' + assign);
+            } else if (shader.vertexShader.includes('#include <begin_vertex>')) {
+              shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + assign);
+            }
           }
           // Receiver patch may become the final onBeforeCompile in chain; ensure terminator patch also runs here.
           try {
@@ -777,7 +767,9 @@ export function createSolidPreviewLightingManager(opts) {
             }
           } catch (_eTermRecv) {}
         } catch (_e) {}
-      };
+        },
+      });
+      try { solidSyncOnBeforeCompileExternalHead(material); } catch (_e) {}
 
       // gaussian params
       try {
@@ -786,6 +778,7 @@ export function createSolidPreviewLightingManager(opts) {
         ud.uSolidShadowGaussRotate.value = g.rotate ? 1.0 : 0.0;
       } catch (_eG) {}
 
+      try { ud.uSolidShadowReceiverEnable.value = 1.0; } catch (_eEn) {}
       material.needsUpdate = true;
       return true;
     } catch (_e0) {
@@ -796,19 +789,9 @@ export function createSolidPreviewLightingManager(opts) {
   function _clearReceiverSoftShadowPatch(material) {
     try {
       if (!material) return false;
-      const had = !!(material.defines && (material.defines.SOLID_SHADOW_SOFT_RECEIVER || material.defines.SOLID_SHADOW_SOFT_RECEIVER_KIND != null));
-      if (!had) return false;
-      // Keep behavior conservative: remove defines + neutralize onBeforeCompile to avoid shader-cache key pitfalls.
       try {
-        if (material.defines) {
-          delete material.defines.SOLID_SHADOW_SOFT_RECEIVER;
-          delete material.defines.SOLID_SHADOW_SOFT_RECEIVER_KIND;
-        }
+        if (material.userData && material.userData.uSolidShadowReceiverEnable) material.userData.uSolidShadowReceiverEnable.value = 0.0;
       } catch (_eDef) {}
-      try {
-        if (material.onBeforeCompile) material.onBeforeCompile = function() {};
-      } catch (_eObc) {}
-      try { material.needsUpdate = true; } catch (_eNu) {}
       return true;
     } catch (_e) {
       return false;
@@ -2660,22 +2643,12 @@ export function createSolidPreviewLightingManager(opts) {
     if (!material || (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial)) return;
     if (!_solidShIrrEnabled()) return;
     if (material.userData.__solidShPatchVer === _SOLID_SH_PATCH_VER) return;
-    if (typeof material.userData._solidShOrigBeforeCompile !== 'function' && typeof material.onBeforeCompile === 'function') {
-      material.userData._solidShOrigBeforeCompile = material.onBeforeCompile;
-    }
-    const prevCompile = material.userData._solidShOrigBeforeCompile;
-    if (typeof material.userData._solidShOrigCacheKey !== 'function' && typeof material.customProgramCacheKey === 'function') {
-      material.userData._solidShOrigCacheKey = material.customProgramCacheKey;
-    }
-    const prevCacheKey = material.userData._solidShOrigCacheKey;
     material.userData.__solidShPatchVer = _SOLID_SH_PATCH_VER;
-    material.customProgramCacheKey = function () {
-      const base = (typeof prevCacheKey === 'function') ? String(prevCacheKey.call(this)) : '';
-      return base + '_solidShProbe_v' + _SOLID_SH_PATCH_VER;
-    };
-    material.onBeforeCompile = (shader) => {
-      if (typeof prevCompile === 'function') prevCompile(shader);
-      try {
+    solidInstallOnBeforeCompilePatch(material, {
+      id: 'solidShProbe',
+      ver: _SOLID_SH_PATCH_VER,
+      apply: (shader) => {
+        try {
         const u = _solidShEnsureUniforms(material);
         Object.keys(u).forEach((k) => {
           shader.uniforms[k] = u[k];
@@ -2788,8 +2761,10 @@ export function createSolidPreviewLightingManager(opts) {
             shader.fragmentShader = shader.fragmentShader.replace(endTag, glslBlock + endTag);
           }
         }
-      } catch (_eSh) {}
-    };
+        } catch (_eSh) {}
+      },
+    });
+    try { solidSyncOnBeforeCompileExternalHead(material); } catch (_e) {}
     try {
       material.needsUpdate = true;
     } catch (_eNu) {}
