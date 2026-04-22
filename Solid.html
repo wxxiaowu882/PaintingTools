@@ -166,6 +166,25 @@
     }
     const isIosPosterizeHost = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false; let solidAnimRafId = 0; window.sumDuration = 0;
+    const __SOLID_DEGRADE_GUARD_KEY = '__solidDegradedOnce';
+    function _solidSetDegradeGuard(reason) {
+        try {
+            if (!window.sessionStorage) return;
+            window.sessionStorage.setItem(__SOLID_DEGRADE_GUARD_KEY, String(reason || '1'));
+        } catch (_e) {}
+    }
+    function _solidHasDegradeGuard() {
+        try {
+            if (!window.sessionStorage) return false;
+            return !!window.sessionStorage.getItem(__SOLID_DEGRADE_GUARD_KEY);
+        } catch (_e) { return false; }
+    }
+    function _solidClearDegradeGuard() {
+        try {
+            if (!window.sessionStorage) return;
+            window.sessionStorage.removeItem(__SOLID_DEGRADE_GUARD_KEY);
+        } catch (_e) {}
+    }
     const _solidPtSync = createSolidPathTracerSyncController({
         minIntervalMs: Math.max(16, Number(_solidPtCfg.resetMinIntervalMs || 120)),
         debug: !!_solidPtCfg.debugResetLog,
@@ -568,7 +587,7 @@
     hwLog("已停止渲染，当前为预览模式。点击“开启渲染”可再次尝试。");
     const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0';
     syncRenderButtons();
-    }; window.forceReRender = function() { window._solidUserStoppedRender = false; if (window._solidHardwareUnsupported) { window.hwLog('[forceReRender] 当前设备暂不支持渲染'); (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '当前设备暂不支持渲染'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 2500); } })(); try { syncRenderButtons(); } catch(_eBtn) {} return; }
+    }; window.forceReRender = function() { window._solidUserStoppedRender = false; try { _solidClearDegradeGuard(); } catch(_eG) {} if (window._solidHardwareUnsupported) { window.hwLog('[forceReRender] 当前设备暂不支持渲染'); (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '当前设备暂不支持渲染'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 2500); } })(); try { syncRenderButtons(); } catch(_eBtn) {} return; }
     try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.setEnabled) window.__solidPreviewLighting.setEnabled(false); } catch (_eT) {}
     try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.dispose) window.__solidPreviewLighting.dispose(); } catch (_eDisp) {}
     window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none'; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
@@ -605,8 +624,12 @@
             window.__solidLastDegradeReason = { t: Date.now(), reason: reason || 'unknown', detail: detail != null ? String(detail) : '' };
             window.hwLog('[Degrade] ' + (reason || 'unknown') + (detail ? ' | ' + detail : ''));
         } catch (_eL) {}
+        try { _solidSetDegradeGuard(reason || 'degrade'); } catch (_eG) {}
         if (window.isUnsupported) return;
         window.isUnsupported = true; window.useAdvancedRender = false; window.isTestingPerformance = false;
+        try { _solidEnsurePreviewLightingAlive('degrade'); } catch (_ePlR) {}
+        try { _solidEnableRasterShadowsOnce(); } catch (_eSh) {}
+        try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('degrade'); } catch (_ePr) {}
     // 【核心修复 1】：先切断引用，再异步 dispose。同步 dispose 在 Shader 编译/驱动卡顿时会长时间阻塞主线程，导致关 Tab 假死。
     if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); }
     ['scene-loader', 'perf-test-overlay'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); const msg = document.getElementById('fallback-msg'); if(msg) { msg.style.display = 'flex'; msg.style.zIndex = '99999';
@@ -621,6 +644,9 @@
     else if (window._solidSampleTimeout) pw.textContent = '渲染超时，已切换为预览模式。点击“开启渲染”可再次尝试。'; else if (window._solidPerfSoftFail) pw.textContent = '渲染暂未启动，已处于预览模式。点击“开启渲染”可再次尝试。'; else pw.textContent = '当前为预览模式。点击“开启渲染”可再次尝试。';
     pw.style.display = 'block'; }
     syncRenderButtons();
+    try { _solidEnsurePreviewLightingAlive('ack_fallback'); } catch (_ePlA) {}
+    try { _solidEnableRasterShadowsOnce(); } catch (_eShA) {}
+    try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('ack_fallback'); } catch (_ePrA) {}
     // 【核心修复】：降级后，如果还未成功加载过场景数据，必须强制拉取数据！
     // 否则场景列表为空，且会触发防呆机制导致右上角 X 按钮无法关闭。
     if (!window.customScenes || window.customScenes.length === 0) { sceneGroup.clear(); window.loadJSONData(); }
@@ -702,6 +728,41 @@
     });
     try { __solidPreviewLighting.install(); } catch (_e) {}
     try { window.__solidPreviewLighting = __solidPreviewLighting; } catch (_e) {}
+    function _solidEnsurePreviewLightingAlive(reason) {
+        try {
+            const pl = window.__solidPreviewLighting;
+            if (pl && typeof pl.syncShadows === 'function' && typeof pl.setEnabled === 'function') return true;
+        } catch (_e0) {}
+        try {
+            const next = createSolidPreviewLightingManager({
+                THREE,
+                getRenderer: () => renderer,
+                getScene: () => scene,
+                getCamera: () => camera,
+                getSceneGroup: () => sceneGroup,
+                getMainLight: () => (__solidRasterLightRig.getShadowLight() || mainLight),
+                getShadowLight: () => (__solidRasterLightRig.getShadowLight() || mainLight),
+                getGround: () => ground,
+                getWalls: () => window.walls,
+                getIsMobile: () => isMobile,
+                getIsIosHost: () => isIosPosterizeHost,
+                getInteractionState: () => getSolidUnifiedInteractionState(),
+                getLightState: () => state,
+                shouldSkipEnvProbe: solidRasterPreviewShouldSkipEnvProbe(() => ({
+                    useAdvancedRender: window.useAdvancedRender,
+                    isLoadingScene: window.isLoadingScene,
+                    currentSceneData: window.currentSceneData,
+                    currentSceneIndex: window.currentSceneIndex,
+                })),
+                log: (msg) => { try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e) {} },
+                safeDispose,
+            });
+            try { next.install(); } catch (_e1) {}
+            try { window.__solidPreviewLighting = next; } catch (_e2) {}
+            try { if (window.hwLog) window.hwLog('[RasterShadows] previewLighting rebuilt: ' + (reason || 'unknown')); } catch (_e3) {}
+            return true;
+        } catch (_e4) { return false; }
+    }
     try {
         window.__solidRasterPreviewComposer = createSolidRasterPreviewComposer({
             THREE,
@@ -1134,11 +1195,11 @@
                 window.__solidAnnoViewportH = Math.max(1, Math.round(window.innerHeight || 1));
             }
         };
-        function init() { const container = document.getElementById('canvas-container'); try { addHwLog("系统初始化开始..."); } catch(_e0) {} try { try { window.hwLog("[Init] 尝试实例化最高精度 WebGLRenderer...");
+        function init() { const container = document.getElementById('canvas-container'); const _degradeGuard = (function(){ try { return _solidHasDegradeGuard(); } catch(_e){ return false; } })(); try { addHwLog("系统初始化开始..."); } catch(_e0) {} if (_degradeGuard) { try { window.hwLog('[Init] 检测到上次会话发生渲染降级：本次刷新将以预览模式启动（跳过 PathTracer/性能测试），可手动点击“开启渲染”重试'); } catch(_eG0) {} } try { try { window.hwLog("[Init] 尝试实例化最高精度 WebGLRenderer...");
         renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: true }); } catch(err1) {
         window.hwLog(`[Init] 高精度实例化异常 (${err1.message})，降级为基础实例...`); renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true }); }
         if (!renderer || !renderer.getContext()) { throw new Error("当前设备或浏览器完全拒绝创建 WebGL 上下文"); }
-        window.hwLog("[Init] WebGLRenderer 实例化完毕"); renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window._solidContextLost = true; window.useAdvancedRender = false; try { if (window.__solidRasterPreviewComposer && window.__solidRasterPreviewComposer.dispose) window.__solidRasterPreviewComposer.dispose(); } catch (_eAoL) {} window.hwLog(`Context Lost 事件: ${e.statusMessage || 'GPU运算超时或系统强制回收'}（常见原因：显存不足/驱动编译失败；恢复将在 webglcontextrestored 后进行，请勿在丢失期间重建 PathTracer）`); if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); } }, false);
+        window.hwLog("[Init] WebGLRenderer 实例化完毕"); renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window._solidContextLost = true; window.useAdvancedRender = false; try { _solidSetDegradeGuard('context_lost'); } catch(_eG) {} try { if (window.__solidRasterPreviewComposer && window.__solidRasterPreviewComposer.dispose) window.__solidRasterPreviewComposer.dispose(); } catch (_eAoL) {} window.hwLog(`Context Lost 事件: ${e.statusMessage || 'GPU运算超时或系统强制回收'}（常见原因：显存不足/驱动编译失败；恢复将在 webglcontextrestored 后进行，请勿在丢失期间重建 PathTracer）`); if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); } }, false);
         renderer.domElement.addEventListener('webglcontextrestored', () => { window.hwLog('Context Restored 事件: 准备恢复渲染'); window._solidContextLost = false; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('event_context_restored'); }, false);
         scene = new THREE.Scene(); scene.add(sceneGroup); scene.backgroundRotation = new THREE.Euler(); scene.environmentRotation = new THREE.Euler();
         camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix();
@@ -1156,6 +1217,7 @@
         if (!isWebGL2 || !hasColorBufFloat) { window._solidHardwareUnsupported = true; window.hwLog('[Init] 硬件或浏览器不满足渲染前置条件，将跳过性能测试直接进入预览模式'); }
         } catch(_e) { window.hwLog('[Init] 静态检测异常: ' + _e.message); } })();
         requestAnimationFrame(() => { try { window.hwLog("[Init] 推迟一帧再启动渲染（先让加载层绘制，略缩短首屏等待）");
+        if (_degradeGuard) { window.useAdvancedRender = false; window.isUnsupported = false; window.isTestingPerformance = false; window.perfTestDone = true; try { const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none'; } catch(_ePto) {} try { const pw = document.getElementById('persistent-warning'); if (pw) { pw.textContent = '上次渲染异常，本次已以预览模式启动。可点击“开启渲染”重试。'; pw.style.display = 'block'; } } catch(_ePw) {} try { syncRenderButtons(); } catch(_eBtn) {} window.loadJSONData(); animate(); return; }
         if (window._solidHardwareUnsupported) { window.hwLog("[Init] 静态检测不通过，跳过 PathTracer 实例化"); }
         else { try { window.hwLog("[Init] 准备实例化 WebGLPathTracer...");
         pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = _solidPtCfg.multipleImportanceSampling !== false; pathTracer.bounces = Number(_solidPtCfg.bounces || 3); pathTracer.renderScale = _solidPathTracerRenderScale();
