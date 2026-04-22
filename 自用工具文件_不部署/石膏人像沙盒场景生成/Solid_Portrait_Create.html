@@ -2152,6 +2152,45 @@
         try { _solidSyncGroundShadowUniforms(); } catch (_eSyncL) {}
         } lightPosUpdated = true; try { window._solidGroundShadowDirty = true; } catch (_eGsl) {} }
         function setupUIControls() {
+        let _solidIntensitySkySyncRaf = 0;
+        let _solidIntensityProbeTimer = 0;
+        let _solidIntensityConvergeTimer = 0;
+        function _solidSyncSkyEnvLightFast() {
+        if (_solidIntensitySkySyncRaf) return;
+        _solidIntensitySkySyncRaf = requestAnimationFrame(() => {
+        _solidIntensitySkySyncRaf = 0;
+        try {
+        if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
+        } catch (_eSkyFast) {}
+        });
+        }
+        function _solidScheduleIntensityProbe(reason, waitMs) {
+        if (_solidIntensityProbeTimer) { clearTimeout(_solidIntensityProbeTimer); _solidIntensityProbeTimer = 0; }
+        _solidIntensityProbeTimer = setTimeout(() => {
+        _solidIntensityProbeTimer = 0;
+        try {
+        if (window.useAdvancedRender) return;
+        if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) {
+        // 强制走“立即优先”通道：scene_changed 会重置 lastRunAt，避免强度更新长期被节流吞掉。
+        window.__solidPreviewLighting.requestEnvProbe('scene_changed');
+        return;
+        }
+        if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe(reason);
+        } catch (_eProbeFast) {}
+        }, waitMs);
+        }
+        function _solidScheduleIntensityConverge(waitMs) {
+        if (_solidIntensityConvergeTimer) { clearTimeout(_solidIntensityConvergeTimer); _solidIntensityConvergeTimer = 0; }
+        _solidIntensityConvergeTimer = setTimeout(() => {
+        _solidIntensityConvergeTimer = 0;
+        try {
+        if (window.useAdvancedRender) return;
+        buildEnvironment();
+        if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
+        else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed');
+        } catch (_eConverge) {}
+        }, waitMs);
+        }
         installSolidMainLightSliderBindings({
         state,
         getUseAdvancedRender: () => window.useAdvancedRender,
@@ -2162,7 +2201,19 @@
         updateLightPosition,
         getTempColor: (t) => solidGetTempColorFromKelvin100(THREE, t),
         assignPathTracerFlags(f) { if (f.lightPosUpdated) lightPosUpdated = true; if (f.lightMoved) lightMoved = true; },
-        requestRasterProbe(reason) { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe(reason); },
+        requestRasterProbe(reason) {
+        if (window.useAdvancedRender || typeof window._solidRequestRasterEnvProbe !== 'function') return;
+        const r = String(reason || '');
+        if (r === 'light_intensity') {
+        try {
+        if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
+        else window._solidRequestRasterEnvProbe('light_intensity');
+        } catch (_eP0) {}
+        _solidScheduleIntensityConverge(0);
+        return;
+        }
+        window._solidRequestRasterEnvProbe(r);
+        },
         afterLightDirectionInput() {
         try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSs) {}
         try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_dir'); } catch (_eP) {}
@@ -2175,6 +2226,9 @@
         afterLightIntensityInput() {
         try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSi) {}
         try { window._solidGroundShadowDirty = true; } catch (_eGi) {}
+        _solidSyncSkyEnvLightFast();
+        _solidScheduleIntensityProbe('light_intensity_drag', 100);
+        _solidScheduleIntensityConverge(140);
         },
         });
         const cropBox = document.getElementById('crop-box'), dragH = document.getElementById('crop-drag-handle'), resH = document.getElementById('crop-resize-handle');
