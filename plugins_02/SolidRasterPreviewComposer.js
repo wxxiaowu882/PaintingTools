@@ -9,7 +9,6 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
   SOLID_RASTER_IRRADIANCE_PROBES,
-  SOLID_RASTER_AREA_LIGHT_RIG,
   SOLID_RASTER_PREVIEW_AA,
   SOLID_RASTER_PREVIEW_AO,
   getSolidRasterPreviewLightingDerived,
@@ -31,7 +30,6 @@ export function createSolidRasterPreviewComposer(opts) {
   const getRenderer = opts.getRenderer;
   const getScene = opts.getScene;
   const getCamera = opts.getCamera;
-  const getLightState = typeof opts.getLightState === 'function' ? opts.getLightState : () => null;
   const getIsMobile = typeof opts.getIsMobile === 'function' ? opts.getIsMobile : () => false;
   const getInteractionState = typeof opts.getInteractionState === 'function' ? opts.getInteractionState : () => false;
   const getUseAdvancedRender = opts.getUseAdvancedRender;
@@ -85,27 +83,11 @@ export function createSolidRasterPreviewComposer(opts) {
     return tuned;
   }
 
-  function _sizeT() {
-    try {
-      const st = getLightState ? (getLightState() || {}) : {};
-      const cfg = SOLID_RASTER_AREA_LIGHT_RIG || {};
-      const sMin = Number(cfg.sizeMin || 1.0);
-      const sMax = Number(cfg.sizeMax || 15.0);
-      const s = Number(st.lightSize);
-      if (!Number.isFinite(s)) return 0.0;
-      return Math.max(0, Math.min(1, (s - sMin) / Math.max(1e-6, sMax - sMin)));
-    } catch (_e) {
-      return 0.0;
-    }
-  }
-
   function _aoTerminatorProtectedBlend(baseBi) {
     const bi0 = Number.isFinite(baseBi) ? baseBi : 0;
-    const t = _sizeT();
-    const te = Math.pow(t, 0.62);
-    // 极值抑制：size 越大，AO 越少压死交界线；保留最小结构对比
-    const mul = Math.max(0.08, 1.0 - 0.82 * te);
-    return Math.max(0, Math.min(1, bi0 * mul));
+    // Anti-regression: AO 只负责“间接遮蔽”对比，不承担主光交界线宽化职责。
+    // 主光明暗交界线的宽化/柔化应由主光链路（N·L / 影子）控制，避免出现“AO线被误调宽”。
+    return Math.max(0, Math.min(1, bi0));
   }
 
   function dispose() {

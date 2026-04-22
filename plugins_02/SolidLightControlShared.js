@@ -1,3 +1,5 @@
+import { SOLID_RASTER_AREA_LIGHT_RIG } from '../Config/PaintingConfig.js';
+
 // 消费端 Solid.html 与生产端 Solid_Portrait_Create 共用：主光强度换算、灯体构造（含 rect 光栅降级）、
 // 轨道位置、色温表、尺寸防抖与强度拖动策略。**强度倍率与灯体角度/尺寸公式仅允许在本文件常量区维护。**
 // 拖动强度时只改 three.js Light.intensity，避免每帧销毁 shadow map / 整灯重建；松手 change 再完整 buildEnvironment。
@@ -9,11 +11,25 @@ export function clampSolidLightIntensitySlider(value) {
   return Math.max(0.2, Math.min(8, n));
 }
 
-/** 与控制面板 `lightSize` range（min 1 max 15）一致 */
+function _getSolidSizeBounds() {
+  try {
+    const cfg = SOLID_RASTER_AREA_LIGHT_RIG || {};
+    const min = Number(cfg.sizeMin);
+    const max = Number(cfg.sizeMax);
+    const sizeMin = Number.isFinite(min) ? min : 1.0;
+    const sizeMax = Number.isFinite(max) ? max : 15.0;
+    return { sizeMin, sizeMax: Math.max(sizeMin + 1e-6, sizeMax) };
+  } catch (_e) {
+    return { sizeMin: 1.0, sizeMax: 15.0 };
+  }
+}
+
+/** 与控制面板 `lightSize` range（min = rig.sizeMin, max = rig.sizeMax）一致 */
 export function clampSolidLightSizeSlider(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 1.9;
-  return Math.max(1, Math.min(15, n));
+  const b = _getSolidSizeBounds();
+  return Math.max(b.sizeMin, Math.min(b.sizeMax, n));
 }
 
 /** 与控制面板 `lightTemp` range（min 30 max 90）一致 */
@@ -50,7 +66,22 @@ function _clamp01(v) {
 function _sizeT(lightSize) {
   const n = Number(lightSize);
   if (!Number.isFinite(n)) return 0.3;
-  return _clamp01((n - 1.0) / 3.0);
+  const b = _getSolidSizeBounds();
+  return _clamp01((n - b.sizeMin) / Math.max(1e-6, b.sizeMax - b.sizeMin));
+}
+
+function _ptSizeMapped(lightSize) {
+  const s = clampSolidLightSizeSlider(lightSize);
+  const b = _getSolidSizeBounds();
+  const span = Math.max(1e-6, b.sizeMax - b.sizeMin);
+  const t = _clamp01((s - b.sizeMin) / span);
+  // 追光稳态：保留“size 越大越柔”的历史语义，但压缩高区间增速，降低大 size 噪点/发黑风险。
+  return b.sizeMin + span * Math.pow(t, 0.72) * 0.58;
+}
+
+function _isPtSizeDecoupledTemp() {
+  // 临时稳定策略（按需求）：size 先不进入追光参数，避免高 size 导致发黑/噪点尖峰。
+  return true;
 }
 
 /**
@@ -105,6 +136,30 @@ export function applySolidMainLightIntensityFromSlider(mainLight, lightType, use
   }
   mainLight.intensity = getSolidMainLightIntensityScalar(lightType, false, sliderVal);
   return true;
+}
+
+/**
+ * 将 UI 大小滑块值应用到**已有**主光，避免交互中高频重建。
+ * @returns {boolean} 是否已写入 size 参数
+ */
+export function applySolidMainLightSizeFromSlider(mainLight, lightType, useAdvancedRender, sliderVal) {
+  if (!mainLight || !mainLight.isLight) return false;
+  const lSize = clampSolidLightSizeSlider(sliderVal);
+  if (useAdvancedRender && _isPtSizeDecoupledTemp()) return true;
+  if (lightType === 'rect' && useAdvancedRender && mainLight.isRectAreaLight) {
+    const ptSize = _ptSizeMapped(lSize);
+    const w = 8 * (ptSize / 2 + 0.1);
+    const h = 8 * (ptSize / 2 + 0.1);
+    mainLight.width = w;
+    mainLight.height = h;
+    return true;
+  }
+  const eff = useAdvancedRender ? _ptSizeMapped(lSize) : lSize;
+  if ('radius' in mainLight) {
+    mainLight.radius = eff;
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -236,7 +291,9 @@ export function computeSolidMainLightCartesianPosition(THREE, state) {
  */
 export function createSolidMainLight(THREE, { lightType, color, intensitySlider, lightSize, useAdvancedRender }) {
   const val = clampSolidLightIntensitySlider(intensitySlider);
-  const lSize = Number(lightSize);
+  const lSize = clampSolidLightSizeSlider(lightSize);
+  const adv = !!useAdvancedRender;
+  const ptSize = (adv && !_isPtSizeDecoupledTemp()) ? _ptSizeMapped(lSize) : 1.9;
   let light;
   let addSpotTargetToScene = false;
 
@@ -245,22 +302,25 @@ export function createSolidMainLight(THREE, { lightType, color, intensitySlider,
     light = new THREE.SpotLight(color, intensity);
     light.angle = SOLID_SPOT_ANGLE;
     light.penumbra = SOLID_SPOT_PENUMBRA;
-    light.radius = lSize;
+    // IMPORTANT (anti-regression): 在追光中保持历史口径 `radius = size`，
+    // 否则会显著削弱聚光灯半影与明暗交界线自然度。
+    light.radius = ptSize;
     addSpotTargetToScene = true;
   } else if (lightType === 'point') {
     light = new THREE.PointLight(color, getSolidMainLightIntensityScalar('point', false, val));
-    light.radius = lSize;
+    light.radius = ptSize;
   } else if (lightType === 'dir') {
     light = new THREE.DirectionalLight(color, getSolidMainLightIntensityScalar('dir', false, val));
-    light.radius = lSize;
+    light.radius = ptSize;
     // Keep directional light direction pipeline identical to spot:
     // target participates in scene graph and world-matrix updates.
     addSpotTargetToScene = true;
   } else if (lightType === 'rect') {
     if (useAdvancedRender) {
       const intensity = getSolidMainLightIntensityScalar('rect', true, val);
-      const w = 8 * (lSize / 2 + 0.1);
-      const h = 8 * (lSize / 2 + 0.1);
+      // IMPORTANT (anti-regression): 追光下 RectAreaLight 面积必须随 size 变化（历史基线）。
+      const w = 8 * (ptSize / 2 + 0.1);
+      const h = 8 * (ptSize / 2 + 0.1);
       light = new THREE.RectAreaLight(color.getHex(), intensity, w, h);
     } else {
       const intensity = getSolidMainLightIntensityScalar('rect', false, val);
@@ -275,11 +335,11 @@ export function createSolidMainLight(THREE, { lightType, color, intensitySlider,
     light = new THREE.SpotLight(color, intensity);
     light.angle = SOLID_SPOT_ANGLE;
     light.penumbra = SOLID_SPOT_PENUMBRA;
-    light.radius = lSize;
+    light.radius = ptSize;
     addSpotTargetToScene = true;
   }
 
-  _applySolidRasterPhysicalSizeApprox(light, lightType, lSize, !!useAdvancedRender);
+  _applySolidRasterPhysicalSizeApprox(light, lightType, lSize, adv);
 
   return { light, addSpotTargetToScene };
 }
@@ -298,6 +358,8 @@ export function createSolidMainLight(THREE, { lightType, color, intensitySlider,
  * @param {(flags: { lightMoved?: boolean; lightPosUpdated?: boolean }) => void} deps.assignPathTracerFlags
  * @param {(reason: string) => void} [deps.requestRasterProbe]
  * @param {() => void} [deps.afterLightTempInput]
+ * @param {() => void} [deps.afterLightSizeInput]
+ * @param {() => void} [deps.afterLightIntensityInput]
  */
 export function installSolidMainLightSliderBindings(deps) {
   const probe = (reason) => {
@@ -334,6 +396,9 @@ export function installSolidMainLightSliderBindings(deps) {
       if (!_posDirty) return;
       _posDirty = false;
       deps.updateLightPosition();
+      try {
+        deps.afterLightDirectionInput?.();
+      } catch (_e) {}
     });
   }
 
@@ -421,13 +486,44 @@ export function installSolidMainLightSliderBindings(deps) {
     } catch (_e) {}
   }, 90);
   document.getElementById('lightSize').addEventListener('input', (e) => {
-    deps.state.lightSize = parseFloat(e.target.value);
+    deps.state.lightSize = clampSolidLightSizeSlider(e.target.value);
     document.getElementById('sizeVal').innerText = deps.state.lightSize;
-    deps.assignPathTracerFlags({ lightMoved: true });
-    __debLightSize.schedule();
+    let applied = false;
+    try {
+      applied = applySolidMainLightSizeFromSlider(
+        deps.getMainLight(),
+        deps.getLightType(),
+        deps.getUseAdvancedRender(),
+        deps.state.lightSize,
+      );
+    } catch (_eAp) {
+      applied = false;
+    }
+    try {
+      deps.afterLightSizeInput?.();
+    } catch (_eAs) {}
+    if (deps.getUseAdvancedRender()) {
+      if (!_isPtSizeDecoupledTemp()) {
+        if (!applied) {
+          try { deps.buildEnvironment(); } catch (_eB1) {}
+        }
+        deps.assignPathTracerFlags({ lightPosUpdated: true });
+      }
+    } else {
+      deps.assignPathTracerFlags(applied ? { lightPosUpdated: true } : { lightMoved: true });
+      if (!applied) __debLightSize.schedule();
+    }
   });
   document.getElementById('lightSize').addEventListener('change', () => {
-    __debLightSize.flush();
+    if (deps.getUseAdvancedRender()) {
+      if (!_isPtSizeDecoupledTemp()) {
+        try { deps.buildEnvironment(); } catch (_eBszPt) {}
+        deps.assignPathTracerFlags({ lightMoved: true });
+      }
+    } else {
+      try { deps.buildEnvironment(); } catch (_eBsz) {}
+      deps.assignPathTracerFlags({ lightMoved: true });
+    }
     probe('light_size');
   });
 
@@ -445,6 +541,9 @@ export function installSolidMainLightSliderBindings(deps) {
       ) {
         const f = solidLightIntensityDragPathTracerFlags(deps.getUseAdvancedRender());
         deps.assignPathTracerFlags(f);
+        try {
+          deps.afterLightIntensityInput?.();
+        } catch (_eAi) {}
       } else {
         deps.buildEnvironment();
         deps.assignPathTracerFlags({ lightMoved: true });

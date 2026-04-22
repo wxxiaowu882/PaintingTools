@@ -292,7 +292,7 @@ export function createSolidPreviewLightingManager(opts) {
   }
 
   // ---------- Model soft-terminator (direct lighting) ----------
-  const SOLID_TERM_PATCH_REVISION = 2;
+  const SOLID_TERM_PATCH_REVISION = 3;
   let _termDbgLastAt = 0;
   let _termDbgLastRepl = { mats: 0, repl: 0, zero: 0, pending: 0, fallback: 0, chunk: 0 };
 
@@ -337,7 +337,8 @@ export function createSolidPreviewLightingManager(opts) {
           'uniform int uSolidTermLightType;\n' +
           'uniform vec3 uSolidTermLightPos;\n' +
           'uniform vec3 uSolidTermLightDir;\n' +
-          'varying vec3 vSolidTermWorldPos;\n';
+          'varying vec3 vSolidTermWorldPos;\n' +
+          'varying vec3 vSolidTermWorldNormal;\n';
         const tFunc =
           '\n// solidTerminatorFieldFn\n' +
           'vec2 solidTerminatorField( float ndl, float sizeT, float strength ) {\n' +
@@ -360,12 +361,13 @@ export function createSolidPreviewLightingManager(opts) {
         const fbCode =
           '\n// solidTerminatorFieldApply\n' +
           '{\n' +
-          '\tvec3 solidN = normalize( geometryNormal );\n' +
+          '\tvec3 solidN = normalize( vSolidTermWorldNormal );\n' +
           '\tvec3 solidL = (uSolidTermLightType == 0) ? normalize( uSolidTermLightDir ) : normalize( uSolidTermLightPos - vSolidTermWorldPos );\n' +
           '\tfloat ndl = dot( solidN, solidL );\n' +
           '\tvec2 tf = solidTerminatorField( ndl, uSolidTermSizeT, uSolidTermStrength );\n' +
           '\tfloat termMask = tf.x;\n' +
           '\tfloat termGain = tf.y;\n' +
+          '\t// Anti-regression: 仅处理主光直射项，避免 AO/SH 间接项被误当作主光交界线处理。\n' +
           '\tfloat guard = mix( 0.94, 1.0, termMask );\n' +
           '\treflectedLight.directDiffuse *= clamp( termGain * guard, 0.0, 2.0 );\n' +
           '}\n';
@@ -383,6 +385,16 @@ export function createSolidPreviewLightingManager(opts) {
           shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + assign);
         }
       }
+      if (shader.vertexShader && !shader.vertexShader.includes('vSolidTermWorldNormal')) {
+        shader.vertexShader = 'varying vec3 vSolidTermWorldNormal;\n' + shader.vertexShader;
+        const assignNDefault = '\n\tvSolidTermWorldNormal = normalize( mat3( modelMatrix ) * objectNormal );';
+        const assignNBegin = '\n\tvSolidTermWorldNormal = normalize( mat3( modelMatrix ) * normal );';
+        if (shader.vertexShader.includes('#include <defaultnormal_vertex>')) {
+          shader.vertexShader = shader.vertexShader.replace('#include <defaultnormal_vertex>', '#include <defaultnormal_vertex>' + assignNDefault);
+        } else if (shader.vertexShader.includes('#include <begin_vertex>')) {
+          shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + assignNBegin);
+        }
+      }
 
       shader.fragmentShader = fs1;
       if (!ud._solidTermDbg) ud._solidTermDbg = { repl: 0, zero: 0, compiled: 0 };
@@ -393,6 +405,7 @@ export function createSolidPreviewLightingManager(opts) {
       ud._solidTermDbg.termApplied = chunkHit ? 1 : 0;
       ud._solidTermDbg.termMode = chunkHit ? 'chunk_field' : 'none';
       ud._solidTermDbg.termHitChunk = chunkHit ? 'lights_fragment_end' : 'none';
+      ud._solidTermDbg.termSpace = 'world';
       ud._solidTermDbg.compiled = 1;
     } catch (_e) {}
   }
@@ -1437,8 +1450,11 @@ export function createSolidPreviewLightingManager(opts) {
       const __sizeSoft = _sizeDrivenShadowSoftness(shadowLight, isMobile, st);
       const __contactGuard = !!(__sizeSoft && __sizeSoft.contactGuard);
       if (__sizeSoft) {
-        sh.radius = __sizeSoft.radius;
-        sh.blurSamples = __sizeSoft.blurSamples;
+        // 投影保底：size 变大时允许更柔，但限制核大小，避免地面投影被“抹没”。
+        const radiusCap = shadowLight.isPointLight ? 2.15 : (shadowLight.isDirectionalLight ? 1.78 : 1.72);
+        const blurCap = shadowLight.isPointLight ? 18 : 16;
+        sh.radius = Math.min(Number(__sizeSoft.radius || sh.radius), radiusCap);
+        sh.blurSamples = Math.min(Number(__sizeSoft.blurSamples || sh.blurSamples), blurCap);
       }
 
       try { if (sceneGroup) sceneGroup.updateMatrixWorld(true); } catch (_eMw) {}
@@ -2545,6 +2561,7 @@ export function createSolidPreviewLightingManager(opts) {
 
   function _solidShPushUniformsFromState() {
     const irr = _irrCfg();
+    // Anti-regression: SH/AO 链路只做间接光遮蔽，不读取 lightSize，不承担主光交界线宽化。
     let mix = _solidShIrrEnabled() && _solidShLastValid ? Math.max(0, Number(irr.diffuseMix) || 0) : 0;
     try {
       const drv = getSolidRasterPreviewLightingDerived();

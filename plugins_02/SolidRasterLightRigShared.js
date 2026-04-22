@@ -127,7 +127,15 @@ export function createSolidRasterLightRig(opts) {
   function _buildShadowSoftPackage(lightType, lightSize) {
     const c = _cfg();
     const sc = (c && c.shadowSoftness) ? c.shadowSoftness : {};
-    const t = _curveT(lightSize);
+    // 投影软化允许独立于主光 size 上限封顶：
+    // 例如主光 size 可到 25（用于交界线），但投影软化只跟到 15。
+    const sMin = _safeNum(sc.sizeMin, _safeNum(c.sizeMin, 1.0));
+    const sMax = _safeNum(sc.sizeMax, _safeNum(c.sizeMax, 15.0));
+    const tRaw = _clamp((lightSize - sMin) / Math.max(1e-6, sMax - sMin), 0, 1);
+    const ce = (c && c.conservativeEnergy) ? c.conservativeEnergy : {};
+    const t = (ce.curve === 'smoothstep') ? _smoothstep(tRaw) : tRaw;
+    // 主光交界线优先：弱化 size 对“阴影核软化”的驱动力，避免暗部变化盖过主光线条变化。
+    const tSoft = _clamp(t * 0.42, 0, 1);
     const key = _lightTypeKey(lightType, shadowLight);
 
     let defR = _safeNum(sc.spotDefault, 1.4);
@@ -140,13 +148,13 @@ export function createSolidRasterLightRig(opts) {
       maxR = getIsMobile() ? _safeNum(sc.pointMaxMobile, 2.2) : _safeNum(sc.pointMaxDesktop, 2.85);
     }
     return {
-      radiusTarget: _lerp(defR, maxR, t),
+      radiusTarget: _lerp(defR, maxR, tSoft),
       blurMin: getIsMobile() ? _safeNum(sc.blurSamplesMinMobile, 12) : _safeNum(sc.blurSamplesMinDesktop, 18),
       blurMax: getIsMobile() ? _safeNum(sc.blurSamplesMaxMobile, 18) : _safeNum(sc.blurSamplesMaxDesktop, 24),
       blurSampleHysteresis: _safeNum(sc.blurSampleHysteresis, 1.25),
       contactGuard: !!sc.contactGuard,
       lightType: key,
-      t,
+      t: tSoft,
     };
   }
 

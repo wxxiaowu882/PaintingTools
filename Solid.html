@@ -137,6 +137,7 @@
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from './plugins_02/SolidPreviewLighting.js';
     import { createSolidRasterLightRig } from './plugins_02/SolidRasterLightRigShared.js';
     import { createSolidRasterPreviewComposer } from './plugins_02/SolidRasterPreviewComposer.js';
+    import { createSolidPathTracerSyncController } from './plugins_02/SolidPathTracerSyncShared.js';
     import { attachSolidBuiltinSphereShadowCore } from './plugins_02/solidBuiltinSphereShadowCore.js';
     import { installSolidEnvHostBindings } from './plugins_02/SolidEnvControlShared.js';
     import { installSolidAtmosphereHostBindings } from './plugins_02/SolidAtmosphereControlShared.js';
@@ -164,6 +165,17 @@
     }
     const isIosPosterizeHost = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false; let solidAnimRafId = 0; window.sumDuration = 0;
+    const _solidPtSync = createSolidPathTracerSyncController({
+        minIntervalMs: Math.max(16, Number(_solidPtCfg.resetMinIntervalMs || 120)),
+        debug: !!_solidPtCfg.debugResetLog,
+        forceReasons: ['light_moved', 'scene_loaded', 'change_mat'],
+        log: (msg) => { try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e) {} },
+        onAfterReset: ({ now }) => {
+            window.__solidLastResetAt = now;
+            window.sumDuration = 0;
+        },
+        setRasterPreviewUntil: (ts) => { window._solidPtRasterPreviewUntil = ts; },
+    });
     // 默认不自动开启渲染：初次进入为预览模式，需用户点击「开启渲染」再尝试开启完整效果
     window.useAdvancedRender = false;
     window._solidUserStoppedRender = true;
@@ -560,10 +572,25 @@
     try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.dispose) window.__solidPreviewLighting.dispose(); } catch (_eDisp) {}
     window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none'; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
     document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1';
-    document.getElementById('main-panel').style.pointerEvents = 'auto'; window.isLoadingScene = false; if (!pathTracer && renderer) { try {
+    document.getElementById('main-panel').style.pointerEvents = 'auto'; window.isLoadingScene = false;
+    const _entered = _solidPtSync.enterAdvancedRenderSequence({
+    bridgeMs: Number(_solidPtCfg.bridgeMs || 260),
+    beforeEnter() { needsUpdate = true; lightMoved = true; window.sumDuration = 0; window.lastRenderTime = 0; },
+    buildEnvironment,
+    ensurePathTracer() {
+    if (pathTracer) return true;
+    if (!renderer) return false;
+    try {
     pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = _solidPtCfg.multipleImportanceSampling !== false; pathTracer.bounces = Number(_solidPtCfg.bounces || 3); pathTracer.renderScale = _solidPathTracerRenderScale();
-    if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; } catch(e) { triggerUnsupported('forceReRender_path_tracer', e.message); return; } }
-    if(pathTracer) { needsUpdate = true; lightMoved = true; window.sumDuration = 0; window.lastRenderTime = 0; pathTracer.updateMaterials(); pathTracer.updateLights(); pathTracer.reset(); window.isUnsupported = false; window._solidContextLost = false; window._solidSampleTimeout = false; window.__solidLastResetAt = performance.now(); window._solidPerfSoftFail = false;
+    if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor;
+    return true;
+    } catch(e) { triggerUnsupported('forceReRender_path_tracer', e.message); return false; }
+    },
+    getPathTracer: () => pathTracer,
+    onPathTracerReady(pt) { try { pt.updateMaterials(); pt.updateLights(); } catch(_eUp) {} },
+    resetReason: 'light_moved',
+    });
+    if (_entered && pathTracer) { window.isUnsupported = false; window._solidContextLost = false; window._solidSampleTimeout = false; window._solidPerfSoftFail = false;
     if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); }
     syncRenderButtons();
     hwLog("已尝试开启渲染并重建状态"); }; window.isUnsupported = false;
@@ -811,7 +838,7 @@
     else { child.material = child.userData.isFlat ? sysMaterials.flat.clone() : (child.userData.shape==='sphere' ? sysMaterials.sphere.clone() : sysMaterials.plaster.clone()); if(child.userData.customColor) child.material.color.set(child.userData.customColor); }
     } else {
     const idx = parseInt(window.matType); child.material = sysMaterials.plaster.clone(); child.material.color.set(child.userData.customColor || '#e8e8e8'); child.material.roughness = (child.userData.shape==='sphere' && idx===0) ? 0.6 : roughs[idx]; child.material.metalness = metals[idx]; child.material.transmission = trans[idx]; child.material.transparent = trans[idx] > 0; child.material.ior = 1.5; if(child.userData.isFlat) child.material.flatShading = true;
-    } } }); if(pathTracer) { lightMoved = true; needsUpdate = true; pathTracer.reset(); window.sumDuration = 0; }
+    } } }); if(pathTracer) { lightMoved = true; needsUpdate = true; _solidPtSync.queueReset('change_mat'); }
     try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('change_mat'); } catch(_eP) {}
     window.isLoadingScene = false;
     try { syncRenderButtons(); } catch (_eBtnMat) {}
@@ -961,7 +988,7 @@
     setLoaderText("恢复标注与场景元素..."); setLoaderProgress(83);
     Promise.all(promises).then(() => { setLoaderProgress(90); setLoaderText("构建光栅光影..."); requestAnimationFrame(() => { requestAnimationFrame(() => { setLoaderProgress(97); window.resetAll();
     
-    if (window.useAdvancedRender && pathTracer) { pathTracer.updateMaterials(); lightPosUpdated = true; pathTracer.reset(); window.sumDuration = 0; }
+    if (window.useAdvancedRender && pathTracer) { pathTracer.updateMaterials(); lightPosUpdated = true; _solidPtSync.queueReset('scene_loaded'); }
     window.isLoadingScene = false; // [解锁] 资产与BVH就绪，放行渲染
     try { syncRenderButtons(); } catch (_eBtnScene) {}
     try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_loaded'); } catch(_eP) {}
@@ -1166,8 +1193,12 @@
         if (typeof window.updateAnnotationEyeButtonVisibility === 'function') window.updateAnnotationEyeButtonVisibility();
         if (window.SkyEnvLight && window.SkyEnvLight.mountUI) window.SkyEnvLight.mountUI();
         const markNeedsUpdate = function(reason) {
-            needsUpdate = true; lightMoved = true;
-            if (pathTracer) { try { pathTracer.reset(); } catch(_e) {} window.sumDuration = 0; }
+            _solidPtSync.markPathTracerDirty({
+                reason: String(reason || 'mark_needs_update'),
+                setNeedsUpdate: (v) => { needsUpdate = !!v; },
+                setLightMoved: (v) => { lightMoved = !!v; },
+                hasPathTracer: () => !!pathTracer,
+            });
         };
         installSolidEnvHostBindings({
             THREE,
@@ -1222,6 +1253,7 @@
             try { localStorage.setItem('SolidPerfResult_v1', JSON.stringify({ passed: true, ts: Date.now(), ua: navigator.userAgent })); } catch(_e) {}
             } else { window.hwLog('[Init] 静默重试失败，保持降级模式'); } } }, 12000);
         }
+        // Host-specific (consumer): 首次进入性能测试与软降级策略保留在消费端，不抽到共享模块。
         if (window._solidHardwareUnsupported) {
             resetSolidPerfHardwareProgress();
             const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none';
@@ -1309,6 +1341,18 @@
         getTempColor: (t) => solidGetTempColorFromKelvin100(THREE, t),
         assignPathTracerFlags(f) { if (f.lightPosUpdated) lightPosUpdated = true; if (f.lightMoved) lightMoved = true; },
         requestRasterProbe(reason) { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe(reason); },
+        afterLightDirectionInput() {
+            try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSs) {}
+            try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_dir'); } catch (_eP) {}
+        },
+        afterLightSizeInput() {
+            try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSs2) {}
+            try { window._solidGroundShadowDirty = true; } catch (_eGs2) {}
+        },
+        afterLightIntensityInput() {
+            try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSi) {}
+            try { window._solidGroundShadowDirty = true; } catch (_eGi) {}
+        },
         });
         }
         function __solidEvalImmersiveIdle() {
@@ -1384,17 +1428,21 @@
         if (pathTracer) { if (window.isLoadingScene) { try { _solidTryRasterPreviewDraw(); } catch(err) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); return; }
         // 光追切灯/切环境后的即时体验：短暂显示光栅预览，避免 reset 后画面瞬间发黑
         try {
-        const _pvUntil = window._solidPtRasterPreviewUntil || 0;
-        if (_pvUntil && performance.now() < _pvUntil) {
+        if (_solidPtSync.isInRasterPreviewBridge(performance.now())) {
         if (renderer) { try { _solidTryRasterPreviewDraw(); } catch(_ePvR) {} if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer }); }
         return;
         }
         } catch(_ePv) {}
         try { // 正式全速渲染核心逻辑
-        if (lightMoved || lightPosUpdated || needsUpdate) { camera.updateMatrixWorld(); if (lightMoved) { pathTracer.setScene(scene, camera); }
-        else if (lightPosUpdated && pathTracer.updateLights) { pathTracer.updateLights(); }
-        else { pathTracer.updateCamera(); }
-        pathTracer.reset(); lightMoved = false; lightPosUpdated = false; needsUpdate = false; window.sumDuration = 0; window.__solidLastResetAt = performance.now();
+        if (lightMoved || lightPosUpdated || needsUpdate) { camera.updateMatrixWorld(); if (lightMoved) { pathTracer.setScene(scene, camera); _solidPtSync.queueReset('light_moved'); }
+        else if (lightPosUpdated && pathTracer.updateLights) { pathTracer.updateLights(); _solidPtSync.queueReset('light_updated'); }
+        else { pathTracer.updateCamera(); _solidPtSync.queueReset('camera_update'); }
+        lightMoved = false; lightPosUpdated = false; needsUpdate = false;
+        }
+        _solidPtSync.tryReset(pathTracer);
+        if (_solidPtSync.hasPending()) {
+            // 场景/灯光已更新但 reset 尚未落地时，禁止继续累计，避免旧样本污染新光照导致整片发黑。
+            return;
         }
         const pBar = document.getElementById('render-progress-bar'); const targetSamples = _solidPt.targetSamples; const currentSamples = pathTracer.samples;
         // 【采样超时保底·防黑屏】：reset 后长时间卡在 samples=0，自动切光栅

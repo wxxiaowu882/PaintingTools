@@ -68,6 +68,12 @@ export const SOLID_PATH_TRACER_QUALITY = {
     desktopRenderScaleCap: 0.64, // 桌面端 renderScale 的安全上限：用于降低首帧编译/显存压力。
     bounces: 3, // 光线最多反弹次数：越高越真实（尤其暗部与间接光），但耗时明显增加。常用 2~4。
     multipleImportanceSampling: true, // 多重重要性采样：通常建议保持 true，可明显降低噪点；关闭后可能更快但更脏。
+    // 历史追光口径（anti-regression）：
+    // size 必须直接作用主光几何参数（spot/point/dir.radius 与 rect 面积），
+    // 不可在配置层永久 decouple，否则会明显损失半影与明暗交界线质量。
+    // pathTracer.reset 最小间隔（毫秒）：合并高频事件，避免样本反复清零。
+    resetMinIntervalMs: 160,
+    debugResetLog: false,
     // 两套质量档：可按业务诉求在 default / antiSpeckle 之间切换。
     profiles: {
       // 默认均衡档：速度与画质折中。
@@ -99,6 +105,9 @@ export const SOLID_PATH_TRACER_QUALITY = {
   producer: {
     bounces: 3, // 编辑端反弹次数：一般不建议超过 3，否则交互时明显变慢。
     multipleImportanceSampling: true, // 同上，编辑端也建议保持 true，减少“看起来脏”的主观感受。
+    resetMinIntervalMs: 160, // 与消费端保持同量级 reset 节流，避免高频重置导致样本污染与噪点放大。
+    debugResetLog: false,
+    bridgeMs: 260, // 追光切换时的短暂光栅过渡窗，降低“黑一下”感知。
     renderScaleMobile: 0.38, // 编辑端手机 renderScale：偏低保证拖拽/旋转跟手。
     renderScaleDesktop: 0.62, // 编辑端桌面 renderScale：平衡“能看清”与“可交互”。
     filterGlossyFactor: 1.0, // 编辑端高光抗噪：默认 1.0 保持材质边缘锐度。
@@ -187,7 +196,8 @@ export const SOLID_RASTER_AREA_LIGHT_RIG = {
   enabled: true, // 生产端与消费端同步启用；异常可一键回退为 false。
   mode: 'single_main', // single_main=单主光物理近似；dual=双灯（保留兼容，不作为默认）
   sizeMin: 1.0,
-  sizeMax: 15.0,
+  // 主光 size 上限：滑块拉到 25 时，交界线软化继续增强（由 terminator 映射接管）。
+  sizeMax: 25.0,
   // 严格守恒映射：size 增大时，shadowLight 直射下降，emitLight 直射上升，二者总量保持近似恒定。
   conservativeEnergy: {
     enabled: false,
@@ -220,6 +230,8 @@ export const SOLID_RASTER_AREA_LIGHT_RIG = {
   // 投影柔化：仅强化远端半影，不放大接触区软化
   shadowSoftness: {
     enabled: true,
+    // 投影软化 size 上限：保持历史“15 档”观感，避免 15→25 继续放大投影半影。
+    sizeMax: 15.0,
     contactGuard: true, // true=限制接触区增强，降低亮缝回归风险
     spotDefault: 1.4,
     dirDefault: 1.4,
@@ -245,9 +257,9 @@ export const SOLID_RASTER_AREA_LIGHT_RIG = {
     strengthMobile: 1.0,
     // 等效灯盘半角（弧度）：size 越大，采样方向锥越宽，交界线自然变宽
     widthMin: 0.04,
-    widthMax: 0.42,
+    widthMax: 0.56,
     // sizeT 曲线（<1：高区间增益更明显）
-    curvePow: 0.55,
+    curvePow: 0.42,
     // 调试：打印命中/兜底次数（默认关）
     debugLog: true,
   },
