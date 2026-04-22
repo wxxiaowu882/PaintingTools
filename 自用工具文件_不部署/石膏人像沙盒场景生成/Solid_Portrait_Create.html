@@ -35,9 +35,7 @@
     #mobile-frame-overlay[hidden]{display:none !important;} .mobile-frame-wrap{position:relative;will-change:width,height;transform:translateZ(0);}
     .mobile-frame-outer{position:absolute;inset:0;border:1px solid rgba(255,255,255,0.18);border-radius:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.35) inset;}
     .mobile-frame-safe{position:absolute;left:0;right:0;top:0;bottom:0;border:1px dashed rgba(255,255,255,0.12);border-radius:10px;} .mobile-frame-shade{position:absolute;background:rgba(0,0,0,0.10);}
-    </style> </head> <body><div id="debug-log-panel" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()" onpointermove="event.stopPropagation()" style="display:none; position:fixed; top:10px; right:10px; width:320px; background:rgba(0,0,0,0.9); border:1px solid #ff4444; border-radius:6px; z-index:9999; padding:10px; box-shadow: 0 4px 20px rgba(0,0,0,0.6);">
-    <div style="display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #333; padding-bottom:5px; align-items:center;"><span style="color:#ff4444; font-weight:bold; font-size:12px;">排错日志</span><button onclick="copyDebugLog()" style="background:#2ecc71; border:none; color:#fff; padding:4px 8px; border-radius:3px; cursor:pointer; font-size:10px; font-weight:bold;">一键复制</button></div>
-    <textarea id="log-content" readonly style="width:100%; height:180px; background:transparent; border:none; color:#fff; font-family:monospace; font-size:10px; line-height:1.4; resize:none; outline:none; cursor:text; overflow-y:auto;"></textarea></div> <!-- 截取框默认隐藏 --> <div id="crop-box" style="display:none; position:fixed; border:2px dashed #2ecc71; width:256px; height:256px; top:calc(50% - 128px); left:calc(50% - 128px); z-index:400; pointer-events:none; outline: 9999px solid rgba(0,0,0,0.6);">
+    </style> </head> <body><!-- 截取框默认隐藏 --> <div id="crop-box" style="display:none; position:fixed; border:2px dashed #2ecc71; width:256px; height:256px; top:calc(50% - 128px); left:calc(50% - 128px); z-index:400; pointer-events:none; outline: 9999px solid rgba(0,0,0,0.6);">
     <div id="crop-drag-handle" style="position:absolute; top:0; left:0; width:100%; height:24px; background:rgba(46, 204, 113, 0.8); pointer-events:auto; cursor:move; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold; user-select:none;">拖拽此处移动截取框</div><div id="crop-resize-handle" style="position:absolute; right:-7px; bottom:-7px; width:14px; height:14px; background:#fff; border:2px solid #2ecc71; border-radius:50%; pointer-events:auto; cursor:nwse-resize; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div></div> <!-- 编辑器专属面板 -->
     <div class="editor-panel" id="editor-panel-left"><div style="font-size:12px; font-weight:bold; margin-bottom:10px; color:#a0a0a0; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:6px;">场景生产工具 (SolidCreate)</div><div style="display:flex; gap:6px; margin-bottom:6px;">
     <button class="editor-btn" style="background:#8e44ad; border-color:#9b59b6; flex:1; margin-bottom:0; font-weight:bold;" onclick="mountWorkDirectory()">📂 挂载新目录</button>
@@ -169,35 +167,20 @@
     window.ensurePosterize2dOverlay = function() { return (window.PosterizeShared && window.PosterizeShared.ensureOverlay) ? window.PosterizeShared.ensureOverlay() : null; };
     window.refreshIosPosterizeOverlayFromWebGL = function() { if (window.PosterizeShared && window.PosterizeShared.refreshOverlayFromWebGL) window.PosterizeShared.refreshOverlayFromWebGL(); };
     // window.changePosterize 已由 SolidAssistControlShared 注入
-    window._logCache = [];
     window.__solidDebugPanelEnabled = !!(SOLID_DEBUG_PANEL && SOLID_DEBUG_PANEL.enabled);
-    try { const _dp = document.getElementById('debug-log-panel'); if (_dp && !window.__solidDebugPanelEnabled) _dp.style.display = 'none'; } catch (_eDp) {}
     window.addHwLog = function(msg) {
         if (!window.__solidDebugPanelEnabled) return;
-        const panel = document.getElementById('debug-log-panel');
-        const content = document.getElementById('log-content');
-        if (panel) panel.style.display = 'block';
-        const time = new Date().toLocaleTimeString();
-        window._logCache.push(`[${time}] ${msg}`);
-        if (window._logCache.length > 50) window._logCache.shift();
-        if (content) { content.value = window._logCache.join('\n'); content.scrollTop = content.scrollHeight; }
-        console.log(`[HW-LOG] ${msg}`);
+        console.log(`[HW-LOG] ${String(msg)}`);
     };
     window.diagnosticPanelLog = function(msg) {
         if (!window.__solidDebugPanelEnabled) return;
-        const panel = document.getElementById('debug-log-panel');
-        const content = document.getElementById('log-content');
-        if (panel) panel.style.display = 'block';
-        const time = new Date().toLocaleTimeString();
-        window._logCache.push(`[${time}] ${msg}`);
-        if (window._logCache.length > 80) window._logCache.shift();
-        if (content) { content.value = window._logCache.join('\n'); content.scrollTop = content.scrollHeight; }
+        console.log(`[SolidCreate-Diag] ${String(msg)}`);
     };
     function solidCreateDebugLog(msg) {
         try { if (window.diagnosticPanelLog) window.diagnosticPanelLog(String(msg)); } catch (_e0) {}
         try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e1) {}
     }
-    window.copyDebugLog = function() { const content = document.getElementById('log-content'); content.select(); try { document.execCommand('copy'); alert("成功复制日志！请粘贴发给我。"); } catch(e) { alert("自动复制失败，请在文本框内全选文字手动复制"); } }; window.hwLog = window.addHwLog;
+    window.hwLog = window.addHwLog;
     window.addEventListener('error', e => { if (window.__solidDebugPanelEnabled) window.hwLog('WinErr: ' + e.message); }); window.addEventListener('unhandledrejection', e => { if (window.__solidDebugPanelEnabled) window.hwLog('PromiseRej: ' + e.reason); });
     const originalConsoleError = console.error; console.error = function(...args) {
     originalConsoleError.apply(console, args); const msg = args.join(' ').toLowerCase();

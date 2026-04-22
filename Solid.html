@@ -115,7 +115,6 @@
     <div id="persistent-warning" style="display:none;position:fixed;top:0;left:0;width:100%;background:rgba(0,0,0,0.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);text-align:center;padding:6px 10px;font-size:9px;z-index:6000;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;"> 设备原因导致没有投影和反光，请换高性能设备获得更好的效果。 </div>
     <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">渲染时遇到问题</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">当前设备不支持高级渲染，导致不能出现投影和散射光，想要获得更高级的体验，请去电脑端网页版获得更好的功能体验。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
     <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div id="scene-loader-inner"> <div id="scene-load-pct">0%</div> <div class="scene-load-bar-track" aria-hidden="true"><div id="scene-load-bar-fill" class="scene-load-bar-fill"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">系统环境初始化中...</div> </div> </div>
-    <div id="debug-log-panel" style="display:none; position:fixed; top:10px; left:10px; width:300px; max-height:220px; background:rgba(0,0,0,0.85); border:1px solid #ff4444; border-radius:6px; z-index:9999; padding:10px; font-family:monospace; font-size:10px; color:#fff; overflow-y:auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);"> <div style="display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #333; padding-bottom:3px; align-items:center; gap:6px; flex-wrap:wrap;"> <span style="color:#ff4444; font-weight:bold;">DEBUG LOG (排错模式)</span> <button onclick="copyDebugLog()" style="background:#444; border:none; color:#fff; padding:2px 6px; border-radius:3px; cursor:pointer; font-size:9px;">复制日志</button> </div> <div id="log-content" style="white-space:pre-wrap; line-height:1.4;"></div> </div>
     <div id="perf-test-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:5550; flex-direction:column; align-items:center; justify-content:center;"> <div class="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin mb-4"></div> <div class="font-hairline text-[10px] tracking-[0.2em] text-white/80">正在测试设备渲染性能...</div> <div class="text-[8px] text-white/40 mt-2">首次进入时安全审计，即将完成</div> </div>
     <div id="top-left-scene-btn" style="position:fixed; top:20px; left:20px; z-index:5000; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:8px 14px; border-radius:10px; display:flex; align-items:center; gap:10px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="document.getElementById('scene-grid-modal').style.display='flex'"> <span style="color:#fff; font-size:14px; font-weight:400; letter-spacing:1px;">场景：</span>
     <span id="scene-trigger-top" style="color:#fff; font-size:14px; font-weight:normal; max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">点击选择...</span> <span style="color:#666; font-size:10px;">▼</span> </div>
@@ -210,25 +209,13 @@
     window.ensurePosterize2dOverlay = function() { return (window.PosterizeShared && window.PosterizeShared.ensureOverlay) ? window.PosterizeShared.ensureOverlay() : null; };
     window.refreshIosPosterizeOverlayFromWebGL = function() { if (window.PosterizeShared && window.PosterizeShared.refreshOverlayFromWebGL) window.PosterizeShared.refreshOverlayFromWebGL(); };
     // changePosterize/changeAtmosphere/changeDoF/setEnvColor/setSkyLightScale/toggleWall 由 shared 胶水统一注入
-    window._logCache = [];
     window.__solidDebugPanelEnabled = !!(SOLID_DEBUG_PANEL && SOLID_DEBUG_PANEL.enabled);
-    try { const _dp = document.getElementById('debug-log-panel'); if (_dp && !window.__solidDebugPanelEnabled) _dp.style.display = 'none'; } catch (_eDp) {}
     window.addHwLog = function(msg) {
         if (!window.__solidDebugPanelEnabled) return;
-        const panel = document.getElementById('debug-log-panel');
-        const content = document.getElementById('log-content');
-        const time = new Date().toLocaleTimeString();
         const s = String(msg);
-        window._logCache.push(`[${time}] ${s}`);
-        if (window._logCache.length > 50) window._logCache.shift();
-        if (panel) panel.style.display = 'block';
-        if (content) {
-            content.innerText = window._logCache.join('\n');
-            if (panel) panel.scrollTop = panel.scrollHeight;
-        }
         console.log('[Solid]', s);
     };
-    window.copyDebugLog = function() { navigator.clipboard.writeText(document.getElementById('log-content').innerText).then(() => { alert("日志已复制到剪贴板"); }); }; window.hwLog = window.addHwLog;
+    window.hwLog = window.addHwLog;
     window.__solidGetDiagnostics = function() {
         const out = { t: Date.now(), visibility: typeof document !== 'undefined' ? document.visibilityState : null, hidden: typeof document !== 'undefined' ? document.hidden : null };
         try {
