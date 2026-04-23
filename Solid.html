@@ -37,7 +37,7 @@
     .modal-close { cursor:pointer; width:32px; height:32px; flex-shrink:0; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.08); border:none; border-radius:10px; font-size:18px; line-height:1; position:relative; z-index:9001; pointer-events:auto; color:rgba(255,255,255,0.7); user-select:none; -webkit-tap-highlight-color:transparent; }
     .modal-close:hover { background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.9); }
     .scene-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows:max-content; gap:15px; overflow-y:auto; flex:1; align-content:start; padding-bottom:30px; min-height:0; -webkit-overflow-scrolling:touch; }
-    .scene-item { background:rgba(20,20,20,0.8); border:1px solid rgba(255,255,255,0.05); border-radius:10px; cursor:pointer; transition:all 0.3s cubic-bezier(0.4,0,0.2,1); overflow:hidden; position:relative; display:flex; flex-direction:column; box-shadow:0 4px 15px rgba(0,0,0,0.5); align-self:start; }
+    .scene-item { background:rgba(20,20,20,0.8); border:1px solid rgba(255,255,255,0.05); border-radius:10px; cursor:pointer; transition:all 0.3s cubic-bezier(0.4,0,0.2,1); overflow:hidden; position:relative; display:flex; flex-direction:column; box-shadow:0 4px 15px rgba(0,0,0,0.5); align-self:start; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
     .scene-item:hover, .scene-item.active { border-color:#fff; background:rgba(40,40,40,1); transform:translateY(-2px); box-shadow:0 8px 25px rgba(0,0,0,0.8); }
     .scene-thumb { width:100%; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; background:#111; flex-shrink:0; }
     .scene-name { padding:10px 8px; font-size:11px; text-align:center; color:#ddd; font-weight:300; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -1292,7 +1292,69 @@
         const detailEsc = escapeHtml(detailRaw).replace(/\r?\n/g, '<br>');
         // 仅允许 <b></b> 作为轻量强调，其它 HTML 依然保持转义，避免注入
         const detailSafe = detailEsc.replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>');
-        const item = document.createElement('div'); item.className = 'scene-item'; item.onclick = () => { window.switchScene(i); window.closeSceneGridModal(); };
+        const item = document.createElement('div'); item.className = 'scene-item';
+        // iOS Safari：在可滚动容器内，DIV onclick 可能出现“首次点按无效/第二次才触发”的合成 click 问题；
+        // 这里改为 pointerup/touchend 优先，并加“防滚动误触”阈值，click 仅作兜底。
+        (function bindSceneItemActivate(el, idx) {
+            let sx = 0, sy = 0, moved = false, hadTouch = false;
+            const TH = 8; // px
+            function _pt(e) {
+                try {
+                    if (e && e.changedTouches && e.changedTouches[0]) return e.changedTouches[0];
+                    if (e && e.touches && e.touches[0]) return e.touches[0];
+                } catch (_e) {}
+                return e || {};
+            }
+            function _isFromFav(e) {
+                try {
+                    let t = e && e.target;
+                    if (t && t.nodeType === 3 && t.parentElement) t = t.parentElement;
+                    return !!(t && typeof t.closest === 'function' && t.closest('.scene-fav-btn'));
+                } catch (_e) { return false; }
+            }
+            function _activate(e) {
+                if (_isFromFav(e)) return;
+                if (moved) return;
+                try { window.switchScene(idx); } catch (_e) {}
+                try { window.closeSceneGridModal(); } catch (_e) {}
+            }
+            el.addEventListener('touchstart', (e) => {
+                hadTouch = true;
+                const p = _pt(e);
+                sx = Number(p.clientX || 0); sy = Number(p.clientY || 0);
+                moved = false;
+            }, { passive: true });
+            el.addEventListener('touchmove', (e) => {
+                const p = _pt(e);
+                const dx = Math.abs(Number(p.clientX || 0) - sx);
+                const dy = Math.abs(Number(p.clientY || 0) - sy);
+                if (dx > TH || dy > TH) moved = true;
+            }, { passive: true });
+            el.addEventListener('touchend', (e) => {
+                if (moved) return;
+                _activate(e);
+            }, { passive: true });
+            el.addEventListener('pointerdown', (e) => {
+                const p = _pt(e);
+                sx = Number(p.clientX || 0); sy = Number(p.clientY || 0);
+                moved = false;
+            }, { passive: true });
+            el.addEventListener('pointermove', (e) => {
+                const p = _pt(e);
+                const dx = Math.abs(Number(p.clientX || 0) - sx);
+                const dy = Math.abs(Number(p.clientY || 0) - sy);
+                if (dx > TH || dy > TH) moved = true;
+            }, { passive: true });
+            el.addEventListener('pointerup', (e) => {
+                if (moved) return;
+                _activate(e);
+            }, { passive: true });
+            el.addEventListener('click', (e) => {
+                // 触摸设备上避免 touchend + click 双触发
+                if (hadTouch) return;
+                _activate(e);
+            });
+        })(item, i);
         item.innerHTML =
         `<img src="${escapeHtml(thumb)}" class="scene-thumb" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Crect width=\\'100%25\\' height=\\'100%25\\' fill=\\'%23111\\'/%3E%3C/svg%3E'">` +
         `<div class="scene-meta">` +
