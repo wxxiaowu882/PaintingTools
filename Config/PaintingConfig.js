@@ -340,31 +340,27 @@ export const SOLID_RASTER_IRRADIANCE_PROBES = {
 };
 
 /**
- * 日志开关（给业务同学用）
+ * 日志配置（超简版）
+ * - 线上建议：level=1
+ * - 排障临时：level=3，排完改回1
  *
- * 你只需要记住这 2 步：
- * 1) 想“看排错信息”就把对应页面的 level 调高；
- * 2) 想“线上更干净、更省性能”就把 level 调低。
+ * level 含义：
+ * 0=不输出  1=只错误  2=错误+警告+信息  3=调试全开
  *
- * 级别说明（从安静到详细）：
- * - 0 = 完全不打日志（最安静）
- * - 1 = 只打错误（推荐线上）
- * - 2 = 错误 + 警告 + 一般信息（排查中等问题）
- * - 3 = 全量调试（最详细，可能刷屏，排查时临时开）
- *
- * 推荐用法：
- * - 日常/线上：masterLevel = 1
- * - 临时排查阴影或渲染问题：把 solid.level 临时改成 3，排完再改回 1
+ * 优先级：
+ * - enabled=false：本页日志全关
+ * - 否则用 pages.xxx.level
+ * - 没写就用 masterLevel
  */
 export const APP_LOGGING = {
-  masterLevel: 1, // 全局默认级别。所有页面先吃这个值。
+  masterLevel: 1, // 全局默认日志级别（推荐1）
   pages: {
     // Solid 主页面（几何光影观察）
     solid: {
-      enabled: true, // false=强制关闭该页日志（等价于 level=0）
-      level: 1, // 推荐默认 1；排障临时改 3。
+      enabled: true, // false=本页日志全关
+      level: 1, // 默认1；排障临时改3
       throttleMs: {
-        rasterShadowSoftDbg: 800, // 高频阴影调试日志的最小输出间隔（毫秒）
+        rasterShadowSoftDbg: 800, // 高频日志最小间隔(ms)
       },
     },
   },
