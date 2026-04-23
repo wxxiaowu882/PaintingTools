@@ -113,7 +113,7 @@ export function getSolidMainLightIntensityScalar(lightType, useAdvancedRender, s
   if (lightType === 'point') return val * 250;
   if (lightType === 'dir') return val * 2.8;
   if (lightType === 'rect') {
-    if (useAdvancedRender) return val * 18;
+    if (useAdvancedRender) return val * 5;
     return val * 300;
   }
   return val * 300;

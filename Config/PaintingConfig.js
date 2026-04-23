@@ -94,9 +94,9 @@ export const SOLID_PATH_TRACER_QUALITY = {
         renderScaleDesktop: 0.82, // 抗噪档桌面渲染比例：更高细节，建议仅在中高配设备开启。
         filterGlossyFactor: 0.78, // 抗噪档高光去噪更强：能抑制“亮点噪斑”，但会轻微损失锐利感。
         expRamp: 28, // 抗噪档曝光爬坡区间：给更多样本做平滑，减少亮度跳变。
-        expLo: 0.63, // 抗噪档低样本曝光：前期更稳，不容易炸白。
-        expHi: 0.74, // 抗噪档高样本曝光：最终亮度目标。
-        toneMappingExposureBase: 0.72, // 抗噪档基础曝光：略高以保证最终层次感。
+        expLo: 0.58, // 抗噪档低样本曝光：前期更稳，不容易炸白。
+        expHi: 0.70, // 抗噪档高样本曝光：最终亮度目标。
+        toneMappingExposureBase: 0.70, // 抗噪档基础曝光：略高以保证最终层次感。
       },
     },
   },
