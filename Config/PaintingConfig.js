@@ -43,7 +43,7 @@ export const SOLID_RASTER_SHADOW_PERF = {
   shadowMapSizeTiers: {
     idleDesktop: 4096, // 聚光/平行光：停着时(电脑)阴影清晰度（越大越清晰但更吃显卡）。
     interactiveDesktop: 2048, // 聚光/平行光：动的时候(电脑)阴影清晰度（动的时候降一档更流畅）。
-    idleMobile: 3072, // 聚光/平行光：停着时(手机)阴影清晰度。
+    idleMobile: 4096, // 聚光/平行光：停着时(手机)阴影清晰度。
     interactiveMobile: 2048, // 聚光/平行光：动的时候(手机)阴影清晰度。
     idlePointDesktop: 2048, // 点光源：停着时(电脑)阴影清晰度。
     interactivePointDesktop: 1536, // 点光源：动的时候(电脑)阴影清晰度。
