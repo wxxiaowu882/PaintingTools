@@ -1082,6 +1082,50 @@
     return x;
     } catch (_e) { return url; }
     }
+    function solidFogTypeText(type) {
+    const t = String(type || 'basic');
+    if (t === 'noise') return '扰动体积雾';
+    if (t === 'height') return '高度沉淀雾';
+    if (t === 'animated') return '动态流云雾';
+    return '基础平流雾';
+    }
+    function solidApplyAtmosphereStateToPanel(atmosphere) {
+    const a = atmosphere || {};
+    const enabled = !!a.enabled;
+    const density = Number.isFinite(Number(a.density)) ? Number(a.density) : 0.02;
+    const type = String(a.type || 'basic');
+    const color = (a.color != null && String(a.color).trim() !== '') ? String(a.color) : '#ffffff';
+    const p1 = Number.isFinite(Number(a.p1)) ? Number(a.p1) : 0;
+    const p2 = Number.isFinite(Number(a.p2)) ? Number(a.p2) : 0;
+    window.isFogEnabled = enabled; window.fogDensity = density; window.currentFogType = type;
+    const fogChk = document.getElementById('fogEnable'); if (fogChk) fogChk.checked = enabled;
+    const fogSlider = document.getElementById('fogSlider'); if (fogSlider) fogSlider.value = String(density);
+    const fogColor = document.getElementById('fogColorPicker'); if (fogColor) fogColor.value = color;
+    if (type !== 'basic') {
+    const s1 = document.getElementById('fogParam1_' + type); if (s1) s1.value = String(p1);
+    const s2 = document.getElementById('fogParam2_' + type); if (s2) s2.value = String(p2);
+    }
+    try {
+    const trigger = document.getElementById('fog-type-trigger'); if (trigger) trigger.innerText = solidFogTypeText(type);
+    ['noise', 'height', 'animated'].forEach(t => { const p = document.getElementById('fog-params-' + t); if (p) p.style.display = 'none'; });
+    if (type !== 'basic') { const activeP = document.getElementById('fog-params-' + type); if (activeP) activeP.style.display = 'flex'; }
+    const opts = document.querySelectorAll('#fog-type-options .custom-option'); opts.forEach(opt => opt.classList.remove('selected'));
+    opts.forEach(opt => { try { if (String(opt.getAttribute('onclick') || '').includes(`'${type}'`)) opt.classList.add('selected'); } catch (_e) {} });
+    } catch (_e2) {}
+    if (window.toggleFogAdvanced) window.toggleFogAdvanced(enabled);
+    else if (window.updateFogUI) window.updateFogUI();
+    }
+    function solidApplyDoFStateToPanel(dof) {
+    const d = dof || {};
+    const enabled = !!d.enabled;
+    const aperture = Number.isFinite(Number(d.aperture)) ? Number(d.aperture) : 2.8;
+    const focus = Number.isFinite(Number(d.focusDistance)) ? Number(d.focusDistance) : 10;
+    const chk = document.getElementById('dofEnable'); if (chk) chk.checked = enabled;
+    const aSlider = document.getElementById('dofApertureSlider'); if (aSlider) aSlider.value = String(aperture);
+    const fSlider = document.getElementById('dofFocusSlider'); if (fSlider) fSlider.value = String(focus);
+    if (window.toggleDoF) window.toggleDoF(enabled);
+    else if (window.updateDoFUI) window.updateDoFUI();
+    }
     window.resetAll = function() { if(!window.currentSceneData) return; const data = window.currentSceneData; if(data.light) {
     state.azimuth = data.light.azimuth; document.getElementById('lightAzimuth').value = state.azimuth; document.getElementById('azimuthVal').innerText = state.azimuth;
     state.elevation = data.light.elevation; document.getElementById('lightElevation').value = state.elevation; document.getElementById('elevationVal').innerText = state.elevation;
@@ -1095,15 +1139,24 @@
     if(data.camera) { camera.position.set(...data.camera.pos); controls.target.set(...data.camera.target); camera.zoom = data.camera.zoom; camera.updateProjectionMatrix(); controls.update(); }
     if(data.env) {
     if (data.env.hasWall !== undefined) { window.hasWall = data.env.hasWall; const wallBtn = document.getElementById('wall-btn'); const wchk = document.getElementById('wall-btn-checkbox'); if (wchk) wchk.checked = !!window.hasWall; if (wallBtn) { wallBtn.classList.toggle('active', window.hasWall); wallBtn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; } }
-    window.matType = data.env.defaultMat !== undefined ? data.env.defaultMat : 'origin'; window.posterizeLevel = data.env.posterizeLevel !== undefined ? data.env.posterizeLevel : 0; window.isFogEnabled = data.env.fogEnabled || false; window.fogDensity = data.env.fogDensity !== undefined ? data.env.fogDensity : 0.02;
+    window.matType = data.env.defaultMat !== undefined ? data.env.defaultMat : 'origin'; window.posterizeLevel = data.env.posterizeLevel !== undefined ? data.env.posterizeLevel : 0;
     window.envWallColor = data.env.wallColor || '#cccccc'; window.envGroundColor = data.env.groundColor || '#cccccc'; window.envSkyColor = data.env.skyColor || '#0d0d0f';
     window.envSkyLightScale = data.env.skyLightScale !== undefined && data.env.skyLightScale !== null ? Number(data.env.skyLightScale) : 1; if (Number.isNaN(window.envSkyLightScale)) window.envSkyLightScale = 1;
-    window.envSkyLightScale = Math.min(1, Math.max(0, window.envSkyLightScale)); } else {
-    window.matType = 'origin'; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1; }
+    window.envSkyLightScale = Math.min(1, Math.max(0, window.envSkyLightScale));
+    const _atm = data.env.atmosphere || { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 };
+    const _dof = data.env.dof || { enabled: false, aperture: 2.8, focusDistance: 10 };
+    window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof;
+    } else {
+    window.matType = 'origin'; window.posterizeLevel = 0; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
+    const _atm = { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 }; const _dof = { enabled: false, aperture: 2.8, focusDistance: 10 };
+    window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof; }
     if (window.syncEnvColorPickers) window.syncEnvColorPickers();
     const matchedOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${window.matType}'"]`); if (matchedOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedOpt.innerText;
     document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedOpt.classList.add('selected'); }
-    buildEnvironment(); window.changeMat(window.matType); window.changePosterize(window.posterizeLevel); window.changeAtmosphere(window.isFogEnabled, window.fogDensity); const fChk = document.getElementById('fogEnable'); if(fChk) { fChk.checked = window.isFogEnabled; const fSld = document.getElementById('fogSlider'); if(fSld){ fSld.style.opacity = window.isFogEnabled?'1':'0.5'; fSld.value = window.fogDensity!==undefined?window.fogDensity:0.02; } const fVal = document.getElementById('fogVal'); if(fVal) fVal.innerText = (window.fogDensity!==undefined?window.fogDensity:0.02).toFixed(2); } const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity(); lightMoved = true; try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('reset_all'); } catch(_eP) {} }; window.switchScene = function(index) { if(index === window.currentSceneIndex) return; window.isLoadingScene = true; // [锁定] 安全锁启动
+    buildEnvironment(); window.changeMat(window.matType); window.changePosterize(window.posterizeLevel);
+    solidApplyAtmosphereStateToPanel(window.__solidSceneAtmosphere || { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 });
+    solidApplyDoFStateToPanel(window.__solidSceneDoF || { enabled: false, aperture: 2.8, focusDistance: 10 });
+    const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity(); lightMoved = true; try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('reset_all'); } catch(_eP) {} }; window.switchScene = function(index) { if(index === window.currentSceneIndex) return; window.isLoadingScene = true; // [锁定] 安全锁启动
     try { _solidDisposeRasterEnvProbe(); } catch(_eDisp) {}
     window.currentSceneIndex = index; const data = window.customScenes[index]; window.currentSceneData = data; // 修复首帧视角跳变：先应用目标场景的相机参数，再开始资产加载，避免先看到上一个场景视角
     if (data && data.camera) { camera.position.set(...data.camera.pos); controls.target.set(...data.camera.target); camera.zoom = data.camera.zoom; camera.updateProjectionMatrix(); controls.update(); needsUpdate = true; lightMoved = true; }
