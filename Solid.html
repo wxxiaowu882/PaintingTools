@@ -1177,6 +1177,7 @@
     try {
     if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
     else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed');
+    try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('scene_changed'); } catch (_eScChg) {}
     } catch(_eP0) {}
     try {
     requestAnimationFrame(() => {
@@ -1545,6 +1546,7 @@
         buildEnvironment();
         if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
         else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed');
+        try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('scene_changed'); } catch (_eScChg) {}
         try { _solidTryRasterPreviewDraw(); } catch (_eDraw0) {}
         try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eDraw1) {} }); } catch (_eDrawRaf) {}
         } catch (_eConverge) {}

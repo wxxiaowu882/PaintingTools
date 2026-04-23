@@ -69,7 +69,7 @@ export function createSolidPreviewLightingManager(opts) {
   let _sceneChangedSyncRaf = 0;
   let _sceneChangedSyncTimer80 = 0;
   let _sceneChangedSyncTimer220 = 0;
-  const _safeShadowInjectDefaultOn = true;
+  const _safeShadowInjectDefaultOn = false;
 
   // ---------- Perf tiering (interactive vs idle) ----------
   // We only adjust uniforms (taps/rotate) during interaction to avoid shader recompiles.
@@ -630,16 +630,6 @@ export function createSolidPreviewLightingManager(opts) {
         variant: 'k' + String(kindTag),
         apply: (shader) => {
           try {
-          // Safe mode: avoid rewriting getShadow/getPointShadow function body in shadowmap_pars_fragment.
-          // This significantly reduces ANGLE X4000 warnings on some drivers.
-          if (_safeShadowInjectDefaultOn) {
-            try {
-              if (ud.uSolidTermSizeT && ud.uSolidTermStrength && ud.uSolidTermWidthMin && ud.uSolidTermWidthMax) {
-                _applySolidTerminatorShaderPatch(shader, ud);
-              }
-            } catch (_eTermRecvSafe) {}
-            return;
-          }
           // --- patch shadow chunk wrappers ---
           let fs = shader.fragmentShader;
           const inc = '#include <shadowmap_pars_fragment>';
@@ -1697,7 +1687,7 @@ export function createSolidPreviewLightingManager(opts) {
           m.onBeforeCompile = (shader) => {
             let fs = shader.fragmentShader;
             let cnt = 0;
-            if (!_safeShadowInjectDefaultOn && cnt <= 0) {
+            if (cnt <= 0) {
               try {
                 const inc = '#include <shadowmap_pars_fragment>';
                 if (fs.includes(inc) && THREE.ShaderChunk && THREE.ShaderChunk.shadowmap_pars_fragment) {
@@ -2111,8 +2101,6 @@ export function createSolidPreviewLightingManager(opts) {
             shader.uniforms.uSolidMainLightType = m.userData.uSolidMainLightType;
             shader.uniforms.uSolidMainLightPos = m.userData.uSolidMainLightPos;
             shader.uniforms.uSolidMainLightDir = m.userData.uSolidMainLightDir;
-
-            if (_safeShadowInjectDefaultOn) return;
 
             shader.fragmentShader =
               'varying vec3 vSolidShadowGroundPos;\n' +
