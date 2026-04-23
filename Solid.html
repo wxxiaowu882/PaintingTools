@@ -166,6 +166,12 @@
     }
     const isIosPosterizeHost = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     let scene, camera, renderer, controls, pathTracer, mainLight, ground, lightType = 'spot', needsUpdate = true, lightMoved = true, lightPosUpdated = false; let solidAnimRafId = 0; window.sumDuration = 0;
+    window.__solidSceneLoadToken = 0;
+    window.__solidSceneVersion = 0;
+    window.__solidMatAppliedSceneVersion = -1;
+    window.__solidLastBuildEnvSig = '';
+    window.__solidGlbSceneCache = window.__solidGlbSceneCache || new Map();
+    window.__solidBuiltinGeometryCache = window.__solidBuiltinGeometryCache || new Map();
     const __solidStage = createSolidFrameStageScheduler({ log: (m) => { try { if (window.hwLog) window.hwLog(String(m)); } catch (_e) {} } });
     const __SOLID_DEGRADE_GUARD_KEY = '__solidDegradedOnce';
     function _solidSetDegradeGuard(reason) {
@@ -907,9 +913,29 @@
             if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe(reason);
         } catch (_e) {}
     };
-    function setLoaderText(msg) { document.getElementById('loader-text').innerText = msg; }
+    window.__solidLoaderUiState = window.__solidLoaderUiState || { lastText: '', lastPct: -1, lastPctAt: 0 };
+    function setLoaderText(msg) {
+        const text = String(msg == null ? '' : msg);
+        if (window.__solidLoaderUiState.lastText === text) return;
+        const el = document.getElementById('loader-text');
+        if (el) el.innerText = text;
+        window.__solidLoaderUiState.lastText = text;
+    }
     window.__solidSceneLoadUx = { running: false, target: 0, display: 0, raf: 0, timer: 0, timeoutTimer: 0, stabilizing: false, stableSince: 0, stableFrames: 0, minStableMs: 460, maxWaitMs: 3600, stabilizeStartAt: 0, settleDone: false };
-    function solidSetLoaderProgressNow(p) { p = Math.max(0, Math.min(100, Math.round(Number(p) || 0))); const fill = document.getElementById('scene-load-bar-fill'); const pctEl = document.getElementById('scene-load-pct'); if (fill) fill.style.transform = 'scaleX(' + (p / 100) + ')'; if (pctEl) pctEl.textContent = p + '%'; }
+    function solidSetLoaderProgressNow(p) {
+        p = Math.max(0, Math.min(100, Math.round(Number(p) || 0)));
+        const st = window.__solidLoaderUiState || { lastPct: -1, lastPctAt: 0 };
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        if (p === st.lastPct) return;
+        if (p < 100 && st.lastPct >= 0 && (now - (st.lastPctAt || 0)) < 48) return;
+        const fill = document.getElementById('scene-load-bar-fill');
+        const pctEl = document.getElementById('scene-load-pct');
+        if (fill) fill.style.transform = 'scaleX(' + (p / 100) + ')';
+        if (pctEl) pctEl.textContent = p + '%';
+        st.lastPct = p;
+        st.lastPctAt = now;
+        window.__solidLoaderUiState = st;
+    }
     function solidSceneLoadUxTick() { const ux = window.__solidSceneLoadUx; if (!ux.running) return; ux.display += (ux.target - ux.display) * 0.16; if (Math.abs(ux.target - ux.display) < 0.08) ux.display = ux.target; solidSetLoaderProgressNow(ux.display); ux.raf = requestAnimationFrame(solidSceneLoadUxTick); }
     function solidSceneLoadUxStart() { const ux = window.__solidSceneLoadUx; try { window.__solidSceneStabilizing = false; } catch (_eS0) {} try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e0) {} try { if (ux.timer) clearInterval(ux.timer); } catch (_e1) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e2) {} ux.stabilizing = false; ux.settleDone = false; ux.running = true; ux.target = 0; ux.display = 0; ux.raf = requestAnimationFrame(solidSceneLoadUxTick); ux.timer = setInterval(() => { if (!ux.running) return; ux.target = Math.max(ux.target, Math.min(95, ux.display + 0.25)); }, 420); ux.timeoutTimer = setTimeout(() => { if (!ux.running) return; setLoaderText('正在优化显示，马上完成...'); ux.target = Math.max(ux.target, 95); }, 10000); }
     function solidSceneLoadUxFinish() { const ux = window.__solidSceneLoadUx; if (!ux.running) return; ux.target = 100; setTimeout(() => { try { if (ux.timer) clearInterval(ux.timer); } catch (_e0) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e1) {} ux.running = false; try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e2) {} solidSetLoaderProgressNow(100); }, 220); }
@@ -1009,7 +1035,9 @@
 
     // 场景列表自适应换行：已改为纯 CSS Grid（auto-fit/minmax），不再需要 JS 判定/切 class
     window.togglePanel = function() { const panel = document.getElementById('main-panel'); panel.classList.toggle('minimized'); document.getElementById('toggle-icon').innerText = panel.classList.contains('minimized') ? '▲' : '✕'; };
-    window.changeMat = function(val) { window.isLoadingScene = true; window.matType = val; const roughs = [0.95, 0.15, 0.3, 0.05, 0.4]; const metals = [0.0, 0.0, 0.85, 0.0, 0.0]; const trans = [0.0, 0.0, 0.0, 1.0, 1.0];
+    window.changeMat = function(val) { const _wasLoading = !!window.isLoadingScene; window.isLoadingScene = true; window.matType = val; const roughs = [0.95, 0.15, 0.3, 0.05, 0.4]; const metals = [0.0, 0.0, 0.85, 0.0, 0.0]; const trans = [0.0, 0.0, 0.0, 1.0, 1.0];
+    const _targetSceneVer = Number(window.__solidSceneVersion || 0);
+    if (!_wasLoading && window.__solidMatAppliedSceneVersion === _targetSceneVer && String(window.__solidMatAppliedType || '') === String(window.matType || '')) { window.isLoadingScene = false; try { syncRenderButtons(); } catch (_eBtnSkip) {} return; }
     sceneGroup.traverse(child => { if (child.isMesh) {
     if (child.userData && child.userData.solidShadowCore) return;
     if (child.material && child.material !== child.userData.originalMaterial && child.material !== sysMaterials.flat && child.material !== sysMaterials.sphere && child.material !== sysMaterials.plaster) { safeDispose(child.material); }
@@ -1020,6 +1048,8 @@
     } } }); if(pathTracer) { lightMoved = true; needsUpdate = true; _solidPtSync.queueReset('change_mat'); }
     try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('change_mat'); } catch(_eP) {}
     window.isLoadingScene = false;
+    window.__solidMatAppliedSceneVersion = _targetSceneVer;
+    window.__solidMatAppliedType = String(window.matType || '');
     try { syncRenderButtons(); } catch (_eBtnMat) {}
     };
     window.selectCustomOpt = function(type, value, text, el) {
@@ -1156,52 +1186,58 @@
     buildEnvironment(); window.changeMat(window.matType); window.changePosterize(window.posterizeLevel);
     solidApplyAtmosphereStateToPanel(window.__solidSceneAtmosphere || { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 });
     solidApplyDoFStateToPanel(window.__solidSceneDoF || { enabled: false, aperture: 2.8, focusDistance: 10 });
-    const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity(); lightMoved = true; try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('reset_all'); } catch(_eP) {} }; window.switchScene = function(index) { if(index === window.currentSceneIndex) return; window.isLoadingScene = true; // [锁定] 安全锁启动
+    const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity(); lightMoved = true; try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('reset_all'); } catch(_eP) {} };
+    window.switchScene = function(index) {
+    if (window.isLoadingScene) return;
+    if(index === window.currentSceneIndex) return;
+    const _token = ++window.__solidSceneLoadToken;
+    window.__solidSceneVersion = Number(window.__solidSceneVersion || 0) + 1;
+    window.isLoadingScene = true;
     try { _solidDisposeRasterEnvProbe(); } catch(_eDisp) {}
-    window.currentSceneIndex = index; const data = window.customScenes[index]; window.currentSceneData = data; // 修复首帧视角跳变：先应用目标场景的相机参数，再开始资产加载，避免先看到上一个场景视角
+    window.currentSceneIndex = index; const data = window.customScenes[index]; window.currentSceneData = data;
+    const _isStale = () => (_token !== window.__solidSceneLoadToken);
     if (data && data.camera) { camera.position.set(...data.camera.pos); controls.target.set(...data.camera.target); camera.zoom = data.camera.zoom; camera.updateProjectionMatrix(); controls.update(); needsUpdate = true; lightMoved = true; }
     if (typeof window.updateAnnotationEyeButtonVisibility === 'function') window.updateAnnotationEyeButtonVisibility();
-    document.getElementById('scene-grid-modal').style.display = 'none'; // [解除防呆] 用户已经成功选择了一个场景，以后再打开面板时可以正常关闭了
+    document.getElementById('scene-grid-modal').style.display = 'none';
     document.querySelector('.modal-close').style.display = 'inline-flex';
-    document.getElementById('scene-trigger-top').innerText = data.name || `场景 ${index+1}`; // 同步更新左上角文本
+    document.getElementById('scene-trigger-top').innerText = data.name || `场景 ${index+1}`;
     document.getElementById('scene-loader').style.display = 'flex'; document.getElementById('scene-loader').style.opacity = '1'; solidSceneLoadUxStart(); setLoaderText("读取场景布局..."); setLoaderProgress(2);
-    // 【安全清理旧场景】统一交给总线广播，彻底杜绝数据残留
     if(window.PluginManager) window.PluginManager.trigger('onClearScene');
     for(let i = sceneGroup.children.length - 1; i >= 0; i--) { const obj = sceneGroup.children[i]; if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(obj); else sceneGroup.remove(obj); }
-    let promises = []; const totalItems = Array.isArray(data.items) ? data.items.length : 0; const glbCount = data.items.filter(it => it.type === 'glb').length; const glbSlots = glbCount ? Array.from({ length: glbCount }, () => ({ loaded: 0, total: 0, done: false })) : []; let _glbSlotI = 0; let _assetDone = 0;
-    function updateSceneAssetProgress() { let glbAvg = 0; if (glbCount > 0) { let sumL = 0, sumT = 0; for (const s of glbSlots) { if (s.total > 0) { sumL += Math.min(s.loaded, s.total); sumT += s.total; } } glbAvg = sumT > 0 ? sumL / sumT : (glbSlots.filter(s => s.done).length / glbCount); } const total = Math.max(1, totalItems); const ratio = Math.max(0, Math.min(1, ((_assetDone / total) * 0.8) + (glbAvg * 0.2))); setLoaderProgress(8 + ratio * 55); }
-    setLoaderText("下载并解析模型资产..."); setLoaderProgress(8); data.items.forEach(item => { if(item.type === 'builtin') { let obj3d; let isFlat = false, yOffset = 2.0; const s = item.shape;
-    // 解析多模块贯穿体
-    if (s.startsWith('intersect_')) { obj3d = new THREE.Group(); if (s === 'intersect_cube') { const g1 = new THREE.BoxGeometry(1.5, 4, 1.5).toNonIndexed(); g1.computeVertexNormals();
-    const m1 = new THREE.Mesh(g1, sysMaterials.flat.clone()); const g2 = new THREE.BoxGeometry(4, 1.5, 1.5).toNonIndexed(); g2.computeVertexNormals(); const m2 = new THREE.Mesh(g2, sysMaterials.flat.clone());
-    obj3d.add(m1); obj3d.add(m2); yOffset = 2.0; }
-    else if (s === 'intersect_cone') { const m1 = new THREE.Mesh(new THREE.ConeGeometry(2, 4, 64), sysMaterials.plaster.clone());
-    const m2 = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 4.5, 64), sysMaterials.plaster.clone()); m2.rotation.z = Math.PI / 2; m2.position.y = -0.5; obj3d.add(m1); obj3d.add(m2); yOffset = 2.0; }
-    else if (s === 'intersect_pyramid') { const g1 = new THREE.ConeGeometry(2.2, 4, 4).toNonIndexed(); g1.computeVertexNormals(); const m1 = new THREE.Mesh(g1, sysMaterials.flat.clone()); m1.rotation.y = Math.PI / 4;
-    const g2 = new THREE.BoxGeometry(4.5, 1.2, 1.2).toNonIndexed(); g2.computeVertexNormals(); const m2 = new THREE.Mesh(g2, sysMaterials.flat.clone()); m2.rotation.y = Math.PI / 4; m2.position.y = -0.5;
-    obj3d.add(m1); obj3d.add(m2); yOffset = 2.0; }
+    const items = Array.isArray(data.items) ? data.items : [];
+    let promises = []; const totalItems = items.length; const glbCount = items.filter(it => it.type === 'glb').length; const glbSlots = glbCount ? Array.from({ length: glbCount }, () => ({ loaded: 0, total: 0, done: false })) : []; let _glbSlotI = 0; let _assetDone = 0;
+    function updateSceneAssetProgress() { if (_isStale()) return; let glbAvg = 0; if (glbCount > 0) { let sumL = 0, sumT = 0; for (const s of glbSlots) { if (s.total > 0) { sumL += Math.min(s.loaded, s.total); sumT += s.total; } } glbAvg = sumT > 0 ? sumL / sumT : (glbSlots.filter(s => s.done).length / glbCount); } const total = Math.max(1, totalItems); const ratio = Math.max(0, Math.min(1, ((_assetDone / total) * 0.8) + (glbAvg * 0.2))); setLoaderProgress(8 + ratio * 55); }
+    function _solidGetBuiltinGeoCache(key, factory) { const cache = window.__solidBuiltinGeometryCache; if (cache.has(key)) return cache.get(key).clone(); const g = factory(); cache.set(key, g); return g.clone(); }
+    function _solidBuildBuiltin(item) {
+    return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+    if (_isStale()) { resolve(); return; }
+    try {
+    let obj3d; let isFlat = false, yOffset = 2.0; const s = item.shape;
+    if (s.startsWith('intersect_')) {
+    obj3d = new THREE.Group();
+    if (s === 'intersect_cube') { const g1 = _solidGetBuiltinGeoCache('intersect_cube_g1', () => { const g = new THREE.BoxGeometry(1.5, 4, 1.5).toNonIndexed(); g.computeVertexNormals(); return g; }); const m1 = new THREE.Mesh(g1, sysMaterials.flat.clone()); const g2 = _solidGetBuiltinGeoCache('intersect_cube_g2', () => { const g = new THREE.BoxGeometry(4, 1.5, 1.5).toNonIndexed(); g.computeVertexNormals(); return g; }); const m2 = new THREE.Mesh(g2, sysMaterials.flat.clone()); obj3d.add(m1); obj3d.add(m2); yOffset = 2.0; }
+    else if (s === 'intersect_cone') { const m1 = new THREE.Mesh(_solidGetBuiltinGeoCache('intersect_cone_g1', () => new THREE.ConeGeometry(2, 4, 64)), sysMaterials.plaster.clone()); const m2 = new THREE.Mesh(_solidGetBuiltinGeoCache('intersect_cone_g2', () => new THREE.CylinderGeometry(0.8, 0.8, 4.5, 64)), sysMaterials.plaster.clone()); m2.rotation.z = Math.PI / 2; m2.position.y = -0.5; obj3d.add(m1); obj3d.add(m2); yOffset = 2.0; }
+    else if (s === 'intersect_pyramid') { const g1 = _solidGetBuiltinGeoCache('intersect_pyramid_g1', () => { const g = new THREE.ConeGeometry(2.2, 4, 4).toNonIndexed(); g.computeVertexNormals(); return g; }); const m1 = new THREE.Mesh(g1, sysMaterials.flat.clone()); m1.rotation.y = Math.PI / 4; const g2 = _solidGetBuiltinGeoCache('intersect_pyramid_g2', () => { const g = new THREE.BoxGeometry(4.5, 1.2, 1.2).toNonIndexed(); g.computeVertexNormals(); return g; }); const m2 = new THREE.Mesh(g2, sysMaterials.flat.clone()); m2.rotation.y = Math.PI / 4; m2.position.y = -0.5; obj3d.add(m1); obj3d.add(m2); yOffset = 2.0; }
     obj3d.position.set(...item.pos); obj3d.rotation.set(...item.rot); obj3d.scale.set(...item.scale);
-    obj3d.userData = { type: 'builtin', shape: s, isFlat: false, customColor: item.color }; obj3d.traverse(c => { if(c.isMesh) { c.material.color.set(item.color); c.userData.customColor = item.color; } });
-    sceneGroup.add(obj3d); }
-    // 解析常规单体模型
-    else { let geo; if(s === 'sphere') { geo = new THREE.SphereGeometry(2, 64, 64); }
-    else if(s === 'poly_sphere') { geo = new THREE.IcosahedronGeometry(2, 2); isFlat = true; }
-    else if(s === 'cube') { geo = new THREE.BoxGeometry(3, 3, 3); isFlat = true; yOffset = 1.5; }
-    else if(s === 'cylinder') { geo = new THREE.CylinderGeometry(1.5, 1.5, 4, 64); }
-    else if(s === 'cylinder_cut') { geo = new THREE.CylinderGeometry(1.5, 1.5, 4, 64, 1, false); const pos = geo.attributes.position;
-    for(let i=0; i<pos.count; i++) { let y = pos.getY(i); if (y > 1.9) pos.setY(i, y - (pos.getZ(i) + 1.5) * 0.6); }
-    geo.computeVertexNormals(); }
-    else if(s === 'cone') { geo = new THREE.ConeGeometry(2, 4, 64); }
-    else if(s === 'prism') { geo = new THREE.CylinderGeometry(1.5, 1.5, 4, 6); isFlat = true; }
-    else if(s === 'prism8') { geo = new THREE.CylinderGeometry(1.5, 1.5, 4, 8); isFlat = true; }
-    else if(s === 'pyramid') { geo = new THREE.ConeGeometry(2.2, 4, 4); isFlat = true; }
-    else if(s === 'pyramid6') { geo = new THREE.ConeGeometry(2.2, 4, 6); isFlat = true; }
-    else if(s === 'dodecahedron') { geo = new THREE.DodecahedronGeometry(1.8, 0); isFlat = true; yOffset = 1.8; }
-    else if(s === 'octahedron') { geo = new THREE.OctahedronGeometry(2, 0); isFlat = true; }
-    else if(s === 'icosahedron') { geo = new THREE.IcosahedronGeometry(2, 0); isFlat = true; }
-    else if(s === 'tetrahedron') { geo = new THREE.TetrahedronGeometry(2, 0); isFlat = true; yOffset = 1.0; }
-    else if(s === 'torus') { geo = new THREE.TorusGeometry(1.5, 0.6, 64, 64); yOffset = 0.6; }
-    else if(s === 'capsule') { geo = new THREE.CapsuleGeometry(1.5, 2, 32, 64); yOffset = 2.5; }
+    obj3d.userData = { type: 'builtin', shape: s, isFlat: false, customColor: item.color }; obj3d.traverse(c => { if(c.isMesh) { c.material.color.set(item.color); c.userData.customColor = item.color; } }); sceneGroup.add(obj3d);
+    } else {
+    let geo; if(s === 'sphere') { geo = _solidGetBuiltinGeoCache('sphere', () => new THREE.SphereGeometry(2, 64, 64)); }
+    else if(s === 'poly_sphere') { geo = _solidGetBuiltinGeoCache('poly_sphere', () => new THREE.IcosahedronGeometry(2, 2)); isFlat = true; }
+    else if(s === 'cube') { geo = _solidGetBuiltinGeoCache('cube', () => new THREE.BoxGeometry(3, 3, 3)); isFlat = true; yOffset = 1.5; }
+    else if(s === 'cylinder') { geo = _solidGetBuiltinGeoCache('cylinder', () => new THREE.CylinderGeometry(1.5, 1.5, 4, 64)); }
+    else if(s === 'cylinder_cut') { geo = _solidGetBuiltinGeoCache('cylinder_cut', () => { const g = new THREE.CylinderGeometry(1.5, 1.5, 4, 64, 1, false); const pos = g.attributes.position; for(let i=0; i<pos.count; i++) { let y = pos.getY(i); if (y > 1.9) pos.setY(i, y - (pos.getZ(i) + 1.5) * 0.6); } g.computeVertexNormals(); return g; }); }
+    else if(s === 'cone') { geo = _solidGetBuiltinGeoCache('cone', () => new THREE.ConeGeometry(2, 4, 64)); }
+    else if(s === 'prism') { geo = _solidGetBuiltinGeoCache('prism', () => new THREE.CylinderGeometry(1.5, 1.5, 4, 6)); isFlat = true; }
+    else if(s === 'prism8') { geo = _solidGetBuiltinGeoCache('prism8', () => new THREE.CylinderGeometry(1.5, 1.5, 4, 8)); isFlat = true; }
+    else if(s === 'pyramid') { geo = _solidGetBuiltinGeoCache('pyramid', () => new THREE.ConeGeometry(2.2, 4, 4)); isFlat = true; }
+    else if(s === 'pyramid6') { geo = _solidGetBuiltinGeoCache('pyramid6', () => new THREE.ConeGeometry(2.2, 4, 6)); isFlat = true; }
+    else if(s === 'dodecahedron') { geo = _solidGetBuiltinGeoCache('dodecahedron', () => new THREE.DodecahedronGeometry(1.8, 0)); isFlat = true; yOffset = 1.8; }
+    else if(s === 'octahedron') { geo = _solidGetBuiltinGeoCache('octahedron', () => new THREE.OctahedronGeometry(2, 0)); isFlat = true; }
+    else if(s === 'icosahedron') { geo = _solidGetBuiltinGeoCache('icosahedron', () => new THREE.IcosahedronGeometry(2, 0)); isFlat = true; }
+    else if(s === 'tetrahedron') { geo = _solidGetBuiltinGeoCache('tetrahedron', () => new THREE.TetrahedronGeometry(2, 0)); isFlat = true; yOffset = 1.0; }
+    else if(s === 'torus') { geo = _solidGetBuiltinGeoCache('torus', () => new THREE.TorusGeometry(1.5, 0.6, 64, 64)); yOffset = 0.6; }
+    else if(s === 'capsule') { geo = _solidGetBuiltinGeoCache('capsule', () => new THREE.CapsuleGeometry(1.5, 2, 32, 64)); yOffset = 2.5; }
     if(isFlat) { geo = geo.toNonIndexed(); geo.computeVertexNormals(); }
     const mat = (s === 'sphere' || s === 'torus' || s === 'capsule' || s === 'cylinder' || s === 'cylinder_cut' || s === 'cone') ? sysMaterials.plaster.clone() : (isFlat ? sysMaterials.flat.clone() : sysMaterials.plaster.clone());
     if(s === 'sphere') mat.roughness = 0.6; obj3d = new THREE.Mesh(geo, mat); if(s === 'pyramid' || s === 'pyramid6') obj3d.rotation.y = Math.PI/4;
@@ -1210,41 +1246,64 @@
     if (s === 'sphere') { attachSolidBuiltinSphereShadowCore(obj3d, THREE); }
     obj3d.position.set(...item.pos); obj3d.rotation.set(...item.rot); obj3d.scale.set(...item.scale); sceneGroup.add(obj3d);
     if (s === 'sphere') { try { _solidSnapBuiltinSphereToGroundIfNear(obj3d); } catch(_eSnap) {} }
-    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj3d, itemData: item }); _assetDone++; updateSceneAssetProgress(); } }
-    // 解析外部导入的 GLB
-    else if(item.type === 'glb') { const _slot = _glbSlotI++; promises.push(new Promise((resolve) => { const _modelUrl = solidResolveSceneModelUrl(item.url); gltfLoader.load(_modelUrl, (gltf) => { glbSlots[_slot].done = true; if (glbSlots[_slot].total <= 0 && glbSlots[_slot].loaded <= 0) { glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1; } const model = gltf.scene;
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj3d, itemData: item });
+    }
+    _assetDone++; updateSceneAssetProgress();
+    } catch(_eBuiltin) {}
+    resolve();
+    });
+    });
+    }
+    setLoaderText("下载并解析模型资产..."); setLoaderProgress(8);
+    items.forEach(item => {
+    if(item.type === 'builtin') { promises.push(_solidBuildBuiltin(item)); }
+    else if(item.type === 'glb') {
+    const _slot = _glbSlotI++;
+    promises.push(new Promise((resolve) => {
+    const _modelUrl = solidResolveSceneModelUrl(item.url);
+    const _cached = window.__solidGlbSceneCache.get(_modelUrl);
+    if (_cached) {
+    if (_isStale()) { resolve(); return; }
+    glbSlots[_slot].done = true; glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1;
+    const model = _cached.clone(true);
     model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); });
     model.position.set(...item.pos); model.rotation.set(...item.rot); model.scale.set(...item.scale); model.userData = { type: 'glb', url: item.url }; sceneGroup.add(model);
-    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); _assetDone++; updateSceneAssetProgress(); resolve(); }, (evt) => { if (evt && evt.lengthComputable && evt.total > 0) { glbSlots[_slot].loaded = evt.loaded; glbSlots[_slot].total = evt.total; } else if (evt && evt.loaded > 0) { glbSlots[_slot].loaded = evt.loaded; if (evt.total > 0) glbSlots[_slot].total = evt.total; } updateSceneAssetProgress(); }, (e) => { addHwLog("GLB加载失败: " + e.message); glbSlots[_slot].done = true; _assetDone++; updateSceneAssetProgress(); resolve(); }); })); } });
-    if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data }); // 【安全接管新场景】
-    setLoaderText("恢复标注与场景元素..."); setLoaderProgress(83);
-    Promise.all(promises).then(() => { setLoaderProgress(90); setLoaderText("构建光栅光影..."); requestAnimationFrame(() => { requestAnimationFrame(() => { setLoaderProgress(97); window.resetAll();
-    
-    if (window.useAdvancedRender && pathTracer) { pathTracer.updateMaterials(); lightPosUpdated = true; _solidPtSync.queueReset('scene_loaded'); }
-    window.isLoadingScene = false; // [解锁] 资产与BVH就绪，放行渲染
-    try { syncRenderButtons(); } catch (_eBtnScene) {}
-    // 首次入场强制收敛：避免“需要转动一下暗部才跳亮”。
-    try {
-    if (!window.useAdvancedRender) {
-    try { if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); } catch (_eSkyIn) {}
-    try {
-    if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
-    else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed');
-    try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('scene_changed'); } catch (_eScChg) {}
-    } catch(_eP0) {}
-    try {
-    requestAnimationFrame(() => {
-    try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD0) {}
-    try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD1) {} }); } catch (_eR1) {}
-    });
-    } catch (_eR0) {}
-    try { setTimeout(() => { try { if (!window.useAdvancedRender && window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed'); } catch (_eProbeIn2) {} }, 240); } catch (_eTIn2) {}
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); _assetDone++; updateSceneAssetProgress(); resolve(); return;
     }
-    } catch(_eVrIn) {}
-    solidSceneLoadUxBeginStabilize('正在稳定画面...');
+    gltfLoader.load(_modelUrl, (gltf) => {
+    if (_isStale()) { resolve(); return; }
+    glbSlots[_slot].done = true; if (glbSlots[_slot].total <= 0 && glbSlots[_slot].loaded <= 0) { glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1; }
+    try { window.__solidGlbSceneCache.set(_modelUrl, gltf.scene.clone(true)); } catch(_eCache) {}
+    const model = gltf.scene;
+    model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); });
+    model.position.set(...item.pos); model.rotation.set(...item.rot); model.scale.set(...item.scale); model.userData = { type: 'glb', url: item.url }; sceneGroup.add(model);
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); _assetDone++; updateSceneAssetProgress(); resolve();
+    }, (evt) => {
+    if (_isStale()) return;
+    if (evt && evt.lengthComputable && evt.total > 0) { glbSlots[_slot].loaded = evt.loaded; glbSlots[_slot].total = evt.total; } else if (evt && evt.loaded > 0) { glbSlots[_slot].loaded = evt.loaded; if (evt.total > 0) glbSlots[_slot].total = evt.total; } updateSceneAssetProgress();
+    }, (e) => {
+    if (_isStale()) { resolve(); return; }
+    addHwLog("GLB加载失败: " + e.message); glbSlots[_slot].done = true; _assetDone++; updateSceneAssetProgress(); resolve();
     });
-    }); }).catch(err => { window.isLoadingScene = false; setLoaderProgress(0); solidSceneLoadUxFinish(); // 异常兜底解锁
-    window.hwLog("场景加载致命异常: " + err.message); }); };
+    }));
+    }
+    });
+    if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data });
+    setLoaderText("恢复标注与场景元素..."); setLoaderProgress(83);
+    Promise.all(promises).then(() => {
+    if (_isStale()) return;
+    setLoaderProgress(90); setLoaderText("构建光栅光影...");
+    requestAnimationFrame(() => { requestAnimationFrame(() => {
+    if (_isStale()) return;
+    setLoaderProgress(97); window.__solidForceBuildEnvironment = true; window.resetAll(); window.__solidForceBuildEnvironment = false;
+    if (window.useAdvancedRender && pathTracer) { pathTracer.updateMaterials(); lightPosUpdated = true; _solidPtSync.queueReset('scene_loaded'); }
+    window.isLoadingScene = false;
+    try { syncRenderButtons(); } catch (_eBtnScene) {}
+    try { if (!window.useAdvancedRender) { try { if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); } catch (_eSkyIn) {} try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('scene_changed'); else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed'); } catch(_eP0) {} try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD0) {} try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD1) {} }); } catch (_eR1) {} }); } catch (_eR0) {} try { setTimeout(() => { try { if (!window.useAdvancedRender && window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed'); } catch (_eProbeIn2) {} }, 240); } catch (_eTIn2) {} } } catch(_eVrIn) {}
+    solidSceneLoadUxBeginStabilize('正在稳定画面...');
+    }); });
+    }).catch(err => { if (_isStale()) return; window.isLoadingScene = false; setLoaderProgress(0); solidSceneLoadUxFinish(); window.hwLog("场景加载致命异常: " + err.message); });
+    };
     function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
     
         window.loadJSONData = function() { setLoaderText("获取场景配置数据...");
@@ -1256,10 +1315,18 @@
         const _sandboxKey = (_qs.get('sandbox') || 'geometry').toLowerCase();
         const _solidJsonBySandbox = { geometry: './docs/json/沙盒_几何体静物/沙盒_几何体静物.json', portrait: './docs/json/沙盒_肖像光影沙盒/沙盒_肖像光影沙盒.json' };
         const _sceneJsonUrl = _solidJsonBySandbox[_sandboxKey] || _solidJsonBySandbox.geometry;
-        fetch(_sceneJsonUrl).then(res => res.text()).then(text => { let data = []; try { let parsed = JSON.parse(text); data = Array.isArray(parsed) ? parsed : [parsed]; } catch(e) {
+        fetch(_sceneJsonUrl).then(async (res) => {
+        let data = [];
+        try {
+        const parsed = await res.clone().json();
+        data = Array.isArray(parsed) ? parsed : [parsed];
+        } catch (_eFast) {
+        const text = await res.text();
+        try { let parsed = JSON.parse(text); data = Array.isArray(parsed) ? parsed : [parsed]; } catch(e) {
         const lines = text.split('\n'); lines.forEach(line => { line = line.trim(); if(line.endsWith(',')) line = line.slice(0, -1);
         if(line.startsWith('{') && line.endsWith('}')) { try { data.push(JSON.parse(line)); } catch(err2) { console.warn('单行解析跳过', err2); } } });
         if(data.length === 0) throw new Error("文本中未找到有效的数据节点"); }
+        }
         window.customScenes = data; buildSceneGridUI(data); if(data.length > 0) { // [拦截点] 不再自动进入场景0，而是关掉加载提示，强制弹出场景选择网格
         document.getElementById('scene-loader').style.display = 'none'; document.getElementById('scene-grid-modal').style.display = 'flex';
         // 关闭按钮始终可见；若未选择场景则 closeSceneGridModal 会拦截，避免黑屏
@@ -1603,12 +1670,32 @@
         } else {
         try { window.hwLog("💤 页面进入后台，安全挂起资源"); } catch(_eH) {} window.sumDuration = 0;
         }
-        }); function buildEnvironment() { if (mainLight) {
+        }); function buildEnvironment() {
+        const _liRaw = parseFloat((document.getElementById('lightIntensity') || {}).value);
+        const _liNorm = Number.isFinite(_liRaw) ? _liRaw : 1.7;
+        const _sig = [
+            Number(window.__solidSceneVersion || 0),
+            String(lightType || 'spot'),
+            Number(state.azimuth || 0).toFixed(3),
+            Number(state.elevation || 0).toFixed(3),
+            Number(state.radius || 0).toFixed(3),
+            Number(state.lightSize || 0).toFixed(3),
+            Number(state.lightTemp || 0).toFixed(3),
+            Number(_liNorm).toFixed(3),
+            window.useAdvancedRender ? 1 : 0,
+            window.hasWall ? 1 : 0,
+            String(window.envWallColor || ''),
+            String(window.envGroundColor || ''),
+            String(window.envSkyColor || '')
+        ].join('|');
+        if (!window.__solidForceBuildEnvironment && window.__solidLastBuildEnvSig === _sig) return;
+        window.__solidLastBuildEnvSig = _sig;
+        if (mainLight) {
         // Prevent GPU memory leak/crash when rapidly rebuilding lights (e.g. dragging “size”).
         try { if (mainLight.shadow && mainLight.shadow.map) safeDispose(mainLight.shadow.map); } catch(_eSm) {}
         try { if (mainLight.shadow && mainLight.shadow.mapPass) safeDispose(mainLight.shadow.mapPass); } catch(_eSmp) {}
         scene.remove(mainLight); if (mainLight.target) scene.remove(mainLight.target); }
-        const val = parseFloat(document.getElementById('lightIntensity').value); const lSize = state.lightSize; const col = solidGetTempColorFromKelvin100(THREE, state.lightTemp * 100);
+        const val = _liNorm; const lSize = state.lightSize; const col = solidGetTempColorFromKelvin100(THREE, state.lightTemp * 100);
         const _main = createSolidMainLight(THREE, { lightType, color: col, intensitySlider: val, lightSize: lSize, useAdvancedRender: window.useAdvancedRender });
         mainLight = _main.light;
         if (_main.addSpotTargetToScene && mainLight.target) scene.add(mainLight.target);
@@ -1659,9 +1746,7 @@
         if (window.useAdvancedRender) return;
         _solidIntensityLastConvergeAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         buildEnvironment();
-        if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed');
-        else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed');
-        try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('scene_changed'); } catch (_eScChg) {}
+        try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('scene_changed'); else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed'); } catch (_eScChg) {}
         try { _solidTryRasterPreviewDraw(); } catch (_eDraw0) {}
         try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eDraw1) {} }); } catch (_eDrawRaf) {}
         } catch (_eConverge) {}
