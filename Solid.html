@@ -908,12 +908,45 @@
         } catch (_e) {}
     };
     function setLoaderText(msg) { document.getElementById('loader-text').innerText = msg; }
-    window.__solidSceneLoadUx = { running: false, target: 0, display: 0, raf: 0, timer: 0, timeoutTimer: 0 };
+    window.__solidSceneLoadUx = { running: false, target: 0, display: 0, raf: 0, timer: 0, timeoutTimer: 0, stabilizing: false, stableSince: 0, stableFrames: 0, minStableMs: 460, maxWaitMs: 3600, stabilizeStartAt: 0, settleDone: false };
     function solidSetLoaderProgressNow(p) { p = Math.max(0, Math.min(100, Math.round(Number(p) || 0))); const fill = document.getElementById('scene-load-bar-fill'); const pctEl = document.getElementById('scene-load-pct'); if (fill) fill.style.transform = 'scaleX(' + (p / 100) + ')'; if (pctEl) pctEl.textContent = p + '%'; }
     function solidSceneLoadUxTick() { const ux = window.__solidSceneLoadUx; if (!ux.running) return; ux.display += (ux.target - ux.display) * 0.16; if (Math.abs(ux.target - ux.display) < 0.08) ux.display = ux.target; solidSetLoaderProgressNow(ux.display); ux.raf = requestAnimationFrame(solidSceneLoadUxTick); }
-    function solidSceneLoadUxStart() { const ux = window.__solidSceneLoadUx; try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e0) {} try { if (ux.timer) clearInterval(ux.timer); } catch (_e1) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e2) {} ux.running = true; ux.target = 0; ux.display = 0; ux.raf = requestAnimationFrame(solidSceneLoadUxTick); ux.timer = setInterval(() => { if (!ux.running) return; ux.target = Math.max(ux.target, Math.min(95, ux.display + 0.25)); }, 420); ux.timeoutTimer = setTimeout(() => { if (!ux.running) return; setLoaderText('正在优化显示，马上完成...'); ux.target = Math.max(ux.target, 95); }, 10000); }
+    function solidSceneLoadUxStart() { const ux = window.__solidSceneLoadUx; try { window.__solidSceneStabilizing = false; } catch (_eS0) {} try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e0) {} try { if (ux.timer) clearInterval(ux.timer); } catch (_e1) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e2) {} ux.stabilizing = false; ux.settleDone = false; ux.running = true; ux.target = 0; ux.display = 0; ux.raf = requestAnimationFrame(solidSceneLoadUxTick); ux.timer = setInterval(() => { if (!ux.running) return; ux.target = Math.max(ux.target, Math.min(95, ux.display + 0.25)); }, 420); ux.timeoutTimer = setTimeout(() => { if (!ux.running) return; setLoaderText('正在优化显示，马上完成...'); ux.target = Math.max(ux.target, 95); }, 10000); }
     function solidSceneLoadUxFinish() { const ux = window.__solidSceneLoadUx; if (!ux.running) return; ux.target = 100; setTimeout(() => { try { if (ux.timer) clearInterval(ux.timer); } catch (_e0) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e1) {} ux.running = false; try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e2) {} solidSetLoaderProgressNow(100); }, 220); }
     function setLoaderProgress(p) { const v = Math.max(0, Math.min(100, Number(p) || 0)); const ux = window.__solidSceneLoadUx; if (ux && ux.running) ux.target = Math.max(ux.target, v); else solidSetLoaderProgressNow(v); }
+    function solidSceneLoadUxBeginStabilize(text) {
+        const ux = window.__solidSceneLoadUx; if (!ux) return;
+        ux.stabilizing = true; ux.stableSince = 0; ux.stableFrames = 0; ux.settleDone = false;
+        ux.stabilizeStartAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        ux.target = Math.max(ux.target, 97);
+        setLoaderText(text || '正在稳定画面...');
+        try { window.__solidSceneStabilizing = true; } catch (_e) {}
+    }
+    function solidSceneLoadUxTickStabilize() {
+        const ux = window.__solidSceneLoadUx; if (!ux || !ux.running || !ux.stabilizing || ux.settleDone) return false;
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        const sceneReady = !window.isLoadingScene;
+        if (sceneReady) {
+            ux.stableFrames += 1;
+            if (!ux.stableSince) ux.stableSince = now;
+        } else {
+            ux.stableFrames = 0; ux.stableSince = 0;
+        }
+        const stableMs = ux.stableSince ? (now - ux.stableSince) : 0;
+        const hardTimeout = ux.stabilizeStartAt ? ((now - ux.stabilizeStartAt) > ux.maxWaitMs) : false;
+        const ready = (sceneReady && ux.stableFrames >= 3 && stableMs >= ux.minStableMs) || hardTimeout;
+        if (!ready) {
+            ux.target = Math.max(ux.target, Math.min(99, 97 + Math.min(2, stableMs / 380)));
+            return false;
+        }
+        ux.settleDone = true;
+        ux.stabilizing = false;
+        try { window.__solidSceneStabilizing = false; } catch (_e2) {}
+        setLoaderProgress(100);
+        solidSceneLoadUxFinish();
+        const ld = document.getElementById('scene-loader'); if (ld) { ld.style.opacity = '0'; setTimeout(() => { if (ld) ld.style.display = 'none'; }, 600); }
+        return true;
+    }
     window._solidPerfHardwareT0 = 0; window._solidPerfHardwareLastP = 0; window._solidPerfHardwareIsMobile = false; window._solidPerfStageLo = 0; window._solidPerfStageHi = 10; window._solidPerfStageT0 = 0; window._solidPerfStageTau = 800;
     function startSolidPerfHardwareProgress(isMobile) { window._solidPerfHardwareT0 = performance.now(); window._solidPerfHardwareLastP = 0; window._solidPerfHardwareIsMobile = !!isMobile; window._solidPerfStageLo = 0; window._solidPerfStageHi = 12; window._solidPerfStageTau = 700; window._solidPerfStageT0 = performance.now(); setLoaderProgress(2); }
     function resetSolidPerfHardwareProgress() { window._solidPerfHardwareT0 = 0; window._solidPerfHardwareLastP = 0; window._solidPerfStageLo = 0; window._solidPerfStageHi = 0; window._solidPerfStageT0 = 0; window._solidPerfStageTau = 800; if (window.PerfTester) window.PerfTester.onProgress = null; }
@@ -1154,7 +1187,8 @@
     try { setTimeout(() => { try { if (!window.useAdvancedRender && window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed'); } catch (_eProbeIn2) {} }, 240); } catch (_eTIn2) {}
     }
     } catch(_eVrIn) {}
-    setLoaderProgress(100); solidSceneLoadUxFinish(); document.getElementById('scene-loader').style.opacity = '0'; setTimeout(() => document.getElementById('scene-loader').style.display = 'none', 600); });
+    solidSceneLoadUxBeginStabilize('正在稳定画面...');
+    });
     }); }).catch(err => { window.isLoadingScene = false; setLoaderProgress(0); solidSceneLoadUxFinish(); // 异常兜底解锁
     window.hwLog("场景加载致命异常: " + err.message); }); };
     function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -1576,6 +1610,7 @@
     
         function animate() { solidAnimRafId = requestAnimationFrame(animate); // 【核心防卡死 1】：如果标签页在后台，绝对冻结一切物理渲染和插件更新，防止 GPU 任务堆积导致切回时死锁
         if (document.hidden) return;
+        try { if (typeof solidSceneLoadUxTickStabilize === 'function') solidSceneLoadUxTickStabilize(); } catch (_eStableTick) {}
         try { __solidEvalImmersiveIdle(); } catch(_e) {}
         if (window._solidPerfHardwareT0 && window.PerfTester && window.PerfTester.isTesting) tickSolidPerfHardwareProgress();
         if (window.isUnsupported || !window.useAdvancedRender) {

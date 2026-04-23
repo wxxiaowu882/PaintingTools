@@ -19,6 +19,9 @@ export function solidInstallOnBeforeCompilePatch(material, patch) {
   const prev = st.patches.get(id);
   const ver = (patch.ver != null) ? String(patch.ver) : '1';
   const variant = (patch.variant != null) ? String(patch.variant) : '';
+  const prevVer = prev ? String(prev.ver) : '';
+  const prevVariant = prev ? String(prev.variant || '') : '';
+  const patchChanged = (!prev) || prevVer !== ver || prevVariant !== variant;
   st.patches.set(id, { id, ver, variant, apply: patch.apply });
   if (!prev) {
     st.patchOrder.push(id);
@@ -30,6 +33,7 @@ export function solidInstallOnBeforeCompilePatch(material, patch) {
   // BEFORE applying Solid patches, but keep our wrapper stable.
   const current = (typeof material.onBeforeCompile === 'function') ? material.onBeforeCompile : null;
   if (!st.externalHead || st.externalHead !== current) st.externalHead = current;
+  const hadWrapper = material.onBeforeCompile === st.wrapper;
 
   if (!st.wrapper) {
     st.wrapper = function (shader) {
@@ -51,6 +55,7 @@ export function solidInstallOnBeforeCompilePatch(material, patch) {
     };
   }
   material.onBeforeCompile = st.wrapper;
+  const wrapperChanged = !hadWrapper && material.onBeforeCompile === st.wrapper;
 
   // Stable program cache key: only depends on registered patch ids + versions + variants.
   const prevKey = (typeof st.origCacheKey === 'function')
@@ -59,6 +64,7 @@ export function solidInstallOnBeforeCompilePatch(material, patch) {
   if (typeof st.origCacheKey !== 'function' && typeof material.customProgramCacheKey === 'function') {
     st.origCacheKey = material.customProgramCacheKey;
   }
+  const prevPatchSignature = st.patchSignature || '';
   material.customProgramCacheKey = function () {
     const base = (typeof prevKey === 'function') ? String(prevKey.call(this)) : '';
     try {
@@ -76,8 +82,23 @@ export function solidInstallOnBeforeCompilePatch(material, patch) {
       return base + '_solidC0';
     }
   };
+  let nextPatchSignature = '';
+  try {
+    const s = (ud && ud._solidCompile) ? ud._solidCompile : null;
+    if (s && s.patches && s.patchOrder) {
+      for (let i = 0; i < s.patchOrder.length; i++) {
+        const pid = s.patchOrder[i];
+        const p = s.patches.get(pid);
+        if (!p) continue;
+        nextPatchSignature += pid + 'v' + p.ver + (p.variant ? ('_' + p.variant) : '') + ';';
+      }
+    }
+  } catch (_e) {}
+  st.patchSignature = nextPatchSignature;
 
-  try { material.needsUpdate = true; } catch (_e) {}
+  if (patchChanged || wrapperChanged || prevPatchSignature !== nextPatchSignature) {
+    try { material.needsUpdate = true; } catch (_e) {}
+  }
   return true;
 }
 

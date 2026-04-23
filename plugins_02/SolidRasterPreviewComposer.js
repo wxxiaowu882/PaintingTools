@@ -272,6 +272,11 @@ export function createSolidRasterPreviewComposer(opts) {
     const scene = getScene();
     const camera = getCamera();
     if (!renderer || !scene || !camera) return false;
+    const inStabilizing = (typeof window !== 'undefined' && (window.__solidSceneStabilizing || window.__solidCreateSceneStabilizing));
+    if (inStabilizing) {
+      try { renderer.render(scene, camera); } catch (_eStb) {}
+      return true;
+    }
 
     const atm = _atmosphereRasterState();
     // 景深滑块依赖 AtmosphereManager 的前向路径；景深开启时必须强制 forward。

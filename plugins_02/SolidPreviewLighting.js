@@ -69,6 +69,7 @@ export function createSolidPreviewLightingManager(opts) {
   let _sceneChangedSyncRaf = 0;
   let _sceneChangedSyncTimer80 = 0;
   let _sceneChangedSyncTimer220 = 0;
+  const _safeShadowInjectDefaultOn = true;
 
   // ---------- Perf tiering (interactive vs idle) ----------
   // We only adjust uniforms (taps/rotate) during interaction to avoid shader recompiles.
@@ -616,16 +617,29 @@ export function createSolidPreviewLightingManager(opts) {
       if (!ud.uSolidShadowReceiverEnable) ud.uSolidShadowReceiverEnable = { value: 1.0 };
 
       if (!material.defines) material.defines = {};
-      material.defines.SOLID_SHADOW_SOFT_RECEIVER = 1;
-      material.defines.SOLID_SHADOW_SOFT_RECEIVER_KIND = cfg && cfg.kindTag ? cfg.kindTag : 0;
-      // Install through shared compile pipeline to avoid re-arm fights.
       const kindTag = cfg && cfg.kindTag ? cfg.kindTag : 0;
+      const prevRecvEnabled = material.defines.SOLID_SHADOW_SOFT_RECEIVER;
+      const prevRecvKind = material.defines.SOLID_SHADOW_SOFT_RECEIVER_KIND;
+      material.defines.SOLID_SHADOW_SOFT_RECEIVER = 1;
+      material.defines.SOLID_SHADOW_SOFT_RECEIVER_KIND = kindTag;
+      const definesChanged = prevRecvEnabled !== 1 || prevRecvKind !== kindTag;
+      // Install through shared compile pipeline to avoid re-arm fights.
       solidInstallOnBeforeCompilePatch(material, {
         id: 'solidShadowReceiver',
         ver: 1,
         variant: 'k' + String(kindTag),
         apply: (shader) => {
           try {
+          // Safe mode: avoid rewriting getShadow/getPointShadow function body in shadowmap_pars_fragment.
+          // This significantly reduces ANGLE X4000 warnings on some drivers.
+          if (_safeShadowInjectDefaultOn) {
+            try {
+              if (ud.uSolidTermSizeT && ud.uSolidTermStrength && ud.uSolidTermWidthMin && ud.uSolidTermWidthMax) {
+                _applySolidTerminatorShaderPatch(shader, ud);
+              }
+            } catch (_eTermRecvSafe) {}
+            return;
+          }
           // --- patch shadow chunk wrappers ---
           let fs = shader.fragmentShader;
           const inc = '#include <shadowmap_pars_fragment>';
@@ -637,11 +651,6 @@ export function createSolidPreviewLightingManager(opts) {
             'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {',
             'float getShadow_orig( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {'
           );
-          chunk = chunk.replace(
-            'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {',
-            'float getPointShadow_orig( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {'
-          );
-
           const append =
             '\n\nfloat solidHash12( vec2 p ) { vec3 p3 = fract( vec3( p.xyx ) * 0.1031 ); p3 += dot( p3, p3.yzx + 33.33 ); return fract( ( p3.x + p3.y ) * p3.z ); }\n' +
             'mat2 solidRot2( float a ) { float s = sin( a ), c = cos( a ); return mat2( c, -s, s, c ); }\n' +
@@ -718,9 +727,6 @@ export function createSolidPreviewLightingManager(opts) {
             '\ttSolidSh = pow( clamp( tSolidSh, 0.0, 1.0 ), max( 0.75, uSolidShadowSoftExp ) );\n' +
             '\tshadowRadius *= ( 1.0 + uSolidShadowSoftStrength * tSolidSh );\n' +
             '\treturn solidGaussianShadow2D( shadowMap, shadowMapSize, shadowCoord, shadowRadius, shadowBias );\n' +
-            '}\n' +
-            'float getPointShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord, float shadowCameraNear, float shadowCameraFar ) {\n' +
-            '\treturn getPointShadow_orig( shadowMap, shadowMapSize, shadowBias, shadowRadius, shadowCoord, shadowCameraNear, shadowCameraFar );\n' +
             '}\n';
 
           const endifIdx = chunk.lastIndexOf('#endif');
@@ -779,7 +785,9 @@ export function createSolidPreviewLightingManager(opts) {
       } catch (_eG) {}
 
       try { ud.uSolidShadowReceiverEnable.value = 1.0; } catch (_eEn) {}
-      material.needsUpdate = true;
+      if (definesChanged) {
+        try { material.needsUpdate = true; } catch (_eNu) {}
+      }
       return true;
     } catch (_e0) {
       return false;
@@ -809,6 +817,7 @@ export function createSolidPreviewLightingManager(opts) {
   function _shouldEnsureReceiverSoftPatch() {
     try {
       if (!previewEnabled) return false;
+      if ((typeof window !== 'undefined' && (window.__solidSceneStabilizing || window.__solidCreateSceneStabilizing))) return false;
       const mainLight = getShadowLight();
       if (!mainLight || mainLight.isDirectionalLight) return false;
       const wantWalls = _receiverSoftShadowWallsEnabled();
@@ -1334,11 +1343,13 @@ export function createSolidPreviewLightingManager(opts) {
             delete m0.userData._solidShadowSoftVer;
           }
           if (m0.customProgramCacheKey) delete m0.customProgramCacheKey;
+          let hadSoftGroundPatch = false;
           if (m0.defines) {
+            hadSoftGroundPatch = !!(m0.defines.SOLID_SHADOW_SOFT_GROUND || m0.defines.SOLID_SHADOW_SOFT_GROUND_VER);
             delete m0.defines.SOLID_SHADOW_SOFT_GROUND;
             delete m0.defines.SOLID_SHADOW_SOFT_GROUND_VER;
           }
-          m0.needsUpdate = true;
+          if (hadSoftGroundPatch) m0.needsUpdate = true;
         } catch (_eClr) {}
       };
 
@@ -1686,7 +1697,7 @@ export function createSolidPreviewLightingManager(opts) {
           m.onBeforeCompile = (shader) => {
             let fs = shader.fragmentShader;
             let cnt = 0;
-            if (cnt <= 0) {
+            if (!_safeShadowInjectDefaultOn && cnt <= 0) {
               try {
                 const inc = '#include <shadowmap_pars_fragment>';
                 if (fs.includes(inc) && THREE.ShaderChunk && THREE.ShaderChunk.shadowmap_pars_fragment) {
@@ -2100,6 +2111,8 @@ export function createSolidPreviewLightingManager(opts) {
             shader.uniforms.uSolidMainLightType = m.userData.uSolidMainLightType;
             shader.uniforms.uSolidMainLightPos = m.userData.uSolidMainLightPos;
             shader.uniforms.uSolidMainLightDir = m.userData.uSolidMainLightDir;
+
+            if (_safeShadowInjectDefaultOn) return;
 
             shader.fragmentShader =
               'varying vec3 vSolidShadowGroundPos;\n' +
@@ -2765,9 +2778,6 @@ export function createSolidPreviewLightingManager(opts) {
       },
     });
     try { solidSyncOnBeforeCompileExternalHead(material); } catch (_e) {}
-    try {
-      material.needsUpdate = true;
-    } catch (_eNu) {}
     _solidShPatchedMaterials.add(material);
   }
 
@@ -2850,36 +2860,16 @@ export function createSolidPreviewLightingManager(opts) {
       try { cancelAnimationFrame(_sceneChangedSyncRaf); } catch (_eRafCancel) {}
       _sceneChangedSyncRaf = 0;
     }
-    if (_sceneChangedSyncTimer80) {
-      clearTimeout(_sceneChangedSyncTimer80);
-      _sceneChangedSyncTimer80 = 0;
-    }
-    if (_sceneChangedSyncTimer220) {
-      clearTimeout(_sceneChangedSyncTimer220);
-      _sceneChangedSyncTimer220 = 0;
-    }
+    if (_sceneChangedSyncTimer80) { clearTimeout(_sceneChangedSyncTimer80); _sceneChangedSyncTimer80 = 0; }
+    if (_sceneChangedSyncTimer220) { clearTimeout(_sceneChangedSyncTimer220); _sceneChangedSyncTimer220 = 0; }
 
-    try { syncShadows(); } catch (_eNow) {}
-    try {
-      _sceneChangedSyncRaf = requestAnimationFrame(() => {
-        _sceneChangedSyncRaf = 0;
-        if (!previewEnabled || token !== _sceneChangedSyncToken) return;
-        try { syncShadows(); } catch (_eRafRun) {}
-      });
-    } catch (_eRaf) {}
-    try {
-      _sceneChangedSyncTimer80 = setTimeout(() => {
-        _sceneChangedSyncTimer80 = 0;
-        if (!previewEnabled || token !== _sceneChangedSyncToken) return;
-        try { syncShadows(); } catch (_eT1) {}
-      }, 80);
-    } catch (_eT0) {}
+    const inStabilizing = (typeof window !== 'undefined' && (window.__solidSceneStabilizing || window.__solidCreateSceneStabilizing));
     try {
       _sceneChangedSyncTimer220 = setTimeout(() => {
         _sceneChangedSyncTimer220 = 0;
         if (!previewEnabled || token !== _sceneChangedSyncToken) return;
         try { syncShadows(); } catch (_eT2) {}
-      }, 220);
+      }, inStabilizing ? 260 : 140);
     } catch (_eT00) {}
   }
 
