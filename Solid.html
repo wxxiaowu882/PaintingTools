@@ -325,6 +325,26 @@
         try { window.hwLog('[Diag] ' + JSON.stringify(d)); } catch (_e) { try { window.__solidConsole.debug('[Solid][Diag]', d); } catch (_e2) {} }
         return d;
     };
+    function _solidUserNotice(msg, ms) {
+        try {
+            const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            const last = Number(window.__solidUserNoticeLastAt || 0);
+            if (now - last < 900) return; // 防刷屏：短时间内只弹一次
+            window.__solidUserNoticeLastAt = now;
+        } catch (_e0) {}
+        try {
+            const t = document.getElementById('render-toast');
+            if (!t) return;
+            t.textContent = String(msg || '');
+            t.style.opacity = '1';
+            t.style.transform = 'translateY(0px)';
+            if (t.__hideTimer) clearTimeout(t.__hideTimer);
+            t.__hideTimer = setTimeout(() => {
+                t.style.opacity = '0';
+                t.style.transform = 'translateY(6px)';
+            }, Math.max(1200, Number(ms) || 2500));
+        } catch (_e1) {}
+    }
     function _solidMaybeHandleFatalMessage(msgRaw, from) {
         let msg = '';
         try { msg = String(msgRaw || ''); } catch (_eS) { msg = ''; }
@@ -340,10 +360,12 @@
         if (msgLc.includes('context lost') && !/recover|restore/i.test(msgLc)) {
             window._solidContextLost = true;
             window.useAdvancedRender = false;
+            _solidUserNotice('渲染中断，正在尝试恢复…（如长时间黑屏请刷新）', 3600);
             if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover(String(from || 'event') + '_context_lost');
             return;
         }
         if (msgLc.includes('could not compile shader') || msgLc.includes('gl_invalid_operation') || msgLc.includes('failed to create') || msgLc.includes('framebuffer incomplete') || msgLc.includes('feedback loop')) {
+            _solidUserNotice('渲染遇到兼容性问题，已切换为预览模式。', 3600);
             if (typeof triggerUnsupported === 'function') triggerUnsupported(String(from || 'event') + '_gl_fatal', msg);
         }
     }

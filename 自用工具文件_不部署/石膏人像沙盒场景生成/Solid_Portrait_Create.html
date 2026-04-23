@@ -181,6 +181,17 @@
         try { if (window.hwLog) window.hwLog('[SolidCreate-Diag] ' + String(msg)); } catch (_e1) {}
     }
     window.hwLog = window.addHwLog;
+    function _solidCreateUserNotice(msg, isError) {
+        try {
+            const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            const last = Number(window.__solidCreateUserNoticeLastAt || 0);
+            if (now - last < 900) return;
+            window.__solidCreateUserNoticeLastAt = now;
+        } catch (_e0) {}
+        try {
+            if (typeof window.showToast === 'function') window.showToast(String(msg || ''), !!isError);
+        } catch (_e1) {}
+    }
     function _solidCreateMaybeTriggerUnsupported(msgRaw, from) {
         let msg = '';
         try { msg = String(msgRaw || ''); } catch (_eS) { msg = ''; }
@@ -191,6 +202,8 @@
             try { window.hwLog('[' + String(from || 'Err') + '] ' + msg); } catch (_eL) {}
         }
         if (msgLc.includes('could not compile shader') || msgLc.includes('gl_invalid_operation') || msgLc.includes('context lost') || msgLc.includes('failed to create') || msgLc.includes('framebuffer incomplete') || msgLc.includes('feedback loop')) {
+            if (msgLc.includes('context lost')) _solidCreateUserNotice('渲染中断，正在尝试恢复…（如长时间黑屏请刷新）', true);
+            else _solidCreateUserNotice('渲染遇到兼容性问题，已切换为预览模式。', true);
             try { if (typeof triggerUnsupported === 'function') triggerUnsupported(); } catch (_eT) {}
         }
     }
