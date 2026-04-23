@@ -325,13 +325,44 @@
         try { window.hwLog('[Diag] ' + JSON.stringify(d)); } catch (_e) { try { window.__solidConsole.debug('[Solid][Diag]', d); } catch (_e2) {} }
         return d;
     };
-    window.addEventListener('error', e => { if (window.__solidConsole.shouldLog(3)) window.hwLog('WinErr: ' + e.message); });
-    window.addEventListener('unhandledrejection', e => { if (window.__solidConsole.shouldLog(3)) window.hwLog('PromiseRej: ' + e.reason); }); const originalConsoleError = console.error; console.error = function(...args) {
-    originalConsoleError.apply(console, args); const msg = args.join(' ').toLowerCase();
-    if (window.__solidConsole.shouldLog(3) && /shader|webgl|gl_|framebuffer|context|three\.webgl/i.test(msg)) { try { window.hwLog('[ConsoleError] ' + args.join(' ')); } catch (_e) {} }
-    if (msg.includes('context lost') && !/recover|restore/i.test(msg)) { window._solidContextLost = true; window.useAdvancedRender = false; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('console_context_lost'); return; }
-    if (msg.includes('could not compile shader') || msg.includes('gl_invalid_operation') || msg.includes('failed to create') || msg.includes('framebuffer incomplete') || msg.includes('feedback loop')) {
-    if (typeof triggerUnsupported === 'function') triggerUnsupported('console_gl_fatal', args.join(' ')); } }; function safeDispose(obj) { if (!obj) return; if (Array.isArray(obj)) { obj.forEach(m => safeDispose(m)); return; }
+    function _solidMaybeHandleFatalMessage(msgRaw, from) {
+        let msg = '';
+        try { msg = String(msgRaw || ''); } catch (_eS) { msg = ''; }
+        const msgLc = msg.toLowerCase();
+        if (!msgLc) return;
+
+        // Debug-only：把可能关键的报错抄一份到 hwLog（不再劫持 console.error）
+        if (window.__solidConsole && window.__solidConsole.shouldLog && window.__solidConsole.shouldLog(3) && /shader|webgl|gl_|framebuffer|context|three\.webgl/i.test(msgLc)) {
+            try { window.hwLog('[' + String(from || 'Err') + '] ' + msg); } catch (_eLog) {}
+        }
+
+        // 触发路径：原先来自 console.error 的关键字侦测，迁移到 window error / promise rejection
+        if (msgLc.includes('context lost') && !/recover|restore/i.test(msgLc)) {
+            window._solidContextLost = true;
+            window.useAdvancedRender = false;
+            if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover(String(from || 'event') + '_context_lost');
+            return;
+        }
+        if (msgLc.includes('could not compile shader') || msgLc.includes('gl_invalid_operation') || msgLc.includes('failed to create') || msgLc.includes('framebuffer incomplete') || msgLc.includes('feedback loop')) {
+            if (typeof triggerUnsupported === 'function') triggerUnsupported(String(from || 'event') + '_gl_fatal', msg);
+        }
+    }
+
+    window.addEventListener('error', e => {
+        try { _solidMaybeHandleFatalMessage(e && e.message, 'WinErr'); } catch (_e0) {}
+        if (window.__solidConsole.shouldLog(3)) window.hwLog('WinErr: ' + (e && e.message ? e.message : ''));
+    });
+    window.addEventListener('unhandledrejection', e => {
+        let reasonMsg = '';
+        try {
+            const r = e ? e.reason : '';
+            reasonMsg = (r && r.message) ? r.message : String(r || '');
+        } catch (_e1) { reasonMsg = ''; }
+        try { _solidMaybeHandleFatalMessage(reasonMsg, 'PromiseRej'); } catch (_e2) {}
+        if (window.__solidConsole.shouldLog(3)) window.hwLog('PromiseRej: ' + reasonMsg);
+    });
+
+    function safeDispose(obj) { if (!obj) return; if (Array.isArray(obj)) { obj.forEach(m => safeDispose(m)); return; }
     try { if (typeof obj.dispose === 'function') obj.dispose(); } catch(e) { /* 彻底静默，忽略第三方底层库的销毁瑕疵 */ } }
     window._solidContextLost = false; window._solidRecovering = false; window.__solidRecoverSeq = 0; window.__solidLastScheduleAt = 0;
     window.__solidTryRecoverPathTracer = function(reason) { if (window._solidHardwareUnsupported) return false; if (window._solidRecovering) return false; if (!renderer || !scene || !camera) return false; window._solidRecovering = true; let recovered = false; try {
