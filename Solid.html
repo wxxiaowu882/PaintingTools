@@ -1183,7 +1183,13 @@
     if (window.syncEnvColorPickers) window.syncEnvColorPickers();
     const matchedOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${window.matType}'"]`); if (matchedOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedOpt.innerText;
     document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedOpt.classList.add('selected'); }
-    buildEnvironment(); window.changeMat(window.matType); window.changePosterize(window.posterizeLevel);
+    window.__solidForceBuildEnvironment = true;
+    try { buildEnvironment(); } finally { window.__solidForceBuildEnvironment = false; }
+    try {
+    if (window.PluginManager && typeof window.PluginManager.trigger === 'function') window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
+    else if (typeof window.setSkyLightScale === 'function') window.setSkyLightScale(window.envSkyLightScale);
+    } catch (_eSkyReset) {}
+    window.changeMat(window.matType); window.changePosterize(window.posterizeLevel);
     solidApplyAtmosphereStateToPanel(window.__solidSceneAtmosphere || { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 });
     solidApplyDoFStateToPanel(window.__solidSceneDoF || { enabled: false, aperture: 2.8, focusDistance: 10 });
     const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity(); lightMoved = true; try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('reset_all'); } catch(_eP) {} };
