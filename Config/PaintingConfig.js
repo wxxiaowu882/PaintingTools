@@ -79,7 +79,7 @@ export const SOLID_PATH_TRACER_QUALITY = {
       // 默认均衡档：速度与画质折中。
       default: {
         targetSamples: 200, // 目标采样数：达到这个值后基本收敛。越高越干净，等待越久。
-        renderScaleMobile: 0.42, // 手机端内部渲染比例：越高越清晰但更慢（建议 0.35~0.5）。
+        renderScaleMobile: 0.52, // 手机端内部渲染比例：越高越清晰但更慢（建议 0.35~0.5）。
         renderScaleDesktop: 0.75, // 桌面端内部渲染比例：越高越清晰但更吃显卡（建议 0.6~0.85）。
         filterGlossyFactor: 1, // 高光抗噪强度：越小越去噪（会更柔和），1 基本不额外模糊。
         expRamp: 24, // 曝光爬坡样本阈值：在前 N 个样本内做曝光平滑过渡，减轻“首帧忽明忽暗”。
@@ -339,8 +339,33 @@ export const SOLID_RASTER_IRRADIANCE_PROBES = {
   groundIblOcclusionMinFactor: 0.12,
 };
 
-// 消费端 Solid.html / 生产端 Solid_Portrait_Create.html 共用：排错日志 + #debug-log-panel
-// false：hwLog/addHwLog/diagnosticPanelLog 不输出（含 console）、排错面板强制隐藏；true：输出并显示面板。
-export const SOLID_DEBUG_PANEL = {
-  enabled: true,
+/**
+ * 日志开关（给业务同学用）
+ *
+ * 你只需要记住这 2 步：
+ * 1) 想“看排错信息”就把对应页面的 level 调高；
+ * 2) 想“线上更干净、更省性能”就把 level 调低。
+ *
+ * 级别说明（从安静到详细）：
+ * - 0 = 完全不打日志（最安静）
+ * - 1 = 只打错误（推荐线上）
+ * - 2 = 错误 + 警告 + 一般信息（排查中等问题）
+ * - 3 = 全量调试（最详细，可能刷屏，排查时临时开）
+ *
+ * 推荐用法：
+ * - 日常/线上：masterLevel = 1
+ * - 临时排查阴影或渲染问题：把 solid.level 临时改成 3，排完再改回 1
+ */
+export const APP_LOGGING = {
+  masterLevel: 1, // 全局默认级别。所有页面先吃这个值。
+  pages: {
+    // Solid 主页面（几何光影观察）
+    solid: {
+      enabled: true, // false=强制关闭该页日志（等价于 level=0）
+      level: 1, // 推荐默认 1；排障临时改 3。
+      throttleMs: {
+        rasterShadowSoftDbg: 800, // 高频阴影调试日志的最小输出间隔（毫秒）
+      },
+    },
+  },
 };

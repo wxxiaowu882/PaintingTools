@@ -152,7 +152,7 @@
         clampSolidLightTempSlider,
         getSolidUnifiedInteractionState,
     } from './plugins_02/SolidLightControlShared.js';
-    import { SOLID_PATH_TRACER_QUALITY, SOLID_DEBUG_PANEL, SOLID_RASTER_PREVIEW_CANVAS_FILTER, SOLID_RASTER_AREA_LIGHT_RIG } from './Config/PaintingConfig.js';
+    import { SOLID_PATH_TRACER_QUALITY, SOLID_RASTER_PREVIEW_CANVAS_FILTER, SOLID_RASTER_AREA_LIGHT_RIG, APP_LOGGING } from './Config/PaintingConfig.js';
     window.skyEnvLightMatchMainRect = true; // 【试验·抗黑点噪点】true=更干净（更慢），false=更快（更噪）
     const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.consumer) ? SOLID_PATH_TRACER_QUALITY.consumer : {};
     const _solidPtProfileMap = _solidPtCfg.profiles || {};
@@ -215,11 +215,45 @@
     window.ensurePosterize2dOverlay = function() { return (window.PosterizeShared && window.PosterizeShared.ensureOverlay) ? window.PosterizeShared.ensureOverlay() : null; };
     window.refreshIosPosterizeOverlayFromWebGL = function() { if (window.PosterizeShared && window.PosterizeShared.refreshOverlayFromWebGL) window.PosterizeShared.refreshOverlayFromWebGL(); };
     // changePosterize/changeAtmosphere/changeDoF/setEnvColor/setSkyLightScale/toggleWall 由 shared 胶水统一注入
-    window.__solidDebugPanelEnabled = !!(SOLID_DEBUG_PANEL && SOLID_DEBUG_PANEL.enabled);
+    const __solidLogCfg = (APP_LOGGING && APP_LOGGING.pages && APP_LOGGING.pages.solid) ? APP_LOGGING.pages.solid : {};
+    const __solidMasterLogLevel = (APP_LOGGING && Number.isFinite(Number(APP_LOGGING.masterLevel))) ? Number(APP_LOGGING.masterLevel) : 1;
+    // 统一日志等级来源：优先读 PaintingConfig.js；不再依赖地址栏参数或控制台命令
+    window.__solidLogLevel = (__solidLogCfg && __solidLogCfg.enabled === false) ? 0 : (
+        Number.isFinite(Number(__solidLogCfg.level)) ? Number(__solidLogCfg.level) : __solidMasterLogLevel
+    ); // 0=off,1=error,2=warn/info,3=debug
+    window.__solidLogThrottleMap = window.__solidLogThrottleMap || {};
+    window.__solidConsole = {
+        shouldLog: function(level) {
+            return Number(window.__solidLogLevel || 0) >= level;
+        },
+        debug: function(...args) {
+            try { if (this.shouldLog(3)) console.log(...args); } catch (_e) {}
+        },
+        info: function(...args) {
+            try { if (this.shouldLog(2)) console.info(...args); } catch (_e) {}
+        },
+        warn: function(...args) {
+            try { if (this.shouldLog(2)) console.warn(...args); } catch (_e) {}
+        },
+        error: function(...args) {
+            try { if (this.shouldLog(1)) console.error(...args); } catch (_e) {}
+        },
+        debugThrottled: function(key, waitMs, ...args) {
+            try {
+                if (!this.shouldLog(3)) return;
+                const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                const map = window.__solidLogThrottleMap || (window.__solidLogThrottleMap = {});
+                const last = Number(map[key] || 0);
+                const cfgWait = (__solidLogCfg && __solidLogCfg.throttleMs && Number.isFinite(Number(__solidLogCfg.throttleMs.rasterShadowSoftDbg))) ? Number(__solidLogCfg.throttleMs.rasterShadowSoftDbg) : waitMs;
+                if ((now - last) < Math.max(0, Number(cfgWait) || 0)) return;
+                map[key] = now;
+                console.log(...args);
+            } catch (_e) {}
+        }
+    };
     window.addHwLog = function(msg) {
-        if (!window.__solidDebugPanelEnabled) return;
         const s = String(msg);
-        console.log('[Solid]', s);
+        window.__solidConsole.debug('[Solid]', s);
     };
     window.hwLog = window.addHwLog;
     window.__solidGetDiagnostics = function() {
@@ -288,13 +322,13 @@
     };
     window.__solidLogDiagnostics = function() {
         const d = window.__solidGetDiagnostics();
-        try { window.hwLog('[Diag] ' + JSON.stringify(d)); } catch (_e) { try { console.log('[Solid][Diag]', d); } catch (_e2) {} }
+        try { window.hwLog('[Diag] ' + JSON.stringify(d)); } catch (_e) { try { window.__solidConsole.debug('[Solid][Diag]', d); } catch (_e2) {} }
         return d;
     };
-    window.addEventListener('error', e => { if (window.__solidDebugPanelEnabled) window.hwLog('WinErr: ' + e.message); });
-    window.addEventListener('unhandledrejection', e => { if (window.__solidDebugPanelEnabled) window.hwLog('PromiseRej: ' + e.reason); }); const originalConsoleError = console.error; console.error = function(...args) {
+    window.addEventListener('error', e => { if (window.__solidConsole.shouldLog(3)) window.hwLog('WinErr: ' + e.message); });
+    window.addEventListener('unhandledrejection', e => { if (window.__solidConsole.shouldLog(3)) window.hwLog('PromiseRej: ' + e.reason); }); const originalConsoleError = console.error; console.error = function(...args) {
     originalConsoleError.apply(console, args); const msg = args.join(' ').toLowerCase();
-    if (window.__solidDebugPanelEnabled && /shader|webgl|gl_|framebuffer|context|three\.webgl/i.test(msg)) { try { window.hwLog('[ConsoleError] ' + args.join(' ')); } catch (_e) {} }
+    if (window.__solidConsole.shouldLog(3) && /shader|webgl|gl_|framebuffer|context|three\.webgl/i.test(msg)) { try { window.hwLog('[ConsoleError] ' + args.join(' ')); } catch (_e) {} }
     if (msg.includes('context lost') && !/recover|restore/i.test(msg)) { window._solidContextLost = true; window.useAdvancedRender = false; if (typeof window.__solidScheduleRecover === 'function') window.__solidScheduleRecover('console_context_lost'); return; }
     if (msg.includes('could not compile shader') || msg.includes('gl_invalid_operation') || msg.includes('failed to create') || msg.includes('framebuffer incomplete') || msg.includes('feedback loop')) {
     if (typeof triggerUnsupported === 'function') triggerUnsupported('console_gl_fatal', args.join(' ')); } }; function safeDispose(obj) { if (!obj) return; if (Array.isArray(obj)) { obj.forEach(m => safeDispose(m)); return; }
@@ -501,11 +535,11 @@
                 const s1 = `[shadowProbe] light=${dbg.lightType} gap=${(dbg.gapToGround||0).toFixed(6)} pull=${dbg.groundPull}`;
                 const s2 = `[shadowProbe] bias=${dbg.bias} normalBias=${dbg.normalBias} map=${dbg.mapSize? (dbg.mapSize.x+'x'+dbg.mapSize.y) : 'n/a'}`;
                 if (typeof window.hwLog === 'function') { window.hwLog(s1); window.hwLog(s2); }
-                else console.log(s1, s2);
+                else window.__solidConsole.debug(s1, s2);
             } catch (_eHw) {}
-            try { console.log('[solidShadowProbe] result', dbg); } catch (_eRes) {}
+            try { window.__solidConsole.debug('[solidShadowProbe] result', dbg); } catch (_eRes) {}
         } catch (e) {
-            try { console.error('[solidShadowProbe] fatal', e); } catch (_eCe) {}
+            try { window.__solidConsole.error('[solidShadowProbe] fatal', e); } catch (_eCe) {}
             try { if (typeof window.hwLog === 'function') window.hwLog('[shadowProbe] fatal: ' + (e && e.message ? e.message : e)); } catch (_eHw2) {}
         }
     };
@@ -1330,7 +1364,7 @@
         const text = await res.text();
         try { let parsed = JSON.parse(text); data = Array.isArray(parsed) ? parsed : [parsed]; } catch(e) {
         const lines = text.split('\n'); lines.forEach(line => { line = line.trim(); if(line.endsWith(',')) line = line.slice(0, -1);
-        if(line.startsWith('{') && line.endsWith('}')) { try { data.push(JSON.parse(line)); } catch(err2) { console.warn('单行解析跳过', err2); } } });
+        if(line.startsWith('{') && line.endsWith('}')) { try { data.push(JSON.parse(line)); } catch(err2) { window.__solidConsole.warn('单行解析跳过', err2); } } });
         if(data.length === 0) throw new Error("文本中未找到有效的数据节点"); }
         }
         window.customScenes = data; buildSceneGridUI(data); if(data.length > 0) { // [拦截点] 不再自动进入场景0，而是关掉加载提示，强制弹出场景选择网格

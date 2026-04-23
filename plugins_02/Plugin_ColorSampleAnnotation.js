@@ -19,8 +19,7 @@ const SAMPLE_MIN_INTERVAL_MS = 220;
 
 function colorSampleDebugLog(msg) {
     const line = '[ColorSample] ' + msg;
-    if (typeof window !== 'undefined' && typeof window.diagnosticPanelLog === 'function') window.diagnosticPanelLog(line);
-    else if (typeof window !== 'undefined' && window.hwLog) window.hwLog(line);
+    if (typeof window !== 'undefined' && window.hwLog) window.hwLog(line);
 }
 
 function getDarkBg(hex) {

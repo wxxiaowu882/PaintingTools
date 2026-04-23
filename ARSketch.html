@@ -109,8 +109,14 @@ button.active { background: #007AFF; color: white; }
 <input type="range" id="lineStrength" min="0" max="100" step="1" value="50" oninput="updateCvThreshold()" disabled>
 </div> </div> </div> <div style="display: flex; gap: 8px; margin-top: 6px;"> <button class="panel-btn" onclick="toggleLock()" id="btn-lock" style="max-width: none;">🔓 锁定画面</button>
 <button class="panel-btn" onclick="resetParams()" style="max-width: none;">重置</button> </div> </div> <script> let cvReady = false;
-function onOpenCvReady() { cvReady = true; console.log("OpenCV Ready"); }
-function log(msg) { console.log(msg); }
+const __arSketchDebugLog = (function() {
+    try {
+        const qs = new URLSearchParams(window.location.search || '');
+        return qs.get('debugLog') === '1' || localStorage.getItem('ARSketchDebugLog') === '1';
+    } catch (_e) { return false; }
+})();
+function onOpenCvReady() { cvReady = true; if (__arSketchDebugLog) console.log("OpenCV Ready"); }
+function log(msg) { if (__arSketchDebugLog) console.log(msg); }
 const state = { imageLoaded: false, locked: false, videoTrack: null, videoDevices: [], currentDeviceIndex: 0, cameraActive: false, sketchMode: false, opacity: 0.5, scale: 1, lineStrength: 50, perspective: 1000, rotateX: 0, screenX: 0,
 screenY: 0, viewScale: 1, viewX: 0, viewY: 0 }; const els = { startScreen: document.getElementById('start-screen'), fileInput: document.getElementById('file-input'),
 btnStartCam: document.getElementById('btn-start-cam'), globalViewport: document.getElementById('global-viewport'), screenLayer: document.getElementById('screen-layer'),

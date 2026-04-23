@@ -1650,7 +1650,11 @@ export function createSolidPreviewLightingManager(opts) {
                 const msg = `[RasterShadowSoft][dbg] lt=${lt} anchors=${m.userData.uSolidShadowAnchorCount.value} heightY=${heightY.toFixed(3)} diagXZ=${diagXZ.toFixed(3)} start=${r ? r.x.toFixed(3) : '?'} end=${r ? r.y.toFixed(3) : '?'} exp=${m.userData.uSolidShadowSoftExp.value} strength=${m.userData.uSolidShadowSoftStrength.value}`;
                 try { log(msg); } catch (_eLg) {}
                 try { if (typeof window !== 'undefined' && typeof window.hwLog === 'function') window.hwLog(msg); } catch (_eHw) {}
-                try { if (typeof console !== 'undefined' && console.log) console.log(msg); } catch (_eCon) {}
+                try {
+                  if (typeof window !== 'undefined' && window.__solidConsole && typeof window.__solidConsole.debugThrottled === 'function') {
+                    window.__solidConsole.debugThrottled('RasterShadowSoftDbg', 800, msg);
+                  }
+                } catch (_eCon) {}
               } catch (_eDbg0) {}
             }
           } catch (_eSoftCfg) {}

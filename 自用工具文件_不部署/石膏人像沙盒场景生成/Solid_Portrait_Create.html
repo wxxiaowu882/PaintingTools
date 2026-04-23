@@ -107,7 +107,7 @@
     import { installSolidAtmosphereHostBindings } from '../../plugins_02/SolidAtmosphereControlShared.js';
     import { installSolidAssistHostBindings } from '../../plugins_02/SolidAssistControlShared.js';
     import { computeSolidMainLightCartesianPosition, createSolidMainLight, installSolidMainLightSliderBindings, solidGetTempColorFromKelvin100, clampSolidLightSizeSlider, clampSolidLightTempSlider, getSolidUnifiedInteractionState } from '../../plugins_02/SolidLightControlShared.js';
-    import { SOLID_PATH_TRACER_QUALITY, SOLID_DEBUG_PANEL, SOLID_RASTER_AREA_LIGHT_RIG } from '../../Config/PaintingConfig.js';
+    import { SOLID_PATH_TRACER_QUALITY, SOLID_RASTER_AREA_LIGHT_RIG, APP_LOGGING } from '../../Config/PaintingConfig.js';
     window.skyEnvLightMatchMainRect = true; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.producer) ? SOLID_PATH_TRACER_QUALITY.producer : {};
     const _solidPtSync = createSolidPathTracerSyncController({
@@ -167,24 +167,24 @@
     window.ensurePosterize2dOverlay = function() { return (window.PosterizeShared && window.PosterizeShared.ensureOverlay) ? window.PosterizeShared.ensureOverlay() : null; };
     window.refreshIosPosterizeOverlayFromWebGL = function() { if (window.PosterizeShared && window.PosterizeShared.refreshOverlayFromWebGL) window.PosterizeShared.refreshOverlayFromWebGL(); };
     // window.changePosterize 已由 SolidAssistControlShared 注入
-    window.__solidDebugPanelEnabled = !!(SOLID_DEBUG_PANEL && SOLID_DEBUG_PANEL.enabled);
+    const __solidCreateLogCfg = (APP_LOGGING && APP_LOGGING.pages && APP_LOGGING.pages.solidCreate) ? APP_LOGGING.pages.solidCreate : {};
+    const __solidCreateMasterLogLevel = (APP_LOGGING && Number.isFinite(Number(APP_LOGGING.masterLevel))) ? Number(APP_LOGGING.masterLevel) : 1;
+    const __solidCreateLogLevel = (__solidCreateLogCfg && __solidCreateLogCfg.enabled === false) ? 0 : (
+        Number.isFinite(Number(__solidCreateLogCfg.level)) ? Number(__solidCreateLogCfg.level) : __solidCreateMasterLogLevel
+    );
+    const __solidCreateDebugEnabled = __solidCreateLogLevel >= 3;
     window.addHwLog = function(msg) {
-        if (!window.__solidDebugPanelEnabled) return;
+        if (!__solidCreateDebugEnabled) return;
         console.log(`[HW-LOG] ${String(msg)}`);
     };
-    window.diagnosticPanelLog = function(msg) {
-        if (!window.__solidDebugPanelEnabled) return;
-        console.log(`[SolidCreate-Diag] ${String(msg)}`);
-    };
     function solidCreateDebugLog(msg) {
-        try { if (window.diagnosticPanelLog) window.diagnosticPanelLog(String(msg)); } catch (_e0) {}
-        try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e1) {}
+        try { if (window.hwLog) window.hwLog('[SolidCreate-Diag] ' + String(msg)); } catch (_e1) {}
     }
     window.hwLog = window.addHwLog;
-    window.addEventListener('error', e => { if (window.__solidDebugPanelEnabled) window.hwLog('WinErr: ' + e.message); }); window.addEventListener('unhandledrejection', e => { if (window.__solidDebugPanelEnabled) window.hwLog('PromiseRej: ' + e.reason); });
+    window.addEventListener('error', e => { if (__solidCreateDebugEnabled) window.hwLog('WinErr: ' + e.message); }); window.addEventListener('unhandledrejection', e => { if (__solidCreateDebugEnabled) window.hwLog('PromiseRej: ' + e.reason); });
     const originalConsoleError = console.error; console.error = function(...args) {
     originalConsoleError.apply(console, args); const msg = args.join(' ').toLowerCase();
-    if (window.__solidDebugPanelEnabled) window.hwLog('[ConsoleError] ' + args.join(' '));
+    if (__solidCreateDebugEnabled) window.hwLog('[ConsoleError] ' + args.join(' '));
     if (msg.includes('could not compile shader') || msg.includes('gl_invalid_operation') || msg.includes('context lost') || msg.includes('failed to create') || msg.includes('framebuffer incomplete') || msg.includes('feedback loop')) { if (typeof triggerUnsupported === 'function') triggerUnsupported(); }
     }; // 补回底层的安全销毁函数，免疫组件清理时的未定义崩溃
     function safeDispose(obj) { if (!obj) return; if (Array.isArray(obj)) { obj.forEach(m => safeDispose(m)); return; }
@@ -1671,7 +1671,7 @@
         transformControl.object.traverse(child => { if (child.isMesh && child.material) { child.material.color.set(colorHex); child.userData.customColor = colorHex; } });
         needsUpdate = true; lightMoved = true; window.sumDuration = 0; markDraftDirty(); } }; window.toggleCropBox = function() { const cb = document.getElementById('crop-box');
         cb.style.display = cb.style.display === 'none' ? 'block' : 'none'; };
-        /** 缩略图缓存版本；调试内置体贴地/缩略图请设 localStorage: SolidCreateBuiltinDebug=1；排错面板见 Config SOLID_DEBUG_PANEL.enabled */
+        /** 缩略图缓存版本；调试内置体贴地/缩略图请设 localStorage: SolidCreateBuiltinDebug=1 */
         const BUILTIN_THUMB_CACHE_VERSION = '8';
         const BUILTIN_THUMB_SIZE = 128;
         const BUILTIN_THUMB_DB = 'SolidBuiltinThumbDB';
@@ -2199,14 +2199,14 @@
         renderer.domElement.addEventListener('pointerdown', onPlaneXZPointerDown, true); window.addEventListener('pointermove', onPlaneXZPointerMove, true); window.addEventListener('pointerup', endPlaneXZDrag, true); window.addEventListener('pointercancel', endPlaneXZDrag, true);
         // 【核心注销】：引线标注引擎 (AnnotationManager) 已抽离至外部插件 ../../plugins_02/Plugin_Annotation.js 中独立维护
         let mouseDownPos = {x:0, y:0}; window.mouseDownTarget = null; // 【新增】：记录真实的鼠标按下目标，防止指针捕获导致的靶向偏移
-        window.addEventListener('pointerdown', e => { if (window.__solidDebugPanelEnabled) window.hwLog(`[Log-Down] pointerdown 触发. x:${e.clientX}, y:${e.clientY}, target:${e.target.tagName}`); mouseDownPos = {x: e.clientX, y: e.clientY}; window.mouseDownTarget = e.target; }, true); // 【强制防吞事件】：在 window 的捕获阶段(true)第一时间锁定真实点击坐标！
+        window.addEventListener('pointerdown', e => { if (__solidCreateDebugEnabled) window.hwLog(`[Log-Down] pointerdown 触发. x:${e.clientX}, y:${e.clientY}, target:${e.target.tagName}`); mouseDownPos = {x: e.clientX, y: e.clientY}; window.mouseDownTarget = e.target; }, true); // 【强制防吞事件】：在 window 的捕获阶段(true)第一时间锁定真实点击坐标！
         /* Alt+取色/引线：须在 window 捕获阶段、且晚于上一行 mouseDownPos 之后拦截。canvas 上 TransformControls 先于本页监听器注册，仅用 stopPropagation 无法挡住它；Orbit 在 container 上吃 Shift+左键平移。此处 stopImmediatePropagation 终止整次派发，避免与 Alt+Shift 抢指针。 */
         window.addEventListener('pointerdown', function solidCreateAltSceneHitWinCapture(e) {
         const t = e.target; if (t !== renderer.domElement && (!t || t.id !== 'canvas-container')) return;
         if (e.button !== 0) return;
         const altDown = e.altKey || (typeof e.getModifierState === 'function' && e.getModifierState('Alt'));
         if (!altDown) return;
-        const csLog = function(m) { if (window.diagnosticPanelLog) window.diagnosticPanelLog('[AltHit] ' + m); };
+        const csLog = function(m) { if (__solidCreateDebugEnabled && window.hwLog) window.hwLog('[AltHit] ' + m); };
         csLog(`Alt+LMB target=${t && t.tagName} id=${t && t.id} client=${e.clientX},${e.clientY} editorMode=${window.currentEditorMode} pmMode=${window.PluginManager && window.PluginManager.State.currentMode} shiftKey=${e.shiftKey} getShift=${typeof e.getModifierState === 'function' ? e.getModifierState('Shift') : 'n/a'} pointerId=${e.pointerId}`);
         if (window.PluginManager && window.PluginManager.triggerEvent('onBeforePointerDown', e) === true) { csLog('abort: onBeforePointerDown 已拦截'); e.preventDefault(); e.stopImmediatePropagation(); return; }
         e.preventDefault(); solidEditorSetRaycasterFromClient(dragRaycaster, e.clientX, e.clientY, camera, renderer.domElement, dragMouse);
@@ -2223,7 +2223,7 @@
         if (window.PluginManager && window.PluginManager.triggerEvent('onBeforePointerDown', e) === true) return; }); window.addEventListener('pointermove', e => { // 【事件解耦】：核心只负责广播鼠标移动，具体的位移计算交给正在激活的插件
         if (window.PluginManager) { window.PluginManager.triggerEvent('onGlobalPointerMove', { event: e, startX: mouseDownPos.x, startY: mouseDownPos.y }); } });
         window.addEventListener('pointerup', e => { 
-        const __d = !!window.__solidDebugPanelEnabled;
+        const __d = !!__solidCreateDebugEnabled;
         if (__d) window.hwLog(`[Log-Up] pointerup 触发. mode:${window.currentEditorMode}, dragging:${transformControl.dragging}, axis:${transformControl.axis}, hasObj:${!!transformControl.object}`);
         if (transformControl.dragging || (transformControl.object && transformControl.axis !== null)) { if (__d) window.hwLog(`[Log-Up] 拦截 1: dragging 或悬停在轴上`); return; } // 【修复幽灵轴】：只有真正挂载了模型时，才允许因悬停在轴上而拦截点击！
         // 【事件解耦】：如果有插件接管了松开逻辑，则不再往下执行模型选中操作
