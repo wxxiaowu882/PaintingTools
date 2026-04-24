@@ -1476,6 +1476,10 @@
         window.createNewScene = function() { window._editorSceneLoadGen++; transformControl.detach(); if(window.AnnotationManager) window.AnnotationManager.clearAll(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); document.getElementById('scene-name-input').value = ''; const _d = document.getElementById('scene-meta-detail-input'); if (_d) _d.value = ''; window.currentFileHandle = null; if(document.getElementById('file-list-container').children.length > 0) { Array.from(document.getElementById('file-list-container').children).forEach(el => el.style.borderLeft = 'none'); } document.getElementById('btn-save-direct').innerText = '💾 保存新场景'; const cb = document.getElementById('crop-box'); cb.style.display = 'none'; const cachedCrop = localStorage.getItem('solidCropBoxCache'); if(cachedCrop) { const c = JSON.parse(cachedCrop); cb.style.left = c.left; cb.style.top = c.top; cb.style.width = c.width; cb.style.height = c.height; } else { cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }
         window._solidCreateDraftFileName = null; solidCreateSyncSaveButtonText();
         window.__solidCreateHasExplicitScene = true;
+        // 新建场景时同步重置相机/视线（方案 A）：对准世界原点，避免沿用上一场景/草稿导致取景框偏移
+        try { if (camera) { camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); } } catch (_eCamNs) {}
+        try { if (controls) { controls.target.set(0, 0, 0); controls.update(); } } catch (_eCtlNs) {}
+        try { if (camera) camera.lookAt(0, 0, 0); } catch (_eLookNs) {}
         const matchedMatOpt = document.querySelector(`#mat-options .custom-option[onclick*="'origin'"]`);
         if(matchedMatOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedMatOpt.innerText; document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedMatOpt.classList.add('selected'); }
         window.changeMat('origin'); window.initialMatType = 'origin'; // 【新增】新建场景时，初始材质重置为自带材质
@@ -2171,6 +2175,10 @@
         const canvasContainerForEvents = document.getElementById('canvas-container');
         // 【优化3核心】：仅将场景控制器挂载到父级 container 上，接收穿透冒泡的拖拽旋转事件！
         controls = new OrbitControls(camera, canvasContainerForEvents); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; window._orbitInteracting = false;
+        // 新建场景默认对准世界原点（方案 A）：让(0,0,0)落在取景框中心（屏幕中心）。若后续恢复草稿/加载场景相机数据，会覆盖此默认值。
+        try { controls.target.set(0, 0, 0); } catch (_eCt0) {}
+        try { camera.lookAt(0, 0, 0); } catch (_eLa0) {}
+        try { controls.update(); } catch (_eCu0) {}
         // 恢复“视角锁定”缓存，并同步到 controls 与按钮
         solidCreateRestoreCameraLock();
         let _orbitStartPos = null, _orbitStartTarget = null, _orbitStartQuat = null, _orbitStartZoom = 0;
