@@ -1053,11 +1053,12 @@
         files.sort((a,b) => a.name.localeCompare(b.name, 'zh-CN', {numeric: true})); if(files.length===0){ container.innerHTML = '<div style="color:#aaa; text-align:center;">无JSON文件</div>'; await window.syncQuickDirButtons(); return; }
         if(!window.targetMasterFilename) { const nonNumbered = files.filter(f => !/^\d+/.test(f.name)); if(nonNumbered.length > 0) window.targetMasterFilename = nonNumbered[0].name; }
         container.innerHTML = '<div style="display:flex; justify-content:space-between; color:#a0a0a0; font-size:10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:4px;"><span>📝 场景文件 (点击读取)</span><span title="指定哪个文件为合并目标">🎯 统合目标</span></div>'; files.forEach(fileHandle => { const item = document.createElement('div'); item.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:4px 6px; margin-bottom:2px; background:rgba(255,255,255,0.05); border-radius:3px; transition:0.2s; color:#ddd;';
-        const nameSpan = document.createElement('span'); nameSpan.style.cssText = 'cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;'; nameSpan.innerText = fileHandle.name; nameSpan.onclick = () => window.loadJSONFromFileHandle(fileHandle);
+        const nameSpan = document.createElement('span'); nameSpan.style.cssText = 'cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;'; nameSpan.innerText = fileHandle.name;
         // 双击文件名：安全重命名（数字开头场景文件 / 非数字统合文件）
         nameSpan.ondblclick = async (ev) => {
             try {
                 ev.preventDefault(); ev.stopPropagation();
+                if (nameSpan.__singleClickTimer) { clearTimeout(nameSpan.__singleClickTimer); nameSpan.__singleClickTimer = 0; }
                 _suppressSceneItemClickUntil = Date.now() + 280;
     
                 const oldName = String(fileHandle.name || '');
@@ -1157,7 +1158,13 @@
         // 单击加载：若刚触发过双击编辑，则短暂抑制，避免误加载
         nameSpan.onclick = (e) => {
             if (Date.now() < _suppressSceneItemClickUntil) { try { e.preventDefault(); e.stopPropagation(); } catch(_e) {} return; }
-            window.loadJSONFromFileHandle(fileHandle);
+            if (nameSpan.__singleClickTimer) clearTimeout(nameSpan.__singleClickTimer);
+            // 关键修复：单击延迟触发，给 dblclick 一个取消窗口，避免“想重命名却先加载”
+            nameSpan.__singleClickTimer = setTimeout(() => {
+                nameSpan.__singleClickTimer = 0;
+                if (Date.now() < _suppressSceneItemClickUntil) return;
+                window.loadJSONFromFileHandle(fileHandle);
+            }, 220);
         };
         item.onmouseover = () => { item.style.background='rgba(255,255,255,0.2)'; item.style.color='#fff'; }; item.onmouseout = () => { item.style.background='rgba(255,255,255,0.05)'; item.style.color='#ddd'; };
         item.appendChild(nameSpan); if (!/^\d+/.test(fileHandle.name)) {
