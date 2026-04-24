@@ -87,7 +87,7 @@ window.ControlPanel = {
                             <div class="flex gap-2 mb-2" style="position:relative; z-index:105;">
                                 <div class="flex items-center gap-2 flex-1" style="position:relative;">
                                     <span class="slider-label" style="width:auto;">光向</span>
-                                    <div class="custom-select-trigger" onclick="window.toggleCustomSelect(event, 'dir-options')" id="dir-trigger">默认顶侧</div>
+                                    <div class="custom-select-trigger" onclick="window.toggleCustomSelect(event, 'dir-options')" id="dir-trigger" style="min-width:72px; max-width:110px;">默认顶侧</div>
                                     <div class="custom-options" id="dir-options"> 
                                         <div class="custom-option selected" onclick="window.selectCustomOpt('lightDir', '113,45', '默认顶侧', this)">默认顶侧</div> 
                                         <div class="custom-option" onclick="window.selectCustomOpt('lightDir', '90,6', '正面光', this)">正面光</div>
@@ -100,7 +100,11 @@ window.ControlPanel = {
                                 </div>
                                 <div class="flex items-center gap-2 flex-[0.9]" style="position:relative;">
                                     <span class="slider-label" style="width:auto;">光源</span>
-                                    <div class="custom-select-trigger" onclick="window.toggleCustomSelect(event, 'light-options')" id="light-trigger">聚光灯</div>
+                                    <div class="custom-select-trigger" onclick="window.toggleCustomSelect(event, 'light-options')" id="light-trigger" style="min-width:66px; max-width:96px;">聚光灯</div>
+                                    <label title="显示灯的位置示意（调灯/转动/点击时短暂出现）" style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; margin:0; user-select:none;">
+                                        <input id="light-indicator-toggle" type="checkbox" style="accent-color:#2ecc71; width:14px; height:14px; margin:0;">
+                                        <span style="font-size:10px; color:rgba(255,255,255,0.55); letter-spacing:0.4px;">灯位</span>
+                                    </label>
                                     <div class="custom-options" id="light-options"> 
                                         <div class="custom-option selected" onclick="window.selectCustomOpt('light', 'spot', '聚光灯', this)">聚光灯</div>
                                         <div class="custom-option" onclick="window.selectCustomOpt('light', 'point', '点光源', this)">点光源</div> 
