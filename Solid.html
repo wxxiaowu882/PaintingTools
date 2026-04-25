@@ -122,7 +122,7 @@
     <div id="scene-grid-modal">
     <div class="modal-header"> <span class="modal-title">学习场景</span> <span class="modal-close" aria-label="关闭" title="关闭" onclick="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()" ontouchstart="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()">×</span> </div>
     <div class="scene-grid" id="scene-grid-container"></div> </div> <div id="canvas-container" class="fixed inset-0 z-0"></div> <script type="module">
-    import './plugins_02/PluginManager.js'; import './plugins_02/Plugin_SkyEnvLight.js'; import './plugins_02/Plugin_ControlPanel.js'; import * as THREE from 'three'; import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import './plugins_02/PluginManager.js'; import './plugins_02/Plugin_SkyEnvLight.js'; import './plugins_02/Plugin_ControlPanel.js'; import './plugins_02/Plugin_LightIndicator.js'; import * as THREE from 'three'; import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'; import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer'; import './plugins_02/Plugin_PerfTest.js';
     import './plugins_02/Plugin_Annotation.js'; // 统一接入外部标注插件
     import './plugins_02/Plugin_ColorSampleAnnotation.js'; import './plugins_02/Plugin_NormalArrow.js'; // 同步接入法线箭头插件
@@ -850,6 +850,8 @@
             }
         } catch (_ePl) {}
     };
+    const SOLID_LIGHT_INDICATOR_KEY = 'Solid_LightIndicatorEnabled_v1';
+    const SOLID_LIGHT_INDICATOR_EXTRA_HOLD_MS = 3000;
     const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
     const __solidRasterLightRig = createSolidRasterLightRig({
         THREE,
@@ -1161,6 +1163,7 @@
     try { if (renderer) { renderer.toneMappingExposure = _solidPt.expHi || renderer.toneMappingExposure; _solidTryRasterPreviewDraw(); } } catch(_eR0) {}
     try { requestAnimationFrame(() => { try { if (renderer) _solidTryRasterPreviewDraw(); } catch(_eR1) {} }); } catch(_eRaf) {}
     }
+    try { if (window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(1300); } catch (_eLiShow) {}
     }
     else if (type === 'mat') {
     document.getElementById('mat-trigger').innerText = text;
@@ -1177,6 +1180,7 @@
     document.getElementById('elevationVal').innerText = state.elevation;
     updateLightPosition();
     lightMoved = true;
+    try { if (window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(1300); } catch (_eLiShow2) {}
     try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_dir'); } catch(_eP) {}
     }
     };
@@ -1243,6 +1247,64 @@
     if (window.toggleDoF) window.toggleDoF(enabled);
     else if (window.updateDoFUI) window.updateDoFUI();
     }
+    function solidGetLightIndicatorFallbackEnabled() {
+    try { return localStorage.getItem(SOLID_LIGHT_INDICATOR_KEY) === '1'; } catch (_e) { return false; }
+    }
+    function solidApplyLightIndicatorEnabled(on, saveToLocalStorage) {
+    const enabled = !!on;
+    try {
+    const cb = document.getElementById('light-indicator-toggle');
+    if (cb) cb.checked = enabled;
+    } catch (_eCb) {}
+    if (saveToLocalStorage !== false) {
+    try { localStorage.setItem(SOLID_LIGHT_INDICATOR_KEY, enabled ? '1' : '0'); } catch (_eLs) {}
+    }
+    try { if (window.LightIndicatorManager && window.LightIndicatorManager.setEnabled) window.LightIndicatorManager.setEnabled(enabled); } catch (_eSet) {}
+    }
+    function solidResolveSceneLightIndicatorEnabled(sceneData) {
+    const env = sceneData && sceneData.env ? sceneData.env : null;
+    if (env && env.lightIndicatorEnabled !== undefined) return !!env.lightIndicatorEnabled;
+    return solidGetLightIndicatorFallbackEnabled();
+    }
+    window.__solidLightIndicatorShow = function(ms) {
+    const base = Number(ms) || 1200;
+    const holdMs = base + SOLID_LIGHT_INDICATOR_EXTRA_HOLD_MS;
+    try { if (window.LightIndicatorManager && window.LightIndicatorManager.showTemporarily) window.LightIndicatorManager.showTemporarily(holdMs); } catch (_eLiShow) {}
+    };
+    function solidInitLightIndicator() {
+    const initialOn = solidResolveSceneLightIndicatorEnabled(window.currentSceneData);
+    solidApplyLightIndicatorEnabled(initialOn, false);
+    if (window.LightIndicatorManager && typeof window.LightIndicatorManager.init === 'function') {
+    window.LightIndicatorManager.init({
+    enabled: initialOn,
+    isMobile: isMobile,
+    getScene: () => scene,
+    getCamera: () => camera,
+    getMainLight: () => mainLight,
+    getTarget: () => (controls ? controls.target : null),
+    getLightType: () => lightType,
+    getLightTemp: () => state.lightTemp,
+    getLightIntensity: () => Number(document.getElementById('lightIntensity') && document.getElementById('lightIntensity').value),
+    getLightSize: () => Number(document.getElementById('lightSize') && document.getElementById('lightSize').value),
+    getTempColor: (k) => solidGetTempColorFromKelvin100(THREE, k),
+    });
+    }
+    try {
+    const cb = document.getElementById('light-indicator-toggle');
+    if (cb && !cb.__solidLightIndicatorBound) {
+    cb.__solidLightIndicatorBound = '1';
+    cb.addEventListener('change', () => {
+    const on = !!cb.checked;
+    solidApplyLightIndicatorEnabled(on, true);
+    if (window.currentSceneData && typeof window.currentSceneData === 'object') {
+    window.currentSceneData.env = window.currentSceneData.env || {};
+    window.currentSceneData.env.lightIndicatorEnabled = on;
+    }
+    try { if (on && window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(1400); } catch (_eCbShow) {}
+    });
+    }
+    } catch (_eBind) {}
+    }
     window.resetAll = function() { if(!window.currentSceneData) return; const data = window.currentSceneData; if(data.light) {
     state.azimuth = data.light.azimuth; document.getElementById('lightAzimuth').value = state.azimuth; document.getElementById('azimuthVal').innerText = state.azimuth;
     state.elevation = data.light.elevation; document.getElementById('lightElevation').value = state.elevation; document.getElementById('elevationVal').innerText = state.elevation;
@@ -1255,6 +1317,7 @@
     updateDirTriggerByValues(); }
     if(data.camera) { camera.position.set(...data.camera.pos); controls.target.set(...data.camera.target); camera.zoom = data.camera.zoom; camera.updateProjectionMatrix(); controls.update(); }
     if(data.env) {
+    solidApplyLightIndicatorEnabled(solidResolveSceneLightIndicatorEnabled(data), false);
     if (data.env.hasWall !== undefined) { window.hasWall = data.env.hasWall; const wallBtn = document.getElementById('wall-btn'); const wchk = document.getElementById('wall-btn-checkbox'); if (wchk) wchk.checked = !!window.hasWall; if (wallBtn) { wallBtn.classList.toggle('active', window.hasWall); wallBtn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; } }
     window.matType = data.env.defaultMat !== undefined ? data.env.defaultMat : 'origin'; window.posterizeLevel = data.env.posterizeLevel !== undefined ? data.env.posterizeLevel : 0;
     window.envWallColor = data.env.wallColor || '#cccccc'; window.envGroundColor = data.env.groundColor || '#cccccc'; window.envSkyColor = data.env.skyColor || '#0d0d0f';
@@ -1264,6 +1327,7 @@
     const _dof = data.env.dof || { enabled: false, aperture: 2.8, focusDistance: 10 };
     window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof;
     } else {
+    solidApplyLightIndicatorEnabled(solidResolveSceneLightIndicatorEnabled(data), false);
     window.matType = 'origin'; window.posterizeLevel = 0; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
     const _atm = { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 }; const _dof = { enabled: false, aperture: 2.8, focusDistance: 10 };
     window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof; }
@@ -1639,6 +1703,7 @@
         controls.addEventListener('start', () => {
             window._orbitInteracting = true;
             window._solidLastInteractAt = performance.now();
+            try { if (window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(900); } catch (_eLiOrbit) {}
             _orbitStartPos = camera.position.clone();
             _orbitStartTarget = controls.target.clone();
             _orbitStartQuat = camera.quaternion.clone();
@@ -1658,7 +1723,17 @@
             if (moved) needsUpdate = true;
             if (moved && !window.useAdvancedRender) { try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('orbit_end'); } catch(_eP) {} }
         });
-        controls.addEventListener('change', () => { window._solidLastInteractAt = performance.now(); needsUpdate = true; });
+        controls.addEventListener('change', () => {
+            window._solidLastInteractAt = performance.now(); needsUpdate = true;
+            try {
+                const _tNow = performance.now();
+                if (!window.__solidLightIndicatorOrbitTick || (_tNow - window.__solidLightIndicatorOrbitTick) > 90) {
+                    window.__solidLightIndicatorOrbitTick = _tNow;
+                    if (window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(420);
+                }
+            } catch (_eLiOrbitLive) {}
+        });
+        container.addEventListener('pointerdown', () => { try { if (window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(600); } catch (_eLiDown) {} });
         gltfLoader = new GLTFLoader(); const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'); gltfLoader.setDRACOLoader(dracoLoader);
         sysMaterials = { plaster: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0 }), flat: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0, flatShading: true }), sphere: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.6, metalness: 0 }) };
         // 【架构重构】：必须在任何读取 UI 状态的函数（如 buildEnvironment）之前，注入 DOM 模具！
@@ -1690,6 +1765,7 @@
             getUseAdvancedRender: () => window.useAdvancedRender,
         });
         buildEnvironment(); window.syncEnvColorPickers();
+        solidInitLightIndicator();
         setupUIControls(); window.addEventListener('resize', function() { onWindowResize(); if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); }); setLoaderText("首次加载，硬件检测中…");
         try { window.hwLog('[Init] ready'); } catch (_eRdy) {}
         try { syncRenderButtons(); } catch (_eBtn0) {}
@@ -1869,20 +1945,29 @@
         },
         afterLightDirectionInput() {
             try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSs) {}
+            try { if (window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(1300); } catch (_eLiDir) {}
             try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('light_dir'); } catch (_eP) {}
         },
         afterLightSizeInput() {
             try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSs2) {}
             try { window._solidGroundShadowDirty = true; } catch (_eGs2) {}
+            try { if (window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(1300); } catch (_eLiSize) {}
         },
         afterLightIntensityInput() {
             try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSi) {}
             try { window._solidGroundShadowDirty = true; } catch (_eGi) {}
+            try { if (window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(1300); } catch (_eLiIntensity) {}
             _solidSyncSkyEnvLightFast();
             const _now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
             if ((_now - _solidIntensityLastConvergeAt) > 180) _solidForceIntensityConverge();
             else _solidScheduleIntensityConverge(130);
         },
+        });
+        ['lightAzimuth','lightElevation','lightDistance','lightTemp','lightSize','lightIntensity'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el || el.__solidLightIndicatorBound) return;
+        el.__solidLightIndicatorBound = '1';
+        el.addEventListener('input', () => { try { if (window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(1300); } catch (_eLiInput) {} });
         });
         }
         function __solidEvalImmersiveIdle() {
