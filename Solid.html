@@ -1993,7 +1993,8 @@
         try { if (typeof solidSceneLoadUxTickStabilize === 'function') solidSceneLoadUxTickStabilize(); } catch (_eStableTick) {}
         try { __solidEvalImmersiveIdle(); } catch(_e) {}
         if (window._solidPerfHardwareT0 && window.PerfTester && window.PerfTester.isTesting) tickSolidPerfHardwareProgress();
-        if (window.isUnsupported || !window.useAdvancedRender) {
+        const isTesting = window.PerfTester ? window.PerfTester.isTesting : false;
+        if (window.isUnsupported || (!window.useAdvancedRender && !isTesting)) {
         if (renderer) renderer.toneMappingExposure = 0.7;
         // 光栅态滤镜由 _solidApplyRasterCanvasCssFilter 控制，避免每帧先清空导致“静止后模糊消失”。
         if (controls && !controls.enabled) controls.enabled = true;
@@ -2030,7 +2031,7 @@
             if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
         }
         return; }
-        const isTesting = window.PerfTester ? window.PerfTester.isTesting : false; if (!isTesting) { if (controls && !controls.enabled) controls.enabled = true; if (controls) controls.update(); }
+        if (!isTesting) { if (controls && !controls.enabled) controls.enabled = true; if (controls) controls.update(); }
         // 【统一生命周期总线】：一行代码调度所有插件，彻底解耦
         if (window.PluginManager) { const isInterrupted = window.PluginManager.trigger('onUpdate', { camera, scene, pathTracer, renderer }); if (isInterrupted) return; // 若测试插件要求接管，直接安全 return
         }
