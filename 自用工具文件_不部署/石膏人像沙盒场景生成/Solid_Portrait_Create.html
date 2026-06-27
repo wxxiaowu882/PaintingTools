@@ -1223,6 +1223,26 @@
         } catch (_ePl) {}
         try { if (renderer && scene && camera) { _solidTryRasterPreviewDraw(); } } catch (_eR) {}
         } catch(err) { console.error(err); window.showToast("读取或解析失败！", true); } };
+        /** 封面截取区：绿框内缘（不含虚线 border）+ 排除顶部拖拽条，在剩余区域内取最大正方形 */
+        function solidCreateGetCropCaptureRect(cropBoxEl, vw, vh) {
+        const fb = 256;
+        if (!cropBoxEl || cropBoxEl.style.display === 'none') {
+        return { left: Math.max(0, Math.floor((vw - fb) / 2)), top: Math.max(0, Math.floor((vh - fb) / 2)), width: fb, height: fb };
+        }
+        const outer = cropBoxEl.getBoundingClientRect();
+        const cs = window.getComputedStyle(cropBoxEl);
+        const bl = parseFloat(cs.borderLeftWidth) || 0, bt = parseFloat(cs.borderTopWidth) || 0;
+        const innerW = Math.max(1, cropBoxEl.clientWidth), innerH = Math.max(1, cropBoxEl.clientHeight);
+        const innerLeft = outer.left + bl, innerTop = outer.top + bt;
+        const dragH = document.getElementById('crop-drag-handle');
+        const handleH = dragH ? Math.max(0, dragH.offsetHeight || 0) : 0;
+        const availW = innerW, availH = Math.max(1, innerH - handleH);
+        let side = Math.max(1, Math.min(availW, availH));
+        const cropLeft = Math.max(0, Math.floor(innerLeft + (availW - side) * 0.5));
+        const cropTop = Math.max(0, Math.floor(innerTop + handleH + (availH - side) * 0.5));
+        side = Math.max(1, Math.min(side, Math.max(1, vw - cropLeft), Math.max(1, vh - cropTop)));
+        return { left: cropLeft, top: cropTop, width: side, height: side };
+        }
         window.saveCurrentSceneDirectly = async function() { if(!window.workDirHandle) { window.showToast("请先挂载工作目录！", true); return; }
         let inputName = document.getElementById('scene-name-input').value.trim(); if(!window.currentFileHandle && !inputName) { window.showToast("请先填写【场景名称】！", true); return; }
         const _metaDetailEl = document.getElementById('scene-meta-detail-input');
@@ -1244,14 +1264,30 @@
         if(pathTracer) { const dofOn = window.DoFManager ? window.DoFManager.enabled : false; if (window.AtmosphereManager && (window.isFogEnabled || dofOn)) window.AtmosphereManager.render(pathTracer, renderer, scene, camera); else pathTracer.renderSample(); } else { _solidTryRasterPreviewDraw(); }
         try { if (window.PluginManager) window.PluginManager.trigger('onUpdate', { camera, scene, pathTracer, renderer }); } catch(_e) {}
         await new Promise(r => requestAnimationFrame(r));
-        const cropBox = document.getElementById('crop-box'); let rect; if(cropBox.style.display !== 'none') { rect = cropBox.getBoundingClientRect(); } else { rect = { left: (window.innerWidth - 256)/2, top: (window.innerHeight - 256)/2, width: 256, height: 256 }; }
         const vw = window.innerWidth, vh = window.innerHeight;
-        const cropLeft = Math.max(0, Math.floor(rect.left)), cropTop = Math.max(0, Math.floor(rect.top));
-        const cropW = Math.max(1, Math.min(Math.ceil(rect.width), vw - cropLeft)), cropH = Math.max(1, Math.min(Math.ceil(rect.height), vh - cropTop));
+        const cropBox = document.getElementById('crop-box');
+        const capRect = solidCreateGetCropCaptureRect(cropBox, vw, vh);
+        const cropLeft = capRect.left, cropTop = capRect.top;
+        const cropW = capRect.width, cropH = capRect.height;
         const snapRect = { left: cropLeft, top: cropTop, width: cropW, height: cropH };
         const cboxEl = document.getElementById('crop-box'); const prevCropVis = cboxEl ? cboxEl.style.visibility : '';
         if (cboxEl) cboxEl.style.visibility = 'hidden';
         await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        /** 源裁切区可能非正方形（录屏/html2canvas/WebGL 映射）；居中取 min 边后等比缩到 out×out，避免球体变椭圆 */
+        function solidCreateBlitSquareCover(dstCtx, src, sx, sy, sw, sh, out) {
+        if (!dstCtx || !src || sw < 1 || sh < 1 || out < 1) return;
+        const side = Math.max(1, Math.min(sw, sh));
+        let sx0 = sx + (sw - side) * 0.5, sy0 = sy + (sh - side) * 0.5;
+        const srcW = src.width || src.videoWidth || side, srcH = src.height || src.videoHeight || side;
+        const maxSx = Math.max(0, srcW - side), maxSy = Math.max(0, srcH - side);
+        sx0 = Math.max(0, Math.min(sx0, maxSx)); sy0 = Math.max(0, Math.min(sy0, maxSy));
+        const s = Math.max(1, Math.min(side, srcW - sx0, srcH - sy0));
+        dstCtx.drawImage(src, sx0, sy0, s, s, 0, 0, out, out);
+        }
+        function solidCreateBlitSnapSquareCover(dstCtx, snap, out) {
+        if (!dstCtx || !snap || snap.width < 1 || snap.height < 1) return;
+        solidCreateBlitSquareCover(dstCtx, snap, 0, 0, snap.width, snap.height, out);
+        }
         try {
         thumbnail = await (async function solidCreateCaptureCropThumbnail() {
         const OUT = 256;
@@ -1339,7 +1375,7 @@
         const o = document.createElement('canvas'); o.width = OUT; o.height = OUT;
         const ox = o.getContext('2d'); if (!ox) return null;
         ox.imageSmoothingEnabled = true; ox.imageSmoothingQuality = 'high';
-        ox.drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, OUT, OUT);
+        solidCreateBlitSquareCover(ox, srcCanvas, sx, sy, sw, sh, OUT);
         if (solidCreateIsLikelyBlackFrame(o)) return null;
         return o;
         } catch (_e) {
@@ -1387,7 +1423,7 @@
         if (solidCreateIsLikelyBlackFrame(snap)) {
         console.warn('[SolidCreate] WYSIWYG 缩略图疑似黑帧，回退 WebGL 截图');
         } else {
-        ctx.drawImage(snap, 0, 0, snap.width, snap.height, 0, 0, OUT, OUT);
+        solidCreateBlitSnapSquareCover(ctx, snap, OUT);
         drewWysiwyg = true;
         }
         } else {
@@ -1403,7 +1439,7 @@
         const buX = canvasEl.width / Math.max(1, cR.width), buY = canvasEl.height / Math.max(1, cR.height);
         const sx = Math.max(0, (cropLeft - cR.left) * buX), sy = Math.max(0, (cropTop - cR.top) * buY);
         const sw = Math.max(1, Math.min(cropW * buX, canvasEl.width - sx)), sh = Math.max(1, Math.min(cropH * buY, canvasEl.height - sy));
-        ctx.drawImage(canvasEl, sx, sy, sw, sh, 0, 0, OUT, OUT);
+        solidCreateBlitSquareCover(ctx, canvasEl, sx, sy, sw, sh, OUT);
         }
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
@@ -1414,7 +1450,7 @@
         const er = el.getBoundingClientRect(); if (er.width < 1 || er.height < 1) continue;
         try {
         const snap = await html2canvas(el, Object.assign({}, h2cBase, { x: cropLeft - er.left, y: cropTop - er.top, width: cropW, height: cropH }));
-        if (snap && snap.width > 0 && snap.height > 0) ctx.drawImage(snap, 0, 0, snap.width, snap.height, 0, 0, OUT, OUT);
+        if (snap && snap.width > 0 && snap.height > 0) solidCreateBlitSnapSquareCover(ctx, snap, OUT);
         } catch (e2) { console.warn('[SolidCreate] html2canvas 叠层失败: ' + overlayIds[i], e2); }
         }
         } else if (!drewWysiwyg) {
@@ -1429,7 +1465,8 @@
         const sx = Math.max(0, (cropLeft - cR.left) * buX), sy = Math.max(0, (cropTop - cR.top) * buY);
         const sw = Math.max(1, Math.min(cropW * buX, canvasEl.width - sx)), sh = Math.max(1, Math.min(cropH * buY, canvasEl.height - sy));
         const tCanvas = document.createElement('canvas'); tCanvas.width = 256; tCanvas.height = 256; const ctx = tCanvas.getContext('2d');
-        ctx.drawImage(canvasEl, sx, sy, sw, sh, 0, 0, 256, 256);
+        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+        solidCreateBlitSquareCover(ctx, canvasEl, sx, sy, sw, sh, 256);
         if (window.PluginManager) window.PluginManager.trigger('onDrawSnapshot', { ctx: ctx, rect: snapRect, camera: camera });
         thumbnail = tCanvas.toDataURL('image/jpeg', 0.85);
         } finally { if (cboxEl) cboxEl.style.visibility = prevCropVis; }
