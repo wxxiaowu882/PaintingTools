@@ -853,13 +853,13 @@
     const item = data.items[ii];
     if (item.type === 'builtin') {
     document.getElementById('obj-color-picker').value = item.color || '#e8e8e8';
-    window.addEditorBuiltin(item.shape || 'cube');
-    const obj = editorGroup.children[editorGroup.children.length - 1];
+    const obj = createBuiltinObject3D(item.shape || 'cube', item.color || '#e8e8e8');
+    editorGroup.add(obj);
     obj.position.set(item.pos[0], item.pos[1], item.pos[2]);
     obj.rotation.set(item.rot[0], item.rot[1], item.rot[2]);
     obj.scale.set(item.scale[0], item.scale[1], item.scale[2]);
     obj.updateWorldMatrix(true, true);
-    snapBuiltinRootBottomToGround(obj);
+    if (!obj.userData.noGroundSnap) snapBuiltinRootBottomToGround(obj);
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj, itemData: item });
     _assetDone++; solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
     } else if (item.type === 'glb') {
@@ -1557,6 +1557,7 @@
         const picker = document.getElementById('obj-color-picker'); if (picker) { picker.style.opacity = '1'; picker.style.cursor = 'pointer'; picker.disabled = false; }
         editorGroup.traverse(child => { if (child.isMesh) {
         if (child.userData && child.userData.solidShadowCore) return;
+        if (child.userData && child.userData.isFrame) return;
         if (child.material && child.material !== child.userData.originalMaterial && child.material !== flatMat && child.material !== sphereMat && child.material !== plasterMat) { safeDispose(child.material); }
         if (window.matType === 'origin') { if (child.userData.originalMaterial) { child.material = child.userData.originalMaterial; } else {
         child.material = child.userData.isFlat ? flatMat.clone() : (child.userData.shape==='sphere' ? sphereMat.clone() : plasterMat.clone());
@@ -1765,7 +1766,7 @@
         needsUpdate = true; lightMoved = true; window.sumDuration = 0; markDraftDirty(); } }; window.toggleCropBox = function() { const cb = document.getElementById('crop-box');
         cb.style.display = cb.style.display === 'none' ? 'block' : 'none'; };
         /** 缩略图缓存版本；调试内置体贴地/缩略图请设 localStorage: SolidCreateBuiltinDebug=1 */
-        const BUILTIN_THUMB_CACHE_VERSION = '8';
+        const BUILTIN_THUMB_CACHE_VERSION = '9';
         const BUILTIN_THUMB_SIZE = 128;
         const BUILTIN_THUMB_DB = 'SolidBuiltinThumbDB';
         const BUILTIN_THUMB_STORE = 'thumbs';
@@ -1779,7 +1780,48 @@
         { id: 'octahedron', name: '八面体', icon:'💠' }, { id: 'tetrahedron', name: '三棱锥', icon:'▴' },
         { id: 'intersect_cube', name: '组合：长方体十字', icon:'➕' }, { id: 'intersect_cone', name: '组合：圆锥穿插', icon:'🎪' },
         { id: 'intersect_pyramid', name: '组合：四棱锥穿插', icon:'🏕️' }, { id: 'torus', name: '圆环体', icon:'🍩' },
-        { id: 'capsule', name: '胶囊体', icon:'💊' } ];
+        { id: 'capsule', name: '胶囊体', icon:'💊' },
+        { id: 'frame_1_1', name: '取景框 1:1', icon:'▢', section: '构图取景框' },
+        { id: 'frame_3_4', name: '取景框 3:4 竖', icon:'▭', section: '构图取景框' },
+        { id: 'frame_4_3', name: '取景框 4:3 横', icon:'▬', section: '构图取景框' },
+        { id: 'frame_2_3', name: '取景框 2:3 竖', icon:'▯', section: '构图取景框' } ];
+        /** 构图取景框：空心细框；aspectW/H 为宽:高；外廓长边默认 6，框条厚 ~0.08（消费端 Solid.html 须同步） */
+        function solidCreateParseFrameAspect(shapeStr) {
+        if (shapeStr === 'frame_1_1') return { w: 1, h: 1 };
+        if (shapeStr === 'frame_2_3') return { w: 2, h: 3 };
+        if (shapeStr === 'frame_3_4') return { w: 3, h: 4 };
+        if (shapeStr === 'frame_4_3') return { w: 4, h: 3 };
+        return null;
+        }
+        function createHollowFrameGroup(shapeStr, aspectW, aspectH, colorHex) {
+        const col = colorHex || '#949494';
+        const barT = 0.08;
+        const longSide = 6;
+        let frameW, frameH;
+        if (aspectW >= aspectH) { frameW = longSide; frameH = longSide * (aspectH / aspectW); }
+        else { frameH = longSide; frameW = longSide * (aspectW / aspectH); }
+        const innerH = Math.max(barT, frameH - barT * 2);
+        const mat = flatMat.clone();
+        mat.color.set(col);
+        const group = new THREE.Group();
+        const top = new THREE.Mesh(new THREE.BoxGeometry(frameW, barT, barT), mat.clone());
+        top.position.y = frameH * 0.5 - barT * 0.5;
+        const bottom = new THREE.Mesh(new THREE.BoxGeometry(frameW, barT, barT), mat.clone());
+        bottom.position.y = -frameH * 0.5 + barT * 0.5;
+        const left = new THREE.Mesh(new THREE.BoxGeometry(barT, innerH, barT), mat.clone());
+        left.position.x = -frameW * 0.5 + barT * 0.5;
+        const right = new THREE.Mesh(new THREE.BoxGeometry(barT, innerH, barT), mat.clone());
+        right.position.x = frameW * 0.5 - barT * 0.5;
+        group.add(top, bottom, left, right);
+        group.traverse(c => { if (c.isMesh) { c.castShadow = false; c.receiveShadow = false; c.userData.isFrame = true; } });
+        group.userData = { type: 'builtin', shape: shapeStr, isFrame: true, isFlat: true, noGroundSnap: true, lockAspect: true, customColor: col };
+        group.traverse(c => { if (c.isMesh) { c.material.color.set(col); c.userData.customColor = col; } });
+        return group;
+        }
+        function solidCreateOrientFrameToCamera(frameObj) {
+        if (!frameObj || !camera) return;
+        frameObj.lookAt(camera.position);
+        }
         function builtinThumbCacheKey(shapeId) { return `${BUILTIN_THUMB_CACHE_VERSION}:${shapeId}`; }
         function openBuiltinThumbDB() { return new Promise((resolve, reject) => { const req = indexedDB.open(BUILTIN_THUMB_DB, 1);
         req.onupgradeneeded = e => { if (!e.target.result.objectStoreNames.contains(BUILTIN_THUMB_STORE)) e.target.result.createObjectStore(BUILTIN_THUMB_STORE); };
@@ -1897,7 +1939,11 @@
         }
         function createBuiltinObject3D(shapeStr, colorHex) {
         const col = colorHex || '#e8e8e8'; let obj3d; let isFlat = false;
-        if (shapeStr.startsWith('intersect_')) { obj3d = new THREE.Group(); if (shapeStr === 'intersect_cube') { const g1 = new THREE.BoxGeometry(1.5, 4, 1.5).toNonIndexed(); g1.computeVertexNormals();
+        if (shapeStr.startsWith('frame_')) {
+        const asp = solidCreateParseFrameAspect(shapeStr);
+        if (!asp) return new THREE.Group();
+        obj3d = createHollowFrameGroup(shapeStr, asp.w, asp.h, colorHex || '#949494');
+        } else if (shapeStr.startsWith('intersect_')) { obj3d = new THREE.Group(); if (shapeStr === 'intersect_cube') { const g1 = new THREE.BoxGeometry(1.5, 4, 1.5).toNonIndexed(); g1.computeVertexNormals();
         const m1 = new THREE.Mesh(g1, flatMat.clone()); const g2 = new THREE.BoxGeometry(4, 1.5, 1.5).toNonIndexed(); g2.computeVertexNormals(); const m2 = new THREE.Mesh(g2, flatMat.clone()); obj3d.add(m1); obj3d.add(m2); }
         else if (shapeStr === 'intersect_cone') { const m1 = new THREE.Mesh(new THREE.ConeGeometry(2, 4, 64), plasterMat.clone()); const m2 = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 4.5, 64), plasterMat.clone());
         m2.rotation.z = Math.PI / 2; m2.position.y = -0.5; obj3d.add(m1); obj3d.add(m2); }
@@ -1932,7 +1978,7 @@
         obj3d.userData = { type: 'builtin', shape: shapeStr, isFlat: isFlat, customColor: col }; obj3d.material.color.set(col); obj3d.traverse(c => { if(c.isMesh) c.userData.customColor = col; });
         if (shapeStr === 'sphere') { attachSolidBuiltinSphereShadowCore(obj3d, THREE); }
         }
-        snapBuiltinRootBottomToGround(obj3d);
+        if (!obj3d.userData.noGroundSnap) snapBuiltinRootBottomToGround(obj3d);
         if (localStorage.getItem('SolidCreateBuiltinDebug') === '1') {
         obj3d.updateWorldMatrix(true, true);
         const fb = new THREE.Box3().setFromObject(obj3d, true);
@@ -1972,7 +2018,7 @@
         const m = Math.max(sz.x, sz.y, sz.z, 0.001);
         wrap.scale.setScalar(THUMB_BBOX_TARGET / m);
         wrap.updateWorldMatrix(true, true);
-        snapBuiltinRootBottomToGround(wrap, 0);
+        if (!obj.userData.noGroundSnap) snapBuiltinRootBottomToGround(wrap, 0);
         _thumbScene.add(wrap);
         wrap.updateWorldMatrix(true, true);
         box.setFromObject(wrap, true);
@@ -2048,7 +2094,17 @@
         window.openBuiltinModal = function() { const modal = document.getElementById('builtin-modal');
         const grid = document.getElementById('builtin-grid-container');
         if (grid.innerHTML.trim() === '') {
-        builtinShapes.forEach(s => { const btn = document.createElement('div');
+        let _lastBuiltinSection = null;
+        builtinShapes.forEach(s => {
+        if (s.section && s.section !== _lastBuiltinSection) {
+        const hdr = document.createElement('div');
+        hdr.style.cssText = 'grid-column:1/-1; padding:10px 4px 6px; font-size:11px; color:#888; font-weight:bold; letter-spacing:1px; border-top:1px solid rgba(255,255,255,0.08);';
+        if (_lastBuiltinSection === null) hdr.style.borderTop = 'none';
+        hdr.textContent = s.section;
+        grid.appendChild(hdr);
+        _lastBuiltinSection = s.section;
+        }
+        const btn = document.createElement('div');
         btn.dataset.builtinId = s.id;
         btn.style.cssText = 'background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:12px; cursor:pointer; text-align:center; transition:all 0.2s cubic-bezier(0.4,0,0.2,1); display:flex; flex-direction:column; align-items:center; gap:8px;';
         const wrap = document.createElement('div');
@@ -2069,15 +2125,21 @@
         modal.style.display = 'flex'; };
         window.closeBuiltinModal = function() { document.getElementById('builtin-modal').style.display = 'none'; };
         window.addEditorBuiltin = function(shapeStr) {
-        const col = document.getElementById('obj-color-picker').value;
+        const isFrame = shapeStr.startsWith('frame_');
+        const col = isFrame ? '#949494' : document.getElementById('obj-color-picker').value;
         const obj3d = createBuiltinObject3D(shapeStr, col);
         editorGroup.add(obj3d);
+        if (isFrame) {
+        obj3d.position.set(0, 3, 0);
+        solidCreateOrientFrameToCamera(obj3d);
+        } else {
         obj3d.updateWorldMatrix(true, true);
         snapBuiltinRootBottomToGround(obj3d);
+        }
         transformControl.attach(obj3d);
         markDraftDirty();
         requestAnimationFrame(() => { requestAnimationFrame(() => {
-        if (obj3d.parent === editorGroup && obj3d.userData && obj3d.userData.type === 'builtin') {
+        if (obj3d.parent === editorGroup && obj3d.userData && obj3d.userData.type === 'builtin' && !obj3d.userData.noGroundSnap) {
         obj3d.updateWorldMatrix(true, true);
         snapBuiltinRootBottomToGround(obj3d);
         }
@@ -2269,11 +2331,14 @@
         transformControl.addEventListener('dragging-changed', function (event) { controls.enabled = (!event.value) && (!window.isCameraLocked); if(event.value && transformControl.object) { const obj = transformControl.object; startScale.copy(obj.scale);
         const box = new THREE.Box3().setFromObject(obj); obj.userData.startBottomY = box.min.y; obj.userData.localBottom = (box.min.y - obj.position.y) / obj.scale.y; }
         if (!event.value && transformControl.object && transformControl.object.userData && transformControl.object.userData.type === 'builtin' && transformControl.getMode() === 'scale') {
-        transformControl.object.updateWorldMatrix(true, true);
-        snapBuiltinRootBottomToGround(transformControl.object);
+        const _snapObj = transformControl.object;
+        if (_snapObj.userData.isFrame || !_snapObj.userData.noGroundSnap) {
+        _snapObj.updateWorldMatrix(true, true);
+        snapBuiltinRootBottomToGround(_snapObj);
+        }
         }
         if(!event.value) { needsUpdate = true; lightMoved = true; window.sumDuration = 0; } window.applyCameraLockState(); }); transformControl.addEventListener('change', () => {
-        if (transformControl.dragging && transformControl.getMode() === 'scale' && transformControl.object) { const obj = transformControl.object; if (window.isUniformScale) {
+        if (transformControl.dragging && transformControl.getMode() === 'scale' && transformControl.object) { const obj = transformControl.object; if (window.isUniformScale || obj.userData.lockAspect) {
         const dx = obj.scale.x / startScale.x; const dy = obj.scale.y / startScale.y; const dz = obj.scale.z / startScale.z; let maxR = dx; if(Math.abs(dy - 1) > Math.abs(maxR - 1)) maxR = dy; if(Math.abs(dz - 1) > Math.abs(maxR - 1)) maxR = dz;
         obj.scale.set(startScale.x * maxR, startScale.y * maxR, startScale.z * maxR); }
         // 内置几何体经旋转后不能用 localBottom 线性补 Y，改在缩放结束时 snap；GLB 等仍用原逻辑

@@ -179,7 +179,8 @@ window.AnnotationManager = {
             ctx2.arc(tx, ty, 3, 0, Math.PI * 2);
             ctx2.fill();
             ctx2.font = '11px Inter, sans-serif';
-            const textWidth = ctx2.measureText(data.text).width;
+            const snapText = String(data.text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')[0];
+            const textWidth = ctx2.measureText(snapText).width;
             const boxW = textWidth + 16, boxH = 20;
             ctx2.fillStyle = window.AnnotationManager.getDarkBg(data.color);
             ctx2.fillRect(tx1 - boxW / 2, ty1 - boxH / 2, boxW, boxH);
@@ -189,7 +190,7 @@ window.AnnotationManager = {
             ctx2.fillStyle = '#ffffff';
             ctx2.textAlign = 'center';
             ctx2.textBaseline = 'middle';
-            ctx2.fillText(data.text, tx1, ty1);
+            ctx2.fillText(snapText, tx1, ty1);
         });
     },
 
@@ -232,8 +233,8 @@ window.AnnotationManager = {
                     #anno-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 50 !important; overflow: hidden; }
                     #anno-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
                     .anno-dom { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; font-family: 'Inter', sans-serif; }
-                    .anno-leader-label { border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.35; box-sizing: border-box; white-space: nowrap; cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-flex; align-items: center; justify-content: center; }
-                    .anno-leader-label.editing { background: #fff !important; color: #000; outline: none; border-color: #fff !important; box-shadow: 0 0 10px rgba(0,210,255,0.5) !important; user-select: text !important; cursor: text !important; }
+                    .anno-leader-label { border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.45; box-sizing: border-box; white-space: pre-wrap; word-break: break-word; text-align: left; max-width: min(88vw, 360px); cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-block; vertical-align: top; }
+                    .anno-leader-label.editing { background: #fff !important; color: #000; outline: none; border-color: #fff !important; box-shadow: 0 0 10px rgba(0,210,255,0.5) !important; user-select: text !important; cursor: text !important; max-height: min(50vh, 320px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
                 `;
             document.head.appendChild(style);
         }
@@ -284,7 +285,7 @@ window.AnnotationManager = {
         const div = document.createElement('div');
         div.className = 'anno-dom anno-leader-label';
         div.id = 'dom_' + data.id;
-        div.innerText = data.text;
+        div.innerText = data.text != null ? String(data.text) : '';
         div.style.borderColor = data.color;
         div.style.backgroundColor = this.getDarkBg(data.color);
         div.dataset.color = data.color;
@@ -333,10 +334,24 @@ window.AnnotationManager = {
             div.contentEditable = false;
             div.classList.remove('editing');
             div.style.cursor = 'pointer';
-            data.text = div.innerText;
+            data.text = String(div.innerText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            div.innerText = data.text;
             window.needsUpdate = true;
         });
-        div.addEventListener('keydown', e => { if (e.key === 'Delete' || e.key === 'Backspace') e.stopPropagation(); });
+        div.addEventListener('paste', (e) => {
+            if (!div.isContentEditable) return;
+            e.preventDefault();
+            try {
+                const raw = (e.clipboardData || window.clipboardData).getData('text/plain');
+                if (raw == null) return;
+                const plain = String(raw).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                document.execCommand('insertText', false, plain);
+            } catch (_e) {}
+        });
+        div.addEventListener('keydown', e => {
+            if (e.key === 'Delete' || e.key === 'Backspace') e.stopPropagation();
+            if (div.isContentEditable && e.key === 'Enter') e.stopPropagation();
+        });
         let isDragging = false, startX, startY, startDx, startDy, isMoved = false;
         div.addEventListener('mousedown', e => {
             if (div.isContentEditable) { e.stopPropagation(); return; }

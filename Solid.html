@@ -1129,6 +1129,7 @@
     if (!_wasLoading && window.__solidMatAppliedSceneVersion === _targetSceneVer && String(window.__solidMatAppliedType || '') === String(window.matType || '')) { window.isLoadingScene = false; try { syncRenderButtons(); } catch (_eBtnSkip) {} return; }
     sceneGroup.traverse(child => { if (child.isMesh) {
     if (child.userData && child.userData.solidShadowCore) return;
+    if (child.userData && child.userData.isFrame) return;
     if (child.material && child.material !== child.userData.originalMaterial && child.material !== sysMaterials.flat && child.material !== sysMaterials.sphere && child.material !== sysMaterials.plaster) { safeDispose(child.material); }
     if (window.matType === 'origin') { if (child.userData.originalMaterial) { child.material = child.userData.originalMaterial; }
     else { child.material = child.userData.isFlat ? sysMaterials.flat.clone() : (child.userData.shape==='sphere' ? sysMaterials.sphere.clone() : sysMaterials.plaster.clone()); if(child.userData.customColor) child.material.color.set(child.userData.customColor); }
@@ -1365,13 +1366,54 @@
     let promises = []; const totalItems = items.length; const glbCount = items.filter(it => it.type === 'glb').length; const glbSlots = glbCount ? Array.from({ length: glbCount }, () => ({ loaded: 0, total: 0, done: false })) : []; let _glbSlotI = 0; let _assetDone = 0;
     function updateSceneAssetProgress() { if (_isStale()) return; let glbAvg = 0; if (glbCount > 0) { let sumL = 0, sumT = 0; for (const s of glbSlots) { if (s.total > 0) { sumL += Math.min(s.loaded, s.total); sumT += s.total; } } glbAvg = sumT > 0 ? sumL / sumT : (glbSlots.filter(s => s.done).length / glbCount); } const total = Math.max(1, totalItems); const ratio = Math.max(0, Math.min(1, ((_assetDone / total) * 0.8) + (glbAvg * 0.2))); setLoaderProgress(8 + ratio * 55); }
     function _solidGetBuiltinGeoCache(key, factory) { const cache = window.__solidBuiltinGeometryCache; if (cache.has(key)) return cache.get(key).clone(); const g = factory(); cache.set(key, g); return g.clone(); }
+    /** 构图取景框（须与 Solid_Portrait_Create createHollowFrameGroup 同步） */
+    function _solidParseFrameAspect(shapeStr) {
+    if (shapeStr === 'frame_1_1') return { w: 1, h: 1 };
+    if (shapeStr === 'frame_2_3') return { w: 2, h: 3 };
+    if (shapeStr === 'frame_3_4') return { w: 3, h: 4 };
+    if (shapeStr === 'frame_4_3') return { w: 4, h: 3 };
+    return null;
+    }
+    function _solidCreateHollowFrameGroup(shapeStr, aspectW, aspectH, colorHex) {
+    const col = colorHex || '#949494';
+    const barT = 0.08;
+    const longSide = 6;
+    let frameW, frameH;
+    if (aspectW >= aspectH) { frameW = longSide; frameH = longSide * (aspectH / aspectW); }
+    else { frameH = longSide; frameW = longSide * (aspectW / aspectH); }
+    const innerH = Math.max(barT, frameH - barT * 2);
+    const mat = sysMaterials.flat.clone();
+    mat.color.set(col);
+    const group = new THREE.Group();
+    const top = new THREE.Mesh(new THREE.BoxGeometry(frameW, barT, barT), mat.clone());
+    top.position.y = frameH * 0.5 - barT * 0.5;
+    const bottom = new THREE.Mesh(new THREE.BoxGeometry(frameW, barT, barT), mat.clone());
+    bottom.position.y = -frameH * 0.5 + barT * 0.5;
+    const left = new THREE.Mesh(new THREE.BoxGeometry(barT, innerH, barT), mat.clone());
+    left.position.x = -frameW * 0.5 + barT * 0.5;
+    const right = new THREE.Mesh(new THREE.BoxGeometry(barT, innerH, barT), mat.clone());
+    right.position.x = frameW * 0.5 - barT * 0.5;
+    group.add(top, bottom, left, right);
+    group.traverse(c => { if (c.isMesh) { c.castShadow = false; c.receiveShadow = false; c.userData.isFrame = true; } });
+    group.userData = { type: 'builtin', shape: shapeStr, isFrame: true, isFlat: true, noGroundSnap: true, lockAspect: true, customColor: col };
+    group.traverse(c => { if (c.isMesh) { c.material.color.set(col); c.userData.customColor = col; } });
+    return group;
+    }
     function _solidBuildBuiltin(item) {
     return new Promise((resolve) => {
     requestAnimationFrame(() => {
     if (_isStale()) { resolve(); return; }
     try {
     let obj3d; let isFlat = false, yOffset = 2.0; const s = item.shape;
-    if (s.startsWith('intersect_')) {
+    if (s.startsWith('frame_')) {
+    const asp = _solidParseFrameAspect(s);
+    if (asp) {
+    obj3d = _solidCreateHollowFrameGroup(s, asp.w, asp.h, item.color);
+    obj3d.position.set(...item.pos); obj3d.rotation.set(...item.rot); obj3d.scale.set(...item.scale);
+    sceneGroup.add(obj3d);
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj3d, itemData: item });
+    }
+    } else if (s.startsWith('intersect_')) {
     obj3d = new THREE.Group();
     if (s === 'intersect_cube') { const g1 = _solidGetBuiltinGeoCache('intersect_cube_g1', () => { const g = new THREE.BoxGeometry(1.5, 4, 1.5).toNonIndexed(); g.computeVertexNormals(); return g; }); const m1 = new THREE.Mesh(g1, sysMaterials.flat.clone()); const g2 = _solidGetBuiltinGeoCache('intersect_cube_g2', () => { const g = new THREE.BoxGeometry(4, 1.5, 1.5).toNonIndexed(); g.computeVertexNormals(); return g; }); const m2 = new THREE.Mesh(g2, sysMaterials.flat.clone()); obj3d.add(m1); obj3d.add(m2); yOffset = 2.0; }
     else if (s === 'intersect_cone') { const m1 = new THREE.Mesh(_solidGetBuiltinGeoCache('intersect_cone_g1', () => new THREE.ConeGeometry(2, 4, 64)), sysMaterials.plaster.clone()); const m2 = new THREE.Mesh(_solidGetBuiltinGeoCache('intersect_cone_g2', () => new THREE.CylinderGeometry(0.8, 0.8, 4.5, 64)), sysMaterials.plaster.clone()); m2.rotation.z = Math.PI / 2; m2.position.y = -0.5; obj3d.add(m1); obj3d.add(m2); yOffset = 2.0; }

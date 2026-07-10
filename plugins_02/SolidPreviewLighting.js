@@ -1476,6 +1476,11 @@ export function createSolidPreviewLightingManager(opts) {
             obj.castShadow = true;
             return;
           }
+          if (obj.userData && obj.userData.isFrame) {
+            obj.castShadow = false;
+            obj.receiveShadow = false;
+            return;
+          }
           obj.receiveShadow = true;
           obj.castShadow = true;
         });
