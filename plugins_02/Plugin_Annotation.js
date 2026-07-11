@@ -126,6 +126,7 @@ window.AnnotationManager = {
             if (!aData) return;
             const vw = Math.max(1, window.__solidAnnoViewportW || window.innerWidth || 1);
             const vh = Math.max(1, window.__solidAnnoViewportH || window.innerHeight || 1);
+            const richSave = aData.textRich ? this.sanitizeLabelRichHtml(String(aData.textRich)) : '';
             let norm = [0, 1, 0];
             if (c.userData.localNormal) {
                 norm = [
@@ -138,6 +139,7 @@ window.AnnotationManager = {
                 id: aData.id,
                 annotationKind: 'leader',
                 text: aData.text,
+                textRich: richSave || undefined,
                 detailText: aData.detailText != null ? String(aData.detailText) : '',
                 color: aData.color,
                 dx: aData.dx,
@@ -201,6 +203,182 @@ window.AnnotationManager = {
         return `rgba(${(r * 0.2) | 0}, ${(g * 0.2) | 0}, ${(b * 0.2) | 0}, 0.85)`;
     },
 
+    normalizeHexColor: function (hex) {
+        if (!hex) return '';
+        let c = String(hex).trim();
+        if (!c.startsWith('#')) return '';
+        c = c.slice(1);
+        if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+        if (!/^[0-9a-fA-F]{6}$/.test(c)) return '';
+        return '#' + c.toLowerCase();
+    },
+
+    parseColorToHex: function (colorStr) {
+        if (!colorStr) return '';
+        const s = String(colorStr).trim();
+        const hex = this.normalizeHexColor(s);
+        if (hex) return hex;
+        const m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+        if (!m) return '';
+        const clamp = (n) => Math.max(0, Math.min(255, parseInt(n, 10) || 0));
+        const r = clamp(m[1]), g = clamp(m[2]), b = clamp(m[3]);
+        return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    },
+
+    extractElementColor: function (node) {
+        if (!node || node.nodeType !== Node.ELEMENT_NODE) return '';
+        try {
+            if (node.style && node.style.color) {
+                const hex = this.parseColorToHex(node.style.color);
+                if (hex) return hex;
+            }
+        } catch (_e) {}
+        const style = node.getAttribute('style') || '';
+        const hexMatch = style.match(/(?:^|;)\s*color\s*:\s*(#[0-9a-fA-F]{3,8})/i);
+        if (hexMatch) {
+            const hex = this.normalizeHexColor(hexMatch[1]);
+            if (hex) return hex;
+        }
+        const rgbMatch = style.match(/(?:^|;)\s*color\s*:\s*rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+        if (rgbMatch) {
+            return this.parseColorToHex('rgb(' + rgbMatch[1] + ',' + rgbMatch[2] + ',' + rgbMatch[3] + ')');
+        }
+        return '';
+    },
+
+    isBoldStyleElement: function (node) {
+        if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+        const tag = node.tagName.toLowerCase();
+        if (tag === 'strong' || tag === 'b') return true;
+        if (tag === 'span') {
+            const fw = node.style && node.style.fontWeight;
+            return fw === 'bold' || fw === '700' || (fw && parseInt(fw, 10) >= 700);
+        }
+        return false;
+    },
+
+    getAnnoBoldColor: function () {
+        const DEFAULT = '#ffd966';
+        try {
+            const picker = document.getElementById('anno-bold-color-picker');
+            if (picker && picker.value) return picker.value;
+            const cached = localStorage.getItem('solid_anno_bold_color_cache');
+            const norm = this.normalizeHexColor(cached);
+            if (norm) return norm;
+        } catch (_e) {}
+        return DEFAULT;
+    },
+
+    applyBoldColorToSelection: function (div) {
+        if (!document.queryCommandState('bold')) return;
+        const color = this.getAnnoBoldColor();
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        const painted = new Set();
+
+        const isBoldElement = (el) => {
+            if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+            const tag = el.tagName.toLowerCase();
+            if (tag === 'strong' || tag === 'b') return true;
+            if (tag === 'span') {
+                const fw = el.style && el.style.fontWeight;
+                return fw === 'bold' || fw === '700' || (fw && parseInt(fw, 10) >= 700);
+            }
+            return false;
+        };
+
+        const paint = (el) => {
+            if (!el || painted.has(el) || !isBoldElement(el)) return;
+            painted.add(el);
+            const tag = el.tagName.toLowerCase();
+            if (tag === 'span') {
+                const strong = document.createElement('strong');
+                strong.style.color = this.normalizeHexColor(color) || color;
+                while (el.firstChild) strong.appendChild(el.firstChild);
+                el.parentNode.replaceChild(strong, el);
+                painted.add(strong);
+                return;
+            }
+            el.style.color = this.normalizeHexColor(color) || color;
+        };
+
+        const walkUp = (node) => {
+            let n = node;
+            if (n.nodeType === Node.TEXT_NODE) n = n.parentNode;
+            while (n && n !== div) {
+                if (isBoldElement(n)) { paint(n); return; }
+                n = n.parentNode;
+            }
+        };
+
+        walkUp(range.startContainer);
+        walkUp(range.endContainer);
+        walkUp(range.commonAncestorContainer);
+
+        div.querySelectorAll('strong, b, span[style*="font-weight"]').forEach(el => {
+            if (!isBoldElement(el)) return;
+            try {
+                if (typeof range.intersectsNode === 'function' && range.intersectsNode(el)) paint(el);
+            } catch (_e) { paint(el); }
+        });
+    },
+
+    toggleLabelBoldWithColor: function (div) {
+        const wasBold = document.queryCommandState('bold');
+        document.execCommand('bold', false, null);
+        if (wasBold) return;
+        const apply = () => this.applyBoldColorToSelection(div);
+        apply();
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(apply);
+    },
+
+    /** 小标签富文本：仅保留 strong/br，统一为 strong；strong 仅保留白名单 color；无加粗则返回空串 */
+    sanitizeLabelRichHtml: function (rawHtml) {
+        if (!rawHtml) return '';
+        const tmp = document.createElement('div');
+        tmp.innerHTML = String(rawHtml);
+        const out = document.createElement('div');
+        const walk = (node, parentOut) => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                parentOut.appendChild(document.createTextNode(node.textContent));
+                return;
+            }
+            if (node.nodeType !== Node.ELEMENT_NODE) return;
+            const tag = node.tagName.toLowerCase();
+            if (tag === 'strong' || tag === 'b' || this.isBoldStyleElement(node)) {
+                const s = document.createElement('strong');
+                const hex = this.extractElementColor(node);
+                if (hex) s.style.color = hex;
+                node.childNodes.forEach(c => walk(c, s));
+                parentOut.appendChild(s);
+            } else if (tag === 'br') {
+                parentOut.appendChild(document.createElement('br'));
+            } else {
+                node.childNodes.forEach(c => walk(c, parentOut));
+            }
+        };
+        tmp.childNodes.forEach(c => walk(c, out));
+        const html = out.innerHTML;
+        return /<strong/i.test(html) ? html : '';
+    },
+
+    labelPlainText: function (str) {
+        return String(str || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    },
+
+    syncLabelFromDOM: function (data, div) {
+        data.text = this.labelPlainText(div.innerText || '');
+        const rich = this.sanitizeLabelRichHtml(div.innerHTML);
+        if (rich) data.textRich = rich;
+        else delete data.textRich;
+    },
+
+    applyLabelToDOM: function (div, data) {
+        if (data.textRich) div.innerHTML = data.textRich;
+        else div.textContent = data.text != null ? String(data.text) : '';
+    },
+
     highlightSelected: function () {
         document.querySelectorAll('.anno-dom').forEach(el => {
             el.style.boxShadow = 'none';
@@ -234,7 +412,9 @@ window.AnnotationManager = {
                     #anno-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
                     .anno-dom { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; font-family: 'Inter', sans-serif; }
                     .anno-leader-label { border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.45; box-sizing: border-box; white-space: pre-wrap; word-break: break-word; text-align: left; max-width: min(88vw, 360px); cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-block; vertical-align: top; }
+                    .anno-leader-label strong { font-weight: 700; }
                     .anno-leader-label.editing { background: #fff !important; color: #000; outline: none; border-color: #fff !important; box-shadow: 0 0 10px rgba(0,210,255,0.5) !important; user-select: text !important; cursor: text !important; max-height: min(50vh, 320px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+                    .anno-leader-label.editing strong { font-weight: 700; }
                 `;
             document.head.appendChild(style);
         }
@@ -285,7 +465,7 @@ window.AnnotationManager = {
         const div = document.createElement('div');
         div.className = 'anno-dom anno-leader-label';
         div.id = 'dom_' + data.id;
-        div.innerText = data.text != null ? String(data.text) : '';
+        this.applyLabelToDOM(div, data);
         div.style.borderColor = data.color;
         div.style.backgroundColor = this.getDarkBg(data.color);
         div.dataset.color = data.color;
@@ -320,6 +500,7 @@ window.AnnotationManager = {
                 window.AnnotationManager.selectedId = data.id;
                 window.AnnotationManager.highlightSelected();
             }
+            window.AnnotationManager.applyLabelToDOM(div, data);
             div.contentEditable = true;
             div.classList.add('editing');
             div.style.cursor = 'text';
@@ -331,11 +512,11 @@ window.AnnotationManager = {
             selection.addRange(range);
         });
         div.addEventListener('blur', () => {
+            window.AnnotationManager.syncLabelFromDOM(data, div);
             div.contentEditable = false;
             div.classList.remove('editing');
             div.style.cursor = 'pointer';
-            data.text = String(div.innerText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-            div.innerText = data.text;
+            window.AnnotationManager.applyLabelToDOM(div, data);
             window.needsUpdate = true;
         });
         div.addEventListener('paste', (e) => {
@@ -349,6 +530,12 @@ window.AnnotationManager = {
             } catch (_e) {}
         });
         div.addEventListener('keydown', e => {
+            if (div.isContentEditable && (e.key === 'b' || e.key === 'B') && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                e.stopPropagation();
+                try { window.AnnotationManager.toggleLabelBoldWithColor(div); } catch (_eBold) {}
+                return;
+            }
             if (e.key === 'Delete' || e.key === 'Backspace') e.stopPropagation();
             if (div.isContentEditable && e.key === 'Enter') e.stopPropagation();
         });
@@ -532,6 +719,7 @@ window.AnnotationManager = {
                 ? new THREE.Vector3(a.localNormal[0], a.localNormal[1], a.localNormal[2])
                 : new THREE.Vector3(0, 1, 0);
             obj.add(anchor);
+            const _loadedRich = a.textRich ? this.sanitizeLabelRichHtml(String(a.textRich)) : '';
             const annoData = {
                 id: a.id, targetUUID: obj.uuid, anchorObj: anchor,
                 text: a.text || '引线',
@@ -545,6 +733,7 @@ window.AnnotationManager = {
                 dyW: (typeof a.dyW === 'number') ? a.dyW : 0,
                 isOccluded: false
             };
+            if (_loadedRich) annoData.textRich = _loadedRich;
             if (a.baseDist) annoData.baseDist = a.baseDist;
             if (a.baseScale) annoData.baseScale = a.baseScale;
             window.annoDataList.push(annoData);

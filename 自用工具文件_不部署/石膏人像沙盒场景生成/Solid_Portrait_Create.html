@@ -58,8 +58,9 @@
     <div class="editor-panel editor-panel-right" id="editor-panel-right"><div style="font-size:12px; font-weight:bold; margin-bottom:10px; color:#a0a0a0; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:6px;">操作面板</div>
     <div style="height:8px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px; margin-top:4px;"></div>
     <button class="editor-btn" onclick="openGlbManagerModal()">🔍 从资产库选择 GLB 模型</button><button class="editor-btn" onclick="openBuiltinModal()">➕ 选择并添加内置几何体</button>
-    <div style="height:8px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px;"></div><div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"><span style="font-size:11px; color:#fff;">选中物体颜色：</span>
-    <input type="color" id="obj-color-picker" value="#e8e8e8" style="width:24px; height:24px; padding:0; border:none; background:none; cursor:pointer;" oninput="changeSelectedColor(event)" onchange="changeSelectedColor(event)">
+    <div style="height:8px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px;"></div><div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"><div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0;"><span style="font-size:11px; color:#fff; white-space:nowrap;">选中物体颜色：</span>
+    <input type="color" id="obj-color-picker" value="#e8e8e8" style="width:24px; height:24px; padding:0; border:none; background:none; cursor:pointer; flex-shrink:0;" oninput="changeSelectedColor(event)" onchange="changeSelectedColor(event)"></div><div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0; justify-content:flex-end;"><span style="font-size:11px; color:#fff; white-space:nowrap;">粗体字颜色：</span>
+    <input type="color" id="anno-bold-color-picker" value="#ffd966" style="width:24px; height:24px; padding:0; border:none; background:none; cursor:pointer; flex-shrink:0;" oninput="changeAnnoBoldColor(event)" onchange="changeAnnoBoldColor(event)"></div>
     </div><div style="display:flex; gap:4px; margin-bottom:6px;"><button id="btn-trans" class="editor-btn active" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('translate')">位移(T)</button>
     <button id="btn-rot" class="editor-btn" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('rotate')">旋转(R)</button>
     <button id="btn-scale" class="editor-btn" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('scale')">缩放(S)</button> </div>
@@ -1763,7 +1764,8 @@
         // 解除锁定：无论在什么材质预览模式下，都允许直接更改底层的定制颜色
         if (transformControl.object && transformControl.object.userData.type === 'builtin') { transformControl.object.userData.customColor = colorHex;
         transformControl.object.traverse(child => { if (child.isMesh && child.material) { child.material.color.set(colorHex); child.userData.customColor = colorHex; } });
-        needsUpdate = true; lightMoved = true; window.sumDuration = 0; markDraftDirty(); } }; window.toggleCropBox = function() { const cb = document.getElementById('crop-box');
+        needsUpdate = true; lightMoved = true; window.sumDuration = 0; markDraftDirty(); } }; window.changeAnnoBoldColor = function(e) {
+        const colorHex = e.target.value; localStorage.setItem('solid_anno_bold_color_cache', colorHex); }; window.toggleCropBox = function() { const cb = document.getElementById('crop-box');
         cb.style.display = cb.style.display === 'none' ? 'block' : 'none'; };
         /** 缩略图缓存版本；调试内置体贴地/缩略图请设 localStorage: SolidCreateBuiltinDebug=1 */
         const BUILTIN_THUMB_CACHE_VERSION = '9';
@@ -2251,6 +2253,7 @@
         }
         function init() { installSolidCreateAnnotationDetailUI(); const container = document.getElementById('canvas-container'); addHwLog("SolidCreate 初始化开始..."); // 【优化 3】：初始化时，自动读取上次存入缓存的颜色数据
         const cachedColor = localStorage.getItem('solid_obj_color_cache'); if (cachedColor) { const picker = document.getElementById('obj-color-picker'); if (picker) picker.value = cachedColor; }
+        const cachedBoldColor = localStorage.getItem('solid_anno_bold_color_cache'); if (cachedBoldColor) { const boldPicker = document.getElementById('anno-bold-color-picker'); if (boldPicker) boldPicker.value = cachedBoldColor; }
         try {
             const nameEl = document.getElementById('scene-name-input');
             const detailEl = document.getElementById('scene-meta-detail-input');
