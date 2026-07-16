@@ -504,7 +504,7 @@ window.AnnotationManager = {
                     #anno-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 50 !important; overflow: hidden; }
                     #anno-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
                     .anno-dom { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; font-family: 'Inter', sans-serif; }
-                    .anno-leader-label { position: relative; border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.45; box-sizing: border-box; text-align: left; max-width: min(88vw, 360px); cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-block; vertical-align: top; }
+                    .anno-leader-label { border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.45; box-sizing: border-box; text-align: left; max-width: min(88vw, 360px); cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-block; vertical-align: top; }
                     .anno-leader-label.has-collapse-btn { display: inline-flex; align-items: flex-start; gap: 2px; padding-right: 4px; }
                     .anno-leader-text { display: block; white-space: pre-wrap; word-break: break-word; max-width: 100%; box-sizing: border-box; flex: 1 1 auto; min-width: 0; }
                     .anno-leader-label.collapsed { align-items: center; width: fit-content; max-width: min(88vw, 360px); }
