@@ -59,7 +59,7 @@
     <div style="height:8px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px; margin-top:4px;"></div>
     <button class="editor-btn" onclick="openGlbManagerModal()">🔍 从资产库选择 GLB 模型</button><button class="editor-btn" onclick="openBuiltinModal()">➕ 选择并添加内置几何体</button>
     <div style="height:8px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px;"></div><div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"><div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0;"><span style="font-size:11px; color:#fff; white-space:nowrap;">选中物体颜色：</span>
-    <input type="color" id="obj-color-picker" value="#e8e8e8" style="width:24px; height:24px; padding:0; border:none; background:none; cursor:pointer; flex-shrink:0;" oninput="changeSelectedColor(event)" onchange="changeSelectedColor(event)"></div><div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0; justify-content:flex-end;"><span style="font-size:11px; color:#fff; white-space:nowrap;">粗体字颜色：</span>
+    <input type="color" id="obj-color-picker" value="#e8e8e8" style="width:24px; height:24px; padding:0; border:none; background:none; cursor:pointer; flex-shrink:0;" oninput="changeSelectedColor(event)" onchange="changeSelectedColor(event)"></div><div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0; justify-content:flex-end;" title="【粗体字】先在此选择颜色，再双击经典引出线小标签进入编辑。&#10;选中文字后 Ctrl+B 加粗（Mac：Cmd+B），再按一次取消粗体。"><span style="font-size:11px; color:#fff; white-space:nowrap;">粗体字颜色：</span>
     <input type="color" id="anno-bold-color-picker" value="#ffd966" style="width:24px; height:24px; padding:0; border:none; background:none; cursor:pointer; flex-shrink:0;" oninput="changeAnnoBoldColor(event)" onchange="changeAnnoBoldColor(event)"></div>
     </div><div style="display:flex; gap:4px; margin-bottom:6px;"><button id="btn-trans" class="editor-btn active" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('translate')">位移(T)</button>
     <button id="btn-rot" class="editor-btn" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('rotate')">旋转(R)</button>
@@ -490,7 +490,7 @@
     window.matType = 'origin'; window.workDirHandle = null; window.currentFileHandle = null; window.targetMasterFilename = null; window.__solidCreateHasExplicitScene = false; // --- 自动草稿（低耦合：尽量通过 PluginManager 总线序列化/反序列化扩展字段） ---
     const SOLID_CREATE_DRAFT_DB = 'SolidCreateDraftDB'; const SOLID_CREATE_DRAFT_STORE = 'drafts'; const SOLID_CREATE_DRAFT_KEY = 'main'; let _draftDirty = false;
     let _draftSaving = false; let _draftLastSavedAt = 0; // 记录“草稿对应的源文件名”，用于恢复后继续覆写同一文件
-    window._solidCreateDraftFileName = null; function markDraftDirty() { _draftDirty = true; }
+    window._solidCreateDraftFileName = null; function markDraftDirty() { _draftDirty = true; } window.markDraftDirty = markDraftDirty;
     function solidCreateSyncSaveButtonText() { const btn = document.getElementById('btn-save-direct'); if (!btn) return; btn.innerText = window.currentFileHandle ? '💾 覆写选中项' : '💾 保存新场景';
     }
     function solidCreateHighlightFileInList(fileName) { const c = document.getElementById('file-list-container'); if (!c) return; Array.from(c.children).forEach(el => { try {

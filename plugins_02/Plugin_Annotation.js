@@ -141,6 +141,7 @@ window.AnnotationManager = {
                 text: aData.text,
                 textRich: richSave || undefined,
                 detailText: aData.detailText != null ? String(aData.detailText) : '',
+                collapsed: !!aData.collapsed,
                 color: aData.color,
                 dx: aData.dx,
                 dy: aData.dy,
@@ -367,16 +368,111 @@ window.AnnotationManager = {
         return String(str || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     },
 
+    getLabelTextEl: function (div) {
+        if (!div) return null;
+        return div.querySelector('.anno-leader-text') || div;
+    },
+
     syncLabelFromDOM: function (data, div) {
-        data.text = this.labelPlainText(div.innerText || '');
-        const rich = this.sanitizeLabelRichHtml(div.innerHTML);
+        const textEl = this.getLabelTextEl(div);
+        data.text = this.labelPlainText(textEl.innerText || '');
+        const rich = this.sanitizeLabelRichHtml(textEl.innerHTML);
         if (rich) data.textRich = rich;
         else delete data.textRich;
     },
 
     applyLabelToDOM: function (div, data) {
-        if (data.textRich) div.innerHTML = data.textRich;
-        else div.textContent = data.text != null ? String(data.text) : '';
+        const textEl = this.getLabelTextEl(div);
+        if (data.textRich) textEl.innerHTML = data.textRich;
+        else textEl.textContent = data.text != null ? String(data.text) : '';
+    },
+
+    /** 折叠态 UI；短文测高后可能隐藏按钮。编辑中强制展开。 */
+    measureFirstLineWidth: function (textEl) {
+        if (!textEl) return 0;
+        try {
+            const range = document.createRange();
+            range.selectNodeContents(textEl);
+            const rects = range.getClientRects();
+            if (!rects || !rects.length) return textEl.getBoundingClientRect().width || 0;
+            const top = rects[0].top;
+            let left = rects[0].left;
+            let right = rects[0].right;
+            for (let i = 1; i < rects.length; i++) {
+                const r = rects[i];
+                if (Math.abs(r.top - top) > 0.75) break;
+                left = Math.min(left, r.left);
+                right = Math.max(right, r.right);
+            }
+            return Math.max(0, right - left);
+        } catch (_e) {
+            return 0;
+        }
+    },
+
+    applyCollapsedUI: function (data) {
+        const div = data && data.domEl;
+        if (!div) return;
+        const textEl = this.getLabelTextEl(div);
+        const btn = div.querySelector('.anno-collapse-btn');
+        const editing = div.classList.contains('editing');
+        const collapsed = !editing && !!data.collapsed;
+        if (textEl) textEl.style.width = '';
+        div.style.width = '';
+        div.classList.toggle('collapsed', collapsed);
+        if (collapsed && textEl) {
+            div.classList.remove('collapsed');
+            void div.offsetWidth;
+            const w = this.measureFirstLineWidth(textEl);
+            div.classList.add('collapsed');
+            if (w > 0) textEl.style.width = Math.ceil(w) + 'px';
+        }
+        if (btn) {
+            btn.textContent = collapsed ? '\u22EF\u00BB' : '\u2212';
+            btn.setAttribute('aria-label', collapsed ? '展开' : '收起');
+            btn.setAttribute('title', collapsed ? '展开全文' : '收起');
+        }
+    },
+
+    refreshCollapseButton: function (data) {
+        const div = data && data.domEl;
+        if (!div) return;
+        const textEl = this.getLabelTextEl(div);
+        const btn = div.querySelector('.anno-collapse-btn');
+        if (!btn || !textEl) return;
+        if (div.classList.contains('editing')) {
+            btn.style.display = 'none';
+            div.classList.remove('collapsed');
+            textEl.style.width = '';
+            return;
+        }
+        const wasCollapsed = div.classList.contains('collapsed');
+        div.classList.remove('collapsed');
+        div.classList.add('has-collapse-btn');
+        const cs = window.getComputedStyle(textEl);
+        let lineH = parseFloat(cs.lineHeight);
+        if (!lineH || !isFinite(lineH)) {
+            const fs = parseFloat(cs.fontSize) || 11;
+            lineH = fs * 1.45;
+        }
+        const h = textEl.scrollHeight;
+        const needsBtn = h > lineH * 1.5 + 1;
+        btn.style.display = needsBtn ? '' : 'none';
+        div.classList.toggle('has-collapse-btn', needsBtn);
+        if (wasCollapsed && needsBtn) div.classList.add('collapsed');
+        this.applyCollapsedUI(data);
+        if (!needsBtn) div.classList.remove('collapsed');
+    },
+
+    toggleCollapsed: function (data) {
+        if (!data) return;
+        data.collapsed = !data.collapsed;
+        this.applyCollapsedUI(data);
+        this.refreshCollapseButton(data);
+        window.needsUpdate = true;
+        if (!window.__SOLID_CONSUMER__) {
+            try { if (typeof window.markDraftDirty === 'function') window.markDraftDirty(); } catch (_e) {}
+        }
     },
 
     highlightSelected: function () {
@@ -404,20 +500,31 @@ window.AnnotationManager = {
     },
 
     ensureDOM: function () {
-        if (!document.getElementById('anno-style-inject')) {
-            const style = document.createElement('style');
-            style.id = 'anno-style-inject';
-            style.innerHTML = `
+        const cssText = `
                     #anno-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 50 !important; overflow: hidden; }
                     #anno-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
                     .anno-dom { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; font-family: 'Inter', sans-serif; }
-                    .anno-leader-label { border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.45; box-sizing: border-box; white-space: pre-wrap; word-break: break-word; text-align: left; max-width: min(88vw, 360px); cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-block; vertical-align: top; }
+                    .anno-leader-label { position: relative; border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.45; box-sizing: border-box; text-align: left; max-width: min(88vw, 360px); cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-block; vertical-align: top; }
+                    .anno-leader-label.has-collapse-btn { display: inline-flex; align-items: flex-start; gap: 2px; padding-right: 4px; }
+                    .anno-leader-text { display: block; white-space: pre-wrap; word-break: break-word; max-width: 100%; box-sizing: border-box; flex: 1 1 auto; min-width: 0; }
+                    .anno-leader-label.collapsed { align-items: center; width: fit-content; max-width: min(88vw, 360px); }
+                    .anno-leader-label.collapsed .anno-leader-text { max-height: 1.45em; overflow: hidden; flex: 0 1 auto; }
+                    .anno-collapse-btn { position: relative; flex: 0 0 auto; align-self: flex-start; display: inline-flex; align-items: center; justify-content: center; width: auto; height: calc(11px * 1.45); min-width: calc(11px * 1.45); min-height: calc(11px * 1.45); margin: 0; padding: 0 3px; border: none; border-radius: 2px; background: rgba(0,0,0,0.28); color: #fff; font-size: 14px; font-weight: 700; line-height: 1; text-align: center; cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; user-select: none; z-index: 2; box-sizing: border-box; }
+                    .anno-leader-label.collapsed .anno-collapse-btn { align-self: center; font-size: 15px; font-weight: 600; padding: 0 4px; letter-spacing: 0; }
+                    .anno-collapse-btn:active { background: rgba(0,0,0,0.45); }
                     .anno-leader-label strong { font-weight: 700; }
-                    .anno-leader-label.editing { background: #fff !important; color: #000; outline: none; border-color: #fff !important; box-shadow: 0 0 10px rgba(0,210,255,0.5) !important; user-select: text !important; cursor: text !important; max-height: min(50vh, 320px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+                    .anno-leader-label.editing { background: #fff !important; color: #000; outline: none; border-color: #fff !important; box-shadow: 0 0 10px rgba(0,210,255,0.5) !important; user-select: text !important; cursor: text !important; max-height: min(50vh, 320px); overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 8px; display: inline-block; }
+                    .anno-leader-label.editing .anno-leader-text { max-height: none; overflow: visible; outline: none; width: auto !important; }
+                    .anno-leader-label.editing .anno-collapse-btn { display: none !important; }
                     .anno-leader-label.editing strong { font-weight: 700; }
                 `;
+        let style = document.getElementById('anno-style-inject');
+        if (!style) {
+            style = document.createElement('style');
+            style.id = 'anno-style-inject';
             document.head.appendChild(style);
         }
+        style.innerHTML = cssText;
         if (!document.getElementById('anno-layer')) {
             const layer = document.createElement('div');
             layer.id = 'anno-layer';
@@ -444,7 +551,7 @@ window.AnnotationManager = {
             const color = document.getElementById('obj-color-picker')?.value || '#00d2ff';
             const annoData = {
                 id, targetUUID: targetObj.uuid, anchorObj: anchor,
-                text: '引线 ' + window.annoCounter, detailText: '', color, dx: 0, dy: 0, dxN: 0, dyN: 0, dxW: 0, dyW: 0, isOccluded: false
+                text: '引线 ' + window.annoCounter, detailText: '', collapsed: false, color, dx: 0, dy: 0, dxN: 0, dyN: 0, dxW: 0, dyW: 0, isOccluded: false
             };
             window.annoDataList.push(annoData);
             this.buildDOM(annoData);
@@ -465,11 +572,30 @@ window.AnnotationManager = {
         const div = document.createElement('div');
         div.className = 'anno-dom anno-leader-label';
         div.id = 'dom_' + data.id;
+        const textEl = document.createElement('div');
+        textEl.className = 'anno-leader-text';
+        div.appendChild(textEl);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'anno-collapse-btn';
+        btn.textContent = '\u2212';
+        btn.setAttribute('aria-label', '收起');
+        btn.style.display = 'none';
+        div.appendChild(btn);
+        data.domEl = div;
         this.applyLabelToDOM(div, data);
         div.style.borderColor = data.color;
         div.style.backgroundColor = this.getDarkBg(data.color);
         div.dataset.color = data.color;
+        const onCollapsePointer = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.AnnotationManager.toggleCollapsed(data);
+        };
+        btn.addEventListener('pointerdown', onCollapsePointer);
+        btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
         div.addEventListener('pointerdown', e => {
+            if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
             e.stopPropagation();
             if (window.__SOLID_CONSUMER__) {
                 if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
@@ -481,7 +607,7 @@ window.AnnotationManager = {
                 }
                 return;
             }
-            if (!div.isContentEditable) {
+            if (!textEl.isContentEditable) {
                 if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
                     window.PluginManager.setExclusiveSelection(window.AnnotationManager, data.id);
                 } else {
@@ -493,6 +619,7 @@ window.AnnotationManager = {
         div.addEventListener('click', e => { e.stopPropagation(); });
         div.addEventListener('dblclick', e => {
             if (window.__SOLID_CONSUMER__) return;
+            if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
             e.stopPropagation();
             if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
                 window.PluginManager.setExclusiveSelection(window.AnnotationManager, data.id);
@@ -501,26 +628,32 @@ window.AnnotationManager = {
                 window.AnnotationManager.highlightSelected();
             }
             window.AnnotationManager.applyLabelToDOM(div, data);
-            div.contentEditable = true;
             div.classList.add('editing');
+            div.classList.remove('collapsed');
+            textEl.style.width = '';
+            btn.style.display = 'none';
+            textEl.contentEditable = true;
+            textEl.style.cursor = 'text';
             div.style.cursor = 'text';
-            div.focus();
+            textEl.focus();
             const selection = window.getSelection();
             const range = document.createRange();
-            range.selectNodeContents(div);
+            range.selectNodeContents(textEl);
             selection.removeAllRanges();
             selection.addRange(range);
         });
-        div.addEventListener('blur', () => {
+        textEl.addEventListener('blur', () => {
             window.AnnotationManager.syncLabelFromDOM(data, div);
-            div.contentEditable = false;
+            textEl.contentEditable = false;
             div.classList.remove('editing');
             div.style.cursor = 'pointer';
+            textEl.style.cursor = '';
             window.AnnotationManager.applyLabelToDOM(div, data);
+            window.AnnotationManager.refreshCollapseButton(data);
             window.needsUpdate = true;
         });
-        div.addEventListener('paste', (e) => {
-            if (!div.isContentEditable) return;
+        textEl.addEventListener('paste', (e) => {
+            if (!textEl.isContentEditable) return;
             e.preventDefault();
             try {
                 const raw = (e.clipboardData || window.clipboardData).getData('text/plain');
@@ -529,19 +662,20 @@ window.AnnotationManager = {
                 document.execCommand('insertText', false, plain);
             } catch (_e) {}
         });
-        div.addEventListener('keydown', e => {
-            if (div.isContentEditable && (e.key === 'b' || e.key === 'B') && (e.ctrlKey || e.metaKey)) {
+        textEl.addEventListener('keydown', e => {
+            if (textEl.isContentEditable && (e.key === 'b' || e.key === 'B') && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 e.stopPropagation();
-                try { window.AnnotationManager.toggleLabelBoldWithColor(div); } catch (_eBold) {}
+                try { window.AnnotationManager.toggleLabelBoldWithColor(textEl); } catch (_eBold) {}
                 return;
             }
             if (e.key === 'Delete' || e.key === 'Backspace') e.stopPropagation();
-            if (div.isContentEditable && e.key === 'Enter') e.stopPropagation();
+            if (textEl.isContentEditable && e.key === 'Enter') e.stopPropagation();
         });
         let isDragging = false, startX, startY, startDx, startDy, isMoved = false;
         div.addEventListener('mousedown', e => {
-            if (div.isContentEditable) { e.stopPropagation(); return; }
+            if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
+            if (textEl.isContentEditable) { e.stopPropagation(); return; }
             isDragging = true;
             isMoved = false;
             startX = e.clientX;
@@ -600,7 +734,14 @@ window.AnnotationManager = {
         circle.setAttribute('fill', data.color);
         svg.appendChild(circle);
         data.svgCircle = circle;
-        data.domEl = div;
+        const scheduleCollapseRefresh = () => {
+            try { window.AnnotationManager.refreshCollapseButton(data); } catch (_e) {}
+        };
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => requestAnimationFrame(scheduleCollapseRefresh));
+        } else {
+            setTimeout(scheduleCollapseRefresh, 0);
+        }
     },
 
     updateScreenPositions: function (camera) {
@@ -724,6 +865,7 @@ window.AnnotationManager = {
                 id: a.id, targetUUID: obj.uuid, anchorObj: anchor,
                 text: a.text || '引线',
                 detailText: a.detailText != null ? String(a.detailText) : '',
+                collapsed: a.collapsed === true,
                 color: a.color || '#00d2ff',
                 dx: _dx,
                 dy: _dy,
