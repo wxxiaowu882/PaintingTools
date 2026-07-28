@@ -64,6 +64,7 @@
     </div><div style="display:flex; gap:4px; margin-bottom:6px;"><button id="btn-trans" class="editor-btn active" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('translate')">位移(T)</button>
     <button id="btn-rot" class="editor-btn" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('rotate')">旋转(R)</button>
     <button id="btn-scale" class="editor-btn" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('scale')">缩放(S)</button> </div>
+    <button type="button" class="editor-btn" style="margin:0 0 6px 0; width:100%; padding:4px 0;" onclick="copySelected()" title="复制当前选中的内置几何或 GLB（不含标注），副本沿 X 轴偏移">📋 拷贝选中模型</button>
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"> <span style="font-size:11px; color:#bbb; white-space:nowrap;">标注模式：</span>
     <select id="tool-mode-select" class="editor-select" style="margin:0; flex:1; padding:3px; background:#111; color:#0df; border-color:#444;" onchange="setMode(this.value)">
     <option value="none">未选择标注工具…</option> <option value="annotate">🏷️ 经典引出线 [Alt+Shift+划动]</option> <option value="annotate-color">🎨 屏幕取色引线 [Alt+Shift+划动]</option>
@@ -302,6 +303,15 @@
         } catch (_ePl) {}
     }; // 编辑器专属核心变量
     let editorGroup, transformControl, gltfLoader; let plasterMat, flatMat, sphereMat; let startScale = new THREE.Vector3(); const state = { radius: 21, azimuth: 113, elevation: 45, lightSize: 1.9, lightTemp: 38 };
+    /** 画框旋转用本地轴（框水平/竖直对称轴）；其它物体与位移模式保持世界轴 */
+    function solidCreateSyncTransformSpace() {
+        try {
+            if (!transformControl || typeof transformControl.setSpace !== 'function') return;
+            const obj = transformControl.object;
+            const isFrameRot = !!(obj && obj.userData && obj.userData.isFrame) && transformControl.getMode() === 'rotate';
+            transformControl.setSpace(isFrameRot ? 'local' : 'world');
+        } catch (_e) {}
+    }
     const __solidRasterLightRig = createSolidRasterLightRig({
     THREE,
     getScene: () => scene,
@@ -860,7 +870,7 @@
     obj.rotation.set(item.rot[0], item.rot[1], item.rot[2]);
     obj.scale.set(item.scale[0], item.scale[1], item.scale[2]);
     obj.updateWorldMatrix(true, true);
-    if (!obj.userData.noGroundSnap) snapBuiltinRootBottomToGround(obj);
+    // 加载时信任 JSON 位姿，禁止再贴地：否则有意悬浮的内置体会被拉回地面
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj, itemData: item });
     _assetDone++; solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
     } else if (item.type === 'glb') {
@@ -1756,7 +1766,88 @@
         };
         window.toggleCameraLock = function() { window.isCameraLocked = !window.isCameraLocked; window.applyCameraLockState(); };
         window.deleteSelected = function() { if (transformControl.object) { const obj = transformControl.object; transformControl.detach();
-        if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(obj); else editorGroup.remove(obj); lightMoved = true; markDraftDirty(); try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('delete_selected'); } catch (_ePl) {} } }; window.changeSelectedColor = function(e) {
+        if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(obj); else editorGroup.remove(obj); lightMoved = true; markDraftDirty(); try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('delete_selected'); } catch (_ePl) {} } };
+        /** 拷贝选中模型（仅本体，不含标注）；副本沿 X +0.5 */
+        const SOLID_CREATE_COPY_OFFSET_X = 0.5;
+        window.copySelected = function() {
+            const src = (transformControl && transformControl.object) || window.selectedObj;
+            if (!src || !src.userData) {
+                if (window.showToast) window.showToast('请先选中要拷贝的模型', true);
+                return;
+            }
+            const t = src.userData.type;
+            if (t !== 'builtin' && t !== 'glb') {
+                if (window.showToast) window.showToast('只能拷贝内置几何或 GLB 模型', true);
+                return;
+            }
+            const px = src.position.x + SOLID_CREATE_COPY_OFFSET_X;
+            const py = src.position.y;
+            const pz = src.position.z;
+            const rx = src.rotation.x, ry = src.rotation.y, rz = src.rotation.z;
+            const sx = src.scale.x, sy = src.scale.y, sz = src.scale.z;
+            if (t === 'builtin') {
+                const shape = src.userData.shape;
+                if (!shape) { if (window.showToast) window.showToast('无法拷贝：缺少形状信息', true); return; }
+                const col = src.userData.customColor || document.getElementById('obj-color-picker')?.value || '#e8e8e8';
+                const obj3d = createBuiltinObject3D(shape, col);
+                obj3d.position.set(px, py, pz);
+                obj3d.rotation.set(rx, ry, rz);
+                obj3d.scale.set(sx, sy, sz);
+                obj3d.updateWorldMatrix(true, true);
+                editorGroup.add(obj3d);
+                window.selectedObj = obj3d;
+                transformControl.attach(obj3d);
+                solidCreateSyncTransformSpace();
+                markDraftDirty();
+                lightMoved = true;
+                needsUpdate = true;
+                try {
+                    requestAnimationFrame(() => {
+                        try {
+                            if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows();
+                            if (window.__solidPreviewLighting && window.__solidPreviewLighting.assignEnvProbeMaps) window.__solidPreviewLighting.assignEnvProbeMaps();
+                            if (renderer && renderer.shadowMap) renderer.shadowMap.needsUpdate = true;
+                        } catch (_eSh) {}
+                    });
+                } catch (_eRaf) {}
+                if (window.showToast) window.showToast('已拷贝内置几何（不含标注）');
+                return;
+            }
+            const url = src.userData.url;
+            if (!url) { if (window.showToast) window.showToast('无法拷贝：缺少 GLB 路径', true); return; }
+            const glbGen = ++window._editorGlbInsertGen;
+            if (window.showToast) window.showToast('正在拷贝 GLB…');
+            solidCreateLoadGlbWithFallback(url, (gltf) => {
+                if (glbGen !== window._editorGlbInsertGen) { disposeLoadedGltfRoot(gltf.scene); return; }
+                const model = gltf.scene;
+                model.traverse(child => { if (child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); });
+                model.userData = { type: 'glb', url: solidCreateNormalizeModelUrlForJson(url) };
+                model.position.set(px, py, pz);
+                model.rotation.set(rx, ry, rz);
+                model.scale.set(sx, sy, sz);
+                editorGroup.add(model);
+                window.selectedObj = model;
+                transformControl.attach(model);
+                markDraftDirty();
+                lightMoved = true;
+                needsUpdate = true;
+                try { model.updateMatrixWorld(true); } catch (_eMw) {}
+                try {
+                    requestAnimationFrame(() => {
+                        try {
+                            if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows();
+                            if (window.__solidPreviewLighting && window.__solidPreviewLighting.assignEnvProbeMaps) window.__solidPreviewLighting.assignEnvProbeMaps();
+                            if (renderer && renderer.shadowMap) renderer.shadowMap.needsUpdate = true;
+                        } catch (_eSh) {}
+                    });
+                } catch (_eRaf) {}
+                if (window.showToast) window.showToast('已拷贝 GLB（不含标注）');
+            }, (error) => {
+                if (window.showToast) window.showToast('拷贝失败：GLB 加载出错', true);
+                try { if (window.hwLog) window.hwLog('[Copy] GLB 失败: ' + (error && error.message ? error.message : error)); } catch (_e) {}
+            });
+        };
+        window.changeSelectedColor = function(e) {
         const colorHex = e.target.value; localStorage.setItem('solid_obj_color_cache', colorHex); // 【优化 3】：将用户选择的颜色立即存入浏览器缓存
         if (window.AnnotationManager && window.AnnotationManager.selectedId) return; // 引线颜色交由标注插件底层接管
         if (window.ColorSampleAnnotationManager && window.ColorSampleAnnotationManager.selectedId) return;
@@ -2139,6 +2230,8 @@
         snapBuiltinRootBottomToGround(obj3d);
         }
         transformControl.attach(obj3d);
+        window.selectedObj = obj3d;
+        solidCreateSyncTransformSpace();
         markDraftDirty();
         requestAnimationFrame(() => { requestAnimationFrame(() => {
         if (obj3d.parent === editorGroup && obj3d.userData && obj3d.userData.type === 'builtin' && !obj3d.userData.noGroundSnap) {
@@ -2170,6 +2263,7 @@
         if(window.selectedObj) transformControl.attach(window.selectedObj); document.body.style.cursor = 'default'; } else { transformControl.detach(); 
         // 移除 window.selectedObj = null，使得在全不激活的状态下依然能选中模型上色
         document.body.style.cursor = mode === 'none' ? 'default' : 'crosshair'; if(mode === 'annotate') window.showToast("引线快捷键：按住 Alt+Shift+左键 划动"); else if(mode === 'annotate-color') window.showToast("取色引线：按住 Alt+Shift+左键 划动（颜色随画面实时变化）"); else if(mode === 'normal-arrow') window.showToast("法线快捷键：按住 Alt+左键 点击"); else if(mode === 'prober') window.showToast("受光探针：直接点击模型表面"); }
+        solidCreateSyncTransformSpace();
         ['trans', 'rot', 'scale'].forEach(id => { const btn = document.getElementById('btn-' + id); if (btn) btn.classList.remove('active'); });
         if(mode === 'translate') document.getElementById('btn-trans').classList.add('active');
         if(mode === 'rotate') document.getElementById('btn-rot').classList.add('active');
@@ -2335,9 +2429,30 @@
         const box = new THREE.Box3().setFromObject(obj); obj.userData.startBottomY = box.min.y; obj.userData.localBottom = (box.min.y - obj.position.y) / obj.scale.y; }
         if (!event.value && transformControl.object && transformControl.object.userData && transformControl.object.userData.type === 'builtin' && transformControl.getMode() === 'scale') {
         const _snapObj = transformControl.object;
-        if (_snapObj.userData.isFrame || !_snapObj.userData.noGroundSnap) {
+        if (_snapObj.userData.isFrame) {
+        // 取景框：缩放后仍贴地（设计约定）
         _snapObj.updateWorldMatrix(true, true);
         snapBuiltinRootBottomToGround(_snapObj);
+        } else if (!_snapObj.userData.noGroundSnap) {
+        // 普通内置体：离地很近则贴地；明显悬空则保留缩放前间隙（兼顾贴地稳与有意悬浮）
+        let gy = 0;
+        try {
+        if (typeof ground !== 'undefined' && ground) {
+        ground.updateWorldMatrix(true, true);
+        gy = new THREE.Box3().setFromObject(ground, true).max.y;
+        }
+        } catch (_eGy) {}
+        const startBottom = (typeof _snapObj.userData.startBottomY === 'number') ? _snapObj.userData.startBottomY : gy;
+        const keepGap = startBottom - gy;
+        const NEAR_GROUND_EPS = 1.0; // 场景单位：离地不超过约 1（约半个小方块高）视为贴地意图，缩放后强制贴地
+        _snapObj.updateWorldMatrix(true, true);
+        if (Math.abs(keepGap) <= NEAR_GROUND_EPS) {
+        snapBuiltinRootBottomToGround(_snapObj);
+        } else {
+        const boxAfter = new THREE.Box3().setFromObject(_snapObj, true);
+        _snapObj.position.y += (gy + keepGap) - boxAfter.min.y;
+        _snapObj.updateWorldMatrix(true, true);
+        }
         }
         }
         if(!event.value) { needsUpdate = true; lightMoved = true; window.sumDuration = 0; } window.applyCameraLockState(); }); transformControl.addEventListener('change', () => {
@@ -2426,10 +2541,13 @@
         const intersects = dragRaycaster.intersectObjects(hitTargets, true); if (intersects.length > 0) { let obj = intersects[0].object; if (obj === ground) {
         if (__d) window.hwLog(`[Log-Ray] 射线命中: ground (地面), 执行 detach`);
         transformControl.detach(); window.selectedObj = null;
+        solidCreateSyncTransformSpace();
         } else { while(obj.parent && obj.parent !== editorGroup) obj = obj.parent;
        window.selectedObj = obj; if (__d) window.hwLog(`[Log-Ray] 射线命中模型: ${obj.userData.type||'unknown'}. 准备挂载, 当前mode: ${window.currentEditorMode}`);
-        if (['translate', 'rotate', 'scale'].includes(window.currentEditorMode)) { transformControl.setMode(window.currentEditorMode); transformControl.attach(obj); if (__d) window.hwLog(`[Log-Ray] 成功执行 attach`); } else { transformControl.detach(); if (__d) window.hwLog(`[Log-Ray] mode不匹配，执行 detach`); }  
+        if (['translate', 'rotate', 'scale'].includes(window.currentEditorMode)) { transformControl.setMode(window.currentEditorMode); transformControl.attach(obj); if (__d) window.hwLog(`[Log-Ray] 成功执行 attach`); } else { transformControl.detach(); if (__d) window.hwLog(`[Log-Ray] mode不匹配，执行 detach`); }
+        solidCreateSyncTransformSpace();
         } } else { if (__d) window.hwLog(`[Log-Ray] 射线未命中任何物体(包括地面), 执行 detach`); transformControl.detach(); window.selectedObj = null;
+        solidCreateSyncTransformSpace();
         } }); // 清理掉之前用于排错的界面盒子
         const oldDebug = document.getElementById('anno-debug-panel'); if(oldDebug) oldDebug.remove();
         plasterMat = new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0.0 }); flatMat = plasterMat.clone(); flatMat.flatShading = true; sphereMat = plasterMat.clone(); sphereMat.roughness = 0.6;

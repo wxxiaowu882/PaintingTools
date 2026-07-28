@@ -3053,7 +3053,7 @@ export function createSolidPreviewLightingManager(opts) {
     if (!previewEnabled) return;
     const r = String(reason || '');
     // 换场景/增删物体后若仍沿用旧的 lastRunAt，会把首轮探针推迟整整一个 minInterval，表现为「SH 很久才出来」。
-    if (/scene_loaded|scene_changed|apply_scene|json_loaded|new_scene|delete_selected|add_builtin|add_glb/i.test(r)) {
+    if (/scene_loaded|scene_changed|apply_scene|json_loaded|new_scene|delete_selected|add_builtin|add_glb|copy_builtin|copy_glb/i.test(r)) {
       lastRunAt = 0;
     }
     const irr = _irrCfg();
@@ -3111,6 +3111,14 @@ export function createSolidPreviewLightingManager(opts) {
     }
   }
 
+  function assignEnvProbeMaps() {
+    if (!previewEnabled) return;
+    try {
+      _applyMultiEnvProbesToSceneGroup();
+      if (_solidShIrrEnabled()) _solidShPushUniformsFromState();
+    } catch (_e) {}
+  }
+
   return {
     install,
     setEnabled,
@@ -3119,6 +3127,8 @@ export function createSolidPreviewLightingManager(opts) {
     /** 与 Solid.html 原 `_solidFitRasterShadowFrustumForSceneGroup` 同源：光源移动后收紧 shadow frustum。 */
     fitRasterShadowFrustumForSceneGroup: (lightOverride) => _fitRasterShadowFrustumForSceneGroup(lightOverride),
     requestEnvProbe,
+    /** 仅按当前探针位姿给网格分配 envMap/SH uniform，不重拍 cubemap、不重算探针布局（拷贝模型等增量操作）。 */
+    assignEnvProbeMaps,
     onSceneChanged,
     dispose,
   };
