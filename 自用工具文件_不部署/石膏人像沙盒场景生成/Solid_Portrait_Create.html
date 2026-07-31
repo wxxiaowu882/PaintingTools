@@ -764,6 +764,49 @@
             return url;
         }
     }
+    function solidCreateIsUnderGlbRoot(obj) {
+        let n = obj;
+        while (n) {
+            if (n.userData && n.userData.type === 'glb') return true;
+            n = n.parent;
+        }
+        return false;
+    }
+    function solidCreateCloneMaterialSlot(mat) {
+        if (!mat) return mat;
+        if (Array.isArray(mat)) return mat.map(m => (m && typeof m.clone === 'function') ? m.clone() : m);
+        return (typeof mat.clone === 'function') ? mat.clone() : mat;
+    }
+    function solidCreateStampMeshOriginalMaterial(mesh) {
+        if (!mesh || !mesh.isMesh || !mesh.material) return;
+        if (!mesh.userData) mesh.userData = {};
+        if (mesh.userData.originalMaterial) return;
+        mesh.userData.originalMaterial = solidCreateCloneMaterialSlot(mesh.material);
+        mesh.userData.__solidMatStamped = true;
+    }
+    function solidCreateStampGlbModelMaterials(root) {
+        if (!root || !root.traverse) return;
+        root.traverse(child => { if (child.isMesh) solidCreateStampMeshOriginalMaterial(child); });
+    }
+    function solidCreateSyncMatPanelFromType(matType) {
+        const targetMat = String(matType != null ? matType : 'origin');
+        const matchedMatOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${targetMat}'"]`);
+        if (matchedMatOpt) {
+            const trigger = document.getElementById('mat-trigger');
+            if (trigger) trigger.innerText = matchedMatOpt.innerText;
+            document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected'));
+            matchedMatOpt.classList.add('selected');
+        }
+    }
+    function solidCreateMaterialRefEqual(a, b) {
+        if (a === b) return true;
+        if (Array.isArray(a) && Array.isArray(b)) {
+            if (a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+            return true;
+        }
+        return false;
+    }
     function solidCreateSetLoaderText(msg) { const el = document.getElementById('loader-text'); if (el) el.innerText = String(msg || ''); }
     function solidCreateSetLoaderProgressNow(p) { const v = Math.max(0, Math.min(100, Math.round(Number(p) || 0))); const fill = document.getElementById('scene-load-bar-fill'); const pct = document.getElementById('scene-load-pct'); if (fill) fill.style.transform = 'scaleX(' + (v / 100) + ')'; if (pct) pct.textContent = v + '%'; }
     function solidCreateLoaderShow() { const el = document.getElementById('scene-loader'); if (!el) return; el.style.display = 'flex'; el.style.opacity = '1'; }
@@ -838,7 +881,7 @@
     window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
     const _atm = { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 }; const _dof = { enabled: false, aperture: 2.8, focusDistance: 10 };
     window.isFogEnabled = false; window.fogDensity = 0.02; window.currentFogType = 'basic'; window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof; }
-    window.initialMatType = window.matType; if (window.syncEnvColorPickers) window.syncEnvColorPickers(); const cb = document.getElementById('crop-box'); if (cb) { if (data && data.crop) {
+    window.initialMatType = window.matType; solidCreateSyncMatPanelFromType(window.matType); if (window.syncEnvColorPickers) window.syncEnvColorPickers(); const cb = document.getElementById('crop-box'); if (cb) { if (data && data.crop) {
     cb.style.display = data.crop.display || 'none'; cb.style.left = data.crop.left || 'calc(50% - 128px)'; cb.style.top = data.crop.top || 'calc(50% - 128px)';
     cb.style.width = data.crop.width || '256px'; cb.style.height = data.crop.height || '256px'; } else { cb.style.display = 'none';
     cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }
@@ -858,7 +901,7 @@
     buildEnvironment();
     _perfEnd(_pmEnv);
     if (window.PluginManager) window.PluginManager.trigger('onClearScene'); if (data && data.items && data.items.length > 0) {
-    let _assetDone = 0; let _glbSlot = 0;
+    let _assetDone = 0; let _glbSlot = 0; const _glbPromises = [];
     solidCreateDebugLog(`[SceneLoad] 开始恢复场景 items: ${data.items.length}`);
     for (let ii = 0; ii < data.items.length; ii++) {
     const item = data.items[ii];
@@ -875,10 +918,11 @@
     _assetDone++; solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
     } else if (item.type === 'glb') {
     solidCreateDebugLog(`[SceneLoad] 发现GLB item[${ii}] url=${item && item.url ? item.url : '(empty)'}`); const _slot = _glbSlot++;
+    _glbPromises.push(new Promise((resolve) => {
     solidCreateLoadGlbWithFallback(item.url, (gltf) => {
-    if (sceneLoadGen !== window._editorSceneLoadGen) { disposeLoadedGltfRoot(gltf.scene); return; }
+    if (sceneLoadGen !== window._editorSceneLoadGen) { disposeLoadedGltfRoot(gltf.scene); resolve(); return; }
     const model = gltf.scene;
-    model.traverse(child => { if (child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); });
+    solidCreateStampGlbModelMaterials(model);
     model.userData = { type: 'glb', url: item.url };
     model.position.set(item.pos[0], item.pos[1], item.pos[2]);
     model.rotation.set(item.rot[0], item.rot[1], item.rot[2]);
@@ -887,22 +931,24 @@
     solidCreateDebugLog(`[SceneLoad] GLB入场成功 item[${ii}] loadedUrl=${gltf && gltf.__solidLoadedUrl ? gltf.__solidLoadedUrl : '(unknown)'}`);
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item });
     _assetDone++; solidCreateSceneLoadUxSetGlbSlot(_slot, 1); solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
-    window.changeMat(window.matType);
-    lightMoved = true;
     markDraftDirty();
+    resolve();
     }, (err) => {
     try { if (window.hwLog) window.hwLog(`[GLB-LoadFail] 生产端重载失败: ${item && item.url ? item.url : '(unknown)'} / ${err && err.message ? err.message : err}`); } catch (_e) {} _assetDone++; solidCreateSceneLoadUxSetGlbSlot(_slot, 1); solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
+    resolve();
     }, (evt) => {
     if (evt && evt.total > 0) solidCreateSceneLoadUxSetGlbSlot(_slot, Math.min(1, evt.loaded / evt.total));
     solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
     });
+    }));
     }
     // 分帧：每处理 2 个 item 让出一帧，避免大场景卡死
     if ((ii % 2) === 1) { await new Promise(r => requestAnimationFrame(r)); }
     }
+    if (_glbPromises.length) { await Promise.all(_glbPromises); lightMoved = true; }
     }
     if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data }); solidCreateSceneLoadUxMarkElementsDone(); transformControl.detach();
-    window.changeMat(window.matType); if(window.changePosterize) window.changePosterize(window.posterizeLevel || 0);
+    solidCreateSyncMatPanelFromType(window.matType); window.changeMat(window.matType); if(window.changePosterize) window.changePosterize(window.posterizeLevel || 0);
     solidCreateApplyAtmosphereStateToPanel(window.__solidSceneAtmosphere || { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 });
     solidCreateApplyDoFStateToPanel(window.__solidSceneDoF || { enabled: false, aperture: 2.8, focusDistance: 10 });
     const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity();
@@ -1235,7 +1281,8 @@
         } catch (_ePl) {}
         try { if (renderer && scene && camera) { _solidTryRasterPreviewDraw(); } } catch (_eR) {}
         } catch(err) { console.error(err); window.showToast("读取或解析失败！", true); } };
-        /** 封面截取区：绿框内缘（不含虚线 border）+ 排除顶部拖拽条，在剩余区域内取最大正方形 */
+        /** 封面截取区：绿框内缘（不含虚线 border）取最大正方形，与所见构图中心对齐。
+         * 不再减掉顶部拖拽条高度（否则构图整体上移）；保存时已 visibility:hidden 藏掉绿框/拖拽条。 */
         function solidCreateGetCropCaptureRect(cropBoxEl, vw, vh) {
         const fb = 256;
         if (!cropBoxEl || cropBoxEl.style.display === 'none') {
@@ -1246,12 +1293,9 @@
         const bl = parseFloat(cs.borderLeftWidth) || 0, bt = parseFloat(cs.borderTopWidth) || 0;
         const innerW = Math.max(1, cropBoxEl.clientWidth), innerH = Math.max(1, cropBoxEl.clientHeight);
         const innerLeft = outer.left + bl, innerTop = outer.top + bt;
-        const dragH = document.getElementById('crop-drag-handle');
-        const handleH = dragH ? Math.max(0, dragH.offsetHeight || 0) : 0;
-        const availW = innerW, availH = Math.max(1, innerH - handleH);
-        let side = Math.max(1, Math.min(availW, availH));
-        const cropLeft = Math.max(0, Math.floor(innerLeft + (availW - side) * 0.5));
-        const cropTop = Math.max(0, Math.floor(innerTop + handleH + (availH - side) * 0.5));
+        let side = Math.max(1, Math.min(innerW, innerH));
+        const cropLeft = Math.max(0, Math.floor(innerLeft + (innerW - side) * 0.5));
+        const cropTop = Math.max(0, Math.floor(innerTop + (innerH - side) * 0.5));
         side = Math.max(1, Math.min(side, Math.max(1, vw - cropLeft), Math.max(1, vh - cropTop)));
         return { left: cropLeft, top: cropTop, width: side, height: side };
         }
@@ -1320,6 +1364,27 @@
         return maxRGB <= 2;
         } catch (_e) { return false; }
         }
+        /** 仅当录屏帧与视口近似同比例、同尺度时可用；含标题栏/整屏时会系统性上偏，必须拒绝。 */
+        function solidCreateDisplayMediaMappingOk(srcW, srcH, viewW, viewH) {
+        if (!(srcW > 1 && srcH > 1 && viewW > 1 && viewH > 1)) return false;
+        const viewAspect = viewW / viewH;
+        const srcAspect = srcW / srcH;
+        if (Math.abs(srcAspect - viewAspect) / Math.max(viewAspect, 1e-6) > 0.02) return false;
+        const scX = srcW / viewW, scY = srcH / viewH;
+        if (Math.abs(scX - scY) / Math.max(scX, scY, 1e-6) > 0.02) return false;
+        if (scX < 0.5 || scX > 4) return false;
+        return true;
+        }
+        function solidCreateBlitFromWebGL() {
+        const canvasEl = renderer && renderer.domElement; if (!canvasEl) return false;
+        const cR = canvasEl.getBoundingClientRect();
+        if (!(cR.width > 1 && cR.height > 1 && canvasEl.width > 1 && canvasEl.height > 1)) return false;
+        const buX = canvasEl.width / Math.max(1, cR.width), buY = canvasEl.height / Math.max(1, cR.height);
+        const sx = Math.max(0, (cropLeft - cR.left) * buX), sy = Math.max(0, (cropTop - cR.top) * buY);
+        const sw = Math.max(1, Math.min(cropW * buX, canvasEl.width - sx)), sh = Math.max(1, Math.min(cropH * buY, canvasEl.height - sy));
+        solidCreateBlitSquareCover(ctx, canvasEl, sx, sy, sw, sh, OUT);
+        return true;
+        }
         async function solidCreateCaptureViaDisplayMedia() {
         if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') return null;
         if (typeof window.__solidCreateReleaseCaptureTrack !== 'function') {
@@ -1337,10 +1402,11 @@
         const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
         displaySurface: 'browser',
-        frameRate: 30,
-        selfBrowserSurface: 'include'
+        frameRate: 30
         },
-        audio: false
+        audio: false,
+        preferCurrentTab: true,
+        selfBrowserSurface: 'include'
         });
         track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
         if (!track) return null;
@@ -1381,6 +1447,10 @@
         if (!srcCanvas) return null;
         const srcW = srcCanvas.width, srcH = srcCanvas.height;
         if (srcW < 2 || srcH < 2) return null;
+        if (!solidCreateDisplayMediaMappingOk(srcW, srcH, vw, vh)) {
+        try { if (window.hwLog) window.hwLog('[SolidCreate] 录屏帧与视口比例不一致，放弃录屏截取以免上下偏移'); } catch (_eLog) {}
+        return null;
+        }
         const scX = srcW / Math.max(1, vw), scY = srcH / Math.max(1, vh);
         const sx = Math.max(0, Math.floor(cropLeft * scX)), sy = Math.max(0, Math.floor(cropTop * scY));
         const sw = Math.max(1, Math.min(Math.ceil(cropW * scX), srcW - sx)), sh = Math.max(1, Math.min(Math.ceil(cropH * scY), srcH - sy));
@@ -1395,14 +1465,14 @@
         return null;
         }
         }
+        // 优先 WebGL 画布按 getBoundingClientRect 映射截取：与绿框坐标系一致，不会因录屏含标题栏而上偏。
         let drewWysiwyg = false;
-        const nativeSnap = await solidCreateCaptureViaDisplayMedia();
-        if (nativeSnap) {
-        ctx.drawImage(nativeSnap, 0, 0, OUT, OUT);
+        if (solidCreateBlitFromWebGL()) {
         drewWysiwyg = true;
+        } else {
+        console.warn('[SolidCreate] WebGL 截取失败，尝试其它路径');
         }
-        if (typeof html2canvas === 'function') {
-        if (!drewWysiwyg) {
+        if (!drewWysiwyg && typeof html2canvas === 'function') {
         try {
         const canvasEl = renderer.domElement;
         let snap = null;
@@ -1433,29 +1503,31 @@
         }
         if (snap && snap.width > 0 && snap.height > 0) {
         if (solidCreateIsLikelyBlackFrame(snap)) {
-        console.warn('[SolidCreate] WYSIWYG 缩略图疑似黑帧，回退 WebGL 截图');
+        console.warn('[SolidCreate] WYSIWYG 缩略图疑似黑帧，回退录屏/空');
         } else {
         solidCreateBlitSnapSquareCover(ctx, snap, OUT);
         drewWysiwyg = true;
         }
         } else {
-        console.warn('[SolidCreate] WYSIWYG 缩略图为空，回退 WebGL 截图');
+        console.warn('[SolidCreate] WYSIWYG 缩略图为空');
         }
         } catch (eWysiwyg) {
-        console.warn('[SolidCreate] WYSIWYG 缩略图失败，回退 WebGL 截图:', eWysiwyg);
-        }
+        console.warn('[SolidCreate] WYSIWYG 缩略图失败:', eWysiwyg);
         }
         }
         if (!drewWysiwyg) {
-        const canvasEl = renderer.domElement; const cR = canvasEl.getBoundingClientRect();
-        const buX = canvasEl.width / Math.max(1, cR.width), buY = canvasEl.height / Math.max(1, cR.height);
-        const sx = Math.max(0, (cropLeft - cR.left) * buX), sy = Math.max(0, (cropTop - cR.top) * buY);
-        const sw = Math.max(1, Math.min(cropW * buX, canvasEl.width - sx)), sh = Math.max(1, Math.min(cropH * buY, canvasEl.height - sy));
-        solidCreateBlitSquareCover(ctx, canvasEl, sx, sy, sw, sh, OUT);
+        const nativeSnap = await solidCreateCaptureViaDisplayMedia();
+        if (nativeSnap) {
+        ctx.drawImage(nativeSnap, 0, 0, OUT, OUT);
+        drewWysiwyg = true;
+        }
+        }
+        if (!drewWysiwyg) {
+        solidCreateBlitFromWebGL();
         }
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
-        if (!drewWysiwyg && typeof html2canvas === 'function') {
+        if (typeof html2canvas === 'function') {
         const overlayIds = ['poly3d-layer', 'dashed-line-layer', 'norm-arrow-layer', 'anno-layer', 'anno-cs-layer', 'prober-html-layer'];
         for (let i = 0; i < overlayIds.length; i++) {
         const el = document.getElementById(overlayIds[i]); if (!el) continue;
@@ -1465,7 +1537,7 @@
         if (snap && snap.width > 0 && snap.height > 0) solidCreateBlitSnapSquareCover(ctx, snap, OUT);
         } catch (e2) { console.warn('[SolidCreate] html2canvas 叠层失败: ' + overlayIds[i], e2); }
         }
-        } else if (!drewWysiwyg) {
+        } else {
         if (window.PluginManager) window.PluginManager.trigger('onDrawSnapshot', { ctx: ctx, rect: snapRect, camera: camera });
         }
         return tCanvas.toDataURL('image/jpeg', 0.85);
@@ -1524,14 +1596,13 @@
         const targetHandle = await window.workDirHandle.getFileHandle(window.targetMasterFilename, {create: true}); const writable = await targetHandle.createWritable(); await writable.write(JSON.stringify(mergedData)); await writable.close();
         window.showToast(`成功合并 ${files.length} 个文件！`); } catch(e) { window.showToast("合并失败: " + e.message, true); } };
         window.createNewScene = function() { window._editorSceneLoadGen++; transformControl.detach(); if(window.AnnotationManager) window.AnnotationManager.clearAll(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); document.getElementById('scene-name-input').value = ''; const _d = document.getElementById('scene-meta-detail-input'); if (_d) _d.value = ''; window.currentFileHandle = null; if(document.getElementById('file-list-container').children.length > 0) { Array.from(document.getElementById('file-list-container').children).forEach(el => el.style.borderLeft = 'none'); } document.getElementById('btn-save-direct').innerText = '💾 保存新场景'; const cb = document.getElementById('crop-box'); cb.style.display = 'none'; const cachedCrop = localStorage.getItem('solidCropBoxCache'); if(cachedCrop) { const c = JSON.parse(cachedCrop); cb.style.left = c.left; cb.style.top = c.top; cb.style.width = c.width; cb.style.height = c.height; } else { cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }
-        window._solidCreateDraftFileName = null; solidCreateSyncSaveButtonText();
+        window._solidCreateDraftFileName = null; window.currentSceneData = null; solidCreateSyncSaveButtonText();
         window.__solidCreateHasExplicitScene = true;
         // 新建场景时同步重置相机/视线（方案 A）：对准世界原点，避免沿用上一场景/草稿导致取景框偏移
         try { if (camera) { camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); } } catch (_eCamNs) {}
         try { if (controls) { controls.target.set(0, 0, 0); controls.update(); } } catch (_eCtlNs) {}
         try { if (camera) camera.lookAt(0, 0, 0); } catch (_eLookNs) {}
-        const matchedMatOpt = document.querySelector(`#mat-options .custom-option[onclick*="'origin'"]`);
-        if(matchedMatOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedMatOpt.innerText; document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedMatOpt.classList.add('selected'); }
+        solidCreateSyncMatPanelFromType('origin');
         window.changeMat('origin'); window.initialMatType = 'origin'; // 【新增】新建场景时，初始材质重置为自带材质
         window.changePosterize(0); window.changeAtmosphere(false, 0.02); const fogCheck = document.getElementById('fogEnable'); if(fogCheck) fogCheck.checked = false; if(window.toggleFogAdvanced) window.toggleFogAdvanced(false); const posterizeCheck = document.getElementById('posterizeEnable'); if(posterizeCheck) posterizeCheck.checked = false;
         // 【核心解耦】：通知所有插件安全销毁自己的内存和 DOM 节点
@@ -1564,19 +1635,101 @@
         setTimeout(() => { window.setMode(window.currentEditorMode); }, 100); };
         window.toggleCustomSelect = function(e, id) { e.stopPropagation(); document.querySelectorAll('.custom-options').forEach(el => { if (el.id !== id) el.classList.remove('show'); }); document.getElementById(id).classList.toggle('show'); };
         // 【新增】：材质切换（非破坏性预览）
-        window.changeMat = function(val) { window.matType = val; const roughs = [0.95, 0.15, 0.3, 0.05, 0.4]; const metals = [0.0, 0.0, 0.85, 0.0, 0.0]; const trans = [0.0, 0.0, 0.0, 1.0, 1.0]; // 彻底解禁调色板：满足标注与模型全局调色需求
-        const picker = document.getElementById('obj-color-picker'); if (picker) { picker.style.opacity = '1'; picker.style.cursor = 'pointer'; picker.disabled = false; }
-        editorGroup.traverse(child => { if (child.isMesh) {
-        if (child.userData && child.userData.solidShadowCore) return;
-        if (child.userData && child.userData.isFrame) return;
-        if (child.material && child.material !== child.userData.originalMaterial && child.material !== flatMat && child.material !== sphereMat && child.material !== plasterMat) { safeDispose(child.material); }
-        if (window.matType === 'origin') { if (child.userData.originalMaterial) { child.material = child.userData.originalMaterial; } else {
-        child.material = child.userData.isFlat ? flatMat.clone() : (child.userData.shape==='sphere' ? sphereMat.clone() : plasterMat.clone());
-        if(child.userData.customColor) child.material.color.set(child.userData.customColor); } } else { const idx = parseInt(window.matType); child.material = plasterMat.clone();
-        child.material.color.set(child.userData.customColor || '#e8e8e8');
-        child.material.roughness = (child.userData.shape==='sphere' && idx===0) ? 0.6 : roughs[idx]; child.material.metalness = metals[idx]; child.material.transmission = trans[idx];
-        child.material.transparent = trans[idx] > 0; child.material.ior = 1.5; if(child.userData.isFlat) child.material.flatShading = true; } } });
-        if(pathTracer) { lightMoved = true; needsUpdate = true; _solidPtSync.queueReset('change_mat'); } }; // 同步接入所有下拉框逻辑（包含新加入的 mat）
+        window.changeMat = function(val) {
+        window.matType = val;
+        const roughs = [0.95, 0.15, 0.3, 0.05, 0.4];
+        const metals = [0.0, 0.0, 0.85, 0.0, 0.0];
+        const trans = [0.0, 0.0, 0.0, 1.0, 1.0];
+        const picker = document.getElementById('obj-color-picker');
+        if (picker) { picker.style.opacity = '1'; picker.style.cursor = 'pointer'; picker.disabled = false; }
+        function _isSysMatRef(mat) {
+            if (!mat) return false;
+            if (mat === flatMat || mat === sphereMat || mat === plasterMat) return true;
+            if (Array.isArray(mat)) return mat.every(m => m === flatMat || m === sphereMat || m === plasterMat);
+            return false;
+        }
+        function _shouldDisposeReplaced(oldMat, originalMat) {
+            if (!oldMat) return false;
+            if (solidCreateMaterialRefEqual(oldMat, originalMat)) return false;
+            if (_isSysMatRef(oldMat)) return false;
+            return true;
+        }
+        function _buildBuiltinOriginMat(ud) {
+            const m = ud.isFlat ? flatMat.clone() : (ud.shape === 'sphere' ? sphereMat.clone() : plasterMat.clone());
+            if (ud.customColor && m.color) m.color.set(ud.customColor);
+            return m;
+        }
+        function _applyPreviewParams(m, idx, ud, isGlb) {
+            if (!m || !m.isMaterial) return m;
+            const c = m.clone ? m.clone() : m;
+            if (!isGlb) {
+                if (c.color) c.color.set(ud.customColor || '#e8e8e8');
+            }
+            if (c.roughness !== undefined) c.roughness = (ud.shape === 'sphere' && idx === 0) ? 0.6 : roughs[idx];
+            if (c.metalness !== undefined) c.metalness = metals[idx];
+            if (c.transmission !== undefined) c.transmission = trans[idx];
+            if (c.transparent !== undefined) c.transparent = trans[idx] > 0;
+            if (c.ior !== undefined) c.ior = 1.5;
+            if (ud.isFlat && c.flatShading !== undefined) c.flatShading = true;
+            return c;
+        }
+        function _buildPreviewFromOriginal(originalMat, idx, ud, isGlb) {
+            if (!originalMat) return null;
+            if (Array.isArray(originalMat)) {
+                return originalMat.map(m => _applyPreviewParams(m, idx, ud, isGlb));
+            }
+            return _applyPreviewParams(originalMat, idx, ud, isGlb);
+        }
+        function _buildBuiltinPreviewMat(idx, ud) {
+            const m = plasterMat.clone();
+            if (m.color) m.color.set(ud.customColor || '#e8e8e8');
+            m.roughness = (ud.shape === 'sphere' && idx === 0) ? 0.6 : roughs[idx];
+            m.metalness = metals[idx];
+            m.transmission = trans[idx];
+            m.transparent = trans[idx] > 0;
+            m.ior = 1.5;
+            if (ud.isFlat) m.flatShading = true;
+            return m;
+        }
+        function _resolveNextMaterial(child, matTypeVal) {
+            const ud = child.userData || {};
+            const isGlb = solidCreateIsUnderGlbRoot(child);
+            const orig = ud.originalMaterial;
+            if (matTypeVal === 'origin') {
+                if (orig) return orig;
+                if (isGlb) {
+                    solidCreateStampMeshOriginalMaterial(child);
+                    if (child.userData.originalMaterial) return child.userData.originalMaterial;
+                    return child.material;
+                }
+                return _buildBuiltinOriginMat(ud);
+            }
+            const idx = parseInt(matTypeVal);
+            if (isGlb) {
+                const fromOrig = _buildPreviewFromOriginal(orig, idx, ud, true);
+                if (fromOrig) return fromOrig;
+                return _buildBuiltinPreviewMat(idx, ud);
+            }
+            return _buildBuiltinPreviewMat(idx, ud);
+        }
+        const _updates = [];
+        editorGroup.traverse(child => {
+            if (!child.isMesh) return;
+            if (child.userData && child.userData.solidShadowCore) return;
+            if (child.userData && child.userData.isFrame) return;
+            const prevMat = child.material;
+            const nextMat = _resolveNextMaterial(child, window.matType);
+            if (!solidCreateMaterialRefEqual(prevMat, nextMat)) {
+                _updates.push({ child, prevMat, nextMat, originalMat: child.userData && child.userData.originalMaterial });
+            }
+        });
+        for (let ui = 0; ui < _updates.length; ui++) {
+            const u = _updates[ui];
+            u.child.material = u.nextMat;
+            if (_shouldDisposeReplaced(u.prevMat, u.originalMat)) safeDispose(u.prevMat);
+        }
+        if(pathTracer) { lightMoved = true; needsUpdate = true; _solidPtSync.queueReset('change_mat'); }
+        };
         window.selectCustomOpt = function(type, value, text, el) {
         el.parentElement.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected')); el.classList.add('selected');
         if (type === 'light') {
@@ -1716,8 +1869,7 @@
             window.posterizeLevel = env.posterizeLevel !== undefined ? env.posterizeLevel : 0;
 
             const targetMat = window.matType || 'origin';
-            const matchedMatOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${targetMat}'"]`);
-            if(matchedMatOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedMatOpt.innerText; document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedMatOpt.classList.add('selected'); }
+            solidCreateSyncMatPanelFromType(targetMat);
 
             const atm = env.atmosphere || { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 };
             const dof = env.dof || { enabled: false, aperture: 2.8, focusDistance: 10 };
@@ -1801,6 +1953,7 @@
                 markDraftDirty();
                 lightMoved = true;
                 needsUpdate = true;
+                try { window.changeMat(window.matType); } catch (_eMat) {}
                 try {
                     requestAnimationFrame(() => {
                         try {
@@ -1820,7 +1973,7 @@
             solidCreateLoadGlbWithFallback(url, (gltf) => {
                 if (glbGen !== window._editorGlbInsertGen) { disposeLoadedGltfRoot(gltf.scene); return; }
                 const model = gltf.scene;
-                model.traverse(child => { if (child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); });
+                solidCreateStampGlbModelMaterials(model);
                 model.userData = { type: 'glb', url: solidCreateNormalizeModelUrlForJson(url) };
                 model.position.set(px, py, pz);
                 model.rotation.set(rx, ry, rz);
@@ -1832,6 +1985,7 @@
                 lightMoved = true;
                 needsUpdate = true;
                 try { model.updateMatrixWorld(true); } catch (_eMw) {}
+                try { window.changeMat(window.matType); } catch (_eMat) {}
                 try {
                     requestAnimationFrame(() => {
                         try {
@@ -2233,6 +2387,7 @@
         window.selectedObj = obj3d;
         solidCreateSyncTransformSpace();
         markDraftDirty();
+        try { window.changeMat(window.matType); } catch (_eMat) {}
         requestAnimationFrame(() => { requestAnimationFrame(() => {
         if (obj3d.parent === editorGroup && obj3d.userData && obj3d.userData.type === 'builtin' && !obj3d.userData.noGroundSnap) {
         obj3d.updateWorldMatrix(true, true);
@@ -2247,9 +2402,9 @@
         window.addEventListener('message', function(event) { if (event.data && event.data.type === 'INSERT_GLB') { window.closeGlbManagerModal(); const basePath = '../../docs/model/';
         const relPath = String(event.data.path || '').replace(/\\/g, '/').replace(/^\/+/, ''); const fullUrl = basePath + relPath; window.addEditorGLB(fullUrl); } }); window.addEditorGLB = function(url) { if (!url) return; const glbGen = ++window._editorGlbInsertGen; addHwLog("尝试从资产库加载 GLB: " + url); solidCreateLoadGlbWithFallback(url, (gltf) => {
         if (glbGen !== window._editorGlbInsertGen) { disposeLoadedGltfRoot(gltf.scene); return; }
-        const model = gltf.scene; model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); }); const box = new THREE.Box3().setFromObject(model); const size = box.getSize(new THREE.Vector3()); if (size.y > 0.001) { const scaleFactor = 4.0 / size.y; model.scale.set(scaleFactor, scaleFactor, scaleFactor); }
+        const model = gltf.scene; solidCreateStampGlbModelMaterials(model); const box = new THREE.Box3().setFromObject(model); const size = box.getSize(new THREE.Vector3()); if (size.y > 0.001) { const scaleFactor = 4.0 / size.y; model.scale.set(scaleFactor, scaleFactor, scaleFactor); }
         box.setFromObject(model); const center = box.getCenter(new THREE.Vector3()); const minY = box.min.y; model.position.x -= center.x; model.position.z -= center.z; model.position.y -= minY;
-        model.userData = { type: 'glb', url: solidCreateNormalizeModelUrlForJson(url) }; editorGroup.add(model); transformControl.attach(model); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_glb'); } catch (_ePl) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }, (error) => { alert("模型加载失败，请检查路径是否对应 '../../docs/model/' 目录"); }); };
+        model.userData = { type: 'glb', url: solidCreateNormalizeModelUrlForJson(url) }; editorGroup.add(model); transformControl.attach(model); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_glb'); } catch (_ePl) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { window.changeMat(window.matType); } catch (_eMat) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }, (error) => { alert("模型加载失败，请检查路径是否对应 '../../docs/model/' 目录"); }); };
         window.currentEditorMode = 'translate'; window.setMode = function(mode) { 
         // 【优化1】：支持点击已激活的变换按钮取消激活（最多只有一个激活，也可以全不激活）
         if (window.currentEditorMode === mode && ['translate', 'rotate', 'scale'].includes(mode)) { mode = 'none'; }

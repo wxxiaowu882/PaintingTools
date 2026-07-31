@@ -1127,15 +1127,86 @@
     window.changeMat = function(val) { const _wasLoading = !!window.isLoadingScene; window.isLoadingScene = true; window.matType = val; const roughs = [0.95, 0.15, 0.3, 0.05, 0.4]; const metals = [0.0, 0.0, 0.85, 0.0, 0.0]; const trans = [0.0, 0.0, 0.0, 1.0, 1.0];
     const _targetSceneVer = Number(window.__solidSceneVersion || 0);
     if (!_wasLoading && window.__solidMatAppliedSceneVersion === _targetSceneVer && String(window.__solidMatAppliedType || '') === String(window.matType || '')) { window.isLoadingScene = false; try { syncRenderButtons(); } catch (_eBtnSkip) {} return; }
+    function _isSysMatRef(mat) {
+    if (!mat) return false;
+    if (mat === sysMaterials.flat || mat === sysMaterials.sphere || mat === sysMaterials.plaster) return true;
+    if (Array.isArray(mat)) return mat.every(m => m === sysMaterials.flat || m === sysMaterials.sphere || m === sysMaterials.plaster);
+    return false;
+    }
+    function _shouldDisposeReplaced(oldMat, originalMat) {
+    if (!oldMat) return false;
+    if (solidSceneMaterialRefEqual(oldMat, originalMat)) return false;
+    if (_isSysMatRef(oldMat)) return false;
+    return true;
+    }
+    function _buildBuiltinOriginMat(ud) {
+    const m = ud.isFlat ? sysMaterials.flat.clone() : (ud.shape === 'sphere' ? sysMaterials.sphere.clone() : sysMaterials.plaster.clone());
+    if (ud.customColor && m.color) m.color.set(ud.customColor);
+    return m;
+    }
+    function _applyPreviewParams(m, idx, ud, isGlb) {
+    if (!m || !m.isMaterial) return m;
+    const c = m.clone ? m.clone() : m;
+    if (!isGlb && c.color) c.color.set(ud.customColor || '#e8e8e8');
+    if (c.roughness !== undefined) c.roughness = (ud.shape === 'sphere' && idx === 0) ? 0.6 : roughs[idx];
+    if (c.metalness !== undefined) c.metalness = metals[idx];
+    if (c.transmission !== undefined) c.transmission = trans[idx];
+    if (c.transparent !== undefined) c.transparent = trans[idx] > 0;
+    if (c.ior !== undefined) c.ior = 1.5;
+    if (ud.isFlat && c.flatShading !== undefined) c.flatShading = true;
+    return c;
+    }
+    function _buildPreviewFromOriginal(originalMat, idx, ud, isGlb) {
+    if (!originalMat) return null;
+    if (Array.isArray(originalMat)) return originalMat.map(m => _applyPreviewParams(m, idx, ud, isGlb));
+    return _applyPreviewParams(originalMat, idx, ud, isGlb);
+    }
+    function _buildBuiltinPreviewMat(idx, ud) {
+    const m = sysMaterials.plaster.clone();
+    if (m.color) m.color.set(ud.customColor || '#e8e8e8');
+    m.roughness = (ud.shape === 'sphere' && idx === 0) ? 0.6 : roughs[idx];
+    m.metalness = metals[idx];
+    m.transmission = trans[idx];
+    m.transparent = trans[idx] > 0;
+    m.ior = 1.5;
+    if (ud.isFlat) m.flatShading = true;
+    return m;
+    }
+    function _resolveNextMaterial(child, matTypeVal) {
+    const ud = child.userData || {};
+    const isGlb = solidSceneIsUnderGlbRoot(child);
+    const orig = ud.originalMaterial;
+    if (matTypeVal === 'origin') {
+    if (orig) return orig;
+    if (isGlb) {
+    solidSceneStampMeshOriginalMaterial(child);
+    if (child.userData.originalMaterial) return child.userData.originalMaterial;
+    return child.material;
+    }
+    return _buildBuiltinOriginMat(ud);
+    }
+    const idx = parseInt(matTypeVal);
+    if (isGlb) {
+    const fromOrig = _buildPreviewFromOriginal(orig, idx, ud, true);
+    if (fromOrig) return fromOrig;
+    return _buildBuiltinPreviewMat(idx, ud);
+    }
+    return _buildBuiltinPreviewMat(idx, ud);
+    }
+    const _updates = [];
     sceneGroup.traverse(child => { if (child.isMesh) {
     if (child.userData && child.userData.solidShadowCore) return;
     if (child.userData && child.userData.isFrame) return;
-    if (child.material && child.material !== child.userData.originalMaterial && child.material !== sysMaterials.flat && child.material !== sysMaterials.sphere && child.material !== sysMaterials.plaster) { safeDispose(child.material); }
-    if (window.matType === 'origin') { if (child.userData.originalMaterial) { child.material = child.userData.originalMaterial; }
-    else { child.material = child.userData.isFlat ? sysMaterials.flat.clone() : (child.userData.shape==='sphere' ? sysMaterials.sphere.clone() : sysMaterials.plaster.clone()); if(child.userData.customColor) child.material.color.set(child.userData.customColor); }
-    } else {
-    const idx = parseInt(window.matType); child.material = sysMaterials.plaster.clone(); child.material.color.set(child.userData.customColor || '#e8e8e8'); child.material.roughness = (child.userData.shape==='sphere' && idx===0) ? 0.6 : roughs[idx]; child.material.metalness = metals[idx]; child.material.transmission = trans[idx]; child.material.transparent = trans[idx] > 0; child.material.ior = 1.5; if(child.userData.isFlat) child.material.flatShading = true;
-    } } }); if(pathTracer) { lightMoved = true; needsUpdate = true; _solidPtSync.queueReset('change_mat'); }
+    const prevMat = child.material;
+    const nextMat = _resolveNextMaterial(child, window.matType);
+    if (!solidSceneMaterialRefEqual(prevMat, nextMat)) _updates.push({ child, prevMat, nextMat, originalMat: child.userData && child.userData.originalMaterial });
+    } });
+    for (let ui = 0; ui < _updates.length; ui++) {
+    const u = _updates[ui];
+    u.child.material = u.nextMat;
+    if (_shouldDisposeReplaced(u.prevMat, u.originalMat)) safeDispose(u.prevMat);
+    }
+    if(pathTracer) { lightMoved = true; needsUpdate = true; _solidPtSync.queueReset('change_mat'); }
     try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('change_mat'); } catch(_eP) {}
     window.isLoadingScene = false;
     window.__solidMatAppliedSceneVersion = _targetSceneVer;
@@ -1203,6 +1274,49 @@
     if (x.startsWith('/docs/model/')) return '.' + x;
     return x;
     } catch (_e) { return url; }
+    }
+    function solidSceneIsUnderGlbRoot(obj) {
+    let n = obj;
+    while (n) {
+    if (n.userData && n.userData.type === 'glb') return true;
+    n = n.parent;
+    }
+    return false;
+    }
+    function solidSceneCloneMaterialSlot(mat) {
+    if (!mat) return mat;
+    if (Array.isArray(mat)) return mat.map(m => (m && typeof m.clone === 'function') ? m.clone() : m);
+    return (typeof mat.clone === 'function') ? mat.clone() : mat;
+    }
+    function solidSceneStampMeshOriginalMaterial(mesh) {
+    if (!mesh || !mesh.isMesh || !mesh.material) return;
+    if (!mesh.userData) mesh.userData = {};
+    if (mesh.userData.originalMaterial) return;
+    mesh.userData.originalMaterial = solidSceneCloneMaterialSlot(mesh.material);
+    mesh.userData.__solidMatStamped = true;
+    }
+    function solidSceneStampGlbModelMaterials(root) {
+    if (!root || !root.traverse) return;
+    root.traverse(child => { if (child.isMesh) solidSceneStampMeshOriginalMaterial(child); });
+    }
+    function solidSceneSyncMatPanelFromType(matType) {
+    const targetMat = String(matType != null ? matType : 'origin');
+    const matchedOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${targetMat}'"]`);
+    if (matchedOpt) {
+    const trigger = document.getElementById('mat-trigger');
+    if (trigger) trigger.innerText = matchedOpt.innerText;
+    document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected'));
+    matchedOpt.classList.add('selected');
+    }
+    }
+    function solidSceneMaterialRefEqual(a, b) {
+    if (a === b) return true;
+    if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+    }
+    return false;
     }
     function solidFogTypeText(type) {
     const t = String(type || 'basic');
@@ -1333,8 +1447,7 @@
     const _atm = { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 }; const _dof = { enabled: false, aperture: 2.8, focusDistance: 10 };
     window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof; }
     if (window.syncEnvColorPickers) window.syncEnvColorPickers();
-    const matchedOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${window.matType}'"]`); if (matchedOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedOpt.innerText;
-    document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedOpt.classList.add('selected'); }
+    solidSceneSyncMatPanelFromType(window.matType);
     window.__solidForceBuildEnvironment = true;
     try { buildEnvironment(); } finally { window.__solidForceBuildEnvironment = false; }
     try {
@@ -1465,7 +1578,7 @@
     if (_isStale()) { resolve(); return; }
     glbSlots[_slot].done = true; glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1;
     const model = _cached.clone(true);
-    model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); });
+    solidSceneStampGlbModelMaterials(model);
     model.position.set(...item.pos); model.rotation.set(...item.rot); model.scale.set(...item.scale); model.userData = { type: 'glb', url: item.url }; sceneGroup.add(model);
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); _assetDone++; updateSceneAssetProgress(); resolve(); return;
     }
@@ -1474,7 +1587,7 @@
     glbSlots[_slot].done = true; if (glbSlots[_slot].total <= 0 && glbSlots[_slot].loaded <= 0) { glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1; }
     try { window.__solidGlbSceneCache.set(_modelUrl, gltf.scene.clone(true)); } catch(_eCache) {}
     const model = gltf.scene;
-    model.traverse(child => { if(child.isMesh && child.material) child.userData.originalMaterial = child.material.clone(); });
+    solidSceneStampGlbModelMaterials(model);
     model.position.set(...item.pos); model.rotation.set(...item.rot); model.scale.set(...item.scale); model.userData = { type: 'glb', url: item.url }; sceneGroup.add(model);
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); _assetDone++; updateSceneAssetProgress(); resolve();
     }, (evt) => {
