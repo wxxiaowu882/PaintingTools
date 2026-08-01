@@ -52,17 +52,18 @@
     .scene-detail { font-size:11px; color:rgba(175,178,186,0.92); line-height:1.55; white-space:normal; word-break:break-word; } .scene-detail b { color:rgba(255,255,255,0.92); font-weight:500; }
     .scene-fav-btn { width:28px; height:28px; flex:none; display:inline-flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.35); cursor:pointer; user-select:none; -webkit-tap-highlight-color: transparent; }
     .scene-fav-btn:hover { background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.55); } .scene-fav-btn.is-fav { background:rgba(46, 204, 113, 0.16); border-color:rgba(46, 204, 113, 0.35); color:rgba(46, 204, 113, 0.95); }
-    .scene-fav-btn:active { transform: translateY(1px); } .scene-tabbar { display:flex; gap:8px; margin: 0 0 12px 0; }
-    .scene-tab { flex:none; display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.55); font-size:11px; cursor:pointer; user-select:none; }
+    .scene-fav-btn:active { transform: translateY(1px); } .scene-tabbar { display:flex; flex-wrap:wrap; gap:8px; margin: 0 0 12px 0; }
+    .scene-tab { flex:none; display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.55); font-size:11px; cursor:pointer; user-select:none; white-space:nowrap; -webkit-tap-highlight-color: transparent; }
     .scene-tab:hover { background:rgba(255,255,255,0.08); } .scene-tab.active { background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.90); border-color:rgba(255,255,255,0.16); }
     .scene-empty { padding:18px 10px; color:rgba(255,255,255,0.45); font-size:11px; line-height:1.6; text-align:center; border:1px dashed rgba(255,255,255,0.10); border-radius:12px; }
     /* v2：避免卡片上移导致顶部描边被遮挡 */
     html.solid-scene-list-v2 .scene-item:hover, html.solid-scene-list-v2 .scene-item.active { transform:none; }
     html.solid-scene-list-v2 .scene-item.active::after { inset:1px; }
-    /* 移动端：避免 flex + overflow:hidden 裁切多行详情；全宽卡片；缩略图单独圆角裁剪 */
+    /* 移动端：避免 flex + overflow:hidden 裁切多行详情；全宽卡片；缩略图单独圆角裁剪；标题自动换行 */
     @media (max-width: 899px) {
     html.solid-scene-list-v2 .scene-item { align-self:stretch; width:100%; box-sizing:border-box; overflow:visible; min-height:min-content; }
     html.solid-scene-list-v2 .scene-thumb { overflow:hidden; flex-shrink:0; }
+    html.solid-scene-list-v2 .scene-title { white-space:normal; overflow:visible; text-overflow:unset; word-break:break-word; line-height:1.45; }
     }
     /* PC 端：能放下两列就两列；右端碰到浏览器边界就自动回落单列（纯 CSS，无 JS 判定） */
     @media (min-width: 900px) { html.solid-scene-list-v2 .scene-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(620px, 100%), 1fr)); gap: 14px; max-width: 1440px; margin: 0 auto; }
@@ -116,7 +117,7 @@
     <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">渲染时遇到问题</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">当前设备不支持高级渲染，导致不能出现投影和散射光，想要获得更高级的体验，请去电脑端网页版获得更好的功能体验。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
     <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div id="scene-loader-inner"> <div id="scene-load-pct">0%</div> <div class="scene-load-bar-track" aria-hidden="true"><div id="scene-load-bar-fill" class="scene-load-bar-fill"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">系统环境初始化中...</div> </div> </div>
     <div id="perf-test-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:5550; flex-direction:column; align-items:center; justify-content:center;"> <div class="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin mb-4"></div> <div class="font-hairline text-[10px] tracking-[0.2em] text-white/80">正在测试设备渲染性能...</div> <div class="text-[8px] text-white/40 mt-2">首次进入时安全审计，即将完成</div> </div>
-    <div id="top-left-scene-btn" style="position:fixed; top:20px; left:20px; z-index:5000; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:8px 14px; border-radius:10px; display:flex; align-items:center; gap:10px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="document.getElementById('scene-grid-modal').style.display='flex'"> <span style="color:#fff; font-size:14px; font-weight:400; letter-spacing:1px;">场景：</span>
+    <div id="top-left-scene-btn" style="position:fixed; top:20px; left:20px; z-index:5000; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:8px 14px; border-radius:10px; display:flex; align-items:center; gap:10px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="openSceneGridModal()"> <span style="color:#fff; font-size:14px; font-weight:400; letter-spacing:1px;">场景：</span>
     <span id="scene-trigger-top" style="color:#fff; font-size:14px; font-weight:normal; max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">点击选择...</span> <span style="color:#666; font-size:10px;">▼</span> </div>
     <div id="menu-trigger-overlay" onclick="toggleMenu()"><span class="menu-line line-1"></span><span class="menu-line line-2"></span><span class="menu-line line-3"></span></div>
     <div id="scene-grid-modal">
@@ -1646,6 +1647,14 @@
         }).catch(err => { addHwLog("JSON请求或解析失败: " + err.message); document.getElementById('scene-loader').style.display='none'; }); };
         const SOLID_FAV_STORAGE_KEY = 'SolidConsumer_Favorites_v1';
         const SOLID_FAV_VIEW_KEY = 'SolidConsumer_FavoritesView_v1';
+        const SOLID_SCENE_CATEGORIES = ['几何体', '色彩', '氛围', '构图', '几何体写生', '静物写生'];
+        function solidSceneCategoryOf(sceneData) {
+            try {
+                const c = sceneData && sceneData.meta ? sceneData.meta.category : '';
+                const s = String(c == null ? '' : c).trim();
+                return SOLID_SCENE_CATEGORIES.indexOf(s) >= 0 ? s : '';
+            } catch (_e) { return ''; }
+        }
         function solidSceneKey(sceneData, idx) {
             if (sceneData && typeof sceneData === 'object') {
                 if (sceneData.id != null && String(sceneData.id).trim() !== '') return 'id:' + String(sceneData.id).trim();
@@ -1669,11 +1678,18 @@
         function solidGetFavViewMode() {
             try {
                 const v = localStorage.getItem(SOLID_FAV_VIEW_KEY);
-                return (v === 'fav' || v === 'all') ? v : 'all';
+                if (v === 'fav' || v === 'all') return v;
+                if (SOLID_SCENE_CATEGORIES.indexOf(v) >= 0) return v;
+                return 'all';
             } catch (_e) { return 'all'; }
         }
         function solidSetFavViewMode(v) {
-            try { localStorage.setItem(SOLID_FAV_VIEW_KEY, v); } catch (_e) {}
+            try {
+                let next = 'all';
+                if (v === 'fav' || v === 'all') next = v;
+                else if (SOLID_SCENE_CATEGORIES.indexOf(v) >= 0) next = v;
+                localStorage.setItem(SOLID_FAV_VIEW_KEY, next);
+            } catch (_e) {}
         }
         function buildSceneGridUI(dataArr) {
         const container = document.getElementById('scene-grid-container'); container.innerHTML = '';
@@ -1681,7 +1697,7 @@
         const all = (dataArr || []).map((sceneData, i) => ({ sceneData, i, k: solidSceneKey(sceneData, i) }));
         const favCount = all.reduce((n, it) => n + (favSet.has(it.k) ? 1 : 0), 0);
     
-        // Tabbar（收藏夹是一个视图，不改变“全部”的排序）
+        // Tabbar：全部 / 收藏夹 / 场景类别（互斥单选；自动换行）
         const wrap = container.parentElement;
         if (wrap) {
             let tab = document.getElementById('scene-tabbar');
@@ -1692,9 +1708,13 @@
                 wrap.insertBefore(tab, container);
             }
             const mode = solidGetFavViewMode();
-            tab.innerHTML =
-                `<button type="button" class="scene-tab ${mode === 'all' ? 'active' : ''}" data-mode="all">全部</button>` +
-                `<button type="button" class="scene-tab ${mode === 'fav' ? 'active' : ''}" data-mode="fav">收藏夹（${favCount}）</button>`;
+            let tabHtml = `<button type="button" class="scene-tab ${mode === 'all' ? 'active' : ''}" data-mode="all">全部</button>`;
+            for (let ci = 0; ci < SOLID_SCENE_CATEGORIES.length; ci++) {
+                const cat = SOLID_SCENE_CATEGORIES[ci];
+                tabHtml += `<button type="button" class="scene-tab ${mode === cat ? 'active' : ''}" data-mode="${escapeHtml(cat)}">${escapeHtml(cat)}</button>`;
+            }
+            tabHtml += `<button type="button" class="scene-tab ${mode === 'fav' ? 'active' : ''}" data-mode="fav">收藏夹（${favCount}）</button>`;
+            tab.innerHTML = tabHtml;
             Array.from(tab.querySelectorAll('.scene-tab')).forEach(btn => {
                 btn.onclick = function(e) {
                     e.preventDefault(); e.stopPropagation();
@@ -1706,12 +1726,22 @@
         }
     
         const mode = solidGetFavViewMode();
-        const list = (mode === 'fav')
-            ? all.filter(it => favSet.has(it.k))
-            : all; // 全部：保持原顺序
+        let list;
+        if (mode === 'fav') {
+            list = all.filter(it => favSet.has(it.k));
+        } else if (mode === 'all') {
+            list = all; // 全部：保持原顺序（含未分类）
+        } else {
+            // 类别视图：仅精确匹配 meta.category；缺字段不进入（3B）
+            list = all.filter(it => solidSceneCategoryOf(it.sceneData) === mode);
+        }
     
         if (mode === 'fav' && list.length === 0) {
             container.innerHTML = `<div class="scene-empty">这里是你的收藏夹。<br>在“全部”里点右侧的 ★ 收藏场景。</div>`;
+            return;
+        }
+        if (mode !== 'all' && mode !== 'fav' && list.length === 0) {
+            container.innerHTML = `<div class="scene-empty">「${escapeHtml(mode)}」暂无场景。<br>未填类别的场景只在「全部」中显示。</div>`;
             return;
         }
     
@@ -1724,7 +1754,9 @@
         const detailEsc = escapeHtml(detailRaw).replace(/\r?\n/g, '<br>');
         // 仅允许 <b></b> 作为轻量强调，其它 HTML 依然保持转义，避免注入
         const detailSafe = detailEsc.replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>');
-        const item = document.createElement('div'); item.className = 'scene-item';
+        const item = document.createElement('div');
+        const curIdx = Number(window.currentSceneIndex);
+        item.className = 'scene-item' + ((curIdx >= 0 && i === curIdx) ? ' active' : '');
         // iOS Safari：在可滚动容器内，DIV onclick 可能出现“首次点按无效/第二次才触发”的合成 click 问题；
         // 这里改为 pointerup/touchend 优先，并加“防滚动误触”阈值，click 仅作兜底。
         (function bindSceneItemActivate(el, idx) {
@@ -1806,7 +1838,34 @@
         }
         container.appendChild(item);
         });
+        // 列表已打开时（切 Tab / 收藏），把当前场景滚入视野
+        try {
+            const modal = document.getElementById('scene-grid-modal');
+            const modalOpen = modal && (modal.style.display === 'flex' || (typeof getComputedStyle === 'function' && getComputedStyle(modal).display === 'flex'));
+            if (modalOpen) {
+                requestAnimationFrame(function () {
+                    try {
+                        const active = container.querySelector('.scene-item.active');
+                        if (active && typeof active.scrollIntoView === 'function') active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    } catch (_eScr) {}
+                });
+            }
+        } catch (_eOpen) {}
         }
+        window.openSceneGridModal = function () {
+            try { if (Array.isArray(window.customScenes)) buildSceneGridUI(window.customScenes); } catch (_eBuild) {}
+            const modal = document.getElementById('scene-grid-modal');
+            if (modal) modal.style.display = 'flex';
+            // 先显示再滚，避免 display:none 时 scrollIntoView 无效
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    try {
+                        const active = document.querySelector('#scene-grid-container .scene-item.active');
+                        if (active && typeof active.scrollIntoView === 'function') active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    } catch (_eScr2) {}
+                });
+            });
+        };
         function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); lightMoved = true; try { if (window.__solidRasterPreviewComposer && window.__solidRasterPreviewComposer.setSize) window.__solidRasterPreviewComposer.setSize(window.innerWidth, window.innerHeight); } catch (_eSz) {} if(window.AtmosphereManager) window.AtmosphereManager.resize(renderer); if (typeof window.syncPosterize2dLayout === 'function') window.syncPosterize2dLayout(); }
     
         // 统一“引线长度”口径：以实际画布大小为准（解决生产端/消费端、PC/手机比例不一致）
@@ -2152,7 +2211,7 @@
         if (window.isUnsupported || (!window.useAdvancedRender && !isTesting)) {
         if (renderer) renderer.toneMappingExposure = 0.7;
         // 光栅态滤镜由 _solidApplyRasterCanvasCssFilter 控制，避免每帧先清空导致“静止后模糊消失”。
-        if (controls && !controls.enabled) controls.enabled = true;
+        if (controls && !controls.enabled && !window.__solidAnnoLabelDragging) controls.enabled = true;
         if (controls) controls.update();
         if (window.PluginManager) { try { window.PluginManager.trigger('onUpdate', { camera, scene, renderer, pathTracer: null }); } catch(_e) {} }
         const _now = performance.now();
@@ -2186,7 +2245,7 @@
             if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
         }
         return; }
-        if (!isTesting) { if (controls && !controls.enabled) controls.enabled = true; if (controls) controls.update(); }
+        if (!isTesting) { if (controls && !controls.enabled && !window.__solidAnnoLabelDragging) controls.enabled = true; if (controls) controls.update(); }
         // 【统一生命周期总线】：一行代码调度所有插件，彻底解耦
         if (window.PluginManager) { const isInterrupted = window.PluginManager.trigger('onUpdate', { camera, scene, pathTracer, renderer }); if (isInterrupted) return; // 若测试插件要求接管，直接安全 return
         }

@@ -410,6 +410,79 @@ window.AnnotationManager = {
         }
     },
 
+    /** 与 CSS max-width 对齐：桌面 min(88vw,360)，手机为近全屏宽的 80%（封顶 576） */
+    getLabelMaxWidthPx: function () {
+        const vw = Math.max(1, window.innerWidth || 1);
+        try {
+            if (window.matchMedia && window.matchMedia('(max-width: 899px)').matches) {
+                return Math.min(Math.max(0, vw - 4) * 0.8, 576);
+            }
+        } catch (_e) {}
+        return Math.min(vw * 0.88, 360);
+    },
+
+    invalidateExpandedWidth: function (data) {
+        if (!data) return;
+        try { delete data._labelExpandedWidthPx; } catch (_e) { data._labelExpandedWidthPx = null; }
+    },
+
+    /**
+     * 展开宽只算一次（会话内）：短文跟内容，长文封顶 maxW。
+     * 折叠/拖动不得冲掉 _labelExpandedWidthPx。
+     * 注意：标签是 absolute + left 居中，width:auto 的 shrink-to-fit 可用宽约半屏，
+     * 绝不能直接 getBoundingClientRect；必须用 max-content 测固有宽再封顶。
+     */
+    ensureExpandedWidthPx: function (data) {
+        if (!data) return 0;
+        const cached = data._labelExpandedWidthPx;
+        if (cached > 0 && isFinite(cached)) return cached;
+        const div = data.domEl;
+        const textEl = this.getLabelTextEl(div);
+        if (!div || !textEl) return 0;
+        if (div.classList.contains('editing')) return 0;
+        const wasCollapsed = div.classList.contains('collapsed');
+        const prevDivW = div.style.width;
+        const prevTextW = textEl.style.width;
+        const prevMaxW = div.style.maxWidth;
+        try {
+            div.classList.remove('collapsed');
+            textEl.style.width = '';
+            div.style.maxWidth = 'none';
+            div.style.width = 'max-content';
+            void div.offsetWidth;
+            let natural = Math.ceil(div.getBoundingClientRect().width);
+            try {
+                const cs = window.getComputedStyle(div);
+                const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0)
+                    + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0);
+                const sw = Math.ceil((textEl.scrollWidth || 0) + pad);
+                if (sw > natural) natural = sw;
+            } catch (_ePad) {}
+            const maxW = Math.floor(this.getLabelMaxWidthPx());
+            let w = natural;
+            if (maxW > 0 && w > maxW) w = maxW;
+            // 未布局完成时不缓存，留给下次 ensure 再测
+            if (!(w > 1)) return 0;
+            data._labelExpandedWidthPx = w;
+            return w;
+        } catch (_e) {
+            return 0;
+        } finally {
+            if (wasCollapsed) div.classList.add('collapsed');
+            else div.classList.remove('collapsed');
+            div.style.maxWidth = prevMaxW;
+            div.style.width = prevDivW;
+            textEl.style.width = prevTextW;
+        }
+    },
+
+    applyExpandedWidthStyle: function (data) {
+        const div = data && data.domEl;
+        if (!div) return;
+        const w = this.ensureExpandedWidthPx(data);
+        if (w > 0) div.style.width = w + 'px';
+    },
+
     applyCollapsedUI: function (data) {
         const div = data && data.domEl;
         if (!div) return;
@@ -417,15 +490,31 @@ window.AnnotationManager = {
         const btn = div.querySelector('.anno-collapse-btn');
         const editing = div.classList.contains('editing');
         const collapsed = !editing && !!data.collapsed;
-        if (textEl) textEl.style.width = '';
-        div.style.width = '';
-        div.classList.toggle('collapsed', collapsed);
-        if (collapsed && textEl) {
+        if (editing) {
+            if (textEl) textEl.style.width = '';
             div.classList.remove('collapsed');
+            if (btn) {
+                btn.textContent = '\u2212';
+                btn.setAttribute('aria-label', '收起');
+                btn.setAttribute('title', '收起');
+            }
+            return;
+        }
+        // 先确保有展开基准宽，再改展示形态（折叠不得 delete 基准）
+        this.ensureExpandedWidthPx(data);
+        if (textEl) textEl.style.width = '';
+        if (collapsed) {
+            // 在展开宽下测首行，避免与全文换行无关的 shrink-to-fit 漂移
+            div.classList.remove('collapsed');
+            this.applyExpandedWidthStyle(data);
             void div.offsetWidth;
-            const w = this.measureFirstLineWidth(textEl);
+            const w = textEl ? this.measureFirstLineWidth(textEl) : 0;
+            div.style.width = '';
             div.classList.add('collapsed');
-            if (w > 0) textEl.style.width = Math.ceil(w) + 'px';
+            if (textEl && w > 0) textEl.style.width = Math.ceil(w) + 'px';
+        } else {
+            div.classList.remove('collapsed');
+            this.applyExpandedWidthStyle(data);
         }
         if (btn) {
             btn.textContent = collapsed ? '\u22EF\u00BB' : '\u2212';
@@ -449,6 +538,9 @@ window.AnnotationManager = {
         const wasCollapsed = div.classList.contains('collapsed');
         div.classList.remove('collapsed');
         div.classList.add('has-collapse-btn');
+        // 用稳定展开宽测高，避免宽度未锁定时 scrollHeight 抖动
+        this.ensureExpandedWidthPx(data);
+        this.applyExpandedWidthStyle(data);
         const cs = window.getComputedStyle(textEl);
         let lineH = parseFloat(cs.lineHeight);
         if (!lineH || !isFinite(lineH)) {
@@ -461,7 +553,11 @@ window.AnnotationManager = {
         div.classList.toggle('has-collapse-btn', needsBtn);
         if (wasCollapsed && needsBtn) div.classList.add('collapsed');
         this.applyCollapsedUI(data);
-        if (!needsBtn) div.classList.remove('collapsed');
+        if (!needsBtn) {
+            data.collapsed = false;
+            div.classList.remove('collapsed');
+            this.applyExpandedWidthStyle(data);
+        }
     },
 
     toggleCollapsed: function (data) {
@@ -504,19 +600,23 @@ window.AnnotationManager = {
                     #anno-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 50 !important; overflow: hidden; }
                     #anno-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
                     .anno-dom { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; font-family: 'Inter', sans-serif; }
-                    .anno-leader-label { border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.45; box-sizing: border-box; text-align: left; max-width: min(88vw, 360px); cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-block; vertical-align: top; }
-                    .anno-leader-label.has-collapse-btn { display: inline-flex; align-items: flex-start; gap: 2px; padding-right: 4px; }
-                    .anno-leader-text { display: block; white-space: pre-wrap; word-break: break-word; max-width: 100%; box-sizing: border-box; flex: 1 1 auto; min-width: 0; }
-                    .anno-leader-label.collapsed { align-items: center; width: fit-content; max-width: min(88vw, 360px); }
-                    .anno-leader-label.collapsed .anno-leader-text { max-height: 1.45em; overflow: hidden; flex: 0 1 auto; }
-                    .anno-collapse-btn { position: relative; flex: 0 0 auto; align-self: flex-start; display: inline-flex; align-items: center; justify-content: center; width: auto; height: calc(11px * 1.45); min-width: calc(11px * 1.45); min-height: calc(11px * 1.45); margin: 0; padding: 0 3px; border: none; border-radius: 2px; background: rgba(0,0,0,0.28); color: #fff; font-size: 14px; font-weight: 700; line-height: 1; text-align: center; cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; user-select: none; z-index: 2; box-sizing: border-box; }
-                    .anno-leader-label.collapsed .anno-collapse-btn { align-self: center; font-size: 15px; font-weight: 600; padding: 0 4px; letter-spacing: 0; }
+                    .anno-leader-label { border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.45; box-sizing: border-box; text-align: left; max-width: min(88vw, 360px); cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-block; vertical-align: top; touch-action: none; -webkit-user-select: none; }
+                    .anno-leader-label.has-collapse-btn { /* − 叠右上角，不占独立一列 */ }
+                    .anno-leader-text { display: block; white-space: pre-wrap; word-break: break-word; max-width: 100%; box-sizing: border-box; }
+                    .anno-leader-label.collapsed { width: fit-content; max-width: min(88vw, 360px); padding-right: 30px; }
+                    .anno-leader-label.collapsed .anno-leader-text { max-height: 1.45em; overflow: hidden; }
+                    .anno-collapse-btn { position: absolute; top: 2px; right: 2px; z-index: 2; display: inline-flex; align-items: center; justify-content: center; width: auto; height: calc(11px * 1.45); min-width: calc(11px * 1.45); min-height: calc(11px * 1.45); margin: 0; padding: 0 3px; border: none; border-radius: 2px; background: rgba(0,0,0,0.28); color: #fff; font-size: 14px; font-weight: 700; line-height: 1; text-align: center; cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; user-select: none; box-sizing: border-box; }
+                    .anno-leader-label.collapsed .anno-collapse-btn { top: 50%; right: 4px; transform: translateY(-50%); font-size: 15px; font-weight: 600; padding: 0 4px; letter-spacing: 0; }
                     .anno-collapse-btn:active { background: rgba(0,0,0,0.45); }
                     .anno-leader-label strong { font-weight: 700; }
-                    .anno-leader-label.editing { background: #fff !important; color: #000; outline: none; border-color: #fff !important; box-shadow: 0 0 10px rgba(0,210,255,0.5) !important; user-select: text !important; cursor: text !important; max-height: min(50vh, 320px); overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 8px; display: inline-block; }
+                    .anno-leader-label.editing { background: #fff !important; color: #000; outline: none; border-color: #fff !important; box-shadow: 0 0 10px rgba(0,210,255,0.5) !important; user-select: text !important; cursor: text !important; max-height: min(50vh, 320px); overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 8px; display: inline-block; touch-action: auto; }
                     .anno-leader-label.editing .anno-leader-text { max-height: none; overflow: visible; outline: none; width: auto !important; }
                     .anno-leader-label.editing .anno-collapse-btn { display: none !important; }
                     .anno-leader-label.editing strong { font-weight: 700; }
+                    @media (max-width: 899px) {
+                      .anno-leader-label:not(.collapsed) { max-width: min(calc((100vw - 4px) * 0.8), 576px); }
+                      .anno-leader-label.collapsed { max-width: min(calc((100vw - 4px) * 0.8), 576px); padding-right: 32px; }
+                    }
                 `;
         let style = document.getElementById('anno-style-inject');
         if (!style) {
@@ -594,28 +694,6 @@ window.AnnotationManager = {
         };
         btn.addEventListener('pointerdown', onCollapsePointer);
         btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
-        div.addEventListener('pointerdown', e => {
-            if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
-            e.stopPropagation();
-            if (window.__SOLID_CONSUMER__) {
-                if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
-                    if (window.AnnotationManager.selectedId === data.id) {
-                        window.PluginManager.setExclusiveSelection(window.AnnotationManager, null);
-                    } else {
-                        window.PluginManager.setExclusiveSelection(window.AnnotationManager, data.id);
-                    }
-                }
-                return;
-            }
-            if (!textEl.isContentEditable) {
-                if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
-                    window.PluginManager.setExclusiveSelection(window.AnnotationManager, data.id);
-                } else {
-                    window.AnnotationManager.selectedId = data.id;
-                    window.AnnotationManager.highlightSelected();
-                }
-            }
-        });
         div.addEventListener('click', e => { e.stopPropagation(); });
         div.addEventListener('dblclick', e => {
             if (window.__SOLID_CONSUMER__) return;
@@ -631,6 +709,7 @@ window.AnnotationManager = {
             div.classList.add('editing');
             div.classList.remove('collapsed');
             textEl.style.width = '';
+            div.style.width = '';
             btn.style.display = 'none';
             textEl.contentEditable = true;
             textEl.style.cursor = 'text';
@@ -649,6 +728,7 @@ window.AnnotationManager = {
             div.style.cursor = 'pointer';
             textEl.style.cursor = '';
             window.AnnotationManager.applyLabelToDOM(div, data);
+            window.AnnotationManager.invalidateExpandedWidth(data);
             window.AnnotationManager.refreshCollapseButton(data);
             window.needsUpdate = true;
         });
@@ -672,27 +752,15 @@ window.AnnotationManager = {
             if (e.key === 'Delete' || e.key === 'Backspace') e.stopPropagation();
             if (textEl.isContentEditable && e.key === 'Enter') e.stopPropagation();
         });
+        // 拖动：生产端 mouse；消费端 pointer 绑在标签上（勿挂 window 非 passive，避免手机卡死）
+        // 4A：只改内存 dx/dy，不写 JSON
         let isDragging = false, startX, startY, startDx, startDy, isMoved = false;
-        div.addEventListener('mousedown', e => {
-            if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
-            if (textEl.isContentEditable) { e.stopPropagation(); return; }
-            isDragging = true;
-            isMoved = false;
-            startX = e.clientX;
-            startY = e.clientY;
-            startDx = data.dx;
-            startDy = data.dy;
-            e.stopPropagation();
-        });
-        const onMouseMove = e => {
-            if (!isDragging) return;
-            if (Math.abs(e.clientX - startX) > 3 || Math.abs(e.clientY - startY) > 3) isMoved = true;
-            if (!isMoved) return;
+        let dragPointerId = null, pendingConsumerTap = false, orbitWasEnabled = null;
+        function solidAnnoApplyLabelDrag(clientX, clientY) {
             const vw = Math.max(1, window.__solidAnnoViewportW || window.innerWidth || 1);
             const vh = Math.max(1, window.__solidAnnoViewportH || window.innerHeight || 1);
-            // 这里用“像素拖拽”更符合手感；同时换算出 dxW/dyW 以保证跨端形态一致
-            data.dx = startDx + (e.clientX - startX);
-            data.dy = startDy + (e.clientY - startY);
+            data.dx = startDx + (clientX - startX);
+            data.dy = startDy + (clientY - startY);
             data.dxN = data.dx / vw;
             data.dyN = data.dy / vh;
             try {
@@ -706,14 +774,145 @@ window.AnnotationManager = {
                 }
             } catch (_e) {}
             window.needsUpdate = true;
-        };
-        const onMouseUp = () => { isDragging = false; };
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
-        data.cleanupEvents = () => {
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
-        };
+        }
+        function solidAnnoPauseOrbit() {
+            if (orbitWasEnabled !== null) return;
+            try {
+                if (window.controls) {
+                    orbitWasEnabled = !!window.controls.enabled;
+                    window.controls.enabled = false;
+                }
+            } catch (_e) {}
+            try { window.__solidAnnoLabelDragging = true; } catch (_e2) {}
+        }
+        function solidAnnoResumeOrbit() {
+            try { window.__solidAnnoLabelDragging = false; } catch (_e) {}
+            if (orbitWasEnabled !== null) {
+                try { if (window.controls) window.controls.enabled = orbitWasEnabled; } catch (_e2) {}
+                orbitWasEnabled = null;
+            }
+        }
+        function solidAnnoLockLabelWidth() {
+            // 用会话内展开基准宽，禁止中途 getBoundingClientRect 重算
+            try {
+                if (data.collapsed) return;
+                window.AnnotationManager.applyExpandedWidthStyle(data);
+            } catch (_e) {}
+        }
+        function solidAnnoUnlockLabelWidth() {
+            // 销毁清理：不冲掉其它逻辑；DOM 即将移除
+            try { window.AnnotationManager.applyCollapsedUI(data); } catch (_e2) {}
+        }
+        function solidAnnoConsumerToggleSelect() {
+            if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+                if (window.AnnotationManager.selectedId === data.id) {
+                    window.PluginManager.setExclusiveSelection(window.AnnotationManager, null);
+                } else {
+                    window.PluginManager.setExclusiveSelection(window.AnnotationManager, data.id);
+                }
+            }
+        }
+        if (window.__SOLID_CONSUMER__) {
+            const onPtrMove = e => {
+                if (!isDragging) return;
+                if (dragPointerId != null && e.pointerId !== dragPointerId) return;
+                if (Math.abs(e.clientX - startX) > 3 || Math.abs(e.clientY - startY) > 3) {
+                    if (!isMoved) {
+                        isMoved = true;
+                        pendingConsumerTap = false;
+                        solidAnnoLockLabelWidth();
+                        solidAnnoPauseOrbit();
+                    }
+                }
+                if (!isMoved) return;
+                try { if (e.cancelable) e.preventDefault(); } catch (_ePrev) {}
+                solidAnnoApplyLabelDrag(e.clientX, e.clientY);
+            };
+            const onPtrUp = e => {
+                if (!isDragging) return;
+                if (dragPointerId != null && e.pointerId !== dragPointerId) return;
+                const doTap = pendingConsumerTap && !isMoved;
+                isDragging = false;
+                dragPointerId = null;
+                pendingConsumerTap = false;
+                try { div.releasePointerCapture(e.pointerId); } catch (_eRel) {}
+                solidAnnoResumeOrbit();
+                // 拖完后保持锁定宽度，避免 inline-block 松手后 shrink-to-fit 重算变宽/变窄
+                if (doTap) solidAnnoConsumerToggleSelect();
+            };
+            div.addEventListener('pointerdown', e => {
+                if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
+                if (e.button != null && e.button !== 0) return;
+                isDragging = true;
+                isMoved = false;
+                dragPointerId = e.pointerId;
+                startX = e.clientX;
+                startY = e.clientY;
+                startDx = data.dx;
+                startDy = data.dy;
+                pendingConsumerTap = true;
+                try { div.setPointerCapture(e.pointerId); } catch (_eCap) {}
+                e.stopPropagation();
+                if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+                    try { e.preventDefault(); } catch (_ePrev2) {}
+                }
+            }, { passive: false });
+            div.addEventListener('pointermove', onPtrMove, { passive: false });
+            div.addEventListener('pointerup', onPtrUp);
+            div.addEventListener('pointercancel', onPtrUp);
+            data.cleanupEvents = () => {
+                try { div.removeEventListener('pointermove', onPtrMove, { passive: false }); } catch (_e1) { try { div.removeEventListener('pointermove', onPtrMove); } catch (_e1b) {} }
+                div.removeEventListener('pointerup', onPtrUp);
+                div.removeEventListener('pointercancel', onPtrUp);
+                isDragging = false;
+                dragPointerId = null;
+                pendingConsumerTap = false;
+                solidAnnoResumeOrbit();
+                solidAnnoUnlockLabelWidth();
+            };
+        } else {
+            div.addEventListener('pointerdown', e => {
+                if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
+                e.stopPropagation();
+                if (!textEl.isContentEditable) {
+                    if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+                        window.PluginManager.setExclusiveSelection(window.AnnotationManager, data.id);
+                    } else {
+                        window.AnnotationManager.selectedId = data.id;
+                        window.AnnotationManager.highlightSelected();
+                    }
+                }
+            });
+            div.addEventListener('mousedown', e => {
+                if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
+                if (textEl.isContentEditable) { e.stopPropagation(); return; }
+                isDragging = true;
+                isMoved = false;
+                startX = e.clientX;
+                startY = e.clientY;
+                startDx = data.dx;
+                startDy = data.dy;
+                e.stopPropagation();
+            });
+            const onMouseMove = e => {
+                if (!isDragging) return;
+                if (Math.abs(e.clientX - startX) > 3 || Math.abs(e.clientY - startY) > 3) {
+                    if (!isMoved) {
+                        isMoved = true;
+                        solidAnnoLockLabelWidth();
+                    }
+                }
+                if (!isMoved) return;
+                solidAnnoApplyLabelDrag(e.clientX, e.clientY);
+            };
+            const onMouseUp = () => { isDragging = false; };
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+            data.cleanupEvents = () => {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+            };
+        }
         layer.appendChild(div);
         const ns = 'http://www.w3.org/2000/svg';
         const glowPath = document.createElementNS(ns, 'path');
