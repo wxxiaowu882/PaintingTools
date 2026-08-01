@@ -7,7 +7,7 @@
                 position: fixed;
                 /* 与汉堡菜单对齐，往左挪一点避免重叠，兼容刘海屏 */
                 top: 20px;
-                right: 74px; 
+                right: 50px; 
                 width: 44px;
                 height: 44px;
                 display: flex;

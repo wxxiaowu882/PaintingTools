@@ -44,7 +44,7 @@
     </style> </head> <body><!-- 截取框默认隐藏 --> <div id="crop-box" style="display:none; position:fixed; border:2px dashed #2ecc71; width:256px; height:256px; top:calc(50% - 128px); left:calc(50% - 128px); z-index:400; pointer-events:none; outline: 9999px solid rgba(0,0,0,0.6);">
     <div id="crop-drag-handle" style="position:absolute; top:0; left:0; width:100%; height:24px; background:rgba(46, 204, 113, 0.8); pointer-events:auto; cursor:move; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold; user-select:none;">拖拽此处移动截取框</div><div id="crop-resize-handle" style="position:absolute; right:-7px; bottom:-7px; width:14px; height:14px; background:#fff; border:2px solid #2ecc71; border-radius:50%; pointer-events:auto; cursor:nwse-resize; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div></div> <!-- 编辑器专属面板 -->
     <div class="editor-panel editor-panel-left" id="editor-panel-left">
-    <div class="editor-panel-left-top"><div style="font-size:12px; font-weight:bold; margin-bottom:10px; color:#a0a0a0; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:6px;">场景生产工具 (SolidCreate)</div><div style="display:flex; gap:6px; margin-bottom:6px;">
+    <div class="editor-panel-left-top"><div style="display:flex; gap:6px; margin-bottom:6px;">
     <button class="editor-btn" style="background:#8e44ad; border-color:#9b59b6; flex:1; margin-bottom:0; font-weight:bold;" onclick="mountWorkDirectory()">📂 挂载新目录</button>
     <button class="editor-btn" style="background:#34495e; border-color:#2c3e50; flex:1; margin-bottom:0; font-weight:bold;" onclick="createNewScene()">📄 新建场景</button></div><div style="display:flex; gap:6px; margin-bottom:8px;">
     <button type="button" id="btn-quick-geometry" class="editor-btn quick-dir-btn" style="background:#2c3e50; border-color:#34495e; flex:1; margin-bottom:0; font-size:11px; padding:6px;" onclick="loadQuickDir('geometry')" oncontextmenu="event.preventDefault(); loadQuickDir('geometry', true)" title="【左键】一键加载该库&#10;【右键】重新绑定文件夹">⚡ 沙盒_几何体静物</button>
@@ -53,17 +53,21 @@
     <div class="editor-panel-left-meta">
     <input type="text" id="scene-name-input" class="scene-name-field" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="输入新场景名称 (留空自动生成)">
     <div style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <label for="scene-meta-category-select" style="font-size:10px; color:#aaa; display:block; margin-bottom:4px;">场景类别：</label> <select id="scene-meta-category-select" class="editor-select" style="width:100%; box-sizing:border-box; padding:6px 8px; font-size:11px; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.18); border-radius:4px; color:#eee; outline:none; margin-bottom:0;"> <option value="">（未选类别）</option> <option value="几何体">几何体</option> <option value="色彩">色彩</option> <option value="氛围">氛围</option> <option value="构图">构图</option> <option value="几何体写生">几何体写生</option> <option value="静物写生">静物写生</option> </select> </div>
-    <div style="margin-bottom:0; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <label for="scene-meta-detail-input" style="font-size:10px; color:#aaa; display:block; margin-bottom:4px;">场景说明：</label> <textarea id="scene-meta-detail-input" rows="6" placeholder="例如：你只需要看一条线：<b>交界线怎么走</b>。\n\n看懂它，灰面就不再“糊”。" style="width:100%; box-sizing:border-box; resize:vertical; min-height:92px; max-height:240px; padding:6px 8px; font-size:11px; line-height:1.45; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.18); border-radius:4px; color:#eee; outline:none; font-family:inherit;"></textarea> </div>
+    <div style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <label for="scene-meta-detail-input" style="font-size:10px; color:#aaa; display:block; margin-bottom:4px;">场景说明：</label> <textarea id="scene-meta-detail-input" rows="6" placeholder="例如：你只需要看一条线：<b>交界线怎么走</b>。\n\n看懂它，灰面就不再“糊”。" style="width:100%; box-sizing:border-box; resize:vertical; min-height:92px; max-height:240px; padding:6px 8px; font-size:11px; line-height:1.45; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.18); border-radius:4px; color:#eee; outline:none; font-family:inherit;"></textarea> </div>
+    <div style="margin-bottom:0; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;">
+    <label style="font-size:10px; color:#aaa; display:block; margin-bottom:6px;">本场景要点：</label>
+    <div id="scene-meta-keypoints-root"></div>
+    </div>
     </div>
     <div class="editor-panel-left-footer">
-    <div style="margin-bottom:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:6px 8px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
-    <span style="font-size:11px; color:#ddd;">更新封面</span>
-    <label style="display:flex; align-items:center; gap:6px; color:#fff; font-size:11px; cursor:pointer; user-select:none;">
+    <div style="display:flex; flex-wrap:nowrap; align-items:center; gap:6px; margin-bottom:0;">
+    <label style="display:flex; align-items:center; gap:5px; color:#fff; font-size:11px; cursor:pointer; user-select:none; flex-shrink:0; white-space:nowrap;">
     <input id="update-cover-on-save" type="checkbox" style="accent-color:#2ecc71; transform:scale(1.05); cursor:pointer;">
-    <span id="update-cover-on-save-text" style="color:rgba(255,255,255,0.75);">勾选时保存封面</span>
-    </label></div>
-    <div style="display:flex; gap:6px; margin-bottom:0;"> <button id="btn-save-direct" class="editor-btn" style="background:#d35400; border-color:#e67e22; flex:1; margin-bottom:0; font-weight:bold;" onclick="saveCurrentSceneDirectly()">💾 覆写选中项</button>
-    <button class="editor-btn" style="background:#16a085; border-color:#1abc9c; flex:1; margin-bottom:0; font-weight:bold;" onclick="mergeAllScenes()">📦 批量合并</button></div>
+    <span id="update-cover-on-save-text" style="color:rgba(255,255,255,0.75);">不更新封面</span>
+    </label>
+    <button id="btn-save-direct" class="editor-btn" style="background:#d35400; border-color:#e67e22; flex:1; width:auto; min-width:0; margin-bottom:0; font-weight:bold;" onclick="saveCurrentSceneDirectly()">💾 覆写选中项</button>
+    <button class="editor-btn" style="background:#16a085; border-color:#1abc9c; flex:1; width:auto; min-width:0; margin-bottom:0; font-weight:bold;" onclick="mergeAllScenes()">📦 批量合并</button>
+    </div>
     </div></div>
 
     <!-- 右侧：操作面板（从“覆写/合并”下方迁移过来，为左侧列表腾空间） -->
@@ -109,7 +113,7 @@
     <div class="mobile-frame-safe" id="mobile-frame-safe"></div> </div> </div>
     <script type="module"> import * as THREE from 'three'; import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { TransformControls } from 'three/addons/controls/TransformControls.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer';
-    import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js'; import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js'; import '../../plugins_02/Plugin_LightIndicator.js';
+    import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_SceneKeyPoints.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js'; import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js'; import '../../plugins_02/Plugin_LightIndicator.js';
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from '../../plugins_02/SolidPreviewLighting.js';
     import { createSolidRasterLightRig } from '../../plugins_02/SolidRasterLightRigShared.js';
     import { createSolidRasterPreviewComposer } from '../../plugins_02/SolidRasterPreviewComposer.js';
@@ -642,7 +646,24 @@
         const meta = {};
         if (detail.trim() !== '') meta.detail = detail;
         if (category) meta.category = category;
+        try {
+            const kpApi = window.SolidSceneKeyPoints;
+            const ed = window.__solidCreateKeyPointsEditor;
+            if (kpApi && ed && typeof ed.getFields === 'function') {
+                const fields = ed.getFields();
+                const kp = fields && fields.keyPoints != null ? String(fields.keyPoints) : '';
+                const rich = fields && fields.keyPointsRich ? String(fields.keyPointsRich) : '';
+                if (kp.trim() !== '') meta.keyPoints = kp;
+                if (rich) meta.keyPointsRich = rich;
+            }
+        } catch (_eKp) {}
         return Object.keys(meta).length ? meta : null;
+    }
+    function solidCreateSyncKeyPointsEditorFromMeta(meta) {
+        try {
+            const ed = window.__solidCreateKeyPointsEditor;
+            if (ed && typeof ed.setFields === 'function') ed.setFields(meta || {});
+        } catch (_e) {}
     }
     function buildDraftSceneData() { const inputNameEl = document.getElementById('scene-name-input');
     const inputName = inputNameEl ? String(inputNameEl.value || '').trim() : ''; const sceneName = inputName
@@ -898,6 +919,7 @@
     const _d = document.getElementById('scene-meta-detail-input');
     if (_d) { try { _d.value = (data && data.meta && data.meta.detail != null) ? String(data.meta.detail) : ''; } catch(_e) { _d.value = ''; } }
     try { solidCreateSetMetaCategory(data && data.meta ? data.meta.category : ''); } catch (_eCat) { solidCreateSetMetaCategory(''); }
+    try { solidCreateSyncKeyPointsEditorFromMeta(data && data.meta); } catch (_eKp) {}
     if (data && data.camera) { camera.position.set(data.camera.pos[0], data.camera.pos[1], data.camera.pos[2]); controls.target.set(data.camera.target[0], data.camera.target[1], data.camera.target[2]); camera.zoom = data.camera.zoom || 0.52;
     camera.updateProjectionMatrix(); controls.update(); }
     if (data && data.env) { if (data.env.hasWall !== undefined) { window.hasWall = data.env.hasWall; const btn = document.getElementById('wall-btn');
@@ -1284,7 +1306,7 @@
         } catch(err2) { console.error(err2); window.showToast("读取或解析失败！", true); }
         return;
 
-        const sceneLoadGen = ++window._editorSceneLoadGen; transformControl.detach(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); if(data.name) { const pureName = data.name.replace(/_[0-9]{10}$/, ''); document.getElementById('scene-name-input').value = pureName; } const _d = document.getElementById('scene-meta-detail-input'); if (_d) { try { _d.value = (data && data.meta && data.meta.detail != null) ? String(data.meta.detail) : ''; } catch(_e) { _d.value = ''; } } try { solidCreateSetMetaCategory(data && data.meta ? data.meta.category : ''); } catch (_eCat) { solidCreateSetMetaCategory(''); } if(data.camera) { camera.position.set(data.camera.pos[0], data.camera.pos[1], data.camera.pos[2]); controls.target.set(data.camera.target[0], data.camera.target[1], data.camera.target[2]); camera.zoom = data.camera.zoom || 0.52; camera.updateProjectionMatrix(); controls.update(); } let _liSceneEnabled = null; if(data.env) {
+        const sceneLoadGen = ++window._editorSceneLoadGen; transformControl.detach(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); if(data.name) { const pureName = data.name.replace(/_[0-9]{10}$/, ''); document.getElementById('scene-name-input').value = pureName; } const _d = document.getElementById('scene-meta-detail-input'); if (_d) { try { _d.value = (data && data.meta && data.meta.detail != null) ? String(data.meta.detail) : ''; } catch(_e) { _d.value = ''; } } try { solidCreateSetMetaCategory(data && data.meta ? data.meta.category : ''); } catch (_eCat) { solidCreateSetMetaCategory(''); } try { solidCreateSyncKeyPointsEditorFromMeta(data && data.meta); } catch (_eKp) {} if(data.camera) { camera.position.set(data.camera.pos[0], data.camera.pos[1], data.camera.pos[2]); controls.target.set(data.camera.target[0], data.camera.target[1], data.camera.target[2]); camera.zoom = data.camera.zoom || 0.52; camera.updateProjectionMatrix(); controls.update(); } let _liSceneEnabled = null; if(data.env) {
         window.__solidCreateHasExplicitScene = true;
         if(data.env.hasWall !== undefined) { window.hasWall = data.env.hasWall; const btn = document.getElementById('wall-btn'); btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; }
         window.matType = data.env.defaultMat !== undefined ? data.env.defaultMat : 'origin'; window.posterizeLevel = data.env.posterizeLevel !== undefined ? data.env.posterizeLevel : 0; const _atm = data.env.atmosphere || { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 }; const _dof = data.env.dof || { enabled: false, aperture: 2.8, focusDistance: 10 }; window.isFogEnabled = !!_atm.enabled; window.fogDensity = Number.isFinite(Number(_atm.density)) ? Number(_atm.density) : 0.02; window.currentFogType = String(_atm.type || 'basic'); window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof; _liSceneEnabled = (data.env.lightIndicatorEnabled === undefined) ? null : !!data.env.lightIndicatorEnabled;
@@ -1627,7 +1649,7 @@
         try { const data = JSON.parse(text); mergedData.push(data); } catch(e) { window.hwLog(fileHandle.name + " 解析跳过"); } }
         const targetHandle = await window.workDirHandle.getFileHandle(window.targetMasterFilename, {create: true}); const writable = await targetHandle.createWritable(); await writable.write(JSON.stringify(mergedData)); await writable.close();
         window.showToast(`成功合并 ${files.length} 个文件！`); } catch(e) { window.showToast("合并失败: " + e.message, true); } };
-        window.createNewScene = function() { window._editorSceneLoadGen++; transformControl.detach(); if(window.AnnotationManager) window.AnnotationManager.clearAll(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); document.getElementById('scene-name-input').value = ''; const _d = document.getElementById('scene-meta-detail-input'); if (_d) _d.value = ''; try { solidCreateSetMetaCategory(''); } catch (_eCat) {} window.currentFileHandle = null; if(document.getElementById('file-list-container').children.length > 0) { Array.from(document.getElementById('file-list-container').children).forEach(el => el.style.borderLeft = 'none'); } document.getElementById('btn-save-direct').innerText = '💾 保存新场景'; const cb = document.getElementById('crop-box'); cb.style.display = 'none'; const cachedCrop = localStorage.getItem('solidCropBoxCache'); if(cachedCrop) { const c = JSON.parse(cachedCrop); cb.style.left = c.left; cb.style.top = c.top; cb.style.width = c.width; cb.style.height = c.height; } else { cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }
+        window.createNewScene = function() { window._editorSceneLoadGen++; transformControl.detach(); if(window.AnnotationManager) window.AnnotationManager.clearAll(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); document.getElementById('scene-name-input').value = ''; const _d = document.getElementById('scene-meta-detail-input'); if (_d) _d.value = ''; try { solidCreateSetMetaCategory(''); } catch (_eCat) {} try { solidCreateSyncKeyPointsEditorFromMeta({}); } catch (_eKp) {} window.currentFileHandle = null; if(document.getElementById('file-list-container').children.length > 0) { Array.from(document.getElementById('file-list-container').children).forEach(el => el.style.borderLeft = 'none'); } document.getElementById('btn-save-direct').innerText = '💾 保存新场景'; const cb = document.getElementById('crop-box'); cb.style.display = 'none'; const cachedCrop = localStorage.getItem('solidCropBoxCache'); if(cachedCrop) { const c = JSON.parse(cachedCrop); cb.style.left = c.left; cb.style.top = c.top; cb.style.width = c.width; cb.style.height = c.height; } else { cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }
         window._solidCreateDraftFileName = null; window.currentSceneData = null; solidCreateSyncSaveButtonText();
         window.__solidCreateHasExplicitScene = true;
         // 新建场景时同步重置相机/视线（方案 A）：对准世界原点，避免沿用上一场景/草稿导致取景框偏移
@@ -2542,6 +2564,16 @@
             if (nameEl) nameEl.addEventListener('input', () => markDraftDirty());
             if (detailEl) detailEl.addEventListener('input', () => markDraftDirty());
             if (catEl) catEl.addEventListener('change', () => markDraftDirty());
+            try {
+                const kpRoot = document.getElementById('scene-meta-keypoints-root');
+                if (kpRoot && window.SolidSceneKeyPoints && typeof window.SolidSceneKeyPoints.bindProducerEditor === 'function') {
+                    window.__solidCreateKeyPointsEditor = window.SolidSceneKeyPoints.bindProducerEditor({
+                        rootEl: kpRoot,
+                        onDirty: function () { try { markDraftDirty(); } catch (_e) {} },
+                        placeholder: '写本场景统领知识点（可较长）。列表简介请用上方「场景说明」。'
+                    });
+                }
+            } catch (_eKpInit) {}
             const coverCb = document.getElementById('update-cover-on-save');
             if (coverCb) {
                 const enabled = solidCreateGetUpdateCoverEnabled();
