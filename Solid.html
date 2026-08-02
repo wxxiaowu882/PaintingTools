@@ -10,11 +10,15 @@
     #menu-trigger-overlay{position:fixed;top:20px;right:20px;width:44px;height:44px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;cursor:pointer;z-index:7002;background:transparent;opacity:0.82;transform:translateY(calc(env(safe-area-inset-top, 0px) - 16px));}
     .menu-line{height:1.5px;background-color:rgba(255,255,255,0.72);transition:all 0.3s ease;margin:3px 0;border-radius:1px;} .line-1{width:22px;transform-origin:right center;}.line-2{width:14px;}.line-3{width:22px;transform-origin:right center;}
     .menu-open .line-1{transform:rotate(45deg) translateY(-2px);background-color:rgba(255,255,255,0.72);} .menu-open .line-2{opacity:0;} .menu-open .line-3{transform:rotate(-45deg) translateY(2px);background-color:rgba(255,255,255,0.72);}
-    /* 顶栏按钮（左上场景选择 + 右上菜单）：弱化亮度 + 上移，兼容刘海安全区 */
-    #top-left-scene-btn{top:20px !important; opacity:0.82; transform:translateY(calc(env(safe-area-inset-top, 0px) - 16px)); z-index:7001 !important;}
+    /* 顶栏按钮（左上场景选择 + 右上菜单）：弱化亮度 + 上移，兼容刘海安全区；左边贴边 */
+    #top-left-scene-btn{top:20px !important; left:max(6px, env(safe-area-inset-left, 0px)) !important; opacity:0.82; transform:translateY(calc(env(safe-area-inset-top, 0px) - 16px)); z-index:7001 !important;}
     /* 防回归：模型画布区域保持固定铺满，不受顶栏位移影响 */
     #canvas-container{top:0 !important; right:0 !important; bottom:0 !important; left:0 !important;}
     #top-left-scene-btn span{color:rgba(255,255,255,0.78) !important;}
+    #top-left-scene-btn .solid-scene-label, #top-left-scene-btn #scene-trigger-top { font-size:12px !important; }
+    @media (min-width: 900px) {
+      #top-left-scene-btn .solid-scene-label, #top-left-scene-btn #scene-trigger-top { font-size:14px !important; }
+    }
     .control-panel{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:96%;max-width:380px;background:rgba(15,15,15,0.7);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:10px 14px;z-index:100;color:#fff;touch-action:none;transition:all 0.4s cubic-bezier(0.4,0,0.2,1);box-shadow:0 10px 40px rgba(0,0,0,0.8);}
     .control-panel input[type=range]{touch-action:pan-x;} .control-panel.minimized { bottom: 15px; padding-bottom: 6px; } .control-panel.minimized .panel-content { display: none; }
     .slider-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:10px;min-width:0;} .slider-label{font-size:11px;color:rgba(255,255,255,0.4);width:22px;text-align:right;letter-spacing:1px;font-weight:200;white-space:nowrap;} .slider-val{font-size:9px;color:rgba(255,255,255,0.4);width:22px;text-align:right;font-variant-numeric:tabular-nums;font-weight:200;}
@@ -113,12 +117,12 @@
     <feComponentTransfer in="gray" id="posterize-transfer" result="posterizedGray"> <feFuncR type="discrete" tableValues="0 0.5 1"/>
     <feFuncG type="discrete" tableValues="0 0.5 1"/> <feFuncB type="discrete" tableValues="0 0.5 1"/> </feComponentTransfer>
     <feBlend mode="luminosity" in="posterizedGray" in2="SourceGraphic"/> </filter> </svg>
-    <div id="persistent-warning" style="display:none;position:fixed;top:0;left:0;width:100%;background:rgba(0,0,0,0.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);text-align:center;padding:6px 10px;font-size:9px;z-index:6000;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;"> 设备原因导致没有投影和反光，请换高性能设备获得更好的效果。 </div>
-    <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">渲染时遇到问题</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">当前设备不支持高级渲染，导致不能出现投影和散射光，想要获得更高级的体验，请去电脑端网页版获得更好的功能体验。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
+    <div id="persistent-warning" style="display:none;position:fixed;top:0;left:0;width:100%;background:rgba(0,0,0,0.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);text-align:center;padding:6px 10px;font-size:9px;z-index:6000;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;">未能开启高级渲染。需要时可点「开启渲染」再试</div>
+    <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">暂时无法开启高级渲染</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">本次未能开启高级渲染，仍可正常观察模型与标注。关闭提示后，可随时点「开启渲染」再试。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
     <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div id="scene-loader-inner"> <div id="scene-load-pct">0%</div> <div class="scene-load-bar-track" aria-hidden="true"><div id="scene-load-bar-fill" class="scene-load-bar-fill"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">系统环境初始化中...</div> </div> </div>
     <div id="perf-test-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:5550; flex-direction:column; align-items:center; justify-content:center;"> <div class="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin mb-4"></div> <div class="font-hairline text-[10px] tracking-[0.2em] text-white/80">正在测试设备渲染性能...</div> <div class="text-[8px] text-white/40 mt-2">首次进入时安全审计，即将完成</div> </div>
-    <div id="top-left-scene-btn" style="position:fixed; top:20px; left:20px; z-index:5000; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:6px 8px; border-radius:10px; display:flex; align-items:center; gap:6px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="openSceneGridModal()"> <span style="color:#fff; font-size:14px; font-weight:400; letter-spacing:0;">场景：</span>
-    <span id="scene-trigger-top" style="color:#fff; font-size:14px; font-weight:normal; max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">点击选择...</span> <span style="color:#666; font-size:10px;">▼</span> </div>
+    <div id="top-left-scene-btn" style="position:fixed; top:20px; left:max(6px, env(safe-area-inset-left, 0px)); z-index:5000; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:4px 5px 4px 4px; border-radius:10px; display:flex; align-items:center; gap:4px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="openSceneGridModal()"> <span class="solid-scene-label" style="color:#fff; font-weight:400; letter-spacing:0;">场景：</span>
+    <span id="scene-trigger-top" style="color:#fff; font-weight:normal; max-width:min(72vw, 320px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">点击选择...</span> <span style="color:#666; font-size:10px;">▼</span> </div>
     <div id="menu-trigger-overlay" onclick="toggleMenu()"><span class="menu-line line-1"></span><span class="menu-line line-2"></span><span class="menu-line line-3"></span></div>
     <div id="scene-grid-modal">
     <div class="modal-header"> <span class="modal-title">学习场景</span> <span class="modal-close" aria-label="关闭" title="关闭" onclick="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()" ontouchstart="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()">×</span> </div>
@@ -367,7 +371,7 @@
             return;
         }
         if (msgLc.includes('could not compile shader') || msgLc.includes('gl_invalid_operation') || msgLc.includes('failed to create') || msgLc.includes('framebuffer incomplete') || msgLc.includes('feedback loop')) {
-            _solidUserNotice('渲染遇到兼容性问题，已切换为预览模式。', 3600);
+            _solidUserNotice('渲染遇到兼容性问题，已暂停高级渲染。', 3600);
             if (typeof triggerUnsupported === 'function') triggerUnsupported(String(from || 'event') + '_gl_fatal', msg);
         }
     }
@@ -712,7 +716,7 @@
     } catch (_eR3) {}
     } catch (_e) {}
     }
-    window.forceReRender = function() { window._solidUserStoppedRender = false; try { _solidClearDegradeGuard(); } catch(_eG) {} if (window._solidHardwareUnsupported) { window.hwLog('[forceReRender] 当前设备暂不支持渲染'); (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '当前设备暂不支持渲染'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 2500); } })(); try { syncRenderButtons(); } catch(_eBtn) {} return; }
+    window.forceReRender = function() { window._solidUserStoppedRender = false; try { _solidClearDegradeGuard(); } catch(_eG) {} if (window._solidHardwareUnsupported) { window.hwLog('[forceReRender] 当前设备暂不支持高级渲染'); (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '当前设备暂不支持高级渲染'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 2500); } })(); try { syncRenderButtons(); } catch(_eBtn) {} return; }
     try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.setEnabled) window.__solidPreviewLighting.setEnabled(false); } catch (_eT) {}
     try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.dispose) window.__solidPreviewLighting.dispose(); } catch (_eDisp) {}
     window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none'; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
@@ -771,14 +775,14 @@
     if (typeof pathTracer !== 'undefined' && pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0); }
     ['scene-loader', 'perf-test-overlay'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); const msg = document.getElementById('fallback-msg'); if(msg) { msg.style.display = 'flex'; msg.style.zIndex = '99999';
     const _fTitle = msg.querySelector('h2'); const _fDesc = msg.querySelector('p');
-    if (window._solidHardwareUnsupported) { if (_fTitle) _fTitle.textContent = '当前设备暂不支持渲染'; if (_fDesc) _fDesc.textContent = '检测到该设备缺少开启渲染所需的图形能力，仍可正常预览模型和标注。若要体验完整效果，请在性能更强的设备上打开。'; }
-    else { if (_fTitle) _fTitle.textContent = '渲染时遇到问题'; if (_fDesc) _fDesc.textContent = '当前设备暂时无法开启渲染效果，仍可正常预览模型。点击下方按钮关闭此提示，可随时点击“开启渲染”再次尝试。'; }
+    if (window._solidHardwareUnsupported) { if (_fTitle) _fTitle.textContent = '当前设备暂不支持高级渲染'; if (_fDesc) _fDesc.textContent = '检测到该设备缺少开启高级渲染所需的图形能力，仍可正常观察模型与标注。若要体验更细腻的散射与互反射，请换性能更好的设备。'; }
+    else { if (_fTitle) _fTitle.textContent = '暂时无法开启高级渲染'; if (_fDesc) _fDesc.textContent = '本次未能开启高级渲染，仍可正常观察模型与标注。关闭提示后，可随时点「开启渲染」再试。'; }
     } document.getElementById('canvas-container').style.opacity = '0.1'; const mainPanel = document.getElementById('main-panel'); if (mainPanel) { mainPanel.style.opacity = '0.3'; mainPanel.style.pointerEvents = 'none'; }
     try { syncRenderButtons(); } catch (_eBtn2) {}
     _solidDismissRenderToast(); hwLog('Essential_Intercept: 触发渲染降级保护并安全释放显存。'); }
     window.acknowledgeFallback = function() { document.getElementById('fallback-msg').style.display = 'none'; document.getElementById('canvas-container').style.opacity = '1'; document.getElementById('main-panel').style.opacity = '1'; document.getElementById('main-panel').style.pointerEvents = 'auto';
-    const pw = document.getElementById('persistent-warning'); if(pw) { if (window._solidHardwareUnsupported) pw.textContent = '当前设备暂不支持渲染，可继续使用预览模式。';
-    else if (window._solidSampleTimeout) pw.textContent = '渲染超时，已切换为预览模式。点击“开启渲染”可再次尝试。'; else if (window._solidPerfSoftFail) pw.textContent = '渲染暂未启动，已处于预览模式。点击“开启渲染”可再次尝试。'; else pw.textContent = '当前为预览模式。点击“开启渲染”可再次尝试。';
+    const pw = document.getElementById('persistent-warning'); if(pw) { if (window._solidHardwareUnsupported) pw.textContent = '当前设备暂不支持高级渲染，仍可正常观察模型与标注';
+    else if (window._solidSampleTimeout) pw.textContent = '高级渲染超时已暂停。可点「开启渲染」重试'; else if (window._solidPerfSoftFail) pw.textContent = '未能开启高级渲染。需要时可点「开启渲染」再试'; else pw.textContent = '未能开启高级渲染。需要时可点「开启渲染」再试';
     pw.style.display = 'block'; }
     syncRenderButtons();
     try {
@@ -1907,7 +1911,7 @@
         if (!isWebGL2 || !hasColorBufFloat) { window._solidHardwareUnsupported = true; window.hwLog('[Init] 硬件或浏览器不满足渲染前置条件，将跳过性能测试直接进入预览模式'); }
         } catch(_e) { window.hwLog('[Init] 静态检测异常: ' + _e.message); } })();
         requestAnimationFrame(() => { try { window.hwLog("[Init] 推迟一帧再启动渲染（先让加载层绘制，略缩短首屏等待）");
-        if (_degradeGuard) { window.useAdvancedRender = false; window.isUnsupported = false; window.isTestingPerformance = false; window.perfTestDone = true; try { const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none'; } catch(_ePto) {} try { const pw = document.getElementById('persistent-warning'); if (pw) { pw.textContent = '上次渲染异常，本次已以预览模式启动。可点击“开启渲染”重试。'; pw.style.display = 'block'; } } catch(_ePw) {} try { syncRenderButtons(); } catch(_eBtn) {} window.loadJSONData(); animate(); return; }
+        if (_degradeGuard) { window.useAdvancedRender = false; window.isUnsupported = false; window.isTestingPerformance = false; window.perfTestDone = true; try { const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none'; } catch(_ePto) {} try { const pw = document.getElementById('persistent-warning'); if (pw) { pw.textContent = '上次高级渲染异常，本次先正常进入。需要时可点「开启渲染」重试'; pw.style.display = 'block'; } } catch(_ePw) {} try { syncRenderButtons(); } catch(_eBtn) {} window.loadJSONData(); animate(); return; }
         if (window._solidHardwareUnsupported) { window.hwLog("[Init] 静态检测不通过，跳过 PathTracer 实例化"); }
         else { try { window.hwLog("[Init] 准备实例化 WebGLPathTracer...");
         pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = _solidPtCfg.multipleImportanceSampling !== false; pathTracer.bounces = Number(_solidPtCfg.bounces || 3); pathTracer.renderScale = _solidPathTracerRenderScale();
@@ -2010,8 +2014,8 @@
             _solidDismissRenderToast();
             try { syncRenderButtons(); } catch (_eBtnS) {}
             window.hwLog('[Init] 性能测试未通过，软降级到光栅模式，12 秒后将静默重试');
-            (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '渲染暂未启动，已切换为预览模式'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 4000); } })();
-            const pw = document.getElementById('persistent-warning'); if (pw) pw.style.display = 'block';
+            (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '本次未能开启高级渲染，可稍后点「开启渲染」再试'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 4000); } })();
+            const pw = document.getElementById('persistent-warning'); if (pw) { pw.textContent = '未能开启高级渲染。需要时可点「开启渲染」再试'; pw.style.display = 'block'; }
             window.loadJSONData();
             setTimeout(function() { if (window._solidPerfSoftFail && !window.isUnsupported && !document.hidden) {
             window.hwLog('[Init] 软降级后静默重试渲染...'); const ok = window.__solidTryRecoverPathTracer('perf_soft_retry');
@@ -2285,8 +2289,8 @@
         if (pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch(_e) {} }, 0); }
         try { _solidCommitStandardRasterFallback('sample_timeout'); } catch (_eRf2) {}
         window.hwLog('[animate] 采样超时保底：首帧超 ' + (_stLimit/1000) + 's 未完成，切换光栅模式');
-        (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '渲染超时，已切换为预览模式'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 4000); } })();
-        const _pw2 = document.getElementById('persistent-warning'); if (_pw2) _pw2.style.display = 'block';
+        (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '高级渲染耗时过长，已暂停。可点「开启渲染」重试'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 4000); } })();
+        const _pw2 = document.getElementById('persistent-warning'); if (_pw2) { _pw2.textContent = '高级渲染超时已暂停。可点「开启渲染」重试'; _pw2.style.display = 'block'; }
         const _br2 = document.getElementById('btn-rerender'); if(_br2) { _br2.style.display = ''; _br2.style.opacity = '0.8'; }
         if (renderer && renderer.domElement) renderer.domElement.style.filter = '';
         return; } }

@@ -17,7 +17,18 @@
     let _orbitWasEnabled = null;
 
     function plainText(str) {
-        return String(str || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        // contenteditable 空行常变成 \n\n\n；消费端 pre-wrap 会显示成两行空，压成最多一个空行
+        return String(str || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n{3,}/g, '\n\n');
+    }
+
+    function lastOutIsBr(parentOut) {
+        const last = parentOut && parentOut.lastChild;
+        return !!(last && last.nodeType === Node.ELEMENT_NODE && last.tagName === 'BR');
+    }
+
+    function appendBrOnce(parentOut) {
+        if (!parentOut || lastOutIsBr(parentOut)) return;
+        parentOut.appendChild(document.createElement('br'));
     }
 
     function normalizeHexColor(input) {
@@ -77,7 +88,7 @@
         return false;
     }
 
-    /** 白名单：strong(+color) / br；块级展平为内容 + br */
+    /** 白名单：strong(+color) / br；块级展平为内容 + br（避免空行 div 双 br） */
     function sanitizeKeyPointsRichHtml(rawHtml) {
         if (!rawHtml) return '';
         const tmp = document.createElement('div');
@@ -98,19 +109,30 @@
                 node.childNodes.forEach(c => walk(c, s));
                 parentOut.appendChild(s);
             } else if (tag === 'br') {
-                parentOut.appendChild(document.createElement('br'));
+                appendBrOnce(parentOut);
             } else if (tag === 'div' || tag === 'p' || tag === 'li') {
                 node.childNodes.forEach(c => walk(c, parentOut));
-                parentOut.appendChild(document.createElement('br'));
+                // 空块 <div><br></div>：子节点已写入一个 br，appendBrOnce 不会再叠
+                appendBrOnce(parentOut);
             } else {
                 node.childNodes.forEach(c => walk(c, parentOut));
             }
         };
         tmp.childNodes.forEach(c => walk(c, out));
-        // 去掉末尾多余 br
         while (out.lastChild && out.lastChild.nodeType === Node.ELEMENT_NODE && out.lastChild.tagName === 'BR') {
             out.removeChild(out.lastChild);
         }
+        // 连续 br 最多保留 2 个（一个空行）
+        const nodes = Array.prototype.slice.call(out.childNodes);
+        let run = 0;
+        nodes.forEach(n => {
+            if (n.nodeType === Node.ELEMENT_NODE && n.tagName === 'BR') {
+                run++;
+                if (run > 2 && n.parentNode) n.parentNode.removeChild(n);
+            } else {
+                run = 0;
+            }
+        });
         const html = out.innerHTML;
         return /<strong/i.test(html) ? html : '';
     }
@@ -137,6 +159,7 @@
         const style = document.createElement('style');
         style.id = STYLE_ID;
         style.textContent = `
+            /* 与三杠同列同热区；三杠为 flex-end 右贴齐，圆标同样右对齐才视觉落同一竖列 */
             #${BTN_ID} {
                 position: fixed;
                 top: 64px;
@@ -145,47 +168,55 @@
                 height: 44px;
                 display: none;
                 align-items: center;
-                justify-content: center;
+                justify-content: flex-end;
+                box-sizing: border-box;
+                padding: 0;
+                margin: 0;
                 cursor: pointer;
                 z-index: 7002;
-                background: rgba(255, 214, 102, 0.12);
+                background: transparent;
                 color: #ffd966;
-                border: 1px solid rgba(255, 217, 102, 0.42);
-                border-radius: 50%;
-                box-shadow: 0 0 0 0 rgba(255, 217, 102, 0.35);
-                opacity: 0.95;
+                border: none;
+                border-radius: 0;
+                box-shadow: none;
+                opacity: 0.92;
                 transform: translateY(calc(env(safe-area-inset-top, 0px) - 16px));
                 -webkit-tap-highlight-color: transparent;
                 user-select: none;
-                padding: 0;
-                margin: 0;
-                transition: color 0.25s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+                transition: opacity 0.2s ease;
             }
-            #${BTN_ID}.solid-kp-visible {
-                display: flex;
-                animation: solid-kp-pulse 2.4s ease-in-out infinite;
+            #${BTN_ID} .solid-kp-badge {
+                width: 26px;
+                height: 26px;
+                border-radius: 50%;
+                box-sizing: border-box;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border: 1px solid rgba(255, 217, 102, 0.55);
+                background: rgba(255, 217, 102, 0.12);
+                color: #ffd966;
+                animation: solid-kp-badge-pulse 2.8s ease-in-out infinite;
             }
-            #${BTN_ID}:hover {
+            #${BTN_ID}:hover .solid-kp-badge {
+                border-color: rgba(255, 217, 102, 0.85);
+                background: rgba(255, 217, 102, 0.2);
                 color: #ffe9a8;
-                background: rgba(255, 214, 102, 0.22);
-                border-color: rgba(255, 217, 102, 0.7);
-                box-shadow: 0 0 14px rgba(255, 217, 102, 0.35);
             }
-            #${BTN_ID}:active { transform: translateY(calc(env(safe-area-inset-top, 0px) - 16px)) scale(0.94); }
+            #${BTN_ID}.solid-kp-visible { display: flex; }
             #${BTN_ID} svg {
-                width: 22px;
-                height: 22px;
+                width: 15px;
+                height: 15px;
                 display: block;
                 pointer-events: none;
             }
-            @keyframes solid-kp-pulse {
-                0%, 100% { box-shadow: 0 0 0 0 rgba(255, 217, 102, 0.28); }
-                50% { box-shadow: 0 0 10px 2px rgba(255, 217, 102, 0.42); }
+            @keyframes solid-kp-badge-pulse {
+                0%, 100% { box-shadow: 0 0 0 0 rgba(255, 217, 102, 0); }
+                50% { box-shadow: 0 0 0 3px rgba(255, 217, 102, 0.18); }
             }
             body.immersive-mode #${BTN_ID} {
                 opacity: 0 !important;
                 pointer-events: none !important;
-                animation: none !important;
             }
             #${MODAL_ID} {
                 display: none;
@@ -314,14 +345,16 @@
             btn.id = BTN_ID;
             btn.title = '本场景要点';
             btn.setAttribute('aria-label', '本场景要点');
-            // 书页图标：与「? / ☰」区分，暖色强调重要入口
+            // 圆标 + 书页：与「?」同为圆标语言，黄系强调要点入口
             btn.innerHTML =
-                '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+                '<span class="solid-kp-badge" aria-hidden="true">' +
+                '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
                 '<path d="M5 4.8c0-.44.36-.8.8-.8H12v16H5.8A.8.8 0 0 1 5 19.2V4.8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>' +
                 '<path d="M19 4.8c0-.44-.36-.8-.8-.8H12v16h6.2a.8.8 0 0 0 .8-.8V4.8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>' +
                 '<path d="M12 4v16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
                 '<path d="M7.2 8h2.2M7.2 11h2.2M14.6 8h2.2M14.6 11h2.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.85"/>' +
-                '</svg>';
+                '</svg>' +
+                '</span>';
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();

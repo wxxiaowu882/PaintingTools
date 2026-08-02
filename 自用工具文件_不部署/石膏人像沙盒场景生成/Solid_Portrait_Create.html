@@ -24,9 +24,29 @@
     .editor-panel.editor-panel-left { display:flex; flex-direction:column; max-height:calc(100vh - 30px); overflow:hidden; padding-bottom:10px; }
     .editor-panel-left-top { flex:0 0 auto; }
     .editor-panel-left #file-list-container { flex:1 1 auto; min-height:72px; max-height:none; overflow-y:auto; margin-bottom:8px; font-size:12px; background:rgba(0,0,0,0.3); border-radius:4px; padding:6px; }
-    .editor-panel-left-meta { flex:0 0 auto; max-height:42vh; overflow-y:auto; margin-bottom:2px; padding-right:2px; }
+    .editor-panel-left-meta { flex:0 0 auto; max-height:28vh; overflow-y:auto; margin-bottom:2px; padding-right:2px; }
     .editor-panel-left-footer { flex:0 0 auto; padding-top:4px; border-top:1px solid rgba(255,255,255,0.08); margin-top:4px; }
-    .editor-panel.editor-panel-right { left:auto; right:15px; width:320px; max-height:calc(100vh - 30px); overflow:auto; }
+    /* 右栏：上工具可滚，下要点吃剩余高度 */
+    .editor-panel.editor-panel-right { left:auto; right:15px; width:320px; max-height:calc(100vh - 30px); overflow:hidden; display:flex; flex-direction:column; padding-bottom:10px; }
+    .editor-panel-right-tools { flex:0 1 auto; min-height:0; overflow-y:auto; padding-right:2px; }
+    .editor-panel-right-keypoints { flex:1 1 auto; min-height:180px; display:flex; flex-direction:column; margin:8px -15px 0; overflow:hidden; background:rgba(0,0,0,0.35); border-top:1px solid rgba(255,255,255,0.12); box-sizing:border-box; }
+    .editor-panel-right-keypoints > label { padding:8px 10px 6px; margin:0; }
+    .editor-panel-right-keypoints #scene-meta-keypoints-root,
+    .editor-panel-right-keypoints .solid-kp-producer-wrap { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; margin:0; width:100%; }
+    .editor-panel-right .solid-kp-producer-toolbar { padding:0 10px 4px; margin:0; }
+    .editor-panel-right .solid-kp-producer-editor { flex:1 1 auto !important; min-height:200px !important; max-height:none !important; font-size:13px !important; line-height:1.55 !important; border-radius:0 !important; border-left:none !important; border-right:none !important; border-bottom:none !important; padding:8px 10px !important; }
+    /* 左右栏宽度拖拽条：默认隐形，悬停/拖动时微亮 */
+    .editor-panel-resize-handle {
+        position: absolute; top: 0; bottom: 0; width: 6px; z-index: 30;
+        cursor: ew-resize; touch-action: none; background: transparent;
+        transition: background 0.15s ease;
+    }
+    .editor-panel-resize-handle-right { right: -3px; }
+    .editor-panel-resize-handle-left { left: -3px; }
+    .editor-panel-resize-handle:hover,
+    .editor-panel-resize-handle.is-dragging { background: rgba(46, 204, 113, 0.4); }
+    body.solid-create-panel-resizing { cursor: ew-resize !important; user-select: none !important; -webkit-user-select: none !important; }
+    body.solid-create-panel-resizing * { cursor: ew-resize !important; }
     .editor-btn { display:block; width:100%; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:8px; margin-bottom:8px; border-radius:6px; font-size:13px; cursor:pointer; transition:0.2s; text-align:center; }
     .editor-btn:hover { background:rgba(255,255,255,0.2); } .editor-btn.active { background:#e74c3c; border-color:#ff7979; }
     .editor-select { width:100%; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:6px; margin-bottom:8px; border-radius:4px; font-size:15px; outline:none; }
@@ -44,6 +64,7 @@
     </style> </head> <body><!-- 截取框默认隐藏 --> <div id="crop-box" style="display:none; position:fixed; border:2px dashed #2ecc71; width:256px; height:256px; top:calc(50% - 128px); left:calc(50% - 128px); z-index:400; pointer-events:none; outline: 9999px solid rgba(0,0,0,0.6);">
     <div id="crop-drag-handle" style="position:absolute; top:0; left:0; width:100%; height:24px; background:rgba(46, 204, 113, 0.8); pointer-events:auto; cursor:move; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold; user-select:none;">拖拽此处移动截取框</div><div id="crop-resize-handle" style="position:absolute; right:-7px; bottom:-7px; width:14px; height:14px; background:#fff; border:2px solid #2ecc71; border-radius:50%; pointer-events:auto; cursor:nwse-resize; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div></div> <!-- 编辑器专属面板 -->
     <div class="editor-panel editor-panel-left" id="editor-panel-left">
+    <div class="editor-panel-resize-handle editor-panel-resize-handle-right" data-panel="left" title="拖拽调节左栏宽度" aria-hidden="true"></div>
     <div class="editor-panel-left-top"><div style="display:flex; gap:6px; margin-bottom:6px;">
     <button class="editor-btn" style="background:#8e44ad; border-color:#9b59b6; flex:1; margin-bottom:0; font-weight:bold;" onclick="mountWorkDirectory()">📂 挂载新目录</button>
     <button class="editor-btn" style="background:#34495e; border-color:#2c3e50; flex:1; margin-bottom:0; font-weight:bold;" onclick="createNewScene()">📄 新建场景</button></div><div style="display:flex; gap:6px; margin-bottom:8px;">
@@ -54,10 +75,6 @@
     <input type="text" id="scene-name-input" class="scene-name-field" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="输入新场景名称 (留空自动生成)">
     <div style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <label for="scene-meta-category-select" style="font-size:10px; color:#aaa; display:block; margin-bottom:4px;">场景类别：</label> <select id="scene-meta-category-select" class="editor-select" style="width:100%; box-sizing:border-box; padding:6px 8px; font-size:11px; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.18); border-radius:4px; color:#eee; outline:none; margin-bottom:0;"> <option value="">（未选类别）</option> <option value="几何体">几何体</option> <option value="色彩">色彩</option> <option value="氛围">氛围</option> <option value="构图">构图</option> <option value="几何体写生">几何体写生</option> <option value="静物写生">静物写生</option> </select> </div>
     <div style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <label for="scene-meta-detail-input" style="font-size:10px; color:#aaa; display:block; margin-bottom:4px;">场景说明：</label> <textarea id="scene-meta-detail-input" rows="6" placeholder="例如：你只需要看一条线：<b>交界线怎么走</b>。\n\n看懂它，灰面就不再“糊”。" style="width:100%; box-sizing:border-box; resize:vertical; min-height:92px; max-height:240px; padding:6px 8px; font-size:11px; line-height:1.45; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.18); border-radius:4px; color:#eee; outline:none; font-family:inherit;"></textarea> </div>
-    <div style="margin-bottom:0; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;">
-    <label style="font-size:10px; color:#aaa; display:block; margin-bottom:6px;">本场景要点：</label>
-    <div id="scene-meta-keypoints-root"></div>
-    </div>
     </div>
     <div class="editor-panel-left-footer">
     <div style="display:flex; flex-wrap:nowrap; align-items:center; gap:6px; margin-bottom:0;">
@@ -70,11 +87,15 @@
     </div>
     </div></div>
 
-    <!-- 右侧：操作面板（从“覆写/合并”下方迁移过来，为左侧列表腾空间） -->
-    <div class="editor-panel editor-panel-right" id="editor-panel-right"><div style="font-size:12px; font-weight:bold; margin-bottom:10px; color:#a0a0a0; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:6px;">操作面板</div>
-    <div style="height:8px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px; margin-top:4px;"></div>
-    <button class="editor-btn" onclick="openGlbManagerModal()">🔍 从资产库选择 GLB 模型</button><button class="editor-btn" onclick="openBuiltinModal()">➕ 选择并添加内置几何体</button>
-    <div style="height:8px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px;"></div><div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"><div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0;"><span style="font-size:11px; color:#fff; white-space:nowrap;">选中物体颜色：</span>
+    <!-- 右侧：场景操作 + 本场景要点（要点吃剩余高度） -->
+    <div class="editor-panel editor-panel-right" id="editor-panel-right">
+    <div class="editor-panel-resize-handle editor-panel-resize-handle-left" data-panel="right" title="拖拽调节右栏宽度" aria-hidden="true"></div>
+    <div class="editor-panel-right-tools">
+    <div style="display:flex; gap:6px; margin-bottom:8px;">
+    <button class="editor-btn" style="flex:1; margin-bottom:0; font-size:12px; padding:6px;" onclick="openGlbManagerModal()" title="从资产库选择 GLB 模型">🔍 GLB 资产库</button>
+    <button class="editor-btn" style="flex:1; margin-bottom:0; font-size:12px; padding:6px;" onclick="openBuiltinModal()" title="选择并添加内置几何体">➕ 内置几何体</button>
+    </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"><div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0;"><span style="font-size:11px; color:#fff; white-space:nowrap;">选中物体颜色：</span>
     <input type="color" id="obj-color-picker" value="#e8e8e8" style="width:24px; height:24px; padding:0; border:none; background:none; cursor:pointer; flex-shrink:0;" oninput="changeSelectedColor(event)" onchange="changeSelectedColor(event)"></div><div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0; justify-content:flex-end;" title="【粗体字】先在此选择颜色，再双击经典引出线小标签进入编辑。&#10;选中文字后 Ctrl+B 加粗（Mac：Cmd+B），再按一次取消粗体。"><span style="font-size:11px; color:#fff; white-space:nowrap;">粗体字颜色：</span>
     <input type="color" id="anno-bold-color-picker" value="#ffd966" style="width:24px; height:24px; padding:0; border:none; background:none; cursor:pointer; flex-shrink:0;" oninput="changeAnnoBoldColor(event)" onchange="changeAnnoBoldColor(event)"></div>
     </div><div style="display:flex; gap:4px; margin-bottom:6px;"><button id="btn-trans" class="editor-btn active" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('translate')">位移(T)</button>
@@ -91,7 +112,13 @@
     <span class="text-[9px] env-btn active" id="uniform-scale-btn" onclick="toggleUniformScale()" style="padding:2px 6px;">☑ 等比缩放</span>
     <span class="text-[9px] env-btn" id="camera-lock-btn" onclick="toggleCameraLock()" style="padding:2px 6px; margin-left:6px;" title="锁定后禁止旋转/平移/缩放视角，避免移动模型时误转场景">🔓 视角</span></div>
     <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px; background:rgba(0,0,0,0.45); padding:6px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.14);"> <span style="font-size:11px; color:#bbb; white-space:nowrap; letter-spacing:1px;">📱 手机取景框</span> <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#fff; cursor:pointer; user-select:none;">
-    <input id="mobile-frame-toggle" type="checkbox" style="accent-color:#2ecc71; transform:scale(1.05); cursor:pointer;"> <span style="color:rgba(255,255,255,0.75);">显示</span> </label> </div> </div>
+    <input id="mobile-frame-toggle" type="checkbox" style="accent-color:#2ecc71; transform:scale(1.05); cursor:pointer;"> <span style="color:rgba(255,255,255,0.75);">显示</span> </label> </div>
+    </div>
+    <div class="editor-panel-right-keypoints">
+    <label style="font-size:10px; color:#aaa; display:block; flex:0 0 auto;">本场景要点：</label>
+    <div id="scene-meta-keypoints-root"></div>
+    </div>
+    </div>
     <div id="glb-manager-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10000; backdrop-filter:blur(5px); flex-direction:column; padding:2vh 5vw;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"> <span style="color:#fff; font-size:16px; font-weight:bold; letter-spacing:2px;">GLB 模型资产库</span>
     <button onclick="closeGlbManagerModal()" style="background:rgba(231,76,60,0.2); border:1px solid #e74c3c; color:#e74c3c; padding:6px 16px; border-radius:6px; cursor:pointer; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='#e74c3c'; this.style.color='#fff';" onmouseout="this.style.background='rgba(231,76,60,0.2)'; this.style.color='#e74c3c';">关闭面板 ✕</button></div><div style="flex:1; background:#000; border:1px solid rgba(255,255,255,0.1); border-radius:8px; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,0.8);">
     <iframe id="glb-manager-iframe" src="" style="width:100%; height:100%; border:none;"></iframe></div></div><div id="builtin-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10000; backdrop-filter:blur(5px); flex-direction:column; padding:2vh 5vw;">
@@ -99,7 +126,7 @@
     <div style="display:flex; align-items:center; gap:8px;"><button type="button" id="builtin-thumb-refresh-btn" onclick="refreshBuiltinThumbnails()" style="background:rgba(46,204,113,0.15); border:1px solid #2ecc71; color:#2ecc71; padding:6px 14px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:12px; transition:0.2s;" onmouseover="this.style.background='#2ecc71'; this.style.color='#fff';" onmouseout="if(!this.disabled){ this.style.background='rgba(46,204,113,0.15)'; this.style.color='#2ecc71'; }">刷新缩略图</button>
     <button onclick="closeBuiltinModal()" style="background:rgba(231,76,60,0.2); border:1px solid #e74c3c; color:#e74c3c; padding:6px 16px; border-radius:6px; cursor:pointer; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='#e74c3c'; this.style.color='#fff';" onmouseout="this.style.background='rgba(231,76,60,0.2)'; this.style.color='#e74c3c';">关闭面板 ✕</button></div></div>
     <div id="builtin-grid-container" style="flex:1; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); border-radius:8px; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,0.8); padding:20px; display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:15px; align-content:start;"></div></div>
-    <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">渲染时遇到问题</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">当前设备不支持高级渲染，导致不能出现投影和散射光，想要获得更高级的体验，请去电脑端网页版获得更好的功能体验。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
+    <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">暂时无法开启高级渲染</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">本次未能开启高级渲染，仍可正常观察模型与标注。关闭提示后，可随时点「开启渲染」再试。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
     <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;max-width:min(88vw,340px);width:100%;padding:0 20px;box-sizing:border-box;"> <div class="w-3 h-3 rounded-full bg-white/70 animate-pulse"></div> <div id="scene-load-pct" style="font-size:11px;color:rgba(255,255,255,0.42);font-variant-numeric:tabular-nums;letter-spacing:0.12em;font-weight:200;">0%</div> <div style="width:100%;height:2px;background:rgba(255,255,255,0.1);border-radius:1px;overflow:hidden;"><div id="scene-load-bar-fill" style="display:block;height:100%;width:100%;background:rgba(255,255,255,0.55);transform-origin:left center;transform:scaleX(0);will-change:transform;"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">物理光追引擎初始化中...</div> </div> </div>
     <svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true"> <filter id="posterize-filter" color-interpolation-filters="sRGB">
     <feColorMatrix in="SourceGraphic" type="matrix" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0" result="gray"/>
@@ -142,6 +169,107 @@
     const SOLID_CREATE_CAMERA_LOCK_KEY = 'SolidCreatePortrait_CameraLock_v1';
     const SOLID_CREATE_UPDATE_COVER_KEY = 'SolidCreateUpdateCoverOnSave_v1';
     const SOLID_CREATE_LIGHT_INDICATOR_KEY = 'SolidCreate_LightIndicatorEnabled_v1';
+    const SOLID_CREATE_PANEL_W_KEY = 'SolidCreatePanelW_v1';
+    const SOLID_CREATE_PANEL_W_DEFAULT = { left: 280, right: 320 };
+    const SOLID_CREATE_PANEL_W_MIN = 220;
+    const SOLID_CREATE_PANEL_W_MAX_ABS = 480;
+    function solidCreatePanelWMax() {
+        try {
+            return Math.min(SOLID_CREATE_PANEL_W_MAX_ABS, Math.max(SOLID_CREATE_PANEL_W_MIN, Math.floor(window.innerWidth * 0.4)));
+        } catch (_e) { return SOLID_CREATE_PANEL_W_MAX_ABS; }
+    }
+    function solidCreateClampPanelW(w) {
+        const n = Math.round(Number(w));
+        if (!isFinite(n)) return SOLID_CREATE_PANEL_W_DEFAULT.left;
+        return Math.max(SOLID_CREATE_PANEL_W_MIN, Math.min(solidCreatePanelWMax(), n));
+    }
+    function solidCreateReadPanelWidths() {
+        const out = { left: SOLID_CREATE_PANEL_W_DEFAULT.left, right: SOLID_CREATE_PANEL_W_DEFAULT.right };
+        try {
+            const raw = localStorage.getItem(SOLID_CREATE_PANEL_W_KEY);
+            if (!raw) return out;
+            const o = JSON.parse(raw);
+            if (o && o.left != null) out.left = solidCreateClampPanelW(o.left);
+            if (o && o.right != null) out.right = solidCreateClampPanelW(o.right);
+        } catch (_e) {}
+        return out;
+    }
+    function solidCreateWritePanelWidths(leftW, rightW) {
+        try {
+            localStorage.setItem(SOLID_CREATE_PANEL_W_KEY, JSON.stringify({
+                left: solidCreateClampPanelW(leftW),
+                right: solidCreateClampPanelW(rightW)
+            }));
+        } catch (_e) {}
+    }
+    function solidCreateApplyPanelWidths(widths) {
+        const w = widths || solidCreateReadPanelWidths();
+        const leftEl = document.getElementById('editor-panel-left');
+        const rightEl = document.getElementById('editor-panel-right');
+        if (leftEl) leftEl.style.width = solidCreateClampPanelW(w.left) + 'px';
+        if (rightEl) rightEl.style.width = solidCreateClampPanelW(w.right) + 'px';
+    }
+    function solidCreateGetCurrentPanelWidths() {
+        const leftEl = document.getElementById('editor-panel-left');
+        const rightEl = document.getElementById('editor-panel-right');
+        return {
+            left: leftEl ? (parseFloat(leftEl.style.width) || leftEl.offsetWidth || SOLID_CREATE_PANEL_W_DEFAULT.left) : SOLID_CREATE_PANEL_W_DEFAULT.left,
+            right: rightEl ? (parseFloat(rightEl.style.width) || rightEl.offsetWidth || SOLID_CREATE_PANEL_W_DEFAULT.right) : SOLID_CREATE_PANEL_W_DEFAULT.right
+        };
+    }
+    function initSolidCreatePanelResize() {
+        solidCreateApplyPanelWidths(solidCreateReadPanelWidths());
+        const handles = document.querySelectorAll('.editor-panel-resize-handle');
+        if (!handles || !handles.length) return;
+        handles.forEach(function (handle) {
+            if (handle.__solidCreateResizeBound) return;
+            handle.__solidCreateResizeBound = true;
+            handle.addEventListener('pointerdown', function (ev) {
+                if (ev.button != null && ev.button !== 0) return;
+                const side = handle.getAttribute('data-panel');
+                const panel = side === 'right'
+                    ? document.getElementById('editor-panel-right')
+                    : document.getElementById('editor-panel-left');
+                if (!panel) return;
+                ev.preventDefault();
+                ev.stopPropagation();
+                const startX = ev.clientX;
+                const startW = panel.offsetWidth;
+                handle.classList.add('is-dragging');
+                document.body.classList.add('solid-create-panel-resizing');
+                try { handle.setPointerCapture(ev.pointerId); } catch (_eCap) {}
+                const onMove = function (e) {
+                    const dx = e.clientX - startX;
+                    // 左栏拖右边：向右变宽；右栏拖左边：向左变宽（dx 取反）
+                    const next = side === 'right' ? (startW - dx) : (startW + dx);
+                    panel.style.width = solidCreateClampPanelW(next) + 'px';
+                };
+                const onUp = function (e) {
+                    handle.classList.remove('is-dragging');
+                    document.body.classList.remove('solid-create-panel-resizing');
+                    try { handle.releasePointerCapture(e.pointerId); } catch (_eRel) {}
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                    window.removeEventListener('pointercancel', onUp);
+                    const cur = solidCreateGetCurrentPanelWidths();
+                    solidCreateWritePanelWidths(cur.left, cur.right);
+                };
+                window.addEventListener('pointermove', onMove);
+                window.addEventListener('pointerup', onUp);
+                window.addEventListener('pointercancel', onUp);
+            });
+        });
+        if (!window.__solidCreatePanelResizeOnWin) {
+            window.__solidCreatePanelResizeOnWin = true;
+            window.addEventListener('resize', function () {
+                const cur = solidCreateGetCurrentPanelWidths();
+                solidCreateApplyPanelWidths({
+                    left: solidCreateClampPanelW(cur.left),
+                    right: solidCreateClampPanelW(cur.right)
+                });
+            });
+        }
+    }
     window.isCameraLocked = false;
     function solidCreateSyncCameraLockUI() {
         const btn = document.getElementById('camera-lock-btn');
@@ -222,7 +350,7 @@
         }
         if (msgLc.includes('could not compile shader') || msgLc.includes('gl_invalid_operation') || msgLc.includes('context lost') || msgLc.includes('failed to create') || msgLc.includes('framebuffer incomplete') || msgLc.includes('feedback loop')) {
             if (msgLc.includes('context lost')) _solidCreateUserNotice('渲染中断，正在尝试恢复…（如长时间黑屏请刷新）', true);
-            else _solidCreateUserNotice('渲染遇到兼容性问题，已切换为预览模式。', true);
+            else _solidCreateUserNotice('渲染遇到兼容性问题，已暂停高级渲染。', true);
             try { if (typeof triggerUnsupported === 'function') triggerUnsupported(); } catch (_eT) {}
         }
     }
@@ -2570,7 +2698,7 @@
                     window.__solidCreateKeyPointsEditor = window.SolidSceneKeyPoints.bindProducerEditor({
                         rootEl: kpRoot,
                         onDirty: function () { try { markDraftDirty(); } catch (_e) {} },
-                        placeholder: '写本场景统领知识点（可较长）。列表简介请用上方「场景说明」。'
+                        placeholder: '写本场景统领知识点（可较长）。列表简介请用左栏「场景说明」。'
                     });
                 }
             } catch (_eKpInit) {}
@@ -2584,6 +2712,7 @@
             }
         } catch(_e) {}
         initMobileFrameToggleUI();
+        initSolidCreatePanelResize();
         scene = new THREE.Scene(); scene.backgroundRotation = new THREE.Euler(); scene.environmentRotation = new THREE.Euler();
         camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); try {
         renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: true });
