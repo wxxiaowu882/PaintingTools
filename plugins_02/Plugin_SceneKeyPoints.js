@@ -1,5 +1,5 @@
 /**
- * 本场景要点（Key Points）
+ * 童画师讲解（对外显示名；字段仍为 meta.keyPoints / keyPointsRich）
  * - meta.keyPoints / meta.keyPointsRich（与 meta.detail 列表摘要分离）
  * - 消费端：右上固定按钮 + 阅读板；打开/关闭不碰追光
  * - 生产端：bindProducerEditor 富文本编辑
@@ -24,11 +24,6 @@
     function lastOutIsBr(parentOut) {
         const last = parentOut && parentOut.lastChild;
         return !!(last && last.nodeType === Node.ELEMENT_NODE && last.tagName === 'BR');
-    }
-
-    function appendBrOnce(parentOut) {
-        if (!parentOut || lastOutIsBr(parentOut)) return;
-        parentOut.appendChild(document.createElement('br'));
     }
 
     function normalizeHexColor(input) {
@@ -88,7 +83,21 @@
         return false;
     }
 
-    /** 白名单：strong(+color) / br；块级展平为内容 + br（避免空行 div 双 br） */
+    function appendBr(parentOut) {
+        if (!parentOut) return;
+        parentOut.appendChild(document.createElement('br'));
+    }
+
+    /** 文本中的 \\n 一律变成 br（消费端 rich 用 white-space:normal 时，裸 \\n 会被折叠成空格） */
+    function appendTextWithBreaks(parentOut, text) {
+        const parts = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+        for (let i = 0; i < parts.length; i++) {
+            if (parts[i]) parentOut.appendChild(document.createTextNode(parts[i]));
+            if (i < parts.length - 1) appendBr(parentOut);
+        }
+    }
+
+    /** 白名单：strong(+color) / br；块级展平为内容 + br；文本换行转为 br */
     function sanitizeKeyPointsRichHtml(rawHtml) {
         if (!rawHtml) return '';
         const tmp = document.createElement('div');
@@ -97,7 +106,7 @@
 
         const walk = (node, parentOut) => {
             if (node.nodeType === Node.TEXT_NODE) {
-                parentOut.appendChild(document.createTextNode(node.textContent));
+                appendTextWithBreaks(parentOut, node.textContent);
                 return;
             }
             if (node.nodeType !== Node.ELEMENT_NODE) return;
@@ -109,11 +118,20 @@
                 node.childNodes.forEach(c => walk(c, s));
                 parentOut.appendChild(s);
             } else if (tag === 'br') {
-                appendBrOnce(parentOut);
+                appendBr(parentOut);
             } else if (tag === 'div' || tag === 'p' || tag === 'li') {
+                // 裸文本后接块级时，Chrome 常见「第一行 + <div>第二行</div>」——块前必须补 br，否则会拼成一行
+                if (parentOut.childNodes.length > 0 && !lastOutIsBr(parentOut)) {
+                    appendBr(parentOut);
+                }
+                const beforeLen = parentOut.childNodes.length;
                 node.childNodes.forEach(c => walk(c, parentOut));
-                // 空块 <div><br></div>：子节点已写入一个 br，appendBrOnce 不会再叠
-                appendBrOnce(parentOut);
+                if (parentOut.childNodes.length === beforeLen) {
+                    // 空块（含仅占位的空行）
+                    appendBr(parentOut);
+                } else if (!lastOutIsBr(parentOut)) {
+                    appendBr(parentOut);
+                }
             } else {
                 node.childNodes.forEach(c => walk(c, parentOut));
             }
@@ -135,6 +153,15 @@
         });
         const html = out.innerHTML;
         return /<strong/i.test(html) ? html : '';
+    }
+
+    /** 纯文本回填编辑器：用 br 表达换行，避免只靠 textContent+\\n 在部分路径丢失 */
+    function plainToEditorHtml(plain) {
+        const p = plainText(plain);
+        if (!p) return '';
+        const div = document.createElement('div');
+        appendTextWithBreaks(div, p);
+        return div.innerHTML;
     }
 
     function plainFromHtml(htmlOrEl) {
@@ -343,8 +370,8 @@
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.id = BTN_ID;
-            btn.title = '本场景要点';
-            btn.setAttribute('aria-label', '本场景要点');
+            btn.title = '童画师讲解';
+            btn.setAttribute('aria-label', '童画师讲解');
             // 圆标 + 书页：与「?」同为圆标语言，黄系强调要点入口
             btn.innerHTML =
                 '<span class="solid-kp-badge" aria-hidden="true">' +
@@ -369,7 +396,7 @@
             modal.innerHTML =
                 '<div class="solid-kp-panel" role="dialog" aria-modal="true" aria-labelledby="solid-kp-title">' +
                 '<div class="solid-kp-header">' +
-                '<span class="solid-kp-title" id="solid-kp-title">本场景要点</span>' +
+                '<span class="solid-kp-title" id="solid-kp-title">童画师讲解</span>' +
                 '<button type="button" class="solid-kp-close" aria-label="关闭">×</button>' +
                 '</div>' +
                 '<div class="solid-kp-scroll"><div id="' + BODY_ID + '"></div></div>' +
@@ -407,7 +434,8 @@
         const richRaw = meta && meta.keyPointsRich != null ? String(meta.keyPointsRich) : '';
         const rich = sanitizeKeyPointsRichHtml(richRaw);
         if (rich) {
-            body.style.whiteSpace = 'normal';
+            // pre-wrap：即使残留裸 \\n 也不会被折叠；正常 br 换行同样生效
+            body.style.whiteSpace = 'pre-wrap';
             body.innerHTML = rich;
             return;
         }
@@ -507,7 +535,7 @@
                 return;
             }
             const plain = plainText(meta && meta.keyPoints != null ? meta.keyPoints : '');
-            editorEl.textContent = plain;
+            editorEl.innerHTML = plainToEditorHtml(plain);
         },
 
         /**
@@ -542,7 +570,7 @@
             const editor = document.createElement('div');
             editor.className = 'solid-kp-producer-editor';
             editor.contentEditable = 'true';
-            editor.setAttribute('data-placeholder', opts.placeholder || '写本场景统领知识点（可较长）。列表简介请用上方「场景说明」。');
+            editor.setAttribute('data-placeholder', opts.placeholder || '写本场景要传达的知识（可较长）。列表简介请用上方「场景说明」。');
             editor.spellcheck = false;
 
             rootEl.appendChild(toolbar);
