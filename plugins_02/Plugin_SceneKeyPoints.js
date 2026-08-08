@@ -1,5 +1,5 @@
 /**
- * 童画师讲解（对外显示名；字段仍为 meta.keyPoints / keyPointsRich）
+ * 童画师解析（对外显示名；字段仍为 meta.keyPoints / keyPointsRich）
  * - meta.keyPoints / meta.keyPointsRich（与 meta.detail 列表摘要分离）
  * - 消费端：右上固定按钮 + 阅读板；打开/关闭不碰追光
  * - 生产端：bindProducerEditor 富文本编辑
@@ -370,8 +370,8 @@
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.id = BTN_ID;
-            btn.title = '童画师讲解';
-            btn.setAttribute('aria-label', '童画师讲解');
+            btn.title = '童画师解析';
+            btn.setAttribute('aria-label', '童画师解析');
             // 圆标 + 书页：与「?」同为圆标语言，黄系强调要点入口
             btn.innerHTML =
                 '<span class="solid-kp-badge" aria-hidden="true">' +
@@ -396,7 +396,7 @@
             modal.innerHTML =
                 '<div class="solid-kp-panel" role="dialog" aria-modal="true" aria-labelledby="solid-kp-title">' +
                 '<div class="solid-kp-header">' +
-                '<span class="solid-kp-title" id="solid-kp-title">童画师讲解</span>' +
+                '<span class="solid-kp-title" id="solid-kp-title">童画师解析</span>' +
                 '<button type="button" class="solid-kp-close" aria-label="关闭">×</button>' +
                 '</div>' +
                 '<div class="solid-kp-scroll"><div id="' + BODY_ID + '"></div></div>' +
