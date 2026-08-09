@@ -27,7 +27,9 @@ window.AnnotationPluginManager.register({
     },
     renderSVG: function(item, htmlStr, ctx) {
         const p = item.p; const color = ctx.color; const el = item.el; const isActive = el.classList.contains('show-text'); const baseOpacity = isActive ? 1 : parseFloat(ctx.defaultOpacity);
-        const domAlpha = ctx.getRenderAlpha(item.isOccluded, 1); el.style.opacity = domAlpha; el.style.visibility = domAlpha <= 0 ? 'hidden' : 'visible'; el.style.backgroundColor = ctx.hexToRgba(color, baseOpacity); el.style.boxShadow = isActive ? `0 0 10px ${ctx.hexToRgba(color, baseOpacity)}` : 'none';
+        const domAlpha = ctx.getRenderAlpha(item.isOccluded, 1); el.style.opacity = domAlpha; el.style.visibility = domAlpha <= 0 ? 'hidden' : 'visible';
+        if (window.AnnotationStyleUtil) window.AnnotationStyleUtil.applyDotStyle(el, color, baseOpacity, ctx.hexToRgba, isActive);
+        else { el.style.backgroundColor = ctx.hexToRgba(color, baseOpacity); el.style.boxShadow = isActive ? `0 0 10px ${ctx.hexToRgba(color, baseOpacity)}` : 'none'; }
         const finalSvgAlpha = ctx.getRenderAlpha(item.isOccluded, baseOpacity);
         if (finalSvgAlpha > 0) {
             const rTip = item.elEnd.getBoundingClientRect(); const rTail = el.getBoundingClientRect(); if(!rTip.width || (rTip.left === 0 && rTip.top === 0)) return htmlStr;
@@ -38,7 +40,11 @@ window.AnnotationPluginManager.register({
     renderConsumeSVG: function(item, htmlStr, ctx) {
         const p = item.p; const isHighlight = ctx.isHighlight; const color = ctx.color; const el = item.el; const baseOpacity = isHighlight ? 1 : parseFloat(ctx.defaultOpacity);
         const domAlpha = ctx.getRenderAlpha(item.isOccluded, 1); el.style.opacity = domAlpha; el.style.visibility = domAlpha <= 0 ? 'hidden' : 'visible';
-        if(isHighlight) el.classList.add('active'); else el.classList.remove('active'); el.style.backgroundColor = ctx.hexToRgba(color, baseOpacity); el.style.boxShadow = isHighlight ? `0 0 10px ${ctx.hexToRgba(color, baseOpacity)}` : 'none'; el.style.transform = isHighlight ? 'scale(1.2)' : 'none';
+        if(isHighlight) el.classList.add('active'); else el.classList.remove('active');
+        const fillColor = isHighlight ? '#ffd54a' : color;
+        if (window.AnnotationStyleUtil) window.AnnotationStyleUtil.applyDotStyle(el, fillColor, 0.5, ctx.hexToRgba, isHighlight);
+        else { el.style.backgroundColor = ctx.hexToRgba(fillColor, 0.5); el.style.boxShadow = isHighlight ? `0 0 10px ${ctx.hexToRgba(fillColor, 0.5)}` : 'none'; }
+        el.style.transform = isHighlight ? 'scale(1.2)' : 'none';
         const finalSvgAlpha = ctx.getRenderAlpha(item.isOccluded, baseOpacity);
         if (finalSvgAlpha > 0) { const rTip = item.elEnd.getBoundingClientRect(); const rTail = el.getBoundingClientRect(); if(!rTip.width || (rTip.left === 0 && rTip.top === 0)) return htmlStr; const Tip = {x: rTip.left + rTip.width/2, y: rTip.top + rTip.height/2}; const Tail = {x: rTail.left + rTail.width/2, y: rTail.top + rTail.height/2}; htmlStr += `<line class="svg-hit-path" data-id="${p.id}" x1="${Tail.x}" y1="${Tail.y}" x2="${Tip.x}" y2="${Tip.y}" stroke="transparent" stroke-width="40" style="pointer-events:none;" />`; if(item.elP1 && item.elP2 && item.elP3){ const rP1 = item.elP1.getBoundingClientRect(), rP2 = item.elP2.getBoundingClientRect(), rP3 = item.elP3.getBoundingClientRect(); if(rP1.left === 0 && rP1.top === 0) return htmlStr; const P1 = {x: rP1.left+rP1.width/2, y: rP1.top+rP1.height/2}; const P2 = {x: rP2.left+rP2.width/2, y: rP2.top+rP2.height/2}; const P3 = {x: rP3.left+rP3.width/2, y: rP3.top+rP3.height/2}; const xc = (P1.x+P2.x+P3.x)/3, yc = (P1.y+P2.y+P3.y)/3; htmlStr += `<line x1="${Tail.x}" y1="${Tail.y}" x2="${xc}" y2="${yc}" stroke="${color}" stroke-width="3" opacity="${finalSvgAlpha}" style="transition:opacity 0.2s;filter:drop-shadow(0 0 4px ${color});pointer-events:none;" />`; const drawFacet = (pA, pB, pC, overlayCol, overlayOp) => { const cross = (pB.x - pA.x) * (pC.y - pA.y) - (pB.y - pA.y) * (pC.x - pA.x); if (cross > 0) { htmlStr += `<polygon points="${pA.x},${pA.y} ${pB.x},${pB.y} ${pC.x},${pC.y}" fill="${color}" opacity="${finalSvgAlpha}" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" style="pointer-events:none;" />`; if (overlayOp > 0) htmlStr += `<polygon points="${pA.x},${pA.y} ${pB.x},${pB.y} ${pC.x},${pC.y}" fill="${overlayCol}" opacity="${overlayOp * finalSvgAlpha}" style="pointer-events:none;" />`; } }; drawFacet(Tip, P1, P2, '#ffffff', 0.3); drawFacet(Tip, P2, P3, '#000000', 0.2); drawFacet(Tip, P3, P1, '#000000', 0.5); drawFacet(P1, P3, P2, '#000000', 0.7); } } return htmlStr;
     },
