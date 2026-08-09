@@ -200,7 +200,7 @@ window.AnnotationPluginManager.register({
             id: pointIndex, type: 'prober', slot: slotName,
             slotNorm: `hotspot-prober-norm-${pointIndex}`,
             pos: posStr, posNorm: posStr, norm: normStr, baseNorm: [nx, ny, nz], subAnchors: {},
-            color: defaultColor || '#ffbb33', hidden: false, hideInList: false,
+            color: defaultColor || '#ffbb33', hidden: false, hideInList: false, showTextOnLoad: true,
             text: '分析中...', 
             probeData: { angle: 0, displayAngle: 0, lastAngleTime: 0, state: 'init', lightDir: [0, 1, 0], toneColor: '#fff', toneBg: 'rgba(15,15,20,0.7)' }
         };

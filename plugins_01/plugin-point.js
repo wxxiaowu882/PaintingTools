@@ -8,7 +8,7 @@ window.AnnotationPluginManager.register({
         return null;
     },
     onPointerDown: function(slotName, posStr, normStr) {
-        const defaultText = `区域 ${pointIndex}`; pointsData.push({ id: pointIndex, type: 'point', slot: slotName, pos: posStr, norm: normStr, text: defaultText, color: defaultColor, hidden: false });
+        const defaultText = `区域 ${pointIndex}`; pointsData.push({ id: pointIndex, type: 'point', slot: slotName, pos: posStr, norm: normStr, text: defaultText, color: defaultColor, hidden: false, showTextOnLoad: true });
         this.mountDOM(pointsData[pointsData.length-1], viewer);
     },
     renderSVG: function(item, htmlStr, ctx) {

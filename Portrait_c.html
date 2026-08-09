@@ -64,8 +64,9 @@
   [data-visibility-attribute]:not([visible]), [visible="false"] { pointer-events: none !important; }
   .preview-hotspot { border: none; border-radius: 50%; width: 14px; height: 14px; cursor: pointer; transition: 0.2s; pointer-events: none !important; position: relative; padding: 0; box-sizing: border-box; touch-action: none; }
   .preview-hotspot::after { content: ''; position: absolute; top: -25px; left: -25px; right: -25px; bottom: -25px; border-radius: 50%; } .preview-hotspot:hover, .preview-hotspot.active { z-index: 100; }
-  .preview-hotspot .HotspotAnnotation, .ink-mid .HotspotAnnotation { display: none; background: rgba(20, 22, 28, 0.9); color: var(--text-main); padding: 4px 8px; border-radius: 4px; position: absolute; left: 20px; top: -10px; white-space: nowrap; border: 1px solid rgba(212,175,55,0.3); font-family: sans-serif; font-size: 11px; pointer-events: none; z-index: 100; backdrop-filter: blur(4px); font-weight: normal; }
-  .preview-hotspot.active .HotspotAnnotation, .ink-mid.active .HotspotAnnotation { display: block; } .ink-anchor { position: absolute; width: 2px; height: 2px; background: transparent; transform: translate(-50%, -50%); pointer-events: none; }
+  .preview-hotspot .HotspotAnnotation, .ink-mid .HotspotAnnotation { display: none; background: transparent; color: #fff; padding: 0; position: absolute; left: 20px; top: -10px; white-space: nowrap; border: none; font-family: sans-serif; font-size: 11px; pointer-events: none; z-index: 100; font-weight: 600; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.8); }
+  .preview-hotspot.active .HotspotAnnotation, .ink-mid.active .HotspotAnnotation,
+  .preview-hotspot.show-text .HotspotAnnotation, .ink-mid.show-text .HotspotAnnotation { display: block; } .ink-anchor { position: absolute; width: 2px; height: 2px; background: transparent; transform: translate(-50%, -50%); pointer-events: none; }
   .ink-mid { position: relative; overflow: visible; z-index: 100; }
   /* 沉浸式羽化过渡字幕面板 */
   #subtitle-panel { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 80%; max-width: 700px; background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 50px, rgba(0,0,0,0.8) 100%); padding: 0px 20px 20px 20px; color: var(--text-main); text-align: left; z-index: 60; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; display: flex; flex-direction: column; gap: 8px; text-shadow: 0 2px 5px rgba(0,0,0,0.9); }
@@ -137,7 +138,7 @@
   <div id="control-panel" class="collapsed"> <div class="panel-header"> <div class="drawer-header-trigger" onclick="window.toggleDrawer(event)">
   <div class="drawer-handle"></div> </div> <div class="tab-container"> <div style="position:relative; display:flex; align-items:center;">
   <button class="tab-btn active" data-target="pts-list">重要结构</button> <button class="auto-tour-btn" data-mode="pts">▶ 播放</button> </div>
-  <div style="position:relative; display:flex; align-items:center;"> <button class="tab-btn" data-target="snap-list">童画师解析</button>
+  <div id="snap-tab-wrap" style="position:relative; display:flex; align-items:center;"> <button class="tab-btn" data-target="snap-list">童画师解析</button>
   <button class="auto-tour-btn" data-mode="snap" style="display:none;">▶ 播放</button> </div> </div> </div> <div class="scroll-area" id="pts-list"></div>
   <div class="scroll-area" id="snap-list" style="display:none;"></div> </div> <div id="subtitle-panel"> <div id="subtitle-title"></div>
   <div id="subtitle-desc"></div> </div> <div id="tour-controls"> <button class="tour-ctrl-btn" id="tour-prev" title="上一个">
@@ -159,8 +160,8 @@
   if (libType === 'anatomy') {
       galleryTitleText = '头骨、骨点、肌肉';
       courseConfig = [
-          { name: '头部骨骼与肌肉', url: './docs/json/结构_头骨骨点肌肉/test01.json' },
-          { name: '头骨详解', url: './docs/json/结构_头骨骨点肌肉/3d-annotations (47).json' }, // 请自行修改为真实的 json 路径
+          { name: '头骨详解', url: './docs/json/结构_头骨骨点肌肉/01 头骨详解.json' },
+          { name: '骨点详解', url: './docs/json/结构_头骨骨点肌肉/02 骨点详解.json' }, // 请自行修改为真实的 json 路径
           { name: '头骨详解2', url: './docs/json/结构_头骨骨点肌肉/3d-annotations (48).json' },
           { name: '大象', url: './docs/json/结构_头骨骨点肌肉/3d-annotations (49).json' } // 请自行修改为真实的 json 路径
       ];
@@ -244,8 +245,8 @@
   window.triggerAnnotation(Number(id), false); }
   hitHotspot = true; break; } }
   if (isDoubleTap && !hitHotspot && !e.target.closest('#control-panel, #top-bar, #tour-controls, .custom-select-container')) { if(window.tourState.isActive) window.stopTour(); if (currentData) { currentData.pointsData.forEach(p => p.hidden = false);
-  activePointId = null; window.currentSnapshotShowTextPoints = []; document.querySelectorAll('.list-item').forEach(n => n.classList.remove('active'));
-  viewer.setAttribute('camera-target', 'auto auto auto'); viewer.setAttribute('camera-orbit', 'auto auto auto'); updateSVG(); } } }); // ==========================================
+  activePointId = null; window.currentSnapshotShowTextPoints = []; window._hasAppliedSnapshot = false; document.querySelectorAll('.list-item').forEach(n => n.classList.remove('active'));
+  viewer.setAttribute('camera-target', 'auto auto auto'); viewer.setAttribute('camera-orbit', 'auto auto auto'); applyInitialShowText(); updateSVG(); } } }); // ==========================================
   // 插件管理器基座 (PluginManager) - 消费端只读版
   // ==========================================
   window.AnnotationPluginManager = { plugins: {}, register: function(plugin) { if(plugin && plugin.id) this.plugins[plugin.id] = plugin; }, getPlugin: function(id) { return this.plugins[id]; },
@@ -285,7 +286,14 @@
   const [sr, sg, sb] = k2rgb(envSettings.sT); drawLight(envSettings.spt, envSettings.sX, envSettings.sY, 80, sr, sg, sb, true);
   viewer.setAttribute('environment-image', _lightCanvas.toDataURL('image/jpeg', 0.8)); viewer.setAttribute('exposure', peak.toString());
   viewer.setAttribute('environment-rotation', `0rad ${envSettings.envRotOffset}rad 0rad`); viewer.setAttribute('shadow-intensity', envSettings.shadow); }
-  let activePointId = null; let svgRafId = null; let _isSvgUpdating = false; function updateSVG() { if(!currentData) return; if (svgRafId) cancelAnimationFrame(svgRafId); svgRafId = requestAnimationFrame(() => { _isSvgUpdating = true;
+  let activePointId = null; let svgRafId = null; let _isSvgUpdating = false;
+  // 【初始名称可见】：进页/离开快照时按 showTextOnLoad 挂 show-text；缺省字段视为可见（1A）
+  window._hasAppliedSnapshot = false;
+  function getAnnoSlot(p) { return (p.type==='line'||p.type==='spline'||p.type==='contour')&&p.dots ? p.dots[p.midIndex||Math.floor(p.dots.length/2)].slot : p.slot; }
+  function clearShowTextClasses() { viewer.querySelectorAll('.preview-hotspot.show-text, .ink-mid.show-text').forEach(el => el.classList.remove('show-text')); }
+  function applyInitialShowText() { if (!currentData || !currentData.pointsData) return; clearShowTextClasses();
+  currentData.pointsData.forEach(p => { if (p.hidden || p.showTextOnLoad === false) return; const el = viewer.querySelector(`[slot="${getAnnoSlot(p)}"]`); if (el) el.classList.add('show-text'); }); }
+  function updateSVG() { if(!currentData) return; if (svgRafId) cancelAnimationFrame(svgRafId); svgRafId = requestAnimationFrame(() => { _isSvgUpdating = true;
   svgOverlay.setAttribute('viewBox', `0 0 ${svgOverlay.clientWidth} ${svgOverlay.clientHeight}`); let html = ''; const reads = []; // 实时计算摄像机视线向量 (用于背面剔除补偿)
   let camVec = {x:0, y:0, z:1}; if (viewer.getCameraOrbit) { const o = viewer.getCameraOrbit(); camVec.x = Math.sin(o.phi) * Math.sin(o.theta); camVec.y = Math.cos(o.phi); camVec.z = Math.sin(o.phi) * Math.cos(o.theta); }
   const isBackFace = (normStr) => { if (!normStr) return false; const [nx, ny, nz] = normStr.replace(/m/g, '').split(' ').map(Number); return (nx * camVec.x + ny * camVec.y + nz * camVec.z) < -0.05; };
@@ -300,13 +308,16 @@
   html = window.AnnotationPluginManager.dispatchRenderConsumeSVG(item, html, { defaultOpacity, hexToRgba, color, isHighlight, getRenderAlpha, lightData }); }); svgOverlay.innerHTML = html;
   requestAnimationFrame(() => { _isSvgUpdating = false; }); }); }
   window.triggerAnnotation = function(id, fromList = true) { window.currentSnapshotShowTextPoints = []; // 清除快照多选状态
+  // 离开快照后回到「进页初始名称」规则（2A）
+  if (window._hasAppliedSnapshot) { window._hasAppliedSnapshot = false; applyInitialShowText(); }
   if (fromList) { activePointId = id; document.querySelectorAll('.list-item').forEach(n => n.classList.remove('active')); const targetEl = document.getElementById(`list-item-pt-${id}`);
   if (targetEl) { targetEl.classList.add('active'); targetEl.scrollIntoView({behavior: 'auto', block: 'nearest'}); } } else {
   activePointId = activePointId === id ? null : id; }
   if(activePointId) { const p = currentData.pointsData.find(x => x.id === activePointId); if(p && p.pos && p.norm) {
   const [nx, ny, nz] = p.norm.replace(/m/g, '').split(' ').map(Number); viewer.setAttribute('camera-target', p.pos);
   viewer.setAttribute('camera-orbit', `${Math.atan2(nx, nz)*180/Math.PI}deg ${Math.acos(ny)*180/Math.PI}deg auto`); } }
-  updateSVG(); }; window.applySnapshot = function(s) { activePointId = null; window.currentSnapshotShowTextPoints = s.showTextPoints || [];
+  updateSVG(); }; window.applySnapshot = function(s) { activePointId = null; window._hasAppliedSnapshot = true; window.currentSnapshotShowTextPoints = s.showTextPoints || [];
+  clearShowTextClasses(); // 快照接管名称显隐，不再沿用进页初始设置（2A）
   if(s.camera) { viewer.setAttribute('camera-target', s.camera.target); viewer.setAttribute('camera-orbit', s.camera.orbit); viewer.setAttribute('field-of-view', s.camera.fov); }      if(s.settings) {
   if(s.settings.ambient!==undefined) envSettings.amb = s.settings.ambient; if(s.settings.ambientTemp!==undefined) envSettings.aT = s.settings.ambientTemp; if(s.settings.ambientX!==undefined) envSettings.aX = s.settings.ambientX;
   if(s.settings.ambientY!==undefined) envSettings.aY = s.settings.ambientY; if(s.settings.spot!==undefined) envSettings.spt = s.settings.spot; else if(s.settings.exposure!==undefined) envSettings.spt = s.settings.exposure;
@@ -360,7 +371,8 @@
   if(data.settings.posterize !== undefined) defaultPosterize = data.settings.posterize; if(data.settings.grayscale !== undefined) defaultGrayscale = data.settings.grayscale; }
   updateViewFilters(); updateLighting(); if(data.camera) { if(data.camera.target) viewer.setAttribute('camera-target', data.camera.target);
   if(data.camera.orbit) viewer.setAttribute('camera-orbit', data.camera.orbit); if(data.camera.fov) viewer.setAttribute('field-of-view', data.camera.fov); }
-  viewer.querySelectorAll('.preview-hotspot, .ink-anchor').forEach(el => el.remove()); data.pointsData.forEach(p => { p.hidden = false; window.AnnotationPluginManager.dispatchMountDOM(p, viewer); }); renderLists(); const hideLoading = () => {
+  viewer.querySelectorAll('.preview-hotspot, .ink-anchor').forEach(el => el.remove()); data.pointsData.forEach(p => { p.hidden = false; window.AnnotationPluginManager.dispatchMountDOM(p, viewer); });
+  window._hasAppliedSnapshot = false; applyInitialShowText(); renderLists(); const hideLoading = () => {
   setTimeout(() => { loading.style.opacity = '0'; loading.style.pointerEvents = 'none';
   document.getElementById('control-panel').style.display = 'flex'; 
   const tb = document.getElementById('top-bar'); tb.style.display = 'block'; tb.offsetHeight; tb.style.opacity = '1'; /* 模型加载完后才物理呈现菜单栏 */
@@ -377,7 +389,26 @@
   el.classList.add('active'); window.applySnapshot(s); } }); snapListEl.appendChild(el); }); ptsListEl.innerHTML = ''; let displayIdx = 1; (currentData.pointsData || []).forEach((p) => {
   if(!p.text || p.hideInList) return; const el = document.createElement('div'); el.className = 'list-item'; el.id = `list-item-pt-${p.id}`; el.innerHTML = `<div class="item-title">${p.text}</div><div class="item-index">P${displayIdx++}</div><div class="item-details">${p.desc || '暂无详细解剖说明。'}</div>`;
   el.addEventListener('pointerdown', e => { el.dataset.startX = e.clientX; el.dataset.startY = e.clientY; }); el.addEventListener('pointerup', (e) => {
-  if(Math.hypot(e.clientX - (el.dataset.startX||0), e.clientY - (el.dataset.startY||0)) < 10) { e.stopPropagation(); window.triggerAnnotation(p.id, true); } }); ptsListEl.appendChild(el); }); }
+  if(Math.hypot(e.clientX - (el.dataset.startX||0), e.clientY - (el.dataset.startY||0)) < 10) { e.stopPropagation(); window.triggerAnnotation(p.id, true); } }); ptsListEl.appendChild(el); });
+  // 无快照时不展示「童画师解析」页签；若当前停在该页则回到「重要结构」
+  const snapTabWrap = document.getElementById('snap-tab-wrap');
+  const hasSnaps = (currentData.snapshots || []).length > 0;
+  if (snapTabWrap) snapTabWrap.style.display = hasSnaps ? '' : 'none';
+  if (!hasSnaps) {
+    const snapTab = document.querySelector('.tab-btn[data-target="snap-list"]');
+    const ptsTab = document.querySelector('.tab-btn[data-target="pts-list"]');
+    const onSnap = (snapTab && snapTab.classList.contains('active')) || snapListEl.style.display !== 'none';
+    if (onSnap) {
+      if (snapTab) snapTab.classList.remove('active');
+      if (ptsTab) ptsTab.classList.add('active');
+      snapListEl.style.display = 'none';
+      ptsListEl.style.display = 'block';
+      document.querySelectorAll('.auto-tour-btn').forEach(b => b.style.display = 'none');
+      const ptsTour = document.querySelector('.auto-tour-btn[data-mode="pts"]');
+      if (ptsTour) ptsTour.style.display = 'block';
+    }
+  }
+  }
   document.querySelectorAll('.tab-btn').forEach(btn => { btn.addEventListener('pointerdown', e => { btn.dataset.startX = e.clientX; btn.dataset.startY = e.clientY; });
   btn.addEventListener('pointerup', (e) => { if(Math.hypot(e.clientX - (btn.dataset.startX||0), e.clientY - (btn.dataset.startY||0)) < 10) { e.stopPropagation();
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); e.target.classList.add('active');

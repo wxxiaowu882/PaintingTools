@@ -9,7 +9,7 @@ window.AnnotationPluginManager.register({ id: 'contour', name: '体块环绕线'
     const py = this.startY + (this.currentY - this.startY) * (i / numSegments); const hit = viewer.positionAndNormalFromPoint(px, py); if (hit) { const posStr = `${hit.position.x.toFixed(4)}m ${hit.position.y.toFixed(4)}m ${hit.position.z.toFixed(4)}m`; const normStr = `${hit.normal.x.toFixed(4)}m ${hit.normal.y.toFixed(4)}m ${hit.normal.z.toFixed(4)}m`;
     const slotName = `hotspot-contour-${pointIndex}-${collectedDots.length}`; collectedDots.push({ slot: slotName, pos: posStr, norm: normStr }); } }
     if (collectedDots.length > 2) { const midIndex = Math.floor(collectedDots.length / 2); const midDot = collectedDots[midIndex];
-    pointsData.push({ id: pointIndex, type: 'contour', slot: midDot.slot, pos: midDot.pos, norm: midDot.norm, text: `截面线 ${pointIndex}`, dots: collectedDots, midIndex: midIndex, color: defaultColor, hidden: false });
+    pointsData.push({ id: pointIndex, type: 'contour', slot: midDot.slot, pos: midDot.pos, norm: midDot.norm, text: `截面线 ${pointIndex}`, dots: collectedDots, midIndex: midIndex, color: defaultColor, hidden: false, showTextOnLoad: true });
     this.mountDOM(pointsData[pointsData.length-1], viewer); if(typeof renderState !== 'undefined') renderState(); if(typeof updateSVG !== 'undefined') updateSVG();
     const statusMsg = document.getElementById('status-msg'); if(statusMsg) statusMsg.innerText = `体块环绕线 ${pointIndex} 完美贴合生成`; pointIndex++; } else { const statusMsg = document.getElementById('status-msg');
     if(statusMsg) statusMsg.innerText = `划线未击中模型主体，截取取消`; if(typeof updateSVG !== 'undefined') updateSVG(); } } else { if(typeof updateSVG !== 'undefined') updateSVG(); } } },
