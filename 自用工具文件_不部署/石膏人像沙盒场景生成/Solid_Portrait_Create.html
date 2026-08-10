@@ -67,9 +67,10 @@
     <div class="editor-panel-resize-handle editor-panel-resize-handle-right" data-panel="left" title="拖拽调节左栏宽度" aria-hidden="true"></div>
     <div class="editor-panel-left-top"><div style="display:flex; gap:6px; margin-bottom:6px;">
     <button class="editor-btn" style="background:#8e44ad; border-color:#9b59b6; flex:1; margin-bottom:0; font-weight:bold;" onclick="mountWorkDirectory()">📂 挂载新目录</button>
-    <button class="editor-btn" style="background:#34495e; border-color:#2c3e50; flex:1; margin-bottom:0; font-weight:bold;" onclick="createNewScene()">📄 新建场景</button></div><div style="display:flex; gap:6px; margin-bottom:8px;">
+    <button class="editor-btn" style="background:#34495e; border-color:#2c3e50; flex:1; margin-bottom:0; font-weight:bold;" onclick="createNewScene()">📄 新建场景</button></div><div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
     <button type="button" id="btn-quick-geometry" class="editor-btn quick-dir-btn" style="background:#2c3e50; border-color:#34495e; flex:1; margin-bottom:0; font-size:11px; padding:6px;" onclick="loadQuickDir('geometry')" oncontextmenu="event.preventDefault(); loadQuickDir('geometry', true)" title="【左键】一键加载该库&#10;【右键】重新绑定文件夹">⚡ 沙盒_几何体静物</button>
-    <button type="button" id="btn-quick-portrait" class="editor-btn quick-dir-btn" style="background:#2c3e50; border-color:#34495e; flex:1; margin-bottom:0; font-size:11px; padding:6px;" onclick="loadQuickDir('portrait')" oncontextmenu="event.preventDefault(); loadQuickDir('portrait', true)" title="【左键】一键加载该库&#10;【右键】重新绑定文件夹">⚡ 沙盒_肖像光影</button></div></div>
+    <button type="button" id="btn-quick-portrait" class="editor-btn quick-dir-btn" style="background:#2c3e50; border-color:#34495e; flex:1; margin-bottom:0; font-size:11px; padding:6px;" onclick="loadQuickDir('portrait')" oncontextmenu="event.preventDefault(); loadQuickDir('portrait', true)" title="【左键】一键加载该库&#10;【右键】重新绑定文件夹">⚡ 沙盒_肖像光影</button>
+    <button type="button" id="btn-quick-headform" class="editor-btn quick-dir-btn" style="background:#2c3e50; border-color:#34495e; flex:1; margin-bottom:0; font-size:11px; padding:6px;" onclick="loadQuickDir('headform')" oncontextmenu="event.preventDefault(); loadQuickDir('headform', true)" title="【左键】一键加载该库&#10;【右键】重新绑定文件夹">⚡ 沙盒_头部造型规律</button></div></div>
     <div id="file-list-container" style="display:none;"></div>
     <div class="editor-panel-left-meta">
     <input type="text" id="scene-name-input" class="scene-name-field" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="输入新场景名称 (留空自动生成)">
@@ -1295,22 +1296,24 @@
             if (await tryMountHandle(g, "已自动恢复快捷目录：几何体静物")) return true;
             const p = await getDirHandle('portrait');
             if (await tryMountHandle(p, "已自动恢复快捷目录：肖像光影")) return true;
+            const h = await getDirHandle('headform');
+            if (await tryMountHandle(h, "已自动恢复快捷目录：头部造型规律")) return true;
     
             return false;
         } catch(_e) { return false; }
         }
         window.syncQuickDirButtons = async function() {
-        const gBtn = document.getElementById('btn-quick-geometry'); const pBtn = document.getElementById('btn-quick-portrait');
+        const gBtn = document.getElementById('btn-quick-geometry'); const pBtn = document.getElementById('btn-quick-portrait'); const hBtn = document.getElementById('btn-quick-headform');
         const baseStyle = 'background:#2c3e50; border-color:#34495e; flex:1; margin-bottom:0; font-size:11px; padding:6px;';
         const onStyle = 'background:rgba(46,204,113,0.2); border-color:#2ecc71; flex:1; margin-bottom:0; font-size:11px; padding:6px;';
-        if (!gBtn || !pBtn) return;
-        if (!window.workDirHandle) { gBtn.style.cssText = baseStyle; pBtn.style.cssText = baseStyle; return; }
-        let gOn = false, pOn = false;
+        if (!gBtn || !pBtn || !hBtn) return;
+        if (!window.workDirHandle) { gBtn.style.cssText = baseStyle; pBtn.style.cssText = baseStyle; hBtn.style.cssText = baseStyle; return; }
+        let gOn = false, pOn = false, hOn = false;
         try {
-        const gH = await getDirHandle('geometry'); const pH = await getDirHandle('portrait'); const w = window.workDirHandle;
-        if (gH) gOn = await handlesSameDirEntry(w, gH); if (pH) pOn = await handlesSameDirEntry(w, pH);
+        const gH = await getDirHandle('geometry'); const pH = await getDirHandle('portrait'); const hH = await getDirHandle('headform'); const w = window.workDirHandle;
+        if (gH) gOn = await handlesSameDirEntry(w, gH); if (pH) pOn = await handlesSameDirEntry(w, pH); if (hH) hOn = await handlesSameDirEntry(w, hH);
         } catch (e) { console.warn(e); }
-        gBtn.style.cssText = gOn ? onStyle : baseStyle; pBtn.style.cssText = pOn ? onStyle : baseStyle;
+        gBtn.style.cssText = gOn ? onStyle : baseStyle; pBtn.style.cssText = pOn ? onStyle : baseStyle; hBtn.style.cssText = hOn ? onStyle : baseStyle;
         };
         window.loadQuickDir = async function(key, forceRebind = false) { try { let handle = forceRebind ? null : await getDirHandle(key); if (handle) { const perm = await handle.queryPermission({mode: 'readwrite'}); if (perm !== 'granted') { if (await handle.requestPermission({mode: 'readwrite'}) !== 'granted') { handle = null; } } } if (!handle) { window.showToast(forceRebind ? "请选择新的文件夹进行绑定" : "首次绑定或权限过期，请选择并授权文件夹", false); handle = await window.showDirectoryPicker({id: 'solid_create_quick', mode: 'readwrite'}); await saveDirHandle(key, handle); } window.workDirHandle = handle; try { await saveDirHandle('lastWorkDir', handle); } catch(_e) {} window.currentFileHandle = null; window.targetMasterFilename = null; const container = document.getElementById('file-list-container'); container.style.display = 'block'; container.innerHTML = '<div style="color:#2ecc71; margin-bottom:4px; text-align:center;">读取中...</div>'; await window.refreshFileList(); window.showToast(forceRebind ? "已成功重新绑定快捷目录" : "成功挂载快捷目录"); } catch(e) { window.showToast("快捷挂载失败或取消", true); } };
         window.refreshFileList = async function() { if(!window.workDirHandle) { await window.syncQuickDirButtons(); return; } const container = document.getElementById('file-list-container');

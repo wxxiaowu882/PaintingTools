@@ -13,7 +13,7 @@
         
         { type: 'category', text: '肖像' },
         { id: '02', text: '头骨 · 骨点 · 肌肉', url: 'Portrait_c.html?lib=anatomy', color: '#A855F7' },
-        { id: '03', text: '头部造型规律', url: 'Portrait_c.html?lib=form', color: '#D946EF' },
+        { id: '03', text: '头部造型规律', url: 'solid.html?sandbox=headform', color: '#D946EF' },
         { id: '04', text: '肖像光影沙盒', url: 'solid.html?sandbox=portrait', color: '#F43F5E' },
         { id: '05', text: '吴晓的作品', url: 'Gallery.html', color: '#EC4899' },
         { id: '06', text: '课程预约', url: '', disabled: true, tag: 'Coming Soon' },

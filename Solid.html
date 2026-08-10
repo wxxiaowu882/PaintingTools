@@ -1625,14 +1625,32 @@
     };
     function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
     
+        (function solidInitSandboxMeta() {
+            const _qs0 = new URLSearchParams(window.location.search || '');
+            let sk = String(_qs0.get('sandbox') || 'geometry').toLowerCase();
+            if (sk !== 'geometry' && sk !== 'portrait' && sk !== 'headform') sk = 'geometry';
+            window.__solidSandboxKey = sk;
+            const metaBySandbox = {
+                geometry: { title: '几何光影观察 · 视觉维度', description: '专为绘画初学者设计的3D几何体光影观察工具，实时调节光源位置、强度，模拟真实石膏素描明暗调子。' },
+                portrait: { title: '肖像光影沙盒 · 视觉维度', description: '在3D光影画室里观察肖像明暗与体块，实时调节光源，练就写生眼力。' },
+                headform: { title: '头部造型规律 · 视觉维度', description: '用光影看头部体块与造型规律。' }
+            };
+            const m = metaBySandbox[sk] || metaBySandbox.geometry;
+            try { document.title = m.title; } catch (_eT) {}
+            try {
+                let el = document.querySelector('meta[name="description"]');
+                if (!el) { el = document.createElement('meta'); el.setAttribute('name', 'description'); document.head.appendChild(el); }
+                el.setAttribute('content', m.description);
+            } catch (_eD) {}
+        })();
         window.loadJSONData = function() { setLoaderText("获取场景配置数据...");
         document.getElementById('scene-loader').style.display = 'flex'; document.getElementById('scene-loader').style.opacity = '1';
         const _qs = new URLSearchParams(window.location.search || '');
         // 默认启用 v2（demo）列表样式；如需回退旧网格：?sceneListV2=0
         const _forceV2 = (_qs.get('sceneListV2') || '') !== '0';
         if (_forceV2) { try { document.documentElement.classList.add('solid-scene-list-v2'); } catch(_e) {} }
-        const _sandboxKey = (_qs.get('sandbox') || 'geometry').toLowerCase();
-        const _solidJsonBySandbox = { geometry: './docs/json/沙盒_几何体静物/沙盒_几何体静物.json', portrait: './docs/json/沙盒_肖像光影沙盒/沙盒_肖像光影沙盒.json' };
+        const _sandboxKey = window.__solidSandboxKey || 'geometry';
+        const _solidJsonBySandbox = { geometry: './docs/json/沙盒_几何体静物/沙盒_几何体静物.json', portrait: './docs/json/沙盒_肖像光影沙盒/沙盒_肖像光影沙盒.json', headform: './docs/json/沙盒_头部造型规律/沙盒_头部造型规律.json' };
         const _sceneJsonUrl = _solidJsonBySandbox[_sandboxKey] || _solidJsonBySandbox.geometry;
         fetch(_sceneJsonUrl).then(async (res) => {
         let data = [];
@@ -1651,14 +1669,40 @@
         // 关闭按钮始终可见；若未选择场景则 closeSceneGridModal 会拦截，避免黑屏
         document.querySelector('.modal-close').style.display = 'inline-flex'; } else { setLoaderText("场景库为空..."); window.isUnsupported=true; }
         }).catch(err => { addHwLog("JSON请求或解析失败: " + err.message); document.getElementById('scene-loader').style.display='none'; }); };
-        const SOLID_FAV_STORAGE_KEY = 'SolidConsumer_Favorites_v1';
-        const SOLID_FAV_VIEW_KEY = 'SolidConsumer_FavoritesView_v1';
-        const SOLID_SCENE_CATEGORIES = ['几何体', '色彩', '氛围', '构图', '几何体写生', '静物写生'];
+        const SOLID_FAV_LEGACY_KEY = 'SolidConsumer_Favorites_v1';
+        const SOLID_FAV_VIEW_LEGACY_KEY = 'SolidConsumer_FavoritesView_v1';
+        function solidFavStorageKey() { return 'SolidConsumer_Favorites_v1_' + (window.__solidSandboxKey || 'geometry'); }
+        function solidFavViewStorageKey() { return 'SolidConsumer_FavoritesView_v1_' + (window.__solidSandboxKey || 'geometry'); }
+        function solidMaybeMigrateFavKeys() {
+            try {
+                const sk = window.__solidSandboxKey || 'geometry';
+                const nk = solidFavStorageKey();
+                if (localStorage.getItem(nk) == null) {
+                    const legacy = localStorage.getItem(SOLID_FAV_LEGACY_KEY);
+                    if (legacy != null && (sk === 'geometry' || sk === 'portrait')) localStorage.setItem(nk, legacy);
+                    else if (localStorage.getItem(nk) == null) localStorage.setItem(nk, '[]');
+                }
+                const nvk = solidFavViewStorageKey();
+                if (localStorage.getItem(nvk) == null) {
+                    const legacyV = localStorage.getItem(SOLID_FAV_VIEW_LEGACY_KEY);
+                    if (legacyV != null && (sk === 'geometry' || sk === 'portrait')) localStorage.setItem(nvk, legacyV);
+                    else localStorage.setItem(nvk, 'all');
+                }
+            } catch (_eMig) {}
+        }
+        solidMaybeMigrateFavKeys();
+        const SOLID_SCENE_CATEGORIES_DEFAULT = ['几何体', '色彩', '氛围', '构图', '几何体写生', '静物写生'];
+        function solidSceneCategories() {
+            const sk = window.__solidSandboxKey || 'geometry';
+            if (sk === 'headform' || sk === 'portrait') return [];
+            return SOLID_SCENE_CATEGORIES_DEFAULT;
+        }
         function solidSceneCategoryOf(sceneData) {
             try {
+                const cats = solidSceneCategories();
                 const c = sceneData && sceneData.meta ? sceneData.meta.category : '';
                 const s = String(c == null ? '' : c).trim();
-                return SOLID_SCENE_CATEGORIES.indexOf(s) >= 0 ? s : '';
+                return cats.indexOf(s) >= 0 ? s : '';
             } catch (_e) { return ''; }
         }
         function solidSceneKey(sceneData, idx) {
@@ -1671,7 +1715,8 @@
         }
         function solidLoadFavSet() {
             try {
-                const raw = localStorage.getItem(SOLID_FAV_STORAGE_KEY);
+                solidMaybeMigrateFavKeys();
+                const raw = localStorage.getItem(solidFavStorageKey());
                 if (!raw) return new Set();
                 const arr = JSON.parse(raw);
                 if (!Array.isArray(arr)) return new Set();
@@ -1679,22 +1724,25 @@
             } catch (_e) { return new Set(); }
         }
         function solidSaveFavSet(set) {
-            try { localStorage.setItem(SOLID_FAV_STORAGE_KEY, JSON.stringify(Array.from(set))); } catch (_e) {}
+            try { localStorage.setItem(solidFavStorageKey(), JSON.stringify(Array.from(set))); } catch (_e) {}
         }
         function solidGetFavViewMode() {
             try {
-                const v = localStorage.getItem(SOLID_FAV_VIEW_KEY);
+                solidMaybeMigrateFavKeys();
+                const cats = solidSceneCategories();
+                const v = localStorage.getItem(solidFavViewStorageKey());
                 if (v === 'fav' || v === 'all') return v;
-                if (SOLID_SCENE_CATEGORIES.indexOf(v) >= 0) return v;
+                if (cats.indexOf(v) >= 0) return v;
                 return 'all';
             } catch (_e) { return 'all'; }
         }
         function solidSetFavViewMode(v) {
             try {
+                const cats = solidSceneCategories();
                 let next = 'all';
                 if (v === 'fav' || v === 'all') next = v;
-                else if (SOLID_SCENE_CATEGORIES.indexOf(v) >= 0) next = v;
-                localStorage.setItem(SOLID_FAV_VIEW_KEY, next);
+                else if (cats.indexOf(v) >= 0) next = v;
+                localStorage.setItem(solidFavViewStorageKey(), next);
             } catch (_e) {}
         }
         function buildSceneGridUI(dataArr) {
@@ -1714,9 +1762,10 @@
                 wrap.insertBefore(tab, container);
             }
             const mode = solidGetFavViewMode();
+            const cats = solidSceneCategories();
             let tabHtml = `<button type="button" class="scene-tab ${mode === 'all' ? 'active' : ''}" data-mode="all">全部</button>`;
-            for (let ci = 0; ci < SOLID_SCENE_CATEGORIES.length; ci++) {
-                const cat = SOLID_SCENE_CATEGORIES[ci];
+            for (let ci = 0; ci < cats.length; ci++) {
+                const cat = cats[ci];
                 tabHtml += `<button type="button" class="scene-tab ${mode === cat ? 'active' : ''}" data-mode="${escapeHtml(cat)}">${escapeHtml(cat)}</button>`;
             }
             tabHtml += `<button type="button" class="scene-tab ${mode === 'fav' ? 'active' : ''}" data-mode="fav">收藏夹（${favCount}）</button>`;

@@ -159,7 +159,7 @@
   let courseConfig = [];
   let galleryTitleText = '';
   
-  // 动态构建两套不同的内容矩阵
+  // 动态构建内容矩阵（头部造型规律已迁至 Solid?sandbox=headform）
   if (libType === 'anatomy') {
       galleryTitleText = '头骨、骨点、肌肉';
       courseConfig = [
@@ -167,12 +167,6 @@
           { name: '骨点详解', url: './docs/json/结构_头骨骨点肌肉/02 骨点详解.json' }, // 请自行修改为真实的 json 路径
           { name: '肌肉详解', url: './docs/json/结构_头骨骨点肌肉/03 肌肉详解.json' }
           
-      ];
-  } else if (libType === 'form') {
-      galleryTitleText = '头部造型规律';
-      courseConfig = [
-          { name: '阿萨罗头部体块', url: './docs/json/结构_头部造型规律/form01.json' }, // 请自行修改为真实的 json 路径
-          { name: '五官几何概括', url: './docs/json/结构_头部造型规律/form02.json' }
       ];
   }
 
