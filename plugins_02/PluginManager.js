@@ -36,6 +36,34 @@ window.PluginManager = { plugins: [], // 【1. 核心状态隔离区 Core.State�
         });
     },
 
+    /** Shift+Alt 新建标注模式（生产端让路：旧标注不抢鼠标） */
+    ALT_SHIFT_DRAW_MODES: ['annotate', 'annotate-color', 'dashed-line', 'straight-line', 'polygon3d'],
+
+    _modifierDown: function(e, name) {
+        if (!e) return false;
+        const key = name === 'Alt' ? 'altKey' : (name === 'Shift' ? 'shiftKey' : null);
+        if (key && e[key]) return true;
+        if (typeof e.getModifierState === 'function') {
+            try { return e.getModifierState(name); } catch (_e) {}
+        }
+        return false;
+    },
+
+    isAltShiftDrawMode: function() {
+        const mode = window.currentEditorMode;
+        return this.ALT_SHIFT_DRAW_MODES.indexOf(mode) >= 0;
+    },
+
+    isAltShiftDrawIntent: function(e) {
+        if (window.__SOLID_CONSUMER__) return false;
+        if (!this.isAltShiftDrawMode()) return false;
+        return this._modifierDown(e, 'Alt') && this._modifierDown(e, 'Shift');
+    },
+
+    shouldBlockAnnoSelection: function(e) {
+        return this.isAltShiftDrawIntent(e);
+    },
+
     setMode: function(mode) {
         this.cancelInteractivePlacing({ reason: 'mode', nextMode: mode });
         this.State.currentMode = mode;

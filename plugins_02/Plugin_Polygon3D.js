@@ -169,6 +169,7 @@ window.poly3dList = []; window.poly3dCounter = 0; window.Polygon3DManager = { se
         fillPath.setAttribute('fill', `url(#${gradId})`);
     }
     finalGroup.appendChild(hitPath); finalGroup.appendChild(fillPath); finalGroup.appendChild(blendPath); finalGroup.appendChild(strokePath); container.appendChild(finalGroup);     finalGroup.addEventListener('pointerdown', e => {
+    if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return;
     if (window.__SOLID_CONSUMER__) {
         e.stopPropagation();
         if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {

@@ -383,6 +383,7 @@ window.ColorSampleAnnotationManager = {
         ring.setAttribute('stroke-width', RING_W);
         ring.setAttribute('stroke-linejoin', 'round');
         ring.addEventListener('pointerdown', e => {
+            if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return;
             e.stopPropagation();
             if (window.__SOLID_CONSUMER__) {
                 if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
@@ -408,6 +409,7 @@ window.ColorSampleAnnotationManager = {
         endC.setAttribute('stroke', END_STROKE_COLOR);
         endC.setAttribute('stroke-width', String(END_STROKE_W));
         endC.addEventListener('pointerdown', e => {
+            if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return;
             e.stopPropagation();
             if (window.__SOLID_CONSUMER__) {
                 if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
@@ -483,6 +485,7 @@ window.ColorSampleAnnotationManager = {
             label.style.backgroundColor = getDarkBg(data.lineColor || '#00d2ff');
 
             label.addEventListener('pointerdown', e => {
+                if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return;
                 e.stopPropagation();
                 if (window.__SOLID_CONSUMER__) {
                     if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {

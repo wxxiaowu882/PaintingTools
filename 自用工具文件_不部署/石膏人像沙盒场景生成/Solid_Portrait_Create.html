@@ -60,7 +60,22 @@
     #mobile-frame-overlay{position:fixed;inset:0;pointer-events:none;z-index:200;display:flex;align-items:center;justify-content:center;}
     #mobile-frame-overlay[hidden]{display:none !important;} .mobile-frame-wrap{position:relative;will-change:width,height;transform:translateZ(0);}
     .mobile-frame-outer{position:absolute;inset:0;border:1px solid rgba(255,255,255,0.18);border-radius:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.35) inset;}
-    .mobile-frame-safe{position:absolute;left:0;right:0;top:0;bottom:0;border:1px dashed rgba(255,255,255,0.12);border-radius:10px;} .mobile-frame-shade{position:absolute;background:rgba(0,0,0,0.10);}
+    .mobile-frame-safe{position:absolute;left:0;right:0;top:0;bottom:0;border:1px dashed rgba(255,255,255,0.12);border-radius:10px;}     .mobile-frame-shade{position:absolute;background:rgba(0,0,0,0.10);}
+    /* Shift+Alt 新建标注：旧标注层让路（无手形、不抢点击） */
+    html.solid-anno-draw-pass-through #anno-layer,
+    html.solid-anno-draw-pass-through #anno-cs-layer,
+    html.solid-anno-draw-pass-through #norm-arrow-layer,
+    html.solid-anno-draw-pass-through #poly3d-layer,
+    html.solid-anno-draw-pass-through #dashed-line-layer,
+    html.solid-anno-draw-pass-through #prober-html-layer,
+    html.solid-anno-draw-pass-through #anno-layer *,
+    html.solid-anno-draw-pass-through #anno-cs-layer *,
+    html.solid-anno-draw-pass-through #norm-arrow-layer *,
+    html.solid-anno-draw-pass-through #poly3d-layer *,
+    html.solid-anno-draw-pass-through #dashed-line-layer *,
+    html.solid-anno-draw-pass-through #prober-html-layer * { pointer-events: none !important; cursor: crosshair !important; }
+    html.solid-anno-draw-pass-through #canvas-container,
+    html.solid-anno-draw-pass-through #canvas-container canvas { cursor: crosshair !important; }
     </style> </head> <body><!-- 截取框默认隐藏 --> <div id="crop-box" style="display:none; position:fixed; border:2px dashed #2ecc71; width:256px; height:256px; top:calc(50% - 128px); left:calc(50% - 128px); z-index:400; pointer-events:none; outline: 9999px solid rgba(0,0,0,0.6);">
     <div id="crop-drag-handle" style="position:absolute; top:0; left:0; width:100%; height:24px; background:rgba(46, 204, 113, 0.8); pointer-events:auto; cursor:move; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold; user-select:none;">拖拽此处移动截取框</div><div id="crop-resize-handle" style="position:absolute; right:-7px; bottom:-7px; width:14px; height:14px; background:#fff; border:2px solid #2ecc71; border-radius:50%; pointer-events:auto; cursor:nwse-resize; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div></div> <!-- 编辑器专属面板 -->
     <div class="editor-panel editor-panel-left" id="editor-panel-left">
@@ -106,6 +121,8 @@
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"> <span style="font-size:11px; color:#bbb; white-space:nowrap;">标注模式：</span>
     <select id="tool-mode-select" class="editor-select" style="margin:0; flex:1; padding:3px; background:#111; color:#0df; border-color:#444;" onchange="setMode(this.value)">
     <option value="none">未选择标注工具…</option> <option value="annotate">🏷️ 经典引出线 [Alt+Shift+划动]</option> <option value="annotate-color">🎨 屏幕取色引线 [Alt+Shift+划动]</option>
+    <option value="dashed-line">📏 连续虚线 [Alt+Shift+划动]</option>
+    <option value="straight-line">📐 直线 [Alt+Shift+左键点两点]</option>
     <option value="normal-arrow">↗️ 法线箭头 [Alt+左击]</option> <option value="polygon3d">🟩 3D光影面片 [Alt+Shift+悬停滑动]</option> <option value="prober">💡 受光探针 [直接点击]</option> </select></div>
     <div id="solid-create-anno-detail-wrap" style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; gap:8px;"> <span id="solid-create-anno-detail-hint" style="font-size:10px; color:#888; letter-spacing:0.5px;">未选中标注</span> </div>
     <label for="solid-create-anno-detail" style="font-size:10px; color:#aaa; display:block; margin-bottom:4px;">引线详细说明</label> <textarea id="solid-create-anno-detail" rows="4" disabled placeholder="在场景中点击选中一条标注后，在此输入说明…" style="width:100%; box-sizing:border-box; resize:vertical; min-height:72px; max-height:200px; padding:6px 8px; font-size:11px; line-height:1.45; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.18); border-radius:4px; color:#eee; outline:none; font-family:inherit;"></textarea> </div><div style="display:flex; justify-content:space-between; margin-bottom:0;">
@@ -2219,6 +2236,7 @@
         if (window.AnnotationManager && window.AnnotationManager.selectedId) return; // 引线颜色交由标注插件底层接管
         if (window.ColorSampleAnnotationManager && window.ColorSampleAnnotationManager.selectedId) return;
         if (window.NormalArrowManager && window.NormalArrowManager.selectedId) return; // 法线颜色交由法线插件底层接管
+        if (window.DashedLineManager && window.DashedLineManager.selectedId) return; // 虚线颜色交由虚线插件底层接管
         // 解除锁定：无论在什么材质预览模式下，都允许直接更改底层的定制颜色
         if (transformControl.object && transformControl.object.userData.type === 'builtin') { transformControl.object.userData.customColor = colorHex;
         transformControl.object.traverse(child => { if (child.isMesh && child.material) { child.material.color.set(colorHex); child.userData.customColor = colorHex; } });
@@ -2618,19 +2636,29 @@
         const model = gltf.scene; solidCreateStampGlbModelMaterials(model); const box = new THREE.Box3().setFromObject(model); const size = box.getSize(new THREE.Vector3()); if (size.y > 0.001) { const scaleFactor = 4.0 / size.y; model.scale.set(scaleFactor, scaleFactor, scaleFactor); }
         box.setFromObject(model); const center = box.getCenter(new THREE.Vector3()); const minY = box.min.y; model.position.x -= center.x; model.position.z -= center.z; model.position.y -= minY;
         model.userData = { type: 'glb', url: solidCreateNormalizeModelUrlForJson(url) }; editorGroup.add(model); transformControl.attach(model); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_glb'); } catch (_ePl) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { window.changeMat(window.matType); } catch (_eMat) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }, (error) => { alert("模型加载失败，请检查路径是否对应 '../../docs/model/' 目录"); }); };
-        window.currentEditorMode = 'translate'; window.setMode = function(mode) { 
+        window.currentEditorMode = 'translate';
+        window.syncSolidAnnoDrawPassThrough = function(e) {
+            const pm = window.PluginManager;
+            const on = pm && typeof pm.isAltShiftDrawIntent === 'function' && pm.isAltShiftDrawIntent(e);
+            try {
+                if (on) document.documentElement.classList.add('solid-anno-draw-pass-through');
+                else document.documentElement.classList.remove('solid-anno-draw-pass-through');
+            } catch (_e) {}
+        };
+        window.setMode = function(mode) { 
         // 【优化1】：支持点击已激活的变换按钮取消激活（最多只有一个激活，也可以全不激活）
         if (window.currentEditorMode === mode && ['translate', 'rotate', 'scale'].includes(mode)) { mode = 'none'; }
         window.currentEditorMode = mode;
         // PluginManager.setMode 内会 cancelInteractivePlacing（取色/引线放置中、面片绘制中等），勿绕开。
         if (window.PluginManager && typeof window.PluginManager.setMode === 'function') { window.PluginManager.setMode(mode); }
+        window.syncSolidAnnoDrawPassThrough(null);
         const toolSelect = document.getElementById('tool-mode-select'); if (toolSelect) { 
-        if (mode === 'annotate' || mode === 'annotate-color' || mode === 'normal-arrow' || mode === 'polygon3d' || mode === 'prober') { toolSelect.value = mode; }
+        if (mode === 'annotate' || mode === 'annotate-color' || mode === 'dashed-line' || mode === 'straight-line' || mode === 'normal-arrow' || mode === 'polygon3d' || mode === 'prober') { toolSelect.value = mode; }
         else { toolSelect.value = 'none'; } }
         if(mode === 'translate' || mode === 'rotate' || mode === 'scale') { transformControl.setMode(mode);
         if(window.selectedObj) transformControl.attach(window.selectedObj); document.body.style.cursor = 'default'; } else { transformControl.detach(); 
         // 移除 window.selectedObj = null，使得在全不激活的状态下依然能选中模型上色
-        document.body.style.cursor = mode === 'none' ? 'default' : 'crosshair'; if(mode === 'annotate') window.showToast("引线快捷键：按住 Alt+Shift+左键 划动"); else if(mode === 'annotate-color') window.showToast("取色引线：按住 Alt+Shift+左键 划动（颜色随画面实时变化）"); else if(mode === 'normal-arrow') window.showToast("法线快捷键：按住 Alt+左键 点击"); else if(mode === 'prober') window.showToast("受光探针：直接点击模型表面"); }
+        document.body.style.cursor = mode === 'none' ? 'default' : 'crosshair'; if(mode === 'annotate') window.showToast("引线快捷键：按住 Alt+Shift+左键 划动"); else if(mode === 'annotate-color') window.showToast("取色引线：按住 Alt+Shift+左键 划动（颜色随画面实时变化）"); else if(mode === 'dashed-line') window.showToast("连续虚线：按住 Alt+Shift 在模型表面划动"); else if(mode === 'straight-line') window.showToast("直线：按住 Alt+Shift，左键点起点，再点终点"); else if(mode === 'normal-arrow') window.showToast("法线快捷键：按住 Alt+左键 点击"); else if(mode === 'prober') window.showToast("受光探针：直接点击模型表面"); }
         solidCreateSyncTransformSpace();
         ['trans', 'rot', 'scale'].forEach(id => { const btn = document.getElementById('btn-' + id); if (btn) btn.classList.remove('active'); });
         if(mode === 'translate') document.getElementById('btn-trans').classList.add('active');
@@ -2667,7 +2695,17 @@
                 else if (tryOne(window.NormalArrowManager, window.normArrowList, '法线箭头')) {}
                 else if (tryOne(window.Polygon3DManager, window.poly3dList, '3D 光影面片')) {}
                 else if (tryOne(window.ProberManager, window.proberList, '受光探针')) {}
-                else if (tryOne(window.DashedLineManager, window.dashedLineList, '虚线标注')) {}
+                else if (window.DashedLineManager && window.DashedLineManager.selectedId != null && Array.isArray(window.dashedLineList)) {
+                    const _dl = window.dashedLineList.find(function (a) { return a.id === window.DashedLineManager.selectedId; });
+                    if (_dl && _dl.kind !== 'straight') {
+                        text = _dl.detailText != null ? String(_dl.detailText) : '';
+                        title = '虚线标注';
+                        active = true;
+                    } else if (_dl && _dl.kind === 'straight') {
+                        title = '直线（无文字）';
+                        active = false;
+                    }
+                }
                 ta.disabled = !active;
                 ta.value = text;
                 if (hint) hint.textContent = title;
@@ -2687,7 +2725,10 @@
                 else if (setOn(window.NormalArrowManager, window.normArrowList)) {}
                 else if (setOn(window.Polygon3DManager, window.poly3dList)) {}
                 else if (setOn(window.ProberManager, window.proberList)) {}
-                else if (setOn(window.DashedLineManager, window.dashedLineList)) {}
+                else if (window.DashedLineManager && window.DashedLineManager.selectedId != null && Array.isArray(window.dashedLineList)) {
+                    const _dl = window.dashedLineList.find(function (a) { return a.id === window.DashedLineManager.selectedId; });
+                    if (_dl && _dl.kind !== 'straight') { _dl.detailText = v; }
+                }
                 if (typeof needsUpdate !== 'undefined') needsUpdate = true;
                 try { if (typeof markDraftDirty === 'function') markDraftDirty(); } catch(_e) {}
             });
@@ -2877,7 +2918,10 @@
         window.addEventListener('pointerdown', e => { if (__solidCreateDebugEnabled) window.hwLog(`[Log-Down] pointerdown 触发. x:${e.clientX}, y:${e.clientY}, target:${e.target.tagName}`); mouseDownPos = {x: e.clientX, y: e.clientY}; window.mouseDownTarget = e.target; }, true); // 【强制防吞事件】：在 window 的捕获阶段(true)第一时间锁定真实点击坐标！
         /* Alt+取色/引线：须在 window 捕获阶段、且晚于上一行 mouseDownPos 之后拦截。canvas 上 TransformControls 先于本页监听器注册，仅用 stopPropagation 无法挡住它；Orbit 在 container 上吃 Shift+左键平移。此处 stopImmediatePropagation 终止整次派发，避免与 Alt+Shift 抢指针。 */
         window.addEventListener('pointerdown', function solidCreateAltSceneHitWinCapture(e) {
-        const t = e.target; if (t !== renderer.domElement && (!t || t.id !== 'canvas-container')) return;
+        const t = e.target;
+        const pm = window.PluginManager;
+        const altShiftDraw = pm && typeof pm.isAltShiftDrawIntent === 'function' && pm.isAltShiftDrawIntent(e);
+        if (!altShiftDraw && t !== renderer.domElement && (!t || t.id !== 'canvas-container')) return;
         if (e.button !== 0) return;
         const altDown = e.altKey || (typeof e.getModifierState === 'function' && e.getModifierState('Alt'));
         if (!altDown) return;
@@ -2897,8 +2941,11 @@
         document.getElementById('canvas-container').addEventListener('pointerdown', e => {
         if (window.__solidLightIndicatorShow) { try { window.__solidLightIndicatorShow(600); } catch (_eLiDown) {} }
         if (window.PluginManager && window.PluginManager.triggerEvent('onBeforePointerDown', e) === true) return; }); window.addEventListener('pointermove', e => { // 【事件解耦】：核心只负责广播鼠标移动，具体的位移计算交给正在激活的插件
+        if (typeof window.syncSolidAnnoDrawPassThrough === 'function') window.syncSolidAnnoDrawPassThrough(e);
         if (window.PluginManager) { window.PluginManager.triggerEvent('onGlobalPointerMove', { event: e, startX: mouseDownPos.x, startY: mouseDownPos.y }); } });
-        window.addEventListener('pointerup', e => { 
+        window.addEventListener('keydown', e => { if (typeof window.syncSolidAnnoDrawPassThrough === 'function') window.syncSolidAnnoDrawPassThrough(e); }, true);
+        window.addEventListener('keyup', e => { if (typeof window.syncSolidAnnoDrawPassThrough === 'function') window.syncSolidAnnoDrawPassThrough(e); }, true);
+        window.addEventListener('pointerup', e => {
         const __d = !!__solidCreateDebugEnabled;
         if (__d) window.hwLog(`[Log-Up] pointerup 触发. mode:${window.currentEditorMode}, dragging:${transformControl.dragging}, axis:${transformControl.axis}, hasObj:${!!transformControl.object}`);
         if (transformControl.dragging || (transformControl.object && transformControl.axis !== null)) { if (__d) window.hwLog(`[Log-Up] 拦截 1: dragging 或悬停在轴上`); return; } // 【修复幽灵轴】：只有真正挂载了模型时，才允许因悬停在轴上而拦截点击！
@@ -2957,7 +3004,7 @@
         (function syncToolModeSelectUI() {
         const ts = document.getElementById('tool-mode-select'); if (!ts) return;
         const m = window.currentEditorMode;
-        if (m === 'annotate' || m === 'annotate-color' || m === 'normal-arrow' || m === 'polygon3d' || m === 'prober') ts.value = m; else ts.value = 'none';
+        if (m === 'annotate' || m === 'annotate-color' || m === 'dashed-line' || m === 'straight-line' || m === 'normal-arrow' || m === 'polygon3d' || m === 'prober') ts.value = m; else ts.value = 'none';
         if (window.PluginManager && typeof window.PluginManager.setMode === 'function') window.PluginManager.setMode(m);
         })();
         // 生产端策略 A：页面重载时默认不启动光追采样，避免自动刷新导致 GPU/Shader 编译卡死（useAdvancedRender 已在首次 buildEnvironment 前置为 false）

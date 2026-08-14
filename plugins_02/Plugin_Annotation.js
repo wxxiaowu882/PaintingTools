@@ -841,6 +841,7 @@ window.AnnotationManager = {
                 if (doTap) solidAnnoConsumerToggleSelect();
             };
             div.addEventListener('pointerdown', e => {
+                if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return;
                 if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
                 if (e.button != null && e.button !== 0) return;
                 isDragging = true;
@@ -872,6 +873,7 @@ window.AnnotationManager = {
             };
         } else {
             div.addEventListener('pointerdown', e => {
+                if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return;
                 if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
                 e.stopPropagation();
                 if (!textEl.isContentEditable) {

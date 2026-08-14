@@ -112,6 +112,7 @@ window.ProberManager = {
             label.style.background = window.ProberManager.getDarkBg(data.color || '#00ccff');
             label.innerText = data.text;
             label.addEventListener('pointerdown', e => {
+                if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return;
                 if (window.__SOLID_CONSUMER__) {
                     if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
                         if (PM.selectedId === data.id) window.PluginManager.setExclusiveSelection(PM, null);
@@ -168,6 +169,7 @@ window.ProberManager = {
         hit.style.transformOrigin = '0 50%';
         hit.style.zIndex = '54';
         hit.addEventListener('pointerdown', e => {
+            if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return;
             if (window.__SOLID_CONSUMER__) {
                 if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
                     if (PM.selectedId === data.id) window.PluginManager.setExclusiveSelection(PM, null);
