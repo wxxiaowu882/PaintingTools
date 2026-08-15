@@ -20,6 +20,7 @@
     .env-btn { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); color:rgba(255,255,255,0.6); border-radius:3px; padding:3px 6px; cursor:pointer; transition:0.2s; user-select:none; display:flex; align-items:center; gap:4px; letter-spacing:1px; }
     .env-btn:hover { color:#fff; background:rgba(255,255,255,0.15); } .env-btn.active { background:rgba(255,255,255,0.2); color:#fff; border-color:rgba(255,255,255,0.3); }
     #scene-loader{transition:opacity 1s;background:#050505;}
+    #loader-subtext{font-size:10px;color:rgba(255,255,255,0.28);letter-spacing:0.06em;font-weight:200;line-height:1.5;text-align:center;max-width:min(88vw,340px);min-height:0;}
     /* 新增：编辑器专属UI样式 */
     .editor-panel { position:fixed; top:15px; left:15px; width:280px; background:rgba(20,20,20,0.85); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); border-radius:8px; z-index:500; padding:15px; color:#fff; box-shadow:0 8px 30px rgba(0,0,0,0.6); box-sizing:border-box; }
     /* 左栏：限高 + 列表吃剩余空间，底部保存区始终可见（避免被屏外遮挡） */
@@ -185,7 +186,7 @@
     <button onclick="closeBuiltinModal()" style="background:rgba(231,76,60,0.2); border:1px solid #e74c3c; color:#e74c3c; padding:6px 16px; border-radius:6px; cursor:pointer; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='#e74c3c'; this.style.color='#fff';" onmouseout="this.style.background='rgba(231,76,60,0.2)'; this.style.color='#e74c3c';">关闭面板 ✕</button></div></div>
     <div id="builtin-grid-container" style="flex:1; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); border-radius:8px; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,0.8); padding:20px; display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:15px; align-content:start;"></div></div>
     <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">暂时无法开启高级渲染</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">本次未能开启高级渲染，仍可正常观察模型与标注。关闭提示后，可随时点「开启渲染」再试。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
-    <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;max-width:min(88vw,340px);width:100%;padding:0 20px;box-sizing:border-box;"> <div class="w-3 h-3 rounded-full bg-white/70 animate-pulse"></div> <div id="scene-load-pct" style="font-size:11px;color:rgba(255,255,255,0.42);font-variant-numeric:tabular-nums;letter-spacing:0.12em;font-weight:200;">0%</div> <div style="width:100%;height:2px;background:rgba(255,255,255,0.1);border-radius:1px;overflow:hidden;"><div id="scene-load-bar-fill" style="display:block;height:100%;width:100%;background:rgba(255,255,255,0.55);transform-origin:left center;transform:scaleX(0);will-change:transform;"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">物理光追引擎初始化中...</div> </div> </div>
+    <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;max-width:min(88vw,340px);width:100%;padding:0 20px;box-sizing:border-box;"> <div class="w-3 h-3 rounded-full bg-white/70 animate-pulse"></div> <div id="scene-load-pct" style="font-size:11px;color:rgba(255,255,255,0.42);font-variant-numeric:tabular-nums;letter-spacing:0.12em;font-weight:200;">0%</div> <div style="width:100%;height:2px;background:rgba(255,255,255,0.1);border-radius:1px;overflow:hidden;"><div id="scene-load-bar-fill" style="display:block;height:100%;width:100%;background:rgba(255,255,255,0.55);transform-origin:left center;transform:scaleX(0);will-change:transform;"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">物理光追引擎初始化中...</div> <div id="loader-subtext"></div> </div> </div>
     <svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true"> <filter id="posterize-filter" color-interpolation-filters="sRGB">
     <feColorMatrix in="SourceGraphic" type="matrix" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0" result="gray"/>
     <feComponentTransfer in="gray" id="posterize-transfer" result="posterizedGray">
@@ -218,8 +219,18 @@
         applySolidMaterialsFromSceneItems,
         syncSolidMatPanelFromType,
     } from '../../plugins_02/SolidMaterialShared.js';
+    import { getSolidGlbLoadMaxConcurrent, createSolidGlbLoadQueue } from '../../plugins_02/SolidGlbLoadQueueShared.js';
+    import { createSolidGlbPersistCache, normalizeSolidGlbCacheKey, buildSolidGlbFetchCandidates } from '../../plugins_02/SolidGlbPersistCacheShared.js';
+    import { formatSolidGlbLoadHint, LARGE_SCENE_GLB_THRESHOLD, STALL_HINT_MS } from '../../plugins_02/SolidSceneLoadHintShared.js';
     import { SOLID_PATH_TRACER_QUALITY, SOLID_RASTER_AREA_LIGHT_RIG, APP_LOGGING } from '../../Config/PaintingConfig.js';
     window.skyEnvLightMatchMainRect = true; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const __solidGlbLoadQueue = createSolidGlbLoadQueue({ maxConcurrent: getSolidGlbLoadMaxConcurrent(isMobile) });
+    window.__solidGlbLoadQueue = __solidGlbLoadQueue;
+    const __solidGlbPersistCache = createSolidGlbPersistCache({
+        isMobile,
+        log: (msg) => { try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e) {} },
+    });
+    window.__solidGlbPersistCache = __solidGlbPersistCache;
     const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.producer) ? SOLID_PATH_TRACER_QUALITY.producer : {};
     const _solidPtSync = createSolidPathTracerSyncController({
     minIntervalMs: Math.max(16, Number(_solidPtCfg.resetMinIntervalMs || 120)),
@@ -1016,77 +1027,74 @@
         }
     }
     function solidCreateBuildModelUrlCandidates(url) {
-        try {
-            const s = String(url || '').trim();
-            if (!s) return [];
-            if (/^(https?:|data:|blob:|file:)/i.test(s)) return [s];
-            const x = s.replace(/\\/g, '/');
-            const out = [];
-            const push = (v) => { if (!v) return; if (!out.includes(v)) out.push(v); };
-            if (x.startsWith('/docs/model/')) {
-                const tail = x.substring(1);
-                push('/' + tail);
-                push('../../' + tail);
-                push('./' + tail);
-                push(tail);
-            } else if (x.startsWith('docs/model/')) {
-                // 优先绝对路径，避免被拼到当前目录（.../石膏人像沙盒场景生成/docs/model/*）
-                push('/' + x);
-                push('../../' + x);
-                push('./' + x);
-                push(x);
-            } else if (x.startsWith('./docs/model/')) {
-                const tail = x.substring(2);
-                push('/' + tail);
-                push('../../' + tail);
-                push(tail);
-            } else if (x.startsWith('../docs/model/')) {
-                const tail = x.substring(3);
-                push('/' + tail);
-                push('../../' + tail);
-                push(tail);
-            } else if (x.startsWith('../../docs/model/')) {
-                const tail = x.replace(/^(\.\.\/)+/, '');
-                push('/' + tail);
-                push('./' + tail);
-                push(tail);
-            } else {
-                // 非约定路径才保留原样优先，避免影响其它资源策略
-                push(x);
-                push('../../' + x.replace(/^\/+/, ''));
-            }
-            return out;
-        } catch (_e) {
-            return [url];
-        }
+        return buildSolidGlbFetchCandidates(url);
     }
     function solidCreateLoadGlbWithFallback(url, onLoad, onError, onProgress) {
-        const candidates = solidCreateBuildModelUrlCandidates(url);
-        if (!candidates.length) { if (onError) onError(new Error('GLB URL 为空')); return; }
-        solidCreateDebugLog(`[GLB-Fallback] 开始加载: ${String(url || '')}`);
-        solidCreateDebugLog(`[GLB-Fallback] 候选列表: ${candidates.join(' | ')}`);
-        let idx = 0;
-        const tryLoad = () => {
-            const currentUrl = candidates[idx];
-            solidCreateDebugLog(`[GLB-Fallback] 尝试候选(${idx + 1}/${candidates.length}): ${currentUrl}`);
-            gltfLoader.load(currentUrl, (gltf) => {
-                try { gltf.__solidLoadedUrl = currentUrl; } catch (_e) {}
-                solidCreateDebugLog(`[GLB-Fallback] 加载成功: ${currentUrl}`);
-                onLoad(gltf);
-            }, (evt) => {
-                if (onProgress) onProgress(evt);
-            }, (err) => {
-                idx++;
-                if (idx < candidates.length) {
-                    solidCreateDebugLog(`[GLB-Fallback] 加载失败，重试下一候选: ${currentUrl}`);
+        const _run = () => new Promise((resolveQueue) => {
+            const s = String(url || '').trim();
+            if (!s) { if (onError) onError(new Error('GLB URL 为空')); resolveQueue(); return; }
+            const cacheKey = normalizeSolidGlbCacheKey(s);
+            const nonPersist = /^(https?:|data:|blob:|file:)/i.test(s);
+            if (nonPersist || !cacheKey.startsWith('/docs/model/')) {
+                const candidates = solidCreateBuildModelUrlCandidates(url);
+                solidCreateDebugLog(`[GLB-Fallback] 开始加载(非持久): ${String(url || '')}`);
+                let idx = 0;
+                const tryLoad = () => {
+                    const currentUrl = candidates[idx];
+                    gltfLoader.load(currentUrl, (gltf) => {
+                        try { gltf.__solidLoadedUrl = currentUrl; } catch (_e) {}
+                        if (onLoad) onLoad(gltf);
+                        resolveQueue();
+                    }, (evt) => { if (onProgress) onProgress(evt); }, (err) => {
+                        idx++;
+                        if (idx < candidates.length) { tryLoad(); return; }
+                        if (onError) onError(err || new Error('GLB 加载失败'));
+                        resolveQueue();
+                    });
+                };
+                tryLoad();
+                return;
+            }
+            const _persist = window.__solidGlbPersistCache;
+            const _loadPersist = async () => {
+                try {
+                    solidCreateDebugLog(`[GLB-Fallback] 开始加载: ${String(url || '')}`);
+                    const { buffer, cacheKey: ck } = await (_persist ? _persist.getOrFetchArrayBuffer(url, {
+                        onProgress,
+                        tryCandidates: true,
+                    }) : Promise.reject(new Error('no persist cache')));
+                    const gltf = await gltfLoader.parseAsync(buffer, ck || cacheKey);
+                    try { gltf.__solidLoadedUrl = ck || cacheKey; } catch (_e) {}
+                    solidCreateDebugLog(`[GLB-Fallback] 加载成功: ${gltf.__solidLoadedUrl || cacheKey}`);
+                    if (onLoad) onLoad(gltf);
+                } catch (err) {
+                    try { if (_persist && _persist.invalidate) await _persist.invalidate(cacheKey); } catch (_eInv) {}
+                    solidCreateDebugLog(`[GLB-Fallback] persist 失败，回退 load: ${String(url || '')}`);
+                    const candidates = solidCreateBuildModelUrlCandidates(url);
+                    let idx = 0;
+                    const tryLoad = () => {
+                        const currentUrl = candidates[idx];
+                        gltfLoader.load(currentUrl, (gltf) => {
+                            try { gltf.__solidLoadedUrl = currentUrl; } catch (_e) {}
+                            if (onLoad) onLoad(gltf);
+                            resolveQueue();
+                        }, (evt) => { if (onProgress) onProgress(evt); }, (loadErr) => {
+                            idx++;
+                            if (idx < candidates.length) { tryLoad(); return; }
+                            if (onError) onError(loadErr || err || new Error('GLB 加载失败'));
+                            resolveQueue();
+                        });
+                    };
                     tryLoad();
                     return;
                 }
-                solidCreateDebugLog(`[GLB-Fallback] 全部候选失败: ${String(url || '')}`);
-                if (onError) onError(err || new Error('GLB 加载失败'));
-            });
-        };
-        tryLoad();
+                resolveQueue();
+            };
+            _loadPersist();
+        });
+        const _q = window.__solidGlbLoadQueue;
+        if (_q) return _q.enqueue(_run);
+        return _run();
     }
     // 统一写入 JSON 的 GLB 路径：保存为站点根绝对（/docs/model/...），避免不同页面层级下相对路径漂移。
     function solidCreateNormalizeModelUrlForJson(url) {
@@ -1198,15 +1206,29 @@
         return false;
     }
     function solidCreateSetLoaderText(msg) { const el = document.getElementById('loader-text'); if (el) el.innerText = String(msg || ''); }
+    function solidCreateSetLoaderSubtext(msg) { const el = document.getElementById('loader-subtext'); if (el) el.innerText = String(msg == null ? '' : msg); }
+    function solidCreateUpdateGlbLoadHint(overrideMain) {
+        const ux = window.__solidCreateSceneLoadUx;
+        if (!ux || !ux.running) return;
+        const hint = formatSolidGlbLoadHint({
+            done: ux.glbDone || 0,
+            total: ux.glbTotal || 0,
+            isLargeScene: (ux.glbTotal || 0) >= LARGE_SCENE_GLB_THRESHOLD,
+            stalled: !!ux.stalled,
+            overrideMain: overrideMain != null ? overrideMain : undefined,
+        });
+        if (hint.mainText) solidCreateSetLoaderText(hint.mainText);
+        solidCreateSetLoaderSubtext(hint.subText);
+    }
     function solidCreateSetLoaderProgressNow(p) { const v = Math.max(0, Math.min(100, Math.round(Number(p) || 0))); const fill = document.getElementById('scene-load-bar-fill'); const pct = document.getElementById('scene-load-pct'); if (fill) fill.style.transform = 'scaleX(' + (v / 100) + ')'; if (pct) pct.textContent = v + '%'; }
     function solidCreateLoaderShow() { const el = document.getElementById('scene-loader'); if (!el) return; el.style.display = 'flex'; el.style.opacity = '1'; }
     function solidCreateLoaderHide() { const el = document.getElementById('scene-loader'); if (!el) return; el.style.opacity = '0'; setTimeout(() => { if (el) el.style.display = 'none'; }, 380); }
-    window.__solidCreateSceneLoadUx = { running: false, target: 0, display: 0, raf: 0, timer: 0, timeoutTimer: 0, stepDone: 0, totalItems: 0, glbSlotProgress: [], glbDone: 0, stabilizing: false, stableSince: 0, stableFrames: 0, minStableMs: 460, maxWaitMs: 3600, stabilizeStartAt: 0, settleDone: false };
+    window.__solidCreateSceneLoadUx = { running: false, target: 0, display: 0, raf: 0, timer: 0, timeoutTimer: 0, stepDone: 0, totalItems: 0, glbSlotProgress: [], glbDone: 0, glbTotal: 0, stalled: false, stabilizing: false, stableSince: 0, stableFrames: 0, minStableMs: 460, maxWaitMs: 3600, stabilizeStartAt: 0, settleDone: false };
     function solidCreateSceneLoadUxTick() { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; ux.display += (ux.target - ux.display) * 0.17; if (Math.abs(ux.target - ux.display) < 0.08) ux.display = ux.target; solidCreateSetLoaderProgressNow(ux.display); ux.raf = requestAnimationFrame(solidCreateSceneLoadUxTick); }
-    function solidCreateSceneLoadUxStart(totalItems, glbCount) { const ux = window.__solidCreateSceneLoadUx; try { window.__solidCreateSceneStabilizing = false; } catch (_eS0) {} try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e0) {} try { if (ux.timer) clearInterval(ux.timer); } catch (_e1) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e2) {} ux.stabilizing = false; ux.settleDone = false; ux.running = true; ux.target = 1; ux.display = 0; ux.stepDone = 0; ux.totalItems = Math.max(0, Number(totalItems) || 0); ux.glbSlotProgress = Array.from({ length: Math.max(0, Number(glbCount) || 0) }, () => 0); ux.glbDone = 0; solidCreateLoaderShow(); solidCreateSetLoaderText('清理旧场景...'); solidCreateSetLoaderProgressNow(0); ux.raf = requestAnimationFrame(solidCreateSceneLoadUxTick); ux.timer = setInterval(() => { if (!ux.running) return; const fallback = Math.max(ux.target, Math.min(95, ux.display + 0.25)); ux.target = fallback; }, 420); ux.timeoutTimer = setTimeout(() => { if (!ux.running) return; solidCreateSetLoaderText('正在优化显示，马上完成...'); ux.target = Math.max(ux.target, 95); }, 10000); }
+    function solidCreateSceneLoadUxStart(totalItems, glbCount) { const ux = window.__solidCreateSceneLoadUx; try { window.__solidCreateSceneStabilizing = false; } catch (_eS0) {} try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e0) {} try { if (ux.timer) clearInterval(ux.timer); } catch (_e1) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e2) {} ux.stabilizing = false; ux.settleDone = false; ux.stalled = false; ux.running = true; ux.target = 1; ux.display = 0; ux.stepDone = 0; ux.totalItems = Math.max(0, Number(totalItems) || 0); ux.glbTotal = Math.max(0, Number(glbCount) || 0); ux.glbSlotProgress = Array.from({ length: ux.glbTotal }, () => 0); ux.glbDone = 0; solidCreateLoaderShow(); solidCreateSetLoaderText('清理旧场景...'); solidCreateSetLoaderSubtext(''); solidCreateSetLoaderProgressNow(0); ux.raf = requestAnimationFrame(solidCreateSceneLoadUxTick); ux.timer = setInterval(() => { if (!ux.running) return; const fallback = Math.max(ux.target, Math.min(95, ux.display + 0.25)); ux.target = fallback; }, 420); ux.timeoutTimer = setTimeout(() => { if (!ux.running) return; ux.stalled = true; solidCreateSetLoaderText('正在优化显示，马上完成...'); solidCreateUpdateGlbLoadHint('正在优化显示，马上完成...'); ux.target = Math.max(ux.target, 95); }, STALL_HINT_MS); }
     function solidCreateSceneLoadUxSetTarget(p, text) { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; const v = Math.max(0, Math.min(99, Number(p) || 0)); ux.target = Math.max(ux.target, v); if (text) solidCreateSetLoaderText(text); }
     function solidCreateSceneLoadUxMarkClearDone() { solidCreateSceneLoadUxSetTarget(8, '读取场景配置...'); }
-    function solidCreateSceneLoadUxUpdateAssetProgress(doneItems) { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; const total = Math.max(1, ux.totalItems); let glbAvg = 0; if (ux.glbSlotProgress && ux.glbSlotProgress.length) { glbAvg = ux.glbSlotProgress.reduce((a, b) => a + (Number(b) || 0), 0) / ux.glbSlotProgress.length; } const ratio = Math.max(0, Math.min(1, ((Number(doneItems) || 0) / total) * 0.8 + glbAvg * 0.2)); solidCreateSceneLoadUxSetTarget(8 + ratio * 55, '加载模型资源...'); }
+    function solidCreateSceneLoadUxUpdateAssetProgress(doneItems) { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; const total = Math.max(1, ux.totalItems); let glbAvg = 0; if (ux.glbSlotProgress && ux.glbSlotProgress.length) { glbAvg = ux.glbSlotProgress.reduce((a, b) => a + (Number(b) || 0), 0) / ux.glbSlotProgress.length; } const ratio = Math.max(0, Math.min(1, ((Number(doneItems) || 0) / total) * 0.8 + glbAvg * 0.2)); solidCreateSceneLoadUxSetTarget(8 + ratio * 55); if (ux.glbTotal > 0 && ux.glbDone < ux.glbTotal) solidCreateUpdateGlbLoadHint(); else solidCreateSetLoaderText('加载模型资源...'); }
     function solidCreateSceneLoadUxSetGlbSlot(slotIdx, ratio) { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; if (!ux.glbSlotProgress || !ux.glbSlotProgress.length) return; if (slotIdx < 0 || slotIdx >= ux.glbSlotProgress.length) return; ux.glbSlotProgress[slotIdx] = Math.max(0, Math.min(1, Number(ratio) || 0)); }
     function solidCreateSceneLoadUxMarkElementsDone() { solidCreateSceneLoadUxSetTarget(83, '恢复标注与场景元素...'); }
     function solidCreateSceneLoadUxMarkRasterDone() { solidCreateSceneLoadUxSetTarget(95, '构建光栅光影...'); }
@@ -1238,7 +1260,7 @@
         });
     }
 
-    function clearEditorSceneForRestore() { const _pm = _perfMark('clearEditorSceneForRestore(total)'); window._editorSceneLoadGen++; try { transformControl.detach(); } catch (_e) {}
+    function clearEditorSceneForRestore() { const _pm = _perfMark('clearEditorSceneForRestore(total)'); try { if (window.__solidGlbLoadQueue) window.__solidGlbLoadQueue.reset(); } catch (_eQ) {} window._editorSceneLoadGen++; try { transformControl.detach(); } catch (_e) {}
     try { if (window.AnnotationManager) window.AnnotationManager.clearAll(); } catch (_e) {}
     const children = editorGroup ? [...editorGroup.children] : [];
     // 先 remove，马上让主线程轻一点
@@ -1326,11 +1348,11 @@
     solidCreateApplyItemMaterial(model, item, _loadEnvDefaultMat);
     solidCreateDebugLog(`[SceneLoad] GLB入场成功 item[${ii}] loadedUrl=${gltf && gltf.__solidLoadedUrl ? gltf.__solidLoadedUrl : '(unknown)'}`);
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item });
-    _assetDone++; solidCreateSceneLoadUxSetGlbSlot(_slot, 1); solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
+    _assetDone++; window.__solidCreateSceneLoadUx.glbDone = (window.__solidCreateSceneLoadUx.glbDone || 0) + 1; solidCreateSceneLoadUxSetGlbSlot(_slot, 1); solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
     markDraftDirty();
     resolve();
     }, (err) => {
-    try { if (window.hwLog) window.hwLog(`[GLB-LoadFail] 生产端重载失败: ${item && item.url ? item.url : '(unknown)'} / ${err && err.message ? err.message : err}`); } catch (_e) {} _assetDone++; solidCreateSceneLoadUxSetGlbSlot(_slot, 1); solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
+    try { if (window.hwLog) window.hwLog(`[GLB-LoadFail] 生产端重载失败: ${item && item.url ? item.url : '(unknown)'} / ${err && err.message ? err.message : err}`); } catch (_e) {} _assetDone++; window.__solidCreateSceneLoadUx.glbDone = (window.__solidCreateSceneLoadUx.glbDone || 0) + 1; solidCreateSceneLoadUxSetGlbSlot(_slot, 1); solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
     resolve();
     }, (evt) => {
     if (evt && evt.total > 0) solidCreateSceneLoadUxSetGlbSlot(_slot, Math.min(1, evt.loaded / evt.total));
@@ -3154,7 +3176,7 @@
             _orbitNeedsThrottle = now;
             needsUpdate = true;
         });
-        gltfLoader = new GLTFLoader(); const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'); gltfLoader.setDRACOLoader(dracoLoader); editorGroup = new THREE.Group(); scene.add(editorGroup);
+        gltfLoader = new GLTFLoader(); const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('../../docs/js/three_164/examples/jsm/libs/draco/gltf/'); dracoLoader.setWorkerLimit(2); gltfLoader.setDRACOLoader(dracoLoader); editorGroup = new THREE.Group(); scene.add(editorGroup);
         // 【优化2修复】：将变换控制器重新挂载回底层 canvas，解决激活状态下坐标辅助图形隐形的问题！
         transformControl = new TransformControls(camera, renderer.domElement); // 【极其重要的优化】：获取并记录模型的“绝对底边”，这保证了后续放大时，模型永远紧贴地面！
         transformControl.addEventListener('dragging-changed', function (event) { controls.enabled = (!event.value) && (!window.isCameraLocked); if(event.value && transformControl.object) { const obj = transformControl.object; startScale.copy(obj.scale);

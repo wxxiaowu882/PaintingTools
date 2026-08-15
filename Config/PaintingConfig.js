@@ -339,6 +339,14 @@ export const SOLID_RASTER_IRRADIANCE_PROBES = {
   groundIblOcclusionMinFactor: 0.12,
 };
 
+/** GLB IndexedDB 持久缓存（消费端 Solid + 生产端 Create 共用 canonical key）。 */
+export const SOLID_GLB_PERSIST_CACHE = {
+  enabled: true,
+  maxTotalBytesMobile: 150 * 1024 * 1024,
+  maxTotalBytesDesktop: 400 * 1024 * 1024,
+  maxSingleFileBytes: 80 * 1024 * 1024,
+};
+
 /**
  * 日志配置（超简版）
  * - 线上建议：level=1

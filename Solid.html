@@ -32,6 +32,12 @@
     #scene-loader{transition:opacity 0.6s;background:rgba(5,5,5,0.95);backdrop-filter:blur(8px);}
     #scene-loader-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;max-width:min(88vw,300px);width:100%;padding:0 20px;box-sizing:border-box;}
     #scene-load-pct{font-size:11px;color:rgba(255,255,255,0.42);font-variant-numeric:tabular-nums;letter-spacing:0.12em;font-weight:200;}
+    #loader-subtext{font-size:10px;color:rgba(255,255,255,0.28);letter-spacing:0.06em;font-weight:200;line-height:1.5;text-align:center;max-width:min(88vw,300px);min-height:0;}
+    #solid-first-frame-hint{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:5500;pointer-events:none;opacity:0;transition:opacity 0.28s ease;}
+    #solid-first-frame-hint-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;max-width:min(88vw,300px);width:100%;padding:0 20px;box-sizing:border-box;}
+    #solid-first-frame-hint-bar-track{width:100%;height:2px;background:rgba(255,255,255,0.1);border-radius:1px;overflow:hidden;}
+    #solid-first-frame-hint-bar-fill{display:block;height:100%;width:100%;background:rgba(255,255,255,0.45);transform-origin:left center;transform:scaleX(0);will-change:transform;}
+    #solid-first-frame-hint-text{font-size:11px;color:rgba(255,255,255,0.42);letter-spacing:0.12em;font-weight:200;text-align:center;}
     .scene-load-bar-track{width:100%;height:2px;background:rgba(255,255,255,0.1);border-radius:1px;overflow:hidden;}
     .scene-load-bar-fill{display:block;height:100%;width:100%;background:rgba(255,255,255,0.55);transform-origin:left center;transform:scaleX(0);will-change:transform;}
     /* 可视化场景网格弹窗 UI */
@@ -124,7 +130,7 @@
     <feBlend mode="luminosity" in="posterizedGray" in2="SourceGraphic"/> </filter> </svg>
     <div id="persistent-warning" style="display:none;position:fixed;top:0;left:0;width:100%;background:rgba(0,0,0,0.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);text-align:center;padding:6px 10px;font-size:9px;z-index:6000;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;">未能开启高级渲染。需要时可点「开启渲染」再试</div>
     <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">暂时无法开启高级渲染</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">本次未能开启高级渲染，仍可正常观察模型与标注。关闭提示后，可随时点「开启渲染」再试。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
-    <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div id="scene-loader-inner"> <div id="scene-load-pct">0%</div> <div class="scene-load-bar-track" aria-hidden="true"><div id="scene-load-bar-fill" class="scene-load-bar-fill"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">系统环境初始化中...</div> </div> </div>
+    <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div id="scene-loader-inner"> <div id="scene-load-pct">0%</div> <div class="scene-load-bar-track" aria-hidden="true"><div id="scene-load-bar-fill" class="scene-load-bar-fill"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">系统环境初始化中...</div> <div id="loader-subtext"></div> </div> </div>
     <div id="perf-test-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:5550; flex-direction:column; align-items:center; justify-content:center;"> <div class="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin mb-4"></div> <div class="font-hairline text-[10px] tracking-[0.2em] text-white/80">正在测试设备渲染性能...</div> <div class="text-[8px] text-white/40 mt-2">首次进入时安全审计，即将完成</div> </div>
     <div id="top-left-scene-btn" style="position:fixed; top:20px; left:max(6px, env(safe-area-inset-left, 0px)); z-index:5000; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:4px 5px 4px 4px; border-radius:10px; display:flex; align-items:center; gap:4px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="openSceneGridModal()"> <span class="solid-scene-label" style="color:#fff; font-weight:400; letter-spacing:0;">场景：</span>
     <span id="scene-trigger-top" style="color:#fff; font-weight:normal; max-width:min(72vw, 320px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">点击选择...</span> <span style="color:#666; font-size:10px;">▼</span> </div>
@@ -169,6 +175,10 @@
         applySolidMaterialToRoot,
         applySolidMaterialsFromSceneItems,
     } from './plugins_02/SolidMaterialShared.js';
+    import { getSolidGlbLoadMaxConcurrent, createSolidGlbLoadQueue } from './plugins_02/SolidGlbLoadQueueShared.js';
+    import { createSolidGlbPersistCache, normalizeSolidGlbCacheKey } from './plugins_02/SolidGlbPersistCacheShared.js';
+    import { formatSolidLoadPhaseHint, SOLID_LOAD_PHASES, LARGE_SCENE_GLB_THRESHOLD, STALL_HINT_MS } from './plugins_02/SolidSceneLoadHintShared.js';
+    import { createSolidFirstFrameHintController } from './plugins_02/SolidFirstFrameHintShared.js';
     import { SOLID_PATH_TRACER_QUALITY, SOLID_RASTER_PREVIEW_CANVAS_FILTER, SOLID_RASTER_AREA_LIGHT_RIG, APP_LOGGING } from './Config/PaintingConfig.js';
     window.skyEnvLightMatchMainRect = true; // 【试验·抗黑点噪点】true=更干净（更慢），false=更快（更噪）
     const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.consumer) ? SOLID_PATH_TRACER_QUALITY.consumer : {};
@@ -176,6 +186,48 @@
     const _solidPtProfileKey = _solidPtCfg.useAntiSpeckleProfile ? 'antiSpeckle' : 'default';
     const _solidPt = _solidPtProfileMap[_solidPtProfileKey] || _solidPtProfileMap.default || { targetSamples: 200, renderScaleMobile: 0.42, renderScaleDesktop: 0.75, filterGlossyFactor: 1, expRamp: 24, expLo: 0.55, expHi: 0.7, toneMappingExposureBase: 0.7 };
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const __solidGlbLoadQueue = createSolidGlbLoadQueue({ maxConcurrent: getSolidGlbLoadMaxConcurrent(isMobile) });
+    window.__solidGlbLoadQueue = __solidGlbLoadQueue;
+    const __solidGlbPersistCache = createSolidGlbPersistCache({
+        isMobile,
+        log: (msg) => { try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e) {} },
+    });
+    window.__solidGlbPersistCache = __solidGlbPersistCache;
+    try {
+        const _qsGlb = new URLSearchParams(window.location.search || '');
+        if (_qsGlb.get('clearGlbCache') === '1' && __solidGlbPersistCache.invalidate) {
+            __solidGlbPersistCache.invalidate().then(() => {
+                try { if (window.hwLog) window.hwLog('[GlbPersistCache] clearGlbCache=1 已清空 IDB'); } catch (_e) {}
+            });
+        }
+    } catch (_eClrGlb) {}
+    let __solidFirstFrameHintCtrl = null;
+    function _solidInitFirstFrameHintController() {
+        if (__solidFirstFrameHintCtrl) return __solidFirstFrameHintCtrl;
+        __solidFirstFrameHintCtrl = createSolidFirstFrameHintController({
+            isMobile,
+            shouldArm: () => {
+                if (window.useAdvancedRender && pathTracer) return false;
+                if (window.PerfTester && window.PerfTester.isTesting) return false;
+                const rt = document.getElementById('render-toast');
+                if (rt && parseFloat(rt.style.opacity || '0') > 0.45) return false;
+                return true;
+            },
+            isLoaderVisible: () => {
+                const ld = document.getElementById('scene-loader');
+                if (!ld || ld.style.display === 'none') return false;
+                return parseFloat(ld.style.opacity || '1') > 0.05;
+            },
+        });
+        window.__solidFirstFrameHint = __solidFirstFrameHintCtrl;
+        return __solidFirstFrameHintCtrl;
+    }
+    function _solidNotifyFirstFrameDrawIfReady() {
+        try {
+            const h = _solidInitFirstFrameHintController();
+            if (h && h.notifyDraw) h.notifyDraw({ sceneToken: window.__solidSceneLoadToken });
+        } catch (_eN) {}
+    }
     /** PC：PathTracer 首帧会触发大量 HLSL 编译，ANGLE/D3D 上易 GL_OUT_OF_MEMORY；桌面端略降内部分辨率换稳定性 */
     function _solidPathTracerRenderScale() {
         if (isMobile) return _solidPt.renderScaleMobile;
@@ -983,11 +1035,12 @@
         }
         try {
             const c = window.__solidRasterPreviewComposer;
-            if (c && c.tryRender()) { _solidApplyRasterCanvasCssFilter(); return; }
+            if (c && c.tryRender()) { _solidApplyRasterCanvasCssFilter(); _solidNotifyFirstFrameDrawIfReady(); return; }
         } catch (_eC) {}
         try {
             renderer.render(scene, camera);
             _solidApplyRasterCanvasCssFilter();
+            _solidNotifyFirstFrameDrawIfReady();
         } catch (_eR) {}
     }
 
@@ -1020,13 +1073,68 @@
             if (window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe(reason);
         } catch (_e) {}
     };
-    window.__solidLoaderUiState = window.__solidLoaderUiState || { lastText: '', lastPct: -1, lastPctAt: 0 };
-    function setLoaderText(msg) {
+    window.__solidLoaderUiState = window.__solidLoaderUiState || { lastText: '', lastSubtext: '', lastPct: -1, lastPctAt: 0 };
+    window.__solidLoaderHintState = window.__solidLoaderHintState || { phaseId: '', glbDone: 0, glbTotal: 0, stalled: false };
+    function setLoaderText(msg, force) {
         const text = String(msg == null ? '' : msg);
-        if (window.__solidLoaderUiState.lastText === text) return;
+        if (!force && window.__solidLoaderUiState.lastText === text) return;
         const el = document.getElementById('loader-text');
         if (el) el.innerText = text;
         window.__solidLoaderUiState.lastText = text;
+    }
+    function setLoaderSubtext(msg, force) {
+        const text = String(msg == null ? '' : msg);
+        if (!force && window.__solidLoaderUiState.lastSubtext === text) return;
+        const el = document.getElementById('loader-subtext');
+        if (el) el.innerText = text;
+        window.__solidLoaderUiState.lastSubtext = text;
+    }
+    function solidSnapLoaderProgress(p) {
+        const v = Math.max(0, Math.min(100, Number(p) || 0));
+        const ux = window.__solidSceneLoadUx;
+        if (ux && ux.running) { ux.display = v; ux.target = Math.max(ux.target, v); }
+        solidSetLoaderProgressNow(v);
+    }
+    function solidSetLoadPhase(phaseId, opts) {
+        const st = window.__solidLoaderHintState || {};
+        const o = opts || {};
+        const prevPhaseId = st.phaseId;
+        st.phaseId = phaseId;
+        if (o.glbDone != null) st.glbDone = o.glbDone;
+        if (o.glbTotal != null) st.glbTotal = o.glbTotal;
+        if (o.stalled != null) st.stalled = !!o.stalled;
+        window.__solidLoaderHintState = st;
+        const hint = formatSolidLoadPhaseHint({
+            phaseId,
+            glbDone: st.glbDone,
+            glbTotal: st.glbTotal,
+            stalled: st.stalled,
+            progressRatio: o.progressRatio,
+            overrideMain: o.overrideMain,
+        });
+        const force = !!o.force;
+        if (hint.mainText) setLoaderText(hint.mainText, force);
+        setLoaderSubtext(hint.subText, force);
+        const progressVal = o.progress != null ? o.progress : hint.targetProgress;
+        if (progressVal != null) {
+            setLoaderProgress(progressVal);
+            if (phaseId !== 'glb_load' && (o.snapProgress !== false || prevPhaseId !== phaseId)) solidSnapLoaderProgress(progressVal);
+        }
+    }
+    function solidYieldLoadPhase(phaseId, minMs) {
+        solidSetLoadPhase(phaseId, { force: true, snapProgress: true });
+        const waitMs = Math.max(0, Number(minMs) || 0);
+        return new Promise((resolve) => {
+            requestAnimationFrame(() => {
+                if (waitMs <= 0) resolve();
+                else setTimeout(resolve, waitMs);
+            });
+        });
+    }
+    function updateSolidLoaderGlbHint(overrideMain) {
+        const st = window.__solidLoaderHintState || {};
+        if (st.phaseId !== 'glb_load') return;
+        solidSetLoadPhase('glb_load', { overrideMain: overrideMain != null ? overrideMain : undefined, progressRatio: (st.glbTotal > 0) ? Math.min(1, st.glbDone / st.glbTotal) : 0 });
     }
     window.__solidSceneLoadUx = { running: false, target: 0, display: 0, raf: 0, timer: 0, timeoutTimer: 0, stabilizing: false, stableSince: 0, stableFrames: 0, minStableMs: 460, maxWaitMs: 3600, stabilizeStartAt: 0, settleDone: false };
     function solidSetLoaderProgressNow(p) {
@@ -1044,15 +1152,15 @@
         window.__solidLoaderUiState = st;
     }
     function solidSceneLoadUxTick() { const ux = window.__solidSceneLoadUx; if (!ux.running) return; ux.display += (ux.target - ux.display) * 0.16; if (Math.abs(ux.target - ux.display) < 0.08) ux.display = ux.target; solidSetLoaderProgressNow(ux.display); ux.raf = requestAnimationFrame(solidSceneLoadUxTick); }
-    function solidSceneLoadUxStart() { const ux = window.__solidSceneLoadUx; try { window.__solidSceneStabilizing = false; } catch (_eS0) {} try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e0) {} try { if (ux.timer) clearInterval(ux.timer); } catch (_e1) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e2) {} ux.stabilizing = false; ux.settleDone = false; ux.running = true; ux.target = 0; ux.display = 0; ux.raf = requestAnimationFrame(solidSceneLoadUxTick); ux.timer = setInterval(() => { if (!ux.running) return; ux.target = Math.max(ux.target, Math.min(95, ux.display + 0.25)); }, 420); ux.timeoutTimer = setTimeout(() => { if (!ux.running) return; setLoaderText('正在优化显示，马上完成...'); ux.target = Math.max(ux.target, 95); }, 10000); }
+    function solidSceneLoadUxStart() { const ux = window.__solidSceneLoadUx; try { window.__solidSceneStabilizing = false; } catch (_eS0) {} try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e0) {} try { if (ux.timer) clearInterval(ux.timer); } catch (_e1) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e2) {} ux.stabilizing = false; ux.settleDone = false; ux.running = true; ux.target = 0; ux.display = 0; ux.raf = requestAnimationFrame(solidSceneLoadUxTick); ux.timer = setInterval(() => { if (!ux.running) return; ux.target = Math.max(ux.target, Math.min(95, ux.display + 0.25)); }, 420); ux.timeoutTimer = setTimeout(() => { if (!ux.running) return; if (window.__solidLoaderHintState) window.__solidLoaderHintState.stalled = true; const _pid = window.__solidLoaderHintState && window.__solidLoaderHintState.phaseId; if (_pid === 'glb_load') { solidSetLoadPhase('glb_load', { stalled: true, overrideMain: '正在优化显示，马上完成...', force: true }); } else { solidSetLoadPhase(_pid || 'stabilize', { stalled: true, overrideMain: '正在优化显示，马上完成...', force: true }); } ux.target = Math.max(ux.target, 95); }, STALL_HINT_MS); }
     function solidSceneLoadUxFinish() { const ux = window.__solidSceneLoadUx; if (!ux.running) return; ux.target = 100; setTimeout(() => { try { if (ux.timer) clearInterval(ux.timer); } catch (_e0) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e1) {} ux.running = false; try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e2) {} solidSetLoaderProgressNow(100); }, 220); }
     function setLoaderProgress(p) { const v = Math.max(0, Math.min(100, Number(p) || 0)); const ux = window.__solidSceneLoadUx; if (ux && ux.running) ux.target = Math.max(ux.target, v); else solidSetLoaderProgressNow(v); }
     function solidSceneLoadUxBeginStabilize(text) {
         const ux = window.__solidSceneLoadUx; if (!ux) return;
         ux.stabilizing = true; ux.stableSince = 0; ux.stableFrames = 0; ux.settleDone = false;
         ux.stabilizeStartAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        ux.target = Math.max(ux.target, 97);
-        setLoaderText(text || '正在稳定画面...');
+        ux.target = Math.max(ux.target, SOLID_LOAD_PHASES.stabilize.lo);
+        solidSetLoadPhase('stabilize', { overrideMain: text || undefined, force: true, snapProgress: true });
         try { window.__solidSceneStabilizing = true; } catch (_e) {}
     }
     function solidSceneLoadUxTickStabilize() {
@@ -1069,7 +1177,7 @@
         const hardTimeout = ux.stabilizeStartAt ? ((now - ux.stabilizeStartAt) > ux.maxWaitMs) : false;
         const ready = (sceneReady && ux.stableFrames >= 3 && stableMs >= ux.minStableMs) || hardTimeout;
         if (!ready) {
-            ux.target = Math.max(ux.target, Math.min(99, 97 + Math.min(2, stableMs / 380)));
+            ux.target = Math.max(ux.target, Math.min(SOLID_LOAD_PHASES.stabilize.hi - 1, SOLID_LOAD_PHASES.stabilize.lo + Math.min(2, stableMs / 380)));
             return false;
         }
         ux.settleDone = true;
@@ -1077,6 +1185,7 @@
         try { window.__solidSceneStabilizing = false; } catch (_e2) {}
         setLoaderProgress(100);
         solidSceneLoadUxFinish();
+        try { const _h = _solidInitFirstFrameHintController(); if (_h && _h.arm) _h.arm({ sceneToken: window.__solidSceneLoadToken }); } catch (_eHintArm) {}
         const ld = document.getElementById('scene-loader'); if (ld) { ld.style.opacity = '0'; setTimeout(() => { if (ld) ld.style.display = 'none'; }, 600); }
         return true;
     }
@@ -1404,6 +1513,7 @@
     if (window.isLoadingScene) return;
     if(index === window.currentSceneIndex) return;
     const _token = ++window.__solidSceneLoadToken;
+    try { const _h = _solidInitFirstFrameHintController(); if (_h && _h.disarm) _h.disarm(); } catch (_eHintDis) {}
     window.__solidSceneVersion = Number(window.__solidSceneVersion || 0) + 1;
     window.isLoadingScene = true;
     try { _solidDisposeRasterEnvProbe(); } catch(_eDisp) {}
@@ -1415,12 +1525,15 @@
     document.getElementById('scene-grid-modal').style.display = 'none';
     document.querySelector('.modal-close').style.display = 'inline-flex';
     document.getElementById('scene-trigger-top').innerText = data.name || `场景 ${index+1}`;
-    document.getElementById('scene-loader').style.display = 'flex'; document.getElementById('scene-loader').style.opacity = '1'; solidSceneLoadUxStart(); setLoaderText("读取场景布局..."); setLoaderProgress(2);
+    document.getElementById('scene-loader').style.display = 'flex'; document.getElementById('scene-loader').style.opacity = '1'; solidSceneLoadUxStart(); solidSetLoadPhase('layout', { force: true });
     if(window.PluginManager) window.PluginManager.trigger('onClearScene');
     for(let i = sceneGroup.children.length - 1; i >= 0; i--) { const obj = sceneGroup.children[i]; if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(obj); else sceneGroup.remove(obj); }
     const items = Array.isArray(data.items) ? data.items : [];
     let promises = []; const totalItems = items.length; const glbCount = items.filter(it => it.type === 'glb').length; const glbSlots = glbCount ? Array.from({ length: glbCount }, () => ({ loaded: 0, total: 0, done: false })) : []; let _glbSlotI = 0; let _assetDone = 0;
-    function updateSceneAssetProgress() { if (_isStale()) return; let glbAvg = 0; if (glbCount > 0) { let sumL = 0, sumT = 0; for (const s of glbSlots) { if (s.total > 0) { sumL += Math.min(s.loaded, s.total); sumT += s.total; } } glbAvg = sumT > 0 ? sumL / sumT : (glbSlots.filter(s => s.done).length / glbCount); } const total = Math.max(1, totalItems); const ratio = Math.max(0, Math.min(1, ((_assetDone / total) * 0.8) + (glbAvg * 0.2))); setLoaderProgress(8 + ratio * 55); }
+    window.__solidLoaderHintState = { phaseId: glbCount > 0 ? 'glb_load' : 'layout', glbDone: 0, glbTotal: glbCount, stalled: false };
+    try { if (window.__solidGlbLoadQueue) window.__solidGlbLoadQueue.reset(); } catch (_eQReset) {}
+    if (glbCount > 0) solidSetLoadPhase('glb_load', { glbDone: 0, glbTotal: glbCount, force: true });
+    function updateSceneAssetProgress() { if (_isStale()) return; if (glbCount > 0) { window.__solidLoaderHintState.glbDone = glbSlots.filter(s => s.done).length; window.__solidLoaderHintState.phaseId = 'glb_load'; updateSolidLoaderGlbHint(); } let glbAvg = 0; if (glbCount > 0) { let sumL = 0, sumT = 0; for (const s of glbSlots) { if (s.total > 0) { sumL += Math.min(s.loaded, s.total); sumT += s.total; } } glbAvg = sumT > 0 ? sumL / sumT : (glbSlots.filter(s => s.done).length / glbCount); } const total = Math.max(1, totalItems); const ratio = Math.max(0, Math.min(1, ((_assetDone / total) * 0.8) + (glbAvg * 0.2))); const _prog = 8 + ratio * 55; setLoaderProgress(_prog); const _ux = window.__solidSceneLoadUx; if (_ux && _ux.running && _prog > _ux.display + 1.5) solidSnapLoaderProgress(_prog); }
     function _solidGetBuiltinGeoCache(key, factory) { const cache = window.__solidBuiltinGeometryCache; if (cache.has(key)) return cache.get(key).clone(); const g = factory(); cache.set(key, g); return g.clone(); }
     /** 构图取景框（须与 Solid_Portrait_Create createHollowFrameGroup 同步） */
     function _solidParseFrameAspect(shapeStr) {
@@ -1513,14 +1626,13 @@
     });
     });
     }
-    setLoaderText("下载并解析模型资产..."); setLoaderProgress(8);
     items.forEach(item => {
     if(item.type === 'builtin') { promises.push(_solidBuildBuiltin(item)); }
     else if(item.type === 'glb') {
     const _slot = _glbSlotI++;
     promises.push(new Promise((resolve) => {
-    const _modelUrl = solidResolveSceneModelUrl(item.url);
-    const _cached = window.__solidGlbSceneCache.get(_modelUrl);
+    const _cacheKey = normalizeSolidGlbCacheKey(item.url);
+    const _cached = window.__solidGlbSceneCache.get(_cacheKey);
     if (_cached) {
     if (_isStale()) { resolve(); return; }
     glbSlots[_slot].done = true; glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1;
@@ -1529,38 +1641,77 @@
     model.position.set(...item.pos); model.rotation.set(...item.rot); model.scale.set(...item.scale); model.userData = { type: 'glb', url: item.url }; sceneGroup.add(model);
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); solidSceneApplyItemMaterial(model, item, _sceneEnvDefaultMat); _assetDone++; updateSceneAssetProgress(); resolve(); return;
     }
-    gltfLoader.load(_modelUrl, (gltf) => {
-    if (_isStale()) { resolve(); return; }
+    const _doGlbLoad = () => (async () => {
+    try {
+    const _persist = window.__solidGlbPersistCache;
+    const _onGlbProg = (evt) => {
+    if (_isStale()) return;
+    if (evt && evt.lengthComputable && evt.total > 0) { glbSlots[_slot].loaded = evt.loaded; glbSlots[_slot].total = evt.total; }
+    else if (evt && evt.loaded > 0) { glbSlots[_slot].loaded = evt.loaded; if (evt.total > 0) glbSlots[_slot].total = evt.total; }
+    updateSceneAssetProgress();
+    };
+    const { buffer } = await (_persist ? _persist.getOrFetchArrayBuffer(item.url, { isStale: _isStale, onProgress: _onGlbProg, tryCandidates: false }) : Promise.reject(new Error('no persist cache')));
+    if (_isStale()) return;
+    const gltf = await gltfLoader.parseAsync(buffer, _cacheKey);
+    if (_isStale()) return;
     glbSlots[_slot].done = true; if (glbSlots[_slot].total <= 0 && glbSlots[_slot].loaded <= 0) { glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1; }
-    try { window.__solidGlbSceneCache.set(_modelUrl, gltf.scene.clone(true)); } catch(_eCache) {}
+    try { window.__solidGlbSceneCache.set(_cacheKey, gltf.scene.clone(true)); } catch(_eCache) {}
     const model = gltf.scene;
     solidSceneStampGlbModelMaterials(model);
     model.position.set(...item.pos); model.rotation.set(...item.rot); model.scale.set(...item.scale); model.userData = { type: 'glb', url: item.url }; sceneGroup.add(model);
-    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); solidSceneApplyItemMaterial(model, item, _sceneEnvDefaultMat); _assetDone++; updateSceneAssetProgress(); resolve();
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); solidSceneApplyItemMaterial(model, item, _sceneEnvDefaultMat); _assetDone++; updateSceneAssetProgress();
+    } catch (e) {
+    if (_isStale()) return;
+    try { if (window.__solidGlbPersistCache && window.__solidGlbPersistCache.invalidate) await window.__solidGlbPersistCache.invalidate(_cacheKey); } catch (_eInv) {}
+    try {
+    const _modelUrl = solidResolveSceneModelUrl(item.url);
+    await new Promise((resolveLoad, rejectLoad) => {
+    gltfLoader.load(_modelUrl, (gltf) => {
+    if (_isStale()) { resolveLoad(); return; }
+    glbSlots[_slot].done = true; if (glbSlots[_slot].total <= 0 && glbSlots[_slot].loaded <= 0) { glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1; }
+    try { window.__solidGlbSceneCache.set(_cacheKey, gltf.scene.clone(true)); } catch(_eCache) {}
+    const model = gltf.scene;
+    solidSceneStampGlbModelMaterials(model);
+    model.position.set(...item.pos); model.rotation.set(...item.rot); model.scale.set(...item.scale); model.userData = { type: 'glb', url: item.url }; sceneGroup.add(model);
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); solidSceneApplyItemMaterial(model, item, _sceneEnvDefaultMat); _assetDone++; updateSceneAssetProgress(); resolveLoad();
     }, (evt) => {
     if (_isStale()) return;
     if (evt && evt.lengthComputable && evt.total > 0) { glbSlots[_slot].loaded = evt.loaded; glbSlots[_slot].total = evt.total; } else if (evt && evt.loaded > 0) { glbSlots[_slot].loaded = evt.loaded; if (evt.total > 0) glbSlots[_slot].total = evt.total; } updateSceneAssetProgress();
-    }, (e) => {
-    if (_isStale()) { resolve(); return; }
-    addHwLog("GLB加载失败: " + e.message); glbSlots[_slot].done = true; _assetDone++; updateSceneAssetProgress(); resolve();
+    }, (err) => { rejectLoad(err || new Error('GLB load failed')); });
     });
+    } catch (e2) {
+    addHwLog("GLB加载失败: " + (e2 && e2.message ? e2.message : e2)); glbSlots[_slot].done = true; _assetDone++; updateSceneAssetProgress();
+    }
+    }
+    })();
+    const _q = window.__solidGlbLoadQueue;
+    (_q ? _q.enqueue(_doGlbLoad) : _doGlbLoad()).then(() => resolve()).catch(() => resolve());
     }));
     }
     });
     if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data });
-    setLoaderText("恢复标注与场景元素..."); setLoaderProgress(83);
     Promise.all(promises).then(() => {
     if (_isStale()) return;
-    setLoaderProgress(90); setLoaderText("构建光栅光影...");
-    requestAnimationFrame(() => { requestAnimationFrame(() => {
+    (async () => {
+    try {
+    await solidYieldLoadPhase('annotations', 220);
     if (_isStale()) return;
-    setLoaderProgress(97); window.__solidForceBuildEnvironment = true; window.resetAll(); window.__solidForceBuildEnvironment = false;
+    await solidYieldLoadPhase('raster_env', 220);
+    if (_isStale()) return;
+    await new Promise((r) => requestAnimationFrame(r));
+    await new Promise((r) => requestAnimationFrame(r));
+    if (_isStale()) return;
+    solidSetLoadPhase('apply_mat', { force: true, snapProgress: true });
+    window.__solidForceBuildEnvironment = true; window.resetAll(); window.__solidForceBuildEnvironment = false;
     if (window.useAdvancedRender && pathTracer) { pathTracer.updateMaterials(); lightPosUpdated = true; _solidPtSync.queueReset('scene_loaded'); }
     window.isLoadingScene = false;
     try { syncRenderButtons(); } catch (_eBtnScene) {}
+    await solidYieldLoadPhase('first_preview', 220);
+    if (_isStale()) return;
     try { if (!window.useAdvancedRender) { try { if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); } catch (_eSkyIn) {} try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('scene_changed'); else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed'); } catch(_eP0) {} try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD0) {} try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD1) {} }); } catch (_eR1) {} }); } catch (_eR0) {} try { setTimeout(() => { try { if (!window.useAdvancedRender && window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed'); } catch (_eProbeIn2) {} }, 240); } catch (_eTIn2) {} } } catch(_eVrIn) {}
-    solidSceneLoadUxBeginStabilize('正在稳定画面...');
-    }); });
+    solidSceneLoadUxBeginStabilize();
+    } catch (_ePhaseChain) {}
+    })();
     }).catch(err => { if (_isStale()) return; window.isLoadingScene = false; setLoaderProgress(0); solidSceneLoadUxFinish(); window.hwLog("场景加载致命异常: " + err.message); });
     };
     function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -1943,7 +2094,7 @@
             } catch (_eLiOrbitLive) {}
         });
         container.addEventListener('pointerdown', () => { try { if (window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(600); } catch (_eLiDown) {} });
-        gltfLoader = new GLTFLoader(); const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'); gltfLoader.setDRACOLoader(dracoLoader);
+        gltfLoader = new GLTFLoader(); const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('./docs/js/three_164/examples/jsm/libs/draco/gltf/'); dracoLoader.setWorkerLimit(2); gltfLoader.setDRACOLoader(dracoLoader);
         sysMaterials = { plaster: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0 }), flat: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0, flatShading: true }), sphere: new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.6, metalness: 0 }) };
         // 【架构重构】：必须在任何读取 UI 状态的函数（如 buildEnvironment）之前，注入 DOM 模具！
         if (window.ControlPanel) window.ControlPanel.inject({ mode: 'consumer', showRenderButtons: true });
@@ -2200,6 +2351,7 @@
         function animate() { solidAnimRafId = requestAnimationFrame(animate); // 【核心防卡死 1】：如果标签页在后台，绝对冻结一切物理渲染和插件更新，防止 GPU 任务堆积导致切回时死锁
         if (document.hidden) return;
         try { if (typeof solidSceneLoadUxTickStabilize === 'function') solidSceneLoadUxTickStabilize(); } catch (_eStableTick) {}
+        try { const _h = _solidInitFirstFrameHintController(); if (_h && _h.tick) _h.tick({ sceneToken: window.__solidSceneLoadToken }); } catch (_eHintTick) {}
         try { __solidEvalImmersiveIdle(); } catch(_e) {}
         if (window._solidPerfHardwareT0 && window.PerfTester && window.PerfTester.isTesting) tickSolidPerfHardwareProgress();
         const isTesting = window.PerfTester ? window.PerfTester.isTesting : false;
