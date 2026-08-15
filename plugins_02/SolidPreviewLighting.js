@@ -57,6 +57,10 @@ export function createSolidPreviewLightingManager(opts) {
   const getLightState = typeof opts.getLightState === 'function' ? opts.getLightState : (() => opts.lightState || null); // expects { radius?: number }
   const getInteractionState = typeof opts.getInteractionState === 'function' ? opts.getInteractionState : (() => false);
   const shouldSkipEnvProbe = typeof opts.shouldSkipEnvProbe === 'function' ? opts.shouldSkipEnvProbe : () => false;
+  // 模型互不投影：仍投地面，模型网格不 receiveShadow（默认读 window.__solidNoInterModelShadow）
+  const getNoInterModelShadow = typeof opts.getNoInterModelShadow === 'function'
+    ? opts.getNoInterModelShadow
+    : (() => !!(typeof window !== 'undefined' && window.__solidNoInterModelShadow));
 
   let previewEnabled = true;
   let _receiverPatchLastEnsureAt = 0;
@@ -1469,6 +1473,8 @@ export function createSolidPreviewLightingManager(opts) {
         walls.forEach(w => { if (w) { w.receiveShadow = true; w.castShadow = false; } });
       }
       if (sceneGroup && sceneGroup.traverse) {
+        let noInter = false;
+        try { noInter = !!getNoInterModelShadow(); } catch (_eNoInter) { noInter = false; }
         sceneGroup.traverse(obj => {
           if (!obj || !obj.isMesh) return;
           if (obj.userData && obj.userData.solidShadowCore) {
@@ -1481,7 +1487,7 @@ export function createSolidPreviewLightingManager(opts) {
             obj.receiveShadow = false;
             return;
           }
-          obj.receiveShadow = true;
+          obj.receiveShadow = noInter ? false : true;
           obj.castShadow = true;
         });
       }

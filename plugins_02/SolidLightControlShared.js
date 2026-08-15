@@ -344,6 +344,132 @@ export function createSolidMainLight(THREE, { lightType, color, intensitySlider,
   return { light, addSpotTargetToScene };
 }
 
+/** 主光 Tab：双击 slider-val 直接输入数值（与 range/clamp 一致，提交后 dispatch 既有滑块事件） */
+let _solidMainLightValEditorActive = null;
+
+function _clampSolidLightDisplayToRange(val, min, max, step) {
+  let n = Number(val);
+  if (!Number.isFinite(n)) return null;
+  n = Math.max(min, Math.min(max, n));
+  const st = Number(step);
+  if (Number.isFinite(st) && st > 0) {
+    const steps = Math.round((n - min) / st);
+    n = min + steps * st;
+    n = Math.max(min, Math.min(max, n));
+    const dec = (String(st).split('.')[1] || '').length;
+    if (dec > 0) n = Number(n.toFixed(dec));
+    else n = Math.round(n);
+  } else {
+    n = Math.round(n);
+  }
+  return n;
+}
+
+function _installSolidMainLightValueEditors() {
+  const specs = [
+    { valId: 'azimuthVal', rangeId: 'lightAzimuth', kind: 'range' },
+    { valId: 'elevationVal', rangeId: 'lightElevation', kind: 'range' },
+    { valId: 'distanceVal', rangeId: 'lightDistance', kind: 'range' },
+    { valId: 'tempVal', rangeId: 'lightTemp', kind: 'tempKelvin' },
+    { valId: 'sizeVal', rangeId: 'lightSize', kind: 'size' },
+    { valId: 'intensityVal', rangeId: 'lightIntensity', kind: 'intensity' },
+  ];
+
+  function _getInputMeta(kind, range) {
+    if (kind === 'tempKelvin') return { min: 3000, max: 9000, step: 100 };
+    if (kind === 'size') {
+      const b = _getSolidSizeBounds();
+      return { min: b.sizeMin, max: b.sizeMax, step: Number(range.step) || 0.1 };
+    }
+    if (kind === 'intensity') return { min: 0.2, max: 8, step: Number(range.step) || 0.1 };
+    return {
+      min: Number(range.min),
+      max: Number(range.max),
+      step: Number(range.step) || 1,
+    };
+  }
+
+  function _displayToSliderVal(kind, displayVal, range) {
+    if (kind === 'tempKelvin') {
+      const k = Number(displayVal);
+      if (!Number.isFinite(k)) return null;
+      return clampSolidLightTempSlider(Math.round(k / 100));
+    }
+    if (kind === 'size') return clampSolidLightSizeSlider(displayVal);
+    if (kind === 'intensity') return clampSolidLightIntensitySlider(displayVal);
+    const meta = _getInputMeta('range', range);
+    return _clampSolidLightDisplayToRange(displayVal, meta.min, meta.max, meta.step);
+  }
+
+  for (const spec of specs) {
+    const span = document.getElementById(spec.valId);
+    if (!span || span.__solidValEditorBound === '1') continue;
+    span.__solidValEditorBound = '1';
+
+    span.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (_solidMainLightValEditorActive) return;
+
+      const range = document.getElementById(spec.rangeId);
+      if (!range) return;
+
+      const meta = _getInputMeta(spec.kind, range);
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'slider-val-input';
+      input.value = span.innerText;
+      input.min = String(meta.min);
+      input.max = String(meta.max);
+      input.step = String(meta.step);
+
+      span.style.display = 'none';
+      span.parentNode.insertBefore(input, span.nextSibling);
+      _solidMainLightValEditorActive = { span, input };
+
+      try { input.focus(); input.select(); } catch (_eF) {}
+
+      let settled = false;
+
+      function _teardown() {
+        input.remove();
+        span.style.display = '';
+        _solidMainLightValEditorActive = null;
+      }
+
+      function _cancel() {
+        if (settled) return;
+        settled = true;
+        _teardown();
+      }
+
+      function _commit() {
+        if (settled) return;
+        settled = true;
+        const sliderVal = _displayToSliderVal(spec.kind, input.value, range);
+        _teardown();
+        if (sliderVal === null) return;
+        range.value = String(sliderVal);
+        range.dispatchEvent(new Event('input', { bubbles: true }));
+        range.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          _commit();
+        } else if (ev.key === 'Escape') {
+          ev.preventDefault();
+          _cancel();
+        }
+      });
+      input.addEventListener('blur', () => {
+        setTimeout(() => { if (!settled) _commit(); }, 0);
+      });
+    });
+  }
+}
+
 /**
  * 注册主光六条滑块（与控制面板 id 一致）。宿主在 `setupUIControls` 内调用一次即可。
  * @param {object} deps
@@ -560,4 +686,6 @@ export function installSolidMainLightSliderBindings(deps) {
     deps.assignPathTracerFlags({ lightMoved: true });
     probe('light_intensity');
   });
+
+  _installSolidMainLightValueEditors();
 }

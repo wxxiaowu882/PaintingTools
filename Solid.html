@@ -94,8 +94,13 @@
     /* #poly3d-layer 故意从此规则中移除：它始终挂在 #canvas-container 内，DOM 顺序已在 WebGL 画布之上。
        若给它设 z-index（position:absolute + z-index），会创建独立 stacking context，
        导致内部 SVG 的 mix-blend-mode:color 无法与 WebGL 画布合成，面片变成纯色平涂。 */
-    html.solid-anno-clickable #anno-layer, html.solid-anno-clickable #anno-cs-layer, html.solid-anno-clickable #norm-arrow-layer, html.solid-anno-clickable #prober-html-layer,
-    html.solid-anno-clickable #dashed-line-layer { z-index: 4800 !important; }
+    /* 相对顺序对齐生产端插件默认：虚线/直线 < 法线 < 经典引线 < 取色引线 < 探针
+       （勿全部压成同一 4800，否则 DOM 后挂的直线层会盖住引线） */
+    html.solid-anno-clickable #dashed-line-layer { z-index: 4796 !important; }
+    html.solid-anno-clickable #norm-arrow-layer { z-index: 4797 !important; }
+    html.solid-anno-clickable #anno-layer { z-index: 4798 !important; }
+    html.solid-anno-clickable #anno-cs-layer { z-index: 4799 !important; }
+    html.solid-anno-clickable #prober-html-layer { z-index: 4800 !important; }
     /* 底栏 z-index:100 会盖住画布区域；poly3d 须在 canvas-container 内。父级不拦截，仅顶栏条与展开内容区接收触控 */
     html.solid-anno-clickable #main-panel { pointer-events: none; }
     html.solid-anno-clickable #main-panel > div:nth-child(3), html.solid-anno-clickable #main-panel > .panel-content { pointer-events: auto; }
@@ -158,6 +163,12 @@
         clampSolidLightTempSlider,
         getSolidUnifiedInteractionState,
     } from './plugins_02/SolidLightControlShared.js';
+    import {
+        buildSolidMaterialDeps,
+        resolveSolidItemEffectiveMat,
+        applySolidMaterialToRoot,
+        applySolidMaterialsFromSceneItems,
+    } from './plugins_02/SolidMaterialShared.js';
     import { SOLID_PATH_TRACER_QUALITY, SOLID_RASTER_PREVIEW_CANVAS_FILTER, SOLID_RASTER_AREA_LIGHT_RIG, APP_LOGGING } from './Config/PaintingConfig.js';
     window.skyEnvLightMatchMainRect = true; // 【试验·抗黑点噪点】true=更干净（更慢），false=更快（更噪）
     const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.consumer) ? SOLID_PATH_TRACER_QUALITY.consumer : {};
@@ -213,6 +224,7 @@
     window.useAdvancedRender = false;
     window._solidUserStoppedRender = true;
     window.perfTestDone = false; window.isTestingPerformance = true; window.isLoadingScene = false; window._solidHardwareUnsupported = false; window._solidPerfSoftFail = false; window._solidSampleTimeout = false; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
+    window.__solidNoInterModelShadow = false;
     window.updateDoFUIFromRaycaster = function(focusDist) { const slider = document.getElementById('dofFocusSlider'); if(slider) { slider.value = focusDist; if(window.updateDoFUI) window.updateDoFUI(); } };
     if (window.PosterizeShared && typeof window.PosterizeShared.init === 'function') {
     window.PosterizeShared.init({ containerId: 'canvas-container', iosHost: isIosPosterizeHost, getLogger: () => window.hwLog });
@@ -1130,95 +1142,32 @@
 
     // 场景列表自适应换行：已改为纯 CSS Grid（auto-fit/minmax），不再需要 JS 判定/切 class
     window.togglePanel = function() { const panel = document.getElementById('main-panel'); panel.classList.toggle('minimized'); document.getElementById('toggle-icon').innerText = panel.classList.contains('minimized') ? '▲' : '✕'; };
-    window.changeMat = function(val) { const _wasLoading = !!window.isLoadingScene; window.isLoadingScene = true; window.matType = val; const roughs = [0.95, 0.15, 0.3, 0.05, 0.4]; const metals = [0.0, 0.0, 0.85, 0.0, 0.0]; const trans = [0.0, 0.0, 0.0, 1.0, 1.0];
-    const _targetSceneVer = Number(window.__solidSceneVersion || 0);
-    if (!_wasLoading && window.__solidMatAppliedSceneVersion === _targetSceneVer && String(window.__solidMatAppliedType || '') === String(window.matType || '')) { window.isLoadingScene = false; try { syncRenderButtons(); } catch (_eBtnSkip) {} return; }
-    function _isSysMatRef(mat) {
-    if (!mat) return false;
-    if (mat === sysMaterials.flat || mat === sysMaterials.sphere || mat === sysMaterials.plaster) return true;
-    if (Array.isArray(mat)) return mat.every(m => m === sysMaterials.flat || m === sysMaterials.sphere || m === sysMaterials.plaster);
-    return false;
+    let _solidMatDeps = null;
+    function solidSceneEnsureMatDeps() {
+    if (_solidMatDeps || !sysMaterials) return _solidMatDeps;
+    _solidMatDeps = buildSolidMaterialDeps({
+    flatMat: sysMaterials.flat, sphereMat: sysMaterials.sphere, plasterMat: sysMaterials.plaster,
+    safeDispose, materialRefEqual: solidSceneMaterialRefEqual,
+    isUnderGlbRoot: solidSceneIsUnderGlbRoot, stampMeshOriginal: solidSceneStampMeshOriginalMaterial,
+    });
+    return _solidMatDeps;
     }
-    function _shouldDisposeReplaced(oldMat, originalMat) {
-    if (!oldMat) return false;
-    if (solidSceneMaterialRefEqual(oldMat, originalMat)) return false;
-    if (_isSysMatRef(oldMat)) return false;
-    return true;
+    function solidSceneApplyItemMaterial(root, item, envDefaultMat) {
+    const deps = solidSceneEnsureMatDeps(); if (!deps || !root) return;
+    const mat = resolveSolidItemEffectiveMat(item || {}, envDefaultMat);
+    if (!root.userData) root.userData = {};
+    root.userData.matType = mat;
+    applySolidMaterialToRoot(root, mat, deps);
     }
-    function _buildBuiltinOriginMat(ud) {
-    const m = ud.isFlat ? sysMaterials.flat.clone() : (ud.shape === 'sphere' ? sysMaterials.sphere.clone() : sysMaterials.plaster.clone());
-    if (ud.customColor && m.color) m.color.set(ud.customColor);
-    return m;
-    }
-    function _applyPreviewParams(m, idx, ud, isGlb) {
-    if (!m || !m.isMaterial) return m;
-    const c = m.clone ? m.clone() : m;
-    if (!isGlb && c.color) c.color.set(ud.customColor || '#e8e8e8');
-    if (c.roughness !== undefined) c.roughness = (ud.shape === 'sphere' && idx === 0) ? 0.6 : roughs[idx];
-    if (c.metalness !== undefined) c.metalness = metals[idx];
-    if (c.transmission !== undefined) c.transmission = trans[idx];
-    if (c.transparent !== undefined) c.transparent = trans[idx] > 0;
-    if (c.ior !== undefined) c.ior = 1.5;
-    if (ud.isFlat && c.flatShading !== undefined) c.flatShading = true;
-    return c;
-    }
-    function _buildPreviewFromOriginal(originalMat, idx, ud, isGlb) {
-    if (!originalMat) return null;
-    if (Array.isArray(originalMat)) return originalMat.map(m => _applyPreviewParams(m, idx, ud, isGlb));
-    return _applyPreviewParams(originalMat, idx, ud, isGlb);
-    }
-    function _buildBuiltinPreviewMat(idx, ud) {
-    const m = sysMaterials.plaster.clone();
-    if (m.color) m.color.set(ud.customColor || '#e8e8e8');
-    m.roughness = (ud.shape === 'sphere' && idx === 0) ? 0.6 : roughs[idx];
-    m.metalness = metals[idx];
-    m.transmission = trans[idx];
-    m.transparent = trans[idx] > 0;
-    m.ior = 1.5;
-    if (ud.isFlat) m.flatShading = true;
-    return m;
-    }
-    function _resolveNextMaterial(child, matTypeVal) {
-    const ud = child.userData || {};
-    const isGlb = solidSceneIsUnderGlbRoot(child);
-    const orig = ud.originalMaterial;
-    if (matTypeVal === 'origin') {
-    if (orig) return orig;
-    if (isGlb) {
-    solidSceneStampMeshOriginalMaterial(child);
-    if (child.userData.originalMaterial) return child.userData.originalMaterial;
-    return child.material;
-    }
-    return _buildBuiltinOriginMat(ud);
-    }
-    const idx = parseInt(matTypeVal);
-    if (isGlb) {
-    const fromOrig = _buildPreviewFromOriginal(orig, idx, ud, true);
-    if (fromOrig) return fromOrig;
-    return _buildBuiltinPreviewMat(idx, ud);
-    }
-    return _buildBuiltinPreviewMat(idx, ud);
-    }
-    const _updates = [];
-    sceneGroup.traverse(child => { if (child.isMesh) {
-    if (child.userData && child.userData.solidShadowCore) return;
-    if (child.userData && child.userData.isFrame) return;
-    const prevMat = child.material;
-    const nextMat = _resolveNextMaterial(child, window.matType);
-    if (!solidSceneMaterialRefEqual(prevMat, nextMat)) _updates.push({ child, prevMat, nextMat, originalMat: child.userData && child.userData.originalMaterial });
-    } });
-    for (let ui = 0; ui < _updates.length; ui++) {
-    const u = _updates[ui];
-    u.child.material = u.nextMat;
-    if (_shouldDisposeReplaced(u.prevMat, u.originalMat)) safeDispose(u.prevMat);
-    }
-    if(pathTracer) { lightMoved = true; needsUpdate = true; _solidPtSync.queueReset('change_mat'); }
+    function solidSceneApplyAllMaterialsFromSceneData() {
+    const deps = solidSceneEnsureMatDeps(); if (!deps || !window.currentSceneData) return;
+    const data = window.currentSceneData;
+    const envDefault = (data.env && data.env.defaultMat !== undefined) ? data.env.defaultMat : 'origin';
+    applySolidMaterialsFromSceneItems(sceneGroup, data.items || [], envDefault, deps);
+    if (pathTracer) { lightMoved = true; needsUpdate = true; _solidPtSync.queueReset('change_mat'); }
     try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('change_mat'); } catch(_eP) {}
-    window.isLoadingScene = false;
-    window.__solidMatAppliedSceneVersion = _targetSceneVer;
-    window.__solidMatAppliedType = String(window.matType || '');
     try { syncRenderButtons(); } catch (_eBtnMat) {}
-    };
+    }
     window.selectCustomOpt = function(type, value, text, el) {
     el.parentElement.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
     el.classList.add('selected');
@@ -1242,10 +1191,6 @@
     try { requestAnimationFrame(() => { try { if (renderer) _solidTryRasterPreviewDraw(); } catch(_eR1) {} }); } catch(_eRaf) {}
     }
     try { if (window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(1300); } catch (_eLiShow) {}
-    }
-    else if (type === 'mat') {
-    document.getElementById('mat-trigger').innerText = text;
-    window.changeMat(value);
     }
     else if (type === 'lightDir') {
     document.getElementById('dir-trigger').innerText = text;
@@ -1304,16 +1249,6 @@
     function solidSceneStampGlbModelMaterials(root) {
     if (!root || !root.traverse) return;
     root.traverse(child => { if (child.isMesh) solidSceneStampMeshOriginalMaterial(child); });
-    }
-    function solidSceneSyncMatPanelFromType(matType) {
-    const targetMat = String(matType != null ? matType : 'origin');
-    const matchedOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${targetMat}'"]`);
-    if (matchedOpt) {
-    const trigger = document.getElementById('mat-trigger');
-    if (trigger) trigger.innerText = matchedOpt.innerText;
-    document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected'));
-    matchedOpt.classList.add('selected');
-    }
     }
     function solidSceneMaterialRefEqual(a, b) {
     if (a === b) return true;
@@ -1436,9 +1371,10 @@
     lightType = data.light.type || 'spot'; const nameMap = {spot:'聚光灯',point:'点光源',dir:'平行光',rect:'面积光'}; document.getElementById('light-trigger').innerText = nameMap[lightType];
     document.querySelectorAll('#light-options .custom-option').forEach(opt => opt.classList.remove('selected')); document.querySelector(`#light-options .custom-option[onclick*="'${lightType}'"]`).classList.add('selected');
     updateDirTriggerByValues(); }
-    if(data.camera) { camera.position.set(...data.camera.pos); controls.target.set(...data.camera.target); camera.zoom = data.camera.zoom; camera.updateProjectionMatrix(); controls.update(); }
+    if(data.camera) { camera.position.set(...data.camera.pos); controls.target.set(...data.camera.target); camera.zoom = data.camera.zoom; camera.fov = (typeof data.camera.fov === 'number' && isFinite(data.camera.fov)) ? Math.max(5, Math.min(60, data.camera.fov)) : 34; camera.updateProjectionMatrix(); controls.update(); }
     if(data.env) {
     solidApplyLightIndicatorEnabled(solidResolveSceneLightIndicatorEnabled(data), false);
+    try { window.__solidNoInterModelShadow = !!data.env.noInterModelShadow; } catch (_eNis) { window.__solidNoInterModelShadow = false; }
     if (data.env.hasWall !== undefined) { window.hasWall = data.env.hasWall; const wallBtn = document.getElementById('wall-btn'); const wchk = document.getElementById('wall-btn-checkbox'); if (wchk) wchk.checked = !!window.hasWall; if (wallBtn) { wallBtn.classList.toggle('active', window.hasWall); wallBtn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; } }
     window.matType = data.env.defaultMat !== undefined ? data.env.defaultMat : 'origin'; window.posterizeLevel = data.env.posterizeLevel !== undefined ? data.env.posterizeLevel : 0;
     window.envWallColor = data.env.wallColor || '#cccccc'; window.envGroundColor = data.env.groundColor || '#cccccc'; window.envSkyColor = data.env.skyColor || '#0d0d0f';
@@ -1449,18 +1385,18 @@
     window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof;
     } else {
     solidApplyLightIndicatorEnabled(solidResolveSceneLightIndicatorEnabled(data), false);
+    try { window.__solidNoInterModelShadow = false; } catch (_eNis0) {}
     window.matType = 'origin'; window.posterizeLevel = 0; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
     const _atm = { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 }; const _dof = { enabled: false, aperture: 2.8, focusDistance: 10 };
     window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof; }
     if (window.syncEnvColorPickers) window.syncEnvColorPickers();
-    solidSceneSyncMatPanelFromType(window.matType);
     window.__solidForceBuildEnvironment = true;
     try { buildEnvironment(); } finally { window.__solidForceBuildEnvironment = false; }
     try {
     if (window.PluginManager && typeof window.PluginManager.trigger === 'function') window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType });
     else if (typeof window.setSkyLightScale === 'function') window.setSkyLightScale(window.envSkyLightScale);
     } catch (_eSkyReset) {}
-    window.changeMat(window.matType); window.changePosterize(window.posterizeLevel);
+    solidSceneApplyAllMaterialsFromSceneData(); window.changePosterize(window.posterizeLevel);
     solidApplyAtmosphereStateToPanel(window.__solidSceneAtmosphere || { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 });
     solidApplyDoFStateToPanel(window.__solidSceneDoF || { enabled: false, aperture: 2.8, focusDistance: 10 });
     const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity(); lightMoved = true; try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('reset_all'); } catch(_eP) {} };
@@ -1474,7 +1410,7 @@
     window.currentSceneIndex = index; const data = window.customScenes[index]; window.currentSceneData = data;
     const _isStale = () => (_token !== window.__solidSceneLoadToken);
     try { if (window.SolidSceneKeyPoints && typeof window.SolidSceneKeyPoints.syncFromScene === 'function') window.SolidSceneKeyPoints.syncFromScene(data && data.meta); } catch (_eKp) {}
-    if (data && data.camera) { camera.position.set(...data.camera.pos); controls.target.set(...data.camera.target); camera.zoom = data.camera.zoom; camera.updateProjectionMatrix(); controls.update(); needsUpdate = true; lightMoved = true; }
+    if (data && data.camera) { camera.position.set(...data.camera.pos); controls.target.set(...data.camera.target); camera.zoom = data.camera.zoom; camera.fov = (typeof data.camera.fov === 'number' && isFinite(data.camera.fov)) ? Math.max(5, Math.min(60, data.camera.fov)) : 34; camera.updateProjectionMatrix(); controls.update(); needsUpdate = true; lightMoved = true; }
     if (typeof window.updateAnnotationEyeButtonVisibility === 'function') window.updateAnnotationEyeButtonVisibility();
     document.getElementById('scene-grid-modal').style.display = 'none';
     document.querySelector('.modal-close').style.display = 'inline-flex';
@@ -1519,6 +1455,7 @@
     group.traverse(c => { if (c.isMesh) { c.material.color.set(col); c.userData.customColor = col; } });
     return group;
     }
+    const _sceneEnvDefaultMat = (data.env && data.env.defaultMat !== undefined) ? data.env.defaultMat : 'origin';
     function _solidBuildBuiltin(item) {
     return new Promise((resolve) => {
     requestAnimationFrame(() => {
@@ -1532,6 +1469,7 @@
     obj3d.position.set(...item.pos); obj3d.rotation.set(...item.rot); obj3d.scale.set(...item.scale);
     sceneGroup.add(obj3d);
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj3d, itemData: item });
+    solidSceneApplyItemMaterial(obj3d, item, _sceneEnvDefaultMat);
     }
     } else if (s.startsWith('intersect_')) {
     obj3d = new THREE.Group();
@@ -1540,6 +1478,7 @@
     else if (s === 'intersect_pyramid') { const g1 = _solidGetBuiltinGeoCache('intersect_pyramid_g1', () => { const g = new THREE.ConeGeometry(2.2, 4, 4).toNonIndexed(); g.computeVertexNormals(); return g; }); const m1 = new THREE.Mesh(g1, sysMaterials.flat.clone()); m1.rotation.y = Math.PI / 4; const g2 = _solidGetBuiltinGeoCache('intersect_pyramid_g2', () => { const g = new THREE.BoxGeometry(4.5, 1.2, 1.2).toNonIndexed(); g.computeVertexNormals(); return g; }); const m2 = new THREE.Mesh(g2, sysMaterials.flat.clone()); m2.rotation.y = Math.PI / 4; m2.position.y = -0.5; obj3d.add(m1); obj3d.add(m2); yOffset = 2.0; }
     obj3d.position.set(...item.pos); obj3d.rotation.set(...item.rot); obj3d.scale.set(...item.scale);
     obj3d.userData = { type: 'builtin', shape: s, isFlat: false, customColor: item.color }; obj3d.traverse(c => { if(c.isMesh) { c.material.color.set(item.color); c.userData.customColor = item.color; } }); sceneGroup.add(obj3d);
+    solidSceneApplyItemMaterial(obj3d, item, _sceneEnvDefaultMat);
     } else {
     let geo; if(s === 'sphere') { geo = _solidGetBuiltinGeoCache('sphere', () => new THREE.SphereGeometry(2, 64, 64)); }
     else if(s === 'poly_sphere') { geo = _solidGetBuiltinGeoCache('poly_sphere', () => new THREE.IcosahedronGeometry(2, 2)); isFlat = true; }
@@ -1566,6 +1505,7 @@
     obj3d.position.set(...item.pos); obj3d.rotation.set(...item.rot); obj3d.scale.set(...item.scale); sceneGroup.add(obj3d);
     if (s === 'sphere') { try { _solidSnapBuiltinSphereToGroundIfNear(obj3d); } catch(_eSnap) {} }
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj3d, itemData: item });
+    solidSceneApplyItemMaterial(obj3d, item, _sceneEnvDefaultMat);
     }
     _assetDone++; updateSceneAssetProgress();
     } catch(_eBuiltin) {}
@@ -1587,7 +1527,7 @@
     const model = _cached.clone(true);
     solidSceneStampGlbModelMaterials(model);
     model.position.set(...item.pos); model.rotation.set(...item.rot); model.scale.set(...item.scale); model.userData = { type: 'glb', url: item.url }; sceneGroup.add(model);
-    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); _assetDone++; updateSceneAssetProgress(); resolve(); return;
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); solidSceneApplyItemMaterial(model, item, _sceneEnvDefaultMat); _assetDone++; updateSceneAssetProgress(); resolve(); return;
     }
     gltfLoader.load(_modelUrl, (gltf) => {
     if (_isStale()) { resolve(); return; }
@@ -1596,7 +1536,7 @@
     const model = gltf.scene;
     solidSceneStampGlbModelMaterials(model);
     model.position.set(...item.pos); model.rotation.set(...item.rot); model.scale.set(...item.scale); model.userData = { type: 'glb', url: item.url }; sceneGroup.add(model);
-    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); _assetDone++; updateSceneAssetProgress(); resolve();
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); solidSceneApplyItemMaterial(model, item, _sceneEnvDefaultMat); _assetDone++; updateSceneAssetProgress(); resolve();
     }, (evt) => {
     if (_isStale()) return;
     if (evt && evt.lengthComputable && evt.total > 0) { glbSlots[_slot].loaded = evt.loaded; glbSlots[_slot].total = evt.total; } else if (evt && evt.loaded > 0) { glbSlots[_slot].loaded = evt.loaded; if (evt.total > 0) glbSlots[_slot].total = evt.total; } updateSceneAssetProgress();

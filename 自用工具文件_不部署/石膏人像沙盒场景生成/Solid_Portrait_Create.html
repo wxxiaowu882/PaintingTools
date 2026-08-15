@@ -13,6 +13,8 @@
     .custom-select-trigger { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); color:#fff; padding:3px 4px; border-radius:4px; font-size:9px; height:22px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .custom-select-trigger::after { content: '▼'; font-size: 7px; transform: scaleX(1.5); opacity: 0.5; margin-left: 2px; }
     .custom-options { display:none; position:absolute; bottom:calc(100% + 4px); left:0; width:100%; min-width:90px; background:rgba(20,20,20,0.95); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.1); border-radius:4px; z-index:1000; box-shadow:0 -4px 12px rgba(0,0,0,0.5); }
+    /* 右栏模型材质：向下展开（底部灯光栏仍向上） */
+    .custom-options.custom-options-drop-down { bottom:auto; top:calc(100% + 4px); box-shadow:0 4px 12px rgba(0,0,0,0.5); z-index:1200; }
     .custom-options.show { display:block; } .custom-option { padding:6px 8px; font-size:10px; cursor:pointer; color:#ccc; transition:0.2s; white-space:nowrap; } .custom-option:hover, .custom-option.selected { background:rgba(255,255,255,0.15); color:#fff; }
     .opt-group-label { padding:5px 8px; color:#777; font-size:9px; font-weight:bold; background:rgba(0,0,0,0.4); border-bottom: 1px solid rgba(255,255,255,0.05); border-top: 1px solid rgba(255,255,255,0.05); } .opt-group-label:first-child { border-top: none; }
     .env-btn { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); color:rgba(255,255,255,0.6); border-radius:3px; padding:3px 6px; cursor:pointer; transition:0.2s; user-select:none; display:flex; align-items:center; gap:4px; letter-spacing:1px; }
@@ -114,23 +116,61 @@
     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"><div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0;"><span style="font-size:11px; color:#fff; white-space:nowrap;">选中物体颜色：</span>
     <input type="color" id="obj-color-picker" value="#e8e8e8" style="width:24px; height:24px; padding:0; border:none; background:none; cursor:pointer; flex-shrink:0;" oninput="changeSelectedColor(event)" onchange="changeSelectedColor(event)"></div><div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0; justify-content:flex-end;" title="【粗体字】先在此选择颜色，再双击经典引出线小标签进入编辑。&#10;选中文字后 Ctrl+B 加粗（Mac：Cmd+B），再按一次取消粗体。"><span style="font-size:11px; color:#fff; white-space:nowrap;">粗体字颜色：</span>
     <input type="color" id="anno-bold-color-picker" value="#ffd966" style="width:24px; height:24px; padding:0; border:none; background:none; cursor:pointer; flex-shrink:0;" oninput="changeAnnoBoldColor(event)" onchange="changeAnnoBoldColor(event)"></div>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);">
+    <span style="font-size:11px; color:#fff; white-space:nowrap;">模型材质：</span>
+    <div style="position:relative; flex:1; min-width:0; max-width:150px;">
+    <div class="custom-select-trigger" onclick="window.toggleCustomSelect(event, 'mat-options')" id="mat-trigger" style="opacity:0.45; pointer-events:none;" title="请先选中模型">自带材质</div>
+    <div class="custom-options custom-options-drop-down" id="mat-options">
+    <div class="custom-option selected" onclick="window.selectCustomOpt('mat', 'origin', '自带材质', this)">自带材质</div>
+    <div class="custom-option" onclick="window.selectCustomOpt('mat', '0', '哑光石膏', this)">哑光石膏</div>
+    <div class="custom-option" onclick="window.selectCustomOpt('mat', '1', '亮面陶瓷', this)">亮面陶瓷</div>
+    <div class="custom-option" onclick="window.selectCustomOpt('mat', '2', '镜面金属', this)">镜面金属</div>
+    <div class="custom-option" onclick="window.selectCustomOpt('mat', '3', '透明玻璃', this)">透明玻璃</div>
+    <div class="custom-option" onclick="window.selectCustomOpt('mat', '4', '磨砂玻璃', this)">磨砂玻璃</div>
+    </div>
+    </div>
+    <span id="solid-create-mat-hint" style="font-size:10px; color:#888; white-space:nowrap;">请先选中模型</span>
     </div><div style="display:flex; gap:4px; margin-bottom:6px;"><button id="btn-trans" class="editor-btn active" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('translate')">位移(T)</button>
     <button id="btn-rot" class="editor-btn" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('rotate')">旋转(R)</button>
-    <button id="btn-scale" class="editor-btn" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('scale')">缩放(S)</button> </div>
-    <button type="button" class="editor-btn" style="margin:0 0 6px 0; width:100%; padding:4px 0;" onclick="copySelected()" title="复制当前选中的内置几何或 GLB（不含标注），副本沿 X 轴偏移">📋 拷贝选中模型</button>
+    <button id="btn-scale" class="editor-btn" style="margin:0; flex:1; padding:4px 0;" onclick="setMode('scale')">缩放(S)</button>
+    <button type="button" class="editor-btn" style="margin:0; flex:1.15; padding:4px 0; font-size:11px;" onclick="copySelected()" title="复制当前选中的内置几何或 GLB（不含标注），副本沿 X 轴偏移">📋 拷贝</button> </div>
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);" title="【透视】控制近大远小的强弱（相机视野 FOV）。&#10;&#10;向左：更扁、更像长焦，透视弱。&#10;向右：更冲、更像广角，透视强。&#10;&#10;调节时会沿视线微调相机远近，尽量让主体在画面里大小差不多（不是单纯裁切画面）。&#10;写入场景 JSON 的 camera.fov；消费端 Solid 打开同样生效。旧场景无此字段=默认 34°。">
+    <span style="font-size:11px; color:#bbb; white-space:nowrap;">透视</span>
+    <input type="range" id="solid-create-persp-slider" min="5" max="60" step="1" value="34" style="flex:1; min-width:0;" aria-label="透视强弱">
+    <span id="solid-create-persp-val" style="font-size:10px; color:#aaa; width:22px; text-align:right; font-variant-numeric:tabular-nums; flex-shrink:0;">34</span>
+    </div>
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"> <span style="font-size:11px; color:#bbb; white-space:nowrap;">标注模式：</span>
     <select id="tool-mode-select" class="editor-select" style="margin:0; flex:1; padding:3px; background:#111; color:#0df; border-color:#444;" onchange="setMode(this.value)">
     <option value="none">未选择标注工具…</option> <option value="annotate">🏷️ 经典引出线 [Alt+Shift+划动]</option> <option value="annotate-color">🎨 屏幕取色引线 [Alt+Shift+划动]</option>
     <option value="dashed-line">📏 连续虚线 [Alt+Shift+划动]</option>
     <option value="straight-line">📐 直线 [Alt+Shift+左键点两点]</option>
     <option value="normal-arrow">↗️ 法线箭头 [Alt+左击]</option> <option value="polygon3d">🟩 3D光影面片 [Alt+Shift+悬停滑动]</option> <option value="prober">💡 受光探针 [直接点击]</option> </select></div>
-    <div id="solid-create-anno-detail-wrap" style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; gap:8px;"> <span id="solid-create-anno-detail-hint" style="font-size:10px; color:#888; letter-spacing:0.5px;">未选中标注</span> </div>
+    <div id="solid-create-anno-detail-wrap" style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; gap:8px; flex-wrap:wrap;"> <span id="solid-create-anno-detail-hint" style="font-size:10px; color:#888; letter-spacing:0.5px; flex-shrink:0;">未选中标注</span>
+    <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1; justify-content:flex-end; flex-wrap:wrap;">
+    <button type="button" id="solid-create-project-straight-btn" class="editor-btn" disabled style="margin:0; padding:2px 8px; font-size:10px; width:auto; flex-shrink:0;" title="">投到面</button>
+    <label id="solid-create-label-circle-wrap" style="display:flex; align-items:center; gap:4px; margin:0; min-width:0; cursor:pointer; user-select:none;" title="【圆形标签】仅作用于当前选中的经典引线。&#10;&#10;勾选后标签变为正圆、内边距更小，适合单字/短标签；文字变长时圆会变大。&#10;圆形时不显示收起按钮。取消勾选恢复矩形。&#10;存盘写入 labelShape，消费端同样显示。">
+    <input id="solid-create-label-circle" type="checkbox" disabled style="accent-color:#2ecc71; transform:scale(1.05); cursor:pointer; margin:0;">
+    <span style="font-size:10px; color:#aaa; white-space:nowrap;">圆形</span>
+    </label>
+    <label id="solid-create-occlude-wrap" style="display:flex; align-items:center; gap:4px; margin:0; min-width:0;" title="【侧面淡出】控制当前这条标注「贴面转侧多少后才变半透明」。&#10;&#10;原理：看贴点表面是否朝向相机（不是被别的物体挡住多少）。&#10;越灵敏：稍侧一点就淡；越钝：转过去更多才淡。&#10;&#10;用法：先点选「经典引线」或「直线」，再改下拉；取消选中后该条仍按此档生效。&#10;存盘写入场景 JSON，消费端 Solid 同样按该档显示。旧数据无此字段=默认。&#10;&#10;本控件仅对经典引线与直线可用。"> <span style="font-size:10px; color:#aaa; white-space:nowrap;">侧面淡出</span>
+    <select id="solid-create-occlude-select" disabled class="editor-select" style="margin:0; width:72px; max-width:40%; padding:2px 4px; font-size:10px; background:#111; color:#0df; border-color:#444;">
+    <option value="0.25">很灵敏</option> <option value="0.1">灵敏</option> <option value="-0.05" selected>默认</option> <option value="-0.2">略钝</option> <option value="-0.35">钝</option> <option value="-0.55">很钝</option> <option value="-0.8">极钝</option>
+    </select></label></div> </div>
     <label for="solid-create-anno-detail" style="font-size:10px; color:#aaa; display:block; margin-bottom:4px;">引线详细说明</label> <textarea id="solid-create-anno-detail" rows="4" disabled placeholder="在场景中点击选中一条标注后，在此输入说明…" style="width:100%; box-sizing:border-box; resize:vertical; min-height:72px; max-height:200px; padding:6px 8px; font-size:11px; line-height:1.45; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.18); border-radius:4px; color:#eee; outline:none; font-family:inherit;"></textarea> </div><div style="display:flex; justify-content:space-between; margin-bottom:0;">
     <button class="editor-btn" style="flex:1; margin:0; margin-right:6px; background:rgba(142, 68, 173, 0.4); border-color:rgba(142, 68, 173, 0.6);" onclick="toggleCropBox()">✂️ 显/隐 截取框</button>
     <span class="text-[9px] env-btn active" id="uniform-scale-btn" onclick="toggleUniformScale()" style="padding:2px 6px;">☑ 等比缩放</span>
     <span class="text-[9px] env-btn" id="camera-lock-btn" onclick="toggleCameraLock()" style="padding:2px 6px; margin-left:6px;" title="锁定后禁止旋转/平移/缩放视角，避免移动模型时误转场景">🔓 视角</span></div>
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px; background:rgba(0,0,0,0.45); padding:6px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.14);"> <span style="font-size:11px; color:#bbb; white-space:nowrap; letter-spacing:1px;">📱 手机取景框</span> <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#fff; cursor:pointer; user-select:none;">
-    <input id="mobile-frame-toggle" type="checkbox" style="accent-color:#2ecc71; transform:scale(1.05); cursor:pointer;"> <span style="color:rgba(255,255,255,0.75);">显示</span> </label> </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px; background:rgba(0,0,0,0.45); padding:6px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.14);">
+    <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#fff; cursor:pointer; user-select:none; min-width:0;">
+    <span style="font-size:11px; color:#bbb; white-space:nowrap; letter-spacing:1px;">📱 手机取景框</span>
+    <input id="mobile-frame-toggle" type="checkbox" style="accent-color:#2ecc71; transform:scale(1.05); cursor:pointer; margin:0; flex-shrink:0;">
+    </label>
+    <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#fff; cursor:pointer; user-select:none; min-width:0;" title="【互不投影】多模型对照时：影子仍落在地面，模型之间互不挡影。&#10;开启后模型表面也不再接收投影（含自身细影）。写入 env.noInterModelShadow，消费端无开关但效果相同。">
+    <span style="font-size:11px; color:#bbb; white-space:nowrap; letter-spacing:1px;">互不投影</span>
+    <input id="no-inter-model-shadow-toggle" type="checkbox" style="accent-color:#2ecc71; transform:scale(1.05); cursor:pointer; margin:0; flex-shrink:0;">
+    </label>
+    </div>
     </div>
     <div class="editor-panel-right-keypoints">
     <label style="font-size:10px; color:#aaa; display:block; flex:0 0 auto;">童画师解析：</label>
@@ -158,7 +198,7 @@
     <div class="mobile-frame-safe" id="mobile-frame-safe"></div> </div> </div>
     <script type="module"> import * as THREE from 'three'; import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { TransformControls } from 'three/addons/controls/TransformControls.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer';
-    import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_SceneKeyPoints.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js'; import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js'; import '../../plugins_02/Plugin_LightIndicator.js';
+    import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_SceneKeyPoints.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js'; import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js'; import '../../plugins_02/Plugin_LightIndicator.js'; import '../../plugins_02/Plugin_GroundAxesHelper.js';
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from '../../plugins_02/SolidPreviewLighting.js';
     import { createSolidRasterLightRig } from '../../plugins_02/SolidRasterLightRigShared.js';
     import { createSolidRasterPreviewComposer } from '../../plugins_02/SolidRasterPreviewComposer.js';
@@ -170,6 +210,14 @@
     import { installSolidAtmosphereHostBindings } from '../../plugins_02/SolidAtmosphereControlShared.js';
     import { installSolidAssistHostBindings } from '../../plugins_02/SolidAssistControlShared.js';
     import { computeSolidMainLightCartesianPosition, createSolidMainLight, installSolidMainLightSliderBindings, solidGetTempColorFromKelvin100, clampSolidLightSizeSlider, clampSolidLightTempSlider, getSolidUnifiedInteractionState } from '../../plugins_02/SolidLightControlShared.js';
+    import {
+        buildSolidMaterialDeps,
+        normalizeSolidMatType,
+        resolveSolidItemEffectiveMat,
+        applySolidMaterialToRoot,
+        applySolidMaterialsFromSceneItems,
+        syncSolidMatPanelFromType,
+    } from '../../plugins_02/SolidMaterialShared.js';
     import { SOLID_PATH_TRACER_QUALITY, SOLID_RASTER_AREA_LIGHT_RIG, APP_LOGGING } from '../../Config/PaintingConfig.js';
     window.skyEnvLightMatchMainRect = true; const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.producer) ? SOLID_PATH_TRACER_QUALITY.producer : {};
@@ -662,6 +710,7 @@
     window.matType = 'origin'; window.workDirHandle = null; window.currentFileHandle = null; window.targetMasterFilename = null; window.__solidCreateHasExplicitScene = false; // --- 自动草稿（低耦合：尽量通过 PluginManager 总线序列化/反序列化扩展字段） ---
     const SOLID_CREATE_DRAFT_DB = 'SolidCreateDraftDB'; const SOLID_CREATE_DRAFT_STORE = 'drafts'; const SOLID_CREATE_DRAFT_KEY = 'main'; let _draftDirty = false;
     let _draftSaving = false; let _draftLastSavedAt = 0; // 记录“草稿对应的源文件名”，用于恢复后继续覆写同一文件
+    window.__solidNoInterModelShadow = false;
     window._solidCreateDraftFileName = null; function markDraftDirty() { _draftDirty = true; } window.markDraftDirty = markDraftDirty;
     function solidCreateSyncSaveButtonText() { const btn = document.getElementById('btn-save-direct'); if (!btn) return; btn.innerText = window.currentFileHandle ? '💾 覆写选中项' : '💾 保存新场景';
     }
@@ -833,10 +882,78 @@
             if (ed && typeof ed.setFields === 'function') ed.setFields(meta || {});
         } catch (_e) {}
     }
+    window.SOLID_DEFAULT_FOV = 34; window.SOLID_FOV_MIN = 5; window.SOLID_FOV_MAX = 60;
+    function solidCreateClampFov(v) {
+        const n = Number(v);
+        if (!isFinite(n)) return window.SOLID_DEFAULT_FOV;
+        return Math.max(window.SOLID_FOV_MIN, Math.min(window.SOLID_FOV_MAX, n));
+    }
+    window.solidCreatePackCamera = function() {
+        const fov = solidCreateClampFov(camera && camera.fov);
+        return {
+            pos: [parseFloat(camera.position.x.toFixed(3)), parseFloat(camera.position.y.toFixed(3)), parseFloat(camera.position.z.toFixed(3))],
+            target: [parseFloat(controls.target.x.toFixed(3)), parseFloat(controls.target.y.toFixed(3)), parseFloat(controls.target.z.toFixed(3))],
+            zoom: parseFloat(camera.zoom.toFixed(3)),
+            fov: parseFloat(fov.toFixed(2))
+        };
+    };
+    window.solidCreateSyncPerspectiveSlider = function() {
+        const s = document.getElementById('solid-create-persp-slider');
+        const lab = document.getElementById('solid-create-persp-val');
+        if (!camera) return;
+        const fov = Math.round(solidCreateClampFov(camera.fov));
+        if (s && document.activeElement !== s) s.value = String(fov);
+        if (lab) lab.textContent = String(fov);
+    };
+    /** 仅应用存档机位/FOV（不做距离补偿）；加载场景用 */
+    window.solidCreateApplyCameraFromData = function(camData) {
+        if (!camera) return;
+        if (camData && camData.pos) camera.position.set(camData.pos[0], camData.pos[1], camData.pos[2]);
+        if (camData && camData.target && controls) controls.target.set(camData.target[0], camData.target[1], camData.target[2]);
+        camera.zoom = (camData && camData.zoom != null) ? camData.zoom : 0.52;
+        camera.fov = solidCreateClampFov(camData && typeof camData.fov === 'number' ? camData.fov : window.SOLID_DEFAULT_FOV);
+        camera.updateProjectionMatrix();
+        if (controls) controls.update();
+        window.solidCreateSyncPerspectiveSlider();
+    };
+    /** 调透视：改 FOV 并沿视线补偿距离，尽量保住主体大小 */
+    window.solidCreateSetPerspectiveFov = function(newFovDeg) {
+        if (!camera || !controls) return;
+        const clamped = solidCreateClampFov(newFovDeg);
+        const oldFov = solidCreateClampFov(camera.fov);
+        if (Math.abs(clamped - oldFov) < 1e-4) {
+            window.solidCreateSyncPerspectiveSlider();
+            return;
+        }
+        const tx = controls.target.x, ty = controls.target.y, tz = controls.target.z;
+        const ox = camera.position.x - tx, oy = camera.position.y - ty, oz = camera.position.z - tz;
+        const dist = Math.sqrt(ox * ox + oy * oy + oz * oz);
+        if (dist > 1e-4) {
+            const oldHalf = (oldFov * Math.PI / 180) * 0.5;
+            const newHalf = (clamped * Math.PI / 180) * 0.5;
+            const scale = Math.tan(oldHalf) / Math.tan(newHalf);
+            camera.position.set(tx + ox * scale, ty + oy * scale, tz + oz * scale);
+        }
+        camera.fov = clamped;
+        camera.updateProjectionMatrix();
+        controls.update();
+        window.solidCreateSyncPerspectiveSlider();
+        try { needsUpdate = true; lightMoved = true; } catch (_eNu) {}
+        try { if (typeof markDraftDirty === 'function') markDraftDirty(); } catch (_eDirty) {}
+    };
+    function installSolidCreatePerspectiveUI() {
+        const s = document.getElementById('solid-create-persp-slider');
+        if (!s || s._solidPerspBound) return;
+        s._solidPerspBound = true;
+        const onInput = function() { window.solidCreateSetPerspectiveFov(this.value); };
+        s.addEventListener('input', onInput);
+        s.addEventListener('change', onInput);
+        window.solidCreateSyncPerspectiveSlider();
+    }
     function buildDraftSceneData() { const inputNameEl = document.getElementById('scene-name-input');
     const inputName = inputNameEl ? String(inputNameEl.value || '').trim() : ''; const sceneName = inputName
     ? inputName
-    : (window.currentFileHandle && window.currentFileHandle.name ? window.currentFileHandle.name.replace(/^\d{3}_/, '').replace('.json', '') : '未命名场景');
+    : (window.currentFileHandle && window.currentFileHandle.name ? window.currentFileHandle.name.replace(/^\d{1,10}_/, '').replace(/\.json$/i, '') : '未命名场景');
     const cropBox = document.getElementById('crop-box'); const crop = cropBox
     ? { display: cropBox.style.display, left: cropBox.style.left, top: cropBox.style.top, width: cropBox.style.width, height: cropBox.style.height }
     : { display: 'none', left: 'calc(50% - 128px)', top: 'calc(50% - 128px)', width: '256px', height: '256px' }; const items = [];
@@ -845,16 +962,17 @@
     const scale = [parseFloat(child.scale.x.toFixed(3)), parseFloat(child.scale.y.toFixed(3)), parseFloat(child.scale.z.toFixed(3))];
     const _jsonUrl = (child && child.userData && child.userData.type === 'glb') ? solidCreateNormalizeModelUrlForJson(child.userData.url) : child.userData.url;
     const itemData = { type: child.userData.type, url: _jsonUrl, shape: child.userData.shape, pos, rot, scale, color: child.userData.customColor };
+    if (child.userData.matType != null && String(child.userData.matType).trim() !== '') itemData.mat = normalizeSolidMatType(child.userData.matType);
     try { if (window.PluginManager) window.PluginManager.trigger('onSaveItemData', { obj: child, itemData }); } catch (_e) {}
     items.push(itemData); }); }
     const sceneDataTemp = {};
     try { if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onSaveGroundData', { obj: ground, sceneData: sceneDataTemp }); } catch (_e) {}
-    const nodeData = { name: sceneName, thumbnail: null, camera: { pos: [parseFloat(camera.position.x.toFixed(3)), parseFloat(camera.position.y.toFixed(3)), parseFloat(camera.position.z.toFixed(3))],
-    target: [parseFloat(controls.target.x.toFixed(3)), parseFloat(controls.target.y.toFixed(3)), parseFloat(controls.target.z.toFixed(3))], zoom: parseFloat(camera.zoom.toFixed(3)) }, light: { type: lightType,
+    const nodeData = { name: sceneName, thumbnail: null, camera: window.solidCreatePackCamera(), light: { type: lightType,
     azimuth: parseFloat(state.azimuth), elevation: parseFloat(state.elevation), distance: parseFloat(state.radius), temp: parseInt(state.lightTemp), size: parseFloat(state.lightSize),
     intensity: parseFloat(document.getElementById('lightIntensity').value) }, env: { hasWall: window.hasWall, defaultMat: window.matType, posterizeLevel: window.posterizeLevel,
     wallColor: window.envWallColor, groundColor: window.envGroundColor, skyColor: window.envSkyColor, skyLightScale: window.envSkyLightScale,
-    atmosphere: solidCreateGetAtmosphereStateFromPanel(), dof: solidCreateGetDoFStateFromHost() }, crop, items,
+    atmosphere: solidCreateGetAtmosphereStateFromPanel(), dof: solidCreateGetDoFStateFromHost(),
+    noInterModelShadow: !!(window.__solidNoInterModelShadow || (document.getElementById('no-inter-model-shadow-toggle') && document.getElementById('no-inter-model-shadow-toggle').checked)) }, crop, items,
     groundAnnotations: sceneDataTemp.groundAnnotations || [], groundNormArrows: sceneDataTemp.groundNormArrows || [], groundPolygon3ds: sceneDataTemp.groundPolygon3ds || [],
     groundColorSampleAnnotations: sceneDataTemp.groundColorSampleAnnotations || [] }; const _meta = solidCreateBuildMetaFromPanel(); if (_meta) nodeData.meta = _meta; return nodeData; }
     // ---------------------------
@@ -1011,15 +1129,65 @@
         root.traverse(child => { if (child.isMesh) solidCreateStampMeshOriginalMaterial(child); });
     }
     function solidCreateSyncMatPanelFromType(matType) {
-        const targetMat = String(matType != null ? matType : 'origin');
-        const matchedMatOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${targetMat}'"]`);
-        if (matchedMatOpt) {
-            const trigger = document.getElementById('mat-trigger');
-            if (trigger) trigger.innerText = matchedMatOpt.innerText;
-            document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected'));
-            matchedMatOpt.classList.add('selected');
+        syncSolidMatPanelFromType(matType);
+    }
+    let _solidCreateMatDeps = null;
+    function solidCreateEnsureMatDeps() {
+        if (_solidCreateMatDeps || typeof flatMat === 'undefined' || !flatMat) return _solidCreateMatDeps;
+        _solidCreateMatDeps = buildSolidMaterialDeps({
+            flatMat, sphereMat, plasterMat,
+            safeDispose,
+            materialRefEqual: solidCreateMaterialRefEqual,
+            isUnderGlbRoot: solidCreateIsUnderGlbRoot,
+            stampMeshOriginal: solidCreateStampMeshOriginalMaterial,
+        });
+        return _solidCreateMatDeps;
+    }
+    function solidCreateGetSelectedModelRoot() {
+        const root = (transformControl && transformControl.object) || window.selectedObj;
+        if (!root || !root.userData) return null;
+        const t = root.userData.type;
+        if (t !== 'builtin' && t !== 'glb') return null;
+        return root;
+    }
+    function solidCreateSyncMatPanelFromSelection() {
+        const trigger = document.getElementById('mat-trigger');
+        const hint = document.getElementById('solid-create-mat-hint');
+        const root = solidCreateGetSelectedModelRoot();
+        const hasSel = !!root;
+        if (trigger) {
+            trigger.style.opacity = hasSel ? '1' : '0.45';
+            trigger.style.pointerEvents = hasSel ? 'auto' : 'none';
+            trigger.title = hasSel ? '' : '请先选中模型';
+        }
+        if (hint) hint.style.display = hasSel ? 'none' : 'block';
+        if (hasSel) {
+            const mat = root.userData.matType != null ? root.userData.matType : (window.matType || 'origin');
+            syncSolidMatPanelFromType(mat);
         }
     }
+    function solidCreateApplyItemMaterial(root, item, envDefaultMat) {
+        const deps = solidCreateEnsureMatDeps(); if (!deps || !root) return;
+        const mat = resolveSolidItemEffectiveMat(item || {}, envDefaultMat);
+        if (!root.userData) root.userData = {};
+        root.userData.matType = mat;
+        applySolidMaterialToRoot(root, mat, deps);
+    }
+    function solidCreateApplyMatToNewRoot(root) {
+        const mat = normalizeSolidMatType(window.matType || 'origin');
+        if (!root.userData) root.userData = {};
+        root.userData.matType = mat;
+        const deps = solidCreateEnsureMatDeps();
+        if (deps) applySolidMaterialToRoot(root, mat, deps);
+    }
+    function solidCreateApplyAllItemMaterialsFromSceneData() {
+        const deps = solidCreateEnsureMatDeps(); if (!deps || !editorGroup) return;
+        const data = window.currentSceneData || {};
+        const envDefault = (data.env && data.env.defaultMat !== undefined) ? data.env.defaultMat : (window.matType || 'origin');
+        applySolidMaterialsFromSceneItems(editorGroup, data.items || [], envDefault, deps);
+        if (pathTracer) { lightMoved = true; needsUpdate = true; _solidPtSync.queueReset('change_mat'); }
+    }
+    window.solidCreateOnSelectionChanged = function() { solidCreateSyncMatPanelFromSelection(); };
     function solidCreateMaterialRefEqual(a, b) {
         if (a === b) return true;
         if (Array.isArray(a) && Array.isArray(b)) {
@@ -1088,8 +1256,7 @@
     if (_d) { try { _d.value = (data && data.meta && data.meta.detail != null) ? String(data.meta.detail) : ''; } catch(_e) { _d.value = ''; } }
     try { solidCreateSetMetaCategory(data && data.meta ? data.meta.category : ''); } catch (_eCat) { solidCreateSetMetaCategory(''); }
     try { solidCreateSyncKeyPointsEditorFromMeta(data && data.meta); } catch (_eKp) {}
-    if (data && data.camera) { camera.position.set(data.camera.pos[0], data.camera.pos[1], data.camera.pos[2]); controls.target.set(data.camera.target[0], data.camera.target[1], data.camera.target[2]); camera.zoom = data.camera.zoom || 0.52;
-    camera.updateProjectionMatrix(); controls.update(); }
+    if (data && data.camera) { window.solidCreateApplyCameraFromData(data.camera); }
     if (data && data.env) { if (data.env.hasWall !== undefined) { window.hasWall = data.env.hasWall; const btn = document.getElementById('wall-btn');
     if (btn) { btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; } }
     window.matType = data.env.defaultMat !== undefined ? data.env.defaultMat : 'origin'; window.posterizeLevel = data.env.posterizeLevel !== undefined ? data.env.posterizeLevel : 0;
@@ -1101,11 +1268,13 @@
     const _dof = data.env.dof || { enabled: false, aperture: 2.8, focusDistance: 10 };
     window.isFogEnabled = !!_atm.enabled; window.fogDensity = Number.isFinite(Number(_atm.density)) ? Number(_atm.density) : 0.02; window.currentFogType = String(_atm.type || 'basic');
     window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof;
+    try { const _nis = !!(data.env && data.env.noInterModelShadow); window.__solidNoInterModelShadow = _nis; const _nisCb = document.getElementById('no-inter-model-shadow-toggle'); if (_nisCb) _nisCb.checked = _nis; } catch (_eNis) { window.__solidNoInterModelShadow = false; }
     } else { window.matType = 'origin'; window.posterizeLevel = 0;
     window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1;
     const _atm = { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 }; const _dof = { enabled: false, aperture: 2.8, focusDistance: 10 };
-    window.isFogEnabled = false; window.fogDensity = 0.02; window.currentFogType = 'basic'; window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof; }
-    window.initialMatType = window.matType; solidCreateSyncMatPanelFromType(window.matType); if (window.syncEnvColorPickers) window.syncEnvColorPickers(); const cb = document.getElementById('crop-box'); if (cb) { if (data && data.crop) {
+    window.isFogEnabled = false; window.fogDensity = 0.02; window.currentFogType = 'basic'; window.__solidSceneAtmosphere = _atm; window.__solidSceneDoF = _dof;
+    try { window.__solidNoInterModelShadow = false; const _nisCb0 = document.getElementById('no-inter-model-shadow-toggle'); if (_nisCb0) _nisCb0.checked = false; } catch (_eNis0) {} }
+    window.initialMatType = window.matType; solidCreateSyncMatPanelFromSelection(); if (window.syncEnvColorPickers) window.syncEnvColorPickers(); const cb = document.getElementById('crop-box'); if (cb) { if (data && data.crop) {
     cb.style.display = data.crop.display || 'none'; cb.style.left = data.crop.left || 'calc(50% - 128px)'; cb.style.top = data.crop.top || 'calc(50% - 128px)';
     cb.style.width = data.crop.width || '256px'; cb.style.height = data.crop.height || '256px'; } else { cb.style.display = 'none';
     cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }
@@ -1129,6 +1298,7 @@
     solidCreateDebugLog(`[SceneLoad] 开始恢复场景 items: ${data.items.length}`);
     for (let ii = 0; ii < data.items.length; ii++) {
     const item = data.items[ii];
+    const _loadEnvDefaultMat = (data && data.env && data.env.defaultMat !== undefined) ? data.env.defaultMat : 'origin';
     if (item.type === 'builtin') {
     document.getElementById('obj-color-picker').value = item.color || '#e8e8e8';
     const obj = createBuiltinObject3D(item.shape || 'cube', item.color || '#e8e8e8');
@@ -1137,6 +1307,7 @@
     obj.rotation.set(item.rot[0], item.rot[1], item.rot[2]);
     obj.scale.set(item.scale[0], item.scale[1], item.scale[2]);
     obj.updateWorldMatrix(true, true);
+    solidCreateApplyItemMaterial(obj, item, _loadEnvDefaultMat);
     // 加载时信任 JSON 位姿，禁止再贴地：否则有意悬浮的内置体会被拉回地面
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: obj, itemData: item });
     _assetDone++; solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
@@ -1152,6 +1323,7 @@
     model.rotation.set(item.rot[0], item.rot[1], item.rot[2]);
     model.scale.set(item.scale[0], item.scale[1], item.scale[2]);
     editorGroup.add(model);
+    solidCreateApplyItemMaterial(model, item, _loadEnvDefaultMat);
     solidCreateDebugLog(`[SceneLoad] GLB入场成功 item[${ii}] loadedUrl=${gltf && gltf.__solidLoadedUrl ? gltf.__solidLoadedUrl : '(unknown)'}`);
     if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item });
     _assetDone++; solidCreateSceneLoadUxSetGlbSlot(_slot, 1); solidCreateSceneLoadUxUpdateAssetProgress(_assetDone);
@@ -1172,7 +1344,7 @@
     if (_glbPromises.length) { await Promise.all(_glbPromises); lightMoved = true; }
     }
     if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onLoadGround', { obj: ground, sceneData: data }); solidCreateSceneLoadUxMarkElementsDone(); transformControl.detach();
-    solidCreateSyncMatPanelFromType(window.matType); window.changeMat(window.matType); if(window.changePosterize) window.changePosterize(window.posterizeLevel || 0);
+    solidCreateApplyAllItemMaterialsFromSceneData(); solidCreateSyncMatPanelFromSelection(); if(window.changePosterize) window.changePosterize(window.posterizeLevel || 0);
     solidCreateApplyAtmosphereStateToPanel(window.__solidSceneAtmosphere || { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 });
     solidCreateApplyDoFStateToPanel(window.__solidSceneDoF || { enabled: false, aperture: 2.8, focusDistance: 10 });
     const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity();
@@ -1223,7 +1395,10 @@
     const dbName = 'SolidEditorDB'; const storeName = 'dirHandles'; function initDB() { return new Promise((resolve, reject) => { const req = indexedDB.open(dbName, 1); req.onupgradeneeded = e => { if(!e.target.result.objectStoreNames.contains(storeName)) e.target.result.createObjectStore(storeName); }; req.onsuccess = e => resolve(e.target.result); req.onerror = e => reject(e.target.error); }); } async function saveDirHandle(key, handle) { const db = await initDB(); return new Promise((resolve, reject) => { const tx = db.transaction(storeName, 'readwrite'); tx.objectStore(storeName).put(handle, key); tx.oncomplete = resolve; tx.onerror = reject; });     } async function getDirHandle(key) { const db = await initDB(); return new Promise((resolve, reject) => { const req = db.transaction(storeName, 'readonly').objectStore(storeName).get(key); req.onsuccess = e => resolve(e.target.result); req.onerror = () => resolve(null); }); }
     async function handlesSameDirEntry(a, b) { if (!a || !b) return false; if (a === b) return true; if (typeof a.isSameEntry === 'function') { try { return await a.isSameEntry(b); } catch (e) { return false; } } return false; }
     // --- 安全重命名：File System Access API 无原生 rename，用“写新→删旧”模拟 ---
-    let _suppressSceneItemClickUntil = 0; function solidCreateIsNumericSceneFileName(name) { return /^\d{3}_/.test(String(name || '')); }
+    let _suppressSceneItemClickUntil = 0;
+    // 单场景文件：1～10 位数字 + "_" + 标题 + .json（统合文件仍须非数字开头）
+    function solidCreateIsNumericSceneFileName(name) { return /^\d{1,10}_/.test(String(name || '')); }
+    function solidCreateIsValidNumericSceneFileName(name) { return /^\d{1,10}_.+\.json$/i.test(String(name || '')); }
     function solidCreateIsNonNumericMasterFileName(name) { return name && !/^\d/.test(String(name)); }
     function solidCreateNormalizeJsonFileName(input) { let s = String(input || '').trim(); // Windows 下常见：用户复制粘贴带引号
     s = s.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
@@ -1277,6 +1452,50 @@
             // 删除旧文件（最后一步）
             await window.workDirHandle.removeEntry(oldName);
             return { ok: true, newHandle, noOp: false };
+        }
+        function solidCreateParseSceneTitleFromFileName(fileName) {
+            const m = String(fileName || '').match(/^(\d{1,10})_(.+)\.json$/i);
+            if (m) return m[2];
+            return String(fileName || '').replace(/\.json$/i, '');
+        }
+        async function solidCreateGetNextSceneFileNumber() {
+            let maxNum = 0;
+            for await (const entry of window.workDirHandle.values()) {
+                if (entry.kind === 'file' && /^\d{1,10}_/.test(entry.name)) {
+                    const _mNum = entry.name.match(/^(\d{1,10})_/);
+                    const num = _mNum ? parseInt(_mNum[1], 10) : 0;
+                    if (num > maxNum) maxNum = num;
+                }
+            }
+            return maxNum + 1;
+        }
+        /** 拷贝单场景 JSON 为新文件（下一编号_原标题）；不切换当前编辑 */
+        async function solidCreateDuplicateSceneFile(sourceHandle) {
+            if (!window.workDirHandle) throw new Error('未挂载工作目录');
+            const okPerm = await solidCreateEnsureWorkDirPermission();
+            if (!okPerm) throw new Error('无写入权限（需要 readwrite 授权）');
+            const oldName = String(sourceHandle.name || '');
+            if (!solidCreateIsNumericSceneFileName(oldName)) throw new Error('仅可复制单场景文件');
+            const file = await sourceHandle.getFile();
+            const text = await file.text();
+            let data;
+            try { data = JSON.parse(text); } catch (_e) { throw new Error('JSON 解析失败'); }
+            if (Array.isArray(data)) throw new Error('统合 JSON 不可拷贝');
+            const title = solidCreateParseSceneTitleFromFileName(oldName);
+            if (!title || !String(title).trim()) throw new Error('无法解析场景标题');
+            const nextNum = await solidCreateGetNextSceneFileNumber();
+            const newName = nextNum + '_' + title + '.json';
+            const nameErr = solidCreateValidateWindowsFileName(newName);
+            if (nameErr) throw new Error(nameErr);
+            if (await solidCreateFileExists(newName)) throw new Error('同名文件已存在：' + newName);
+            const pureTitle = String(title).replace(/_[0-9]{10}$/, '');
+            if (data && typeof data === 'object') data.name = pureTitle;
+            const outText = JSON.stringify(data);
+            const newHandle = await window.workDirHandle.getFileHandle(newName, { create: true });
+            const w = await newHandle.createWritable();
+            await w.write(outText);
+            await w.close();
+            return { ok: true, newName, newHandle };
         }
         async function autoMountLastWorkDir() {
         try {
@@ -1368,7 +1587,7 @@
                 input.focus();
                 try {
                     if (isNum) {
-                        const m = oldName.match(/^(\d{3}_)(.*?)(\.json)?$/i);
+                        const m = oldName.match(/^(\d{1,10}_)(.*?)(\.json)?$/i);
                         const start = m ? m[1].length : 0;
                         const end = m ? (m[1].length + m[2].length) : oldName.length;
                         input.setSelectionRange(start, end);
@@ -1387,14 +1606,14 @@
                     const err = solidCreateValidateWindowsFileName(newName);
                     if (err) { alert(err); restoreSpan(); return; }
     
-                    // 类型约束：数字场景文件允许改编号，但必须仍为“三位数字+下划线”；非数字统合文件必须仍为非数字开头
+                    // 类型约束：数字场景文件允许改编号，但必须仍为“1～10位数字+下划线”；非数字统合文件必须仍为非数字开头
                     if (isNum) {
-                        if (!/^\d{3}_/i.test(newName)) {
-                            alert('数字场景文件名必须以“三位数字+下划线”开头，例如：001_...');
+                        if (!/^\d{1,10}_/i.test(newName)) {
+                            alert('数字场景文件名必须以“1～10位数字+下划线”开头，例如：1_... 或 001_...');
                             restoreSpan(); return;
                         }
-                        if (!/^\d{3}_.+\.json$/i.test(newName)) {
-                            alert('数字场景文件名格式不正确，应为：三位数字 + "_" + 名称 + ".json"');
+                        if (!solidCreateIsValidNumericSceneFileName(newName)) {
+                            alert('数字场景文件名格式不正确，应为：1～10位数字 + "_" + 名称 + ".json"');
                             restoreSpan(); return;
                         }
                     } else if (isMaster) {
@@ -1458,7 +1677,12 @@
         item.appendChild(nameSpan); if (!/^\d+/.test(fileHandle.name)) {
         const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'masterFileSelect'; radio.style.cssText = 'margin-left:8px; cursor:pointer; accent-color:#2ecc71; transform:scale(1.1); flex-shrink:0;';
         if(window.targetMasterFilename === fileHandle.name) radio.checked = true; radio.onchange = () => { window.targetMasterFilename = fileHandle.name; window.hwLog("已指定统合JSON: " + fileHandle.name); }; item.appendChild(radio);
-        } else { const delBtn = document.createElement('span'); delBtn.innerText = '🗑️'; delBtn.style.cssText = 'cursor:pointer; margin-left:8px; font-size:12px; opacity:0.6; transition:0.2s; flex-shrink:0;'; delBtn.title = "删除此场景";
+        } else {
+        const copyBtn = document.createElement('span'); copyBtn.innerText = '📋'; copyBtn.style.cssText = 'cursor:pointer; margin-left:8px; font-size:12px; opacity:0.6; transition:0.2s; flex-shrink:0;'; copyBtn.title = '拷贝为新单场景（自动分配下一编号，不切换当前编辑）';
+        copyBtn.onmouseover = () => copyBtn.style.opacity = '1'; copyBtn.onmouseout = () => copyBtn.style.opacity = '0.6';
+        copyBtn.onclick = async (e) => { e.stopPropagation(); try { const res = await solidCreateDuplicateSceneFile(fileHandle); window.showToast('已拷贝：' + res.newName); await window.refreshFileList(); } catch(err) { window.showToast('拷贝失败: ' + (err && err.message ? err.message : String(err)), true); } };
+        item.appendChild(copyBtn);
+        const delBtn = document.createElement('span'); delBtn.innerText = '🗑️'; delBtn.style.cssText = 'cursor:pointer; margin-left:8px; font-size:12px; opacity:0.6; transition:0.2s; flex-shrink:0;'; delBtn.title = "删除此场景";
         delBtn.onmouseover = () => delBtn.style.opacity = '1'; delBtn.onmouseout = () => delBtn.style.opacity = '0.6';
         delBtn.onclick = async (e) => { e.stopPropagation(); try { await window.workDirHandle.removeEntry(fileHandle.name); window.showToast(`已删除场景: ${fileHandle.name}`); if(window.currentFileHandle && window.currentFileHandle.name === fileHandle.name) { window.createNewScene(); } await window.refreshFileList(); } catch(err) { window.showToast('删除失败: ' + err.message, true); } };
         item.appendChild(delBtn); }
@@ -1491,7 +1715,7 @@
         if (Number.isNaN(window.envSkyLightScale)) window.envSkyLightScale = 1;
         window.envSkyLightScale = Math.min(1, Math.max(0, window.envSkyLightScale));
         } else { window.matType = 'origin'; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.currentFogType = 'basic'; window.__solidSceneAtmosphere = { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 }; window.__solidSceneDoF = { enabled: false, aperture: 2.8, focusDistance: 10 }; window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 1; _liSceneEnabled = null; }
-        try { const _liCb = document.getElementById('light-indicator-toggle'); const _liOn = (_liSceneEnabled === null) ? (localStorage.getItem(SOLID_CREATE_LIGHT_INDICATOR_KEY) === '1') : !!_liSceneEnabled; if (_liCb) _liCb.checked = !!_liOn; if (window.LightIndicatorManager && window.LightIndicatorManager.setEnabled) window.LightIndicatorManager.setEnabled(!!_liOn); } catch(_eLiLoad) {}
+        try { const _liCb = document.getElementById('light-indicator-toggle'); const _liOn = (_liSceneEnabled === null) ? (localStorage.getItem(SOLID_CREATE_LIGHT_INDICATOR_KEY) === '1') : !!_liSceneEnabled; if (_liCb) _liCb.checked = !!_liOn; if (window.LightIndicatorManager && window.LightIndicatorManager.setEnabled) window.LightIndicatorManager.setEnabled(!!_liOn); if (window.GroundAxesHelperManager && window.GroundAxesHelperManager.setEnabled) window.GroundAxesHelperManager.setEnabled(!!_liOn); } catch(_eLiLoad) {}
         window.initialMatType = window.matType; // 【新增】记录JSON加载时的初始材质，以便重置时恢复
         const matchedMatOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${window.matType}'"]`);
         if(matchedMatOpt) { const trigger = document.getElementById('mat-trigger'); if(trigger) trigger.innerText = matchedMatOpt.innerText; document.querySelectorAll('#mat-options .custom-option').forEach(opt => opt.classList.remove('selected')); matchedMatOpt.classList.add('selected'); }
@@ -1796,22 +2020,23 @@
         const scale = [parseFloat(child.scale.x.toFixed(3)), parseFloat(child.scale.y.toFixed(3)), parseFloat(child.scale.z.toFixed(3))];
         const _jsonUrl = (child && child.userData && child.userData.type === 'glb') ? solidCreateNormalizeModelUrlForJson(child.userData.url) : child.userData.url;
         const itemData = { type: child.userData.type, url: _jsonUrl, shape: child.userData.shape, pos: pos, rot: rot, scale: scale, color: child.userData.customColor }; // 【解耦写入】：通过总线通知各插件把自己的数据附着到 itemData 上
+        if (child.userData.matType != null && String(child.userData.matType).trim() !== '') itemData.mat = normalizeSolidMatType(child.userData.matType);
         if (window.PluginManager) window.PluginManager.trigger('onSaveItemData', { obj: child, itemData: itemData }); items.push(itemData); }); const sceneDataTemp = {}; // 【解耦写入】：通过总线通知各插件把地面数据附着到 sceneDataTemp 上
         if (typeof ground !== 'undefined' && ground && window.PluginManager) window.PluginManager.trigger('onSaveGroundData', { obj: ground, sceneData: sceneDataTemp });
         const groundAnnos = sceneDataTemp.groundAnnotations || []; const groundNormArrows = sceneDataTemp.groundNormArrows || []; const groundPolys = sceneDataTemp.groundPolygon3ds || []; const groundColorSamples = sceneDataTemp.groundColorSampleAnnotations || [];
         window.hwLog(`[App-Save] 地面提取结束. 引线:${groundAnnos.length}, 法线:${groundNormArrows.length}, 面片:${groundPolys.length}, 取色:${groundColorSamples.length}`);
-        const sceneName = inputName ? inputName : window.currentFileHandle.name.replace(/^\d{3}_/, '').replace('.json', '');
+        const sceneName = inputName ? inputName : window.currentFileHandle.name.replace(/^\d{1,10}_/, '').replace(/\.json$/i, '');
         const cropBox = document.getElementById('crop-box');
-        const nodeData = { name: sceneName, thumbnail: thumbnail, camera: { pos: [parseFloat(camera.position.x.toFixed(3)), parseFloat(camera.position.y.toFixed(3)), parseFloat(camera.position.z.toFixed(3))], target: [parseFloat(controls.target.x.toFixed(3)), parseFloat(controls.target.y.toFixed(3)), parseFloat(controls.target.z.toFixed(3))], zoom: parseFloat(camera.zoom.toFixed(3)) }, light: { type: lightType, azimuth: parseFloat(state.azimuth), elevation: parseFloat(state.elevation), distance: parseFloat(state.radius), temp: parseInt(state.lightTemp), size: parseFloat(state.lightSize), intensity: parseFloat(document.getElementById('lightIntensity').value) }, env: { hasWall: window.hasWall, defaultMat: window.matType, posterizeLevel: window.posterizeLevel, wallColor: window.envWallColor, groundColor: window.envGroundColor, skyColor: window.envSkyColor, skyLightScale: window.envSkyLightScale, atmosphere: solidCreateGetAtmosphereStateFromPanel(), dof: solidCreateGetDoFStateFromHost(), lightIndicatorEnabled: !!(document.getElementById('light-indicator-toggle') && document.getElementById('light-indicator-toggle').checked) }, crop: { display: cropBox.style.display, left: cropBox.style.left, top: cropBox.style.top, width: cropBox.style.width, height: cropBox.style.height }, items: items, groundAnnotations: groundAnnos, groundNormArrows: groundNormArrows, groundPolygon3ds: groundPolys, groundColorSampleAnnotations: groundColorSamples };
+        const nodeData = { name: sceneName, thumbnail: thumbnail, camera: window.solidCreatePackCamera(), light: { type: lightType, azimuth: parseFloat(state.azimuth), elevation: parseFloat(state.elevation), distance: parseFloat(state.radius), temp: parseInt(state.lightTemp), size: parseFloat(state.lightSize), intensity: parseFloat(document.getElementById('lightIntensity').value) }, env: { hasWall: window.hasWall, defaultMat: window.matType, posterizeLevel: window.posterizeLevel, wallColor: window.envWallColor, groundColor: window.envGroundColor, skyColor: window.envSkyColor, skyLightScale: window.envSkyLightScale, atmosphere: solidCreateGetAtmosphereStateFromPanel(), dof: solidCreateGetDoFStateFromHost(), lightIndicatorEnabled: !!(document.getElementById('light-indicator-toggle') && document.getElementById('light-indicator-toggle').checked), noInterModelShadow: !!(window.__solidNoInterModelShadow || (document.getElementById('no-inter-model-shadow-toggle') && document.getElementById('no-inter-model-shadow-toggle').checked)) }, crop: { display: cropBox.style.display, left: cropBox.style.left, top: cropBox.style.top, width: cropBox.style.width, height: cropBox.style.height }, items: items, groundAnnotations: groundAnnos, groundNormArrows: groundNormArrows, groundPolygon3ds: groundPolys, groundColorSampleAnnotations: groundColorSamples };
         const _meta = solidCreateBuildMetaFromPanel(); if (_meta) nodeData.meta = _meta;
         window.hwLog(`[App-Save] 最终 JSON 封包完成. 模型总数: ${items.length}`);
         items.forEach((item, idx) => { if(item.polygon3ds && item.polygon3ds.length > 0) window.hwLog(` -> 模型[${idx}] 携带面片: ${item.polygon3ds.length}个`); });
             try { let targetHandle = window.currentFileHandle;
             // 兜底：若草稿恢复后丢了 currentFileHandle，但仍知道源文件名，则优先覆写源文件，避免误新建
             if(!targetHandle && window._solidCreateDraftFileName) { try { const h = await window.workDirHandle.getFileHandle(String(window._solidCreateDraftFileName), { create: false }); if (h) { targetHandle = h; window.currentFileHandle = h; solidCreateHighlightFileInList(String(window._solidCreateDraftFileName)); solidCreateSyncSaveButtonText(); } } catch(_e) {} }
-            if(!targetHandle) { let maxNum = 0; for await (const entry of window.workDirHandle.values()) { if(entry.kind === 'file' && /^\d{3}_/.test(entry.name)) {
-        const num = parseInt(entry.name.substring(0, 3), 10); if(num > maxNum) maxNum = num; } }
-        const nextNumStr = String(maxNum + 1).padStart(3, '0'); const fileName = nextNumStr + "_" + inputName + ".json";
+            if(!targetHandle) { let maxNum = 0; for await (const entry of window.workDirHandle.values()) { if(entry.kind === 'file' && /^\d{1,10}_/.test(entry.name)) {
+        const _mNum = entry.name.match(/^(\d{1,10})_/); const num = _mNum ? parseInt(_mNum[1], 10) : 0; if(num > maxNum) maxNum = num; } }
+        const nextNumStr = String(maxNum + 1); const fileName = nextNumStr + "_" + inputName + ".json";
         targetHandle = await window.workDirHandle.getFileHandle(fileName, {create: true}); window.currentFileHandle = targetHandle; }
         const writable = await targetHandle.createWritable(); await writable.write(JSON.stringify(nodeData)); await writable.close(); window.hwLog("成功保存: " + targetHandle.name);
         const btn = document.getElementById('btn-save-direct'); if(btn){ btn.innerText = '✔️ 已保存'; setTimeout(()=>{ btn.innerText = '💾 覆写选中项'; }, 1500); }
@@ -1829,11 +2054,13 @@
         window._solidCreateDraftFileName = null; window.currentSceneData = null; solidCreateSyncSaveButtonText();
         window.__solidCreateHasExplicitScene = true;
         // 新建场景时同步重置相机/视线（方案 A）：对准世界原点，避免沿用上一场景/草稿导致取景框偏移
-        try { if (camera) { camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); } } catch (_eCamNs) {}
+        try { if (camera) { camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.fov = window.SOLID_DEFAULT_FOV || 34; camera.updateProjectionMatrix(); } } catch (_eCamNs) {}
         try { if (controls) { controls.target.set(0, 0, 0); controls.update(); } } catch (_eCtlNs) {}
         try { if (camera) camera.lookAt(0, 0, 0); } catch (_eLookNs) {}
-        solidCreateSyncMatPanelFromType('origin');
-        window.changeMat('origin'); window.initialMatType = 'origin'; // 【新增】新建场景时，初始材质重置为自带材质
+        try { if (typeof window.solidCreateSyncPerspectiveSlider === 'function') window.solidCreateSyncPerspectiveSlider(); } catch (_ePerspNs) {}
+        solidCreateSyncMatPanelFromSelection();
+        window.matType = 'origin';
+        window.initialMatType = 'origin'; // 【新增】新建场景时，初始材质重置为自带材质
         window.changePosterize(0); window.changeAtmosphere(false, 0.02); const fogCheck = document.getElementById('fogEnable'); if(fogCheck) fogCheck.checked = false; if(window.toggleFogAdvanced) window.toggleFogAdvanced(false); const posterizeCheck = document.getElementById('posterizeEnable'); if(posterizeCheck) posterizeCheck.checked = false;
         // 【核心解耦】：通知所有插件安全销毁自己的内存和 DOM 节点
         if (window.PluginManager) window.PluginManager.trigger('onClearScene'); window.envWallColor = '#cccccc'; window.envGroundColor = '#cccccc'; window.envSkyColor = '#0d0d0f'; window.envSkyLightScale = 0;
@@ -1864,101 +2091,15 @@
         // 【加载唤醒】：新建场景后，重新刷新一次当前的激活模式
         setTimeout(() => { window.setMode(window.currentEditorMode); }, 100); };
         window.toggleCustomSelect = function(e, id) { e.stopPropagation(); document.querySelectorAll('.custom-options').forEach(el => { if (el.id !== id) el.classList.remove('show'); }); document.getElementById(id).classList.toggle('show'); };
-        // 【新增】：材质切换（非破坏性预览）
-        window.changeMat = function(val) {
-        window.matType = val;
-        const roughs = [0.95, 0.15, 0.3, 0.05, 0.4];
-        const metals = [0.0, 0.0, 0.85, 0.0, 0.0];
-        const trans = [0.0, 0.0, 0.0, 1.0, 1.0];
-        const picker = document.getElementById('obj-color-picker');
-        if (picker) { picker.style.opacity = '1'; picker.style.cursor = 'pointer'; picker.disabled = false; }
-        function _isSysMatRef(mat) {
-            if (!mat) return false;
-            if (mat === flatMat || mat === sphereMat || mat === plasterMat) return true;
-            if (Array.isArray(mat)) return mat.every(m => m === flatMat || m === sphereMat || m === plasterMat);
-            return false;
-        }
-        function _shouldDisposeReplaced(oldMat, originalMat) {
-            if (!oldMat) return false;
-            if (solidCreateMaterialRefEqual(oldMat, originalMat)) return false;
-            if (_isSysMatRef(oldMat)) return false;
-            return true;
-        }
-        function _buildBuiltinOriginMat(ud) {
-            const m = ud.isFlat ? flatMat.clone() : (ud.shape === 'sphere' ? sphereMat.clone() : plasterMat.clone());
-            if (ud.customColor && m.color) m.color.set(ud.customColor);
-            return m;
-        }
-        function _applyPreviewParams(m, idx, ud, isGlb) {
-            if (!m || !m.isMaterial) return m;
-            const c = m.clone ? m.clone() : m;
-            if (!isGlb) {
-                if (c.color) c.color.set(ud.customColor || '#e8e8e8');
-            }
-            if (c.roughness !== undefined) c.roughness = (ud.shape === 'sphere' && idx === 0) ? 0.6 : roughs[idx];
-            if (c.metalness !== undefined) c.metalness = metals[idx];
-            if (c.transmission !== undefined) c.transmission = trans[idx];
-            if (c.transparent !== undefined) c.transparent = trans[idx] > 0;
-            if (c.ior !== undefined) c.ior = 1.5;
-            if (ud.isFlat && c.flatShading !== undefined) c.flatShading = true;
-            return c;
-        }
-        function _buildPreviewFromOriginal(originalMat, idx, ud, isGlb) {
-            if (!originalMat) return null;
-            if (Array.isArray(originalMat)) {
-                return originalMat.map(m => _applyPreviewParams(m, idx, ud, isGlb));
-            }
-            return _applyPreviewParams(originalMat, idx, ud, isGlb);
-        }
-        function _buildBuiltinPreviewMat(idx, ud) {
-            const m = plasterMat.clone();
-            if (m.color) m.color.set(ud.customColor || '#e8e8e8');
-            m.roughness = (ud.shape === 'sphere' && idx === 0) ? 0.6 : roughs[idx];
-            m.metalness = metals[idx];
-            m.transmission = trans[idx];
-            m.transparent = trans[idx] > 0;
-            m.ior = 1.5;
-            if (ud.isFlat) m.flatShading = true;
-            return m;
-        }
-        function _resolveNextMaterial(child, matTypeVal) {
-            const ud = child.userData || {};
-            const isGlb = solidCreateIsUnderGlbRoot(child);
-            const orig = ud.originalMaterial;
-            if (matTypeVal === 'origin') {
-                if (orig) return orig;
-                if (isGlb) {
-                    solidCreateStampMeshOriginalMaterial(child);
-                    if (child.userData.originalMaterial) return child.userData.originalMaterial;
-                    return child.material;
-                }
-                return _buildBuiltinOriginMat(ud);
-            }
-            const idx = parseInt(matTypeVal);
-            if (isGlb) {
-                const fromOrig = _buildPreviewFromOriginal(orig, idx, ud, true);
-                if (fromOrig) return fromOrig;
-                return _buildBuiltinPreviewMat(idx, ud);
-            }
-            return _buildBuiltinPreviewMat(idx, ud);
-        }
-        const _updates = [];
-        editorGroup.traverse(child => {
-            if (!child.isMesh) return;
-            if (child.userData && child.userData.solidShadowCore) return;
-            if (child.userData && child.userData.isFrame) return;
-            const prevMat = child.material;
-            const nextMat = _resolveNextMaterial(child, window.matType);
-            if (!solidCreateMaterialRefEqual(prevMat, nextMat)) {
-                _updates.push({ child, prevMat, nextMat, originalMat: child.userData && child.userData.originalMaterial });
-            }
-        });
-        for (let ui = 0; ui < _updates.length; ui++) {
-            const u = _updates[ui];
-            u.child.material = u.nextMat;
-            if (_shouldDisposeReplaced(u.prevMat, u.originalMat)) safeDispose(u.prevMat);
-        }
-        if(pathTracer) { lightMoved = true; needsUpdate = true; _solidPtSync.queueReset('change_mat'); }
+        window.changeMatForSelected = function(val) {
+        const root = solidCreateGetSelectedModelRoot();
+        if (!root) return;
+        const mat = normalizeSolidMatType(val);
+        root.userData.matType = mat;
+        const deps = solidCreateEnsureMatDeps();
+        if (deps) applySolidMaterialToRoot(root, mat, deps);
+        if (pathTracer) { lightMoved = true; needsUpdate = true; _solidPtSync.queueReset('change_mat'); }
+        markDraftDirty();
         };
         window.selectCustomOpt = function(type, value, text, el) {
         el.parentElement.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected')); el.classList.add('selected');
@@ -1980,7 +2121,7 @@
         } catch (_eShOnce) {}
         }
         }
-        else if (type === 'mat') { document.getElementById('mat-trigger').innerText = text; window.changeMat(value); }
+        else if (type === 'mat') { document.getElementById('mat-trigger').innerText = text; window.changeMatForSelected(value); }
         else if (type === 'lightDir') { document.getElementById('dir-trigger').innerText = text; const [az, elv] = value.split(','); state.azimuth = parseFloat(az); state.elevation = parseFloat(elv); document.getElementById('lightAzimuth').value = state.azimuth; document.getElementById('azimuthVal').innerText = state.azimuth; document.getElementById('lightElevation').value = state.elevation; document.getElementById('elevationVal').innerText = state.elevation; updateLightPosition(); lightMoved = true; }
         try { if ((type === 'light' || type === 'lightDir') && window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(1300); } catch (_eLiShow) {}
         }; // 工具函数：数值滑块拨动后，更新下拉框里的文字变为“自定义”或对应的名称
@@ -2077,9 +2218,10 @@
             }
 
             if (data.camera) {
-                camera.position.set(...data.camera.pos); controls.target.set(...data.camera.target); camera.zoom = data.camera.zoom; camera.updateProjectionMatrix(); controls.update();
+                window.solidCreateApplyCameraFromData(data.camera);
             } else {
-                camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); controls.target.set(0, 0, 0); controls.update();
+                camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.fov = window.SOLID_DEFAULT_FOV || 34; camera.updateProjectionMatrix(); controls.target.set(0, 0, 0); controls.update();
+                try { if (typeof window.solidCreateSyncPerspectiveSlider === 'function') window.solidCreateSyncPerspectiveSlider(); } catch (_ePersp) {}
             }
 
             const env = data.env || {};
@@ -2088,7 +2230,15 @@
                 const _liOn = (env.lightIndicatorEnabled === undefined) ? (localStorage.getItem(SOLID_CREATE_LIGHT_INDICATOR_KEY) === '1') : !!env.lightIndicatorEnabled;
                 if (_liCb) _liCb.checked = !!_liOn;
                 if (window.LightIndicatorManager && window.LightIndicatorManager.setEnabled) window.LightIndicatorManager.setEnabled(!!_liOn);
+                if (window.GroundAxesHelperManager && window.GroundAxesHelperManager.setEnabled) window.GroundAxesHelperManager.setEnabled(!!_liOn);
             } catch(_eLiReset) {}
+            try {
+                const _nis = !!env.noInterModelShadow;
+                window.__solidNoInterModelShadow = _nis;
+                const _nisCb = document.getElementById('no-inter-model-shadow-toggle');
+                if (_nisCb) _nisCb.checked = _nis;
+                if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows();
+            } catch(_eNisReset) { window.__solidNoInterModelShadow = false; }
             if (env.hasWall !== undefined) { window.hasWall = !!env.hasWall; const btn = document.getElementById('wall-btn'); if (btn) { btn.classList.toggle('active', window.hasWall); btn.innerText = window.hasWall ? '☑ 背景墙' : '☐ 背景墙'; } }
             window.envWallColor = env.wallColor || '#cccccc'; window.envGroundColor = env.groundColor || '#cccccc'; window.envSkyColor = env.skyColor || '#0d0d0f';
             window.envSkyLightScale = env.skyLightScale !== undefined && env.skyLightScale !== null ? Number(env.skyLightScale) : 1; if (Number.isNaN(window.envSkyLightScale)) window.envSkyLightScale = 1;
@@ -2098,15 +2248,13 @@
             window.matType = env.defaultMat !== undefined ? env.defaultMat : (window.initialMatType || 'origin');
             window.posterizeLevel = env.posterizeLevel !== undefined ? env.posterizeLevel : 0;
 
-            const targetMat = window.matType || 'origin';
-            solidCreateSyncMatPanelFromType(targetMat);
-
             const atm = env.atmosphere || { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 };
             const dof = env.dof || { enabled: false, aperture: 2.8, focusDistance: 10 };
             window.__solidSceneAtmosphere = atm; window.__solidSceneDoF = dof;
 
             buildEnvironment();
-            window.changeMat(targetMat);
+            solidCreateApplyAllItemMaterialsFromSceneData();
+            solidCreateSyncMatPanelFromSelection();
             if (window.changePosterize) window.changePosterize(window.posterizeLevel || 0);
             solidCreateApplyAtmosphereStateToPanel(atm);
             solidCreateApplyDoFStateToPanel(dof);
@@ -2148,7 +2296,7 @@
         };
         window.toggleCameraLock = function() { window.isCameraLocked = !window.isCameraLocked; window.applyCameraLockState(); };
         window.deleteSelected = function() { if (transformControl.object) { const obj = transformControl.object; transformControl.detach();
-        if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(obj); else editorGroup.remove(obj); lightMoved = true; markDraftDirty(); try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('delete_selected'); } catch (_ePl) {} } };
+        if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(obj); else editorGroup.remove(obj); lightMoved = true; markDraftDirty(); try { solidCreateSyncMatPanelFromSelection(); } catch (_eMatDel) {} try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('delete_selected'); } catch (_ePl) {} } };
         /** 拷贝选中模型（仅本体，不含标注）；副本沿 X +0.5 */
         const SOLID_CREATE_COPY_OFFSET_X = 0.5;
         window.copySelected = function() {
@@ -2177,13 +2325,16 @@
                 obj3d.scale.set(sx, sy, sz);
                 obj3d.updateWorldMatrix(true, true);
                 editorGroup.add(obj3d);
+                obj3d.userData.matType = normalizeSolidMatType(src.userData.matType != null ? src.userData.matType : (window.matType || 'origin'));
+                const depsCopy = solidCreateEnsureMatDeps();
+                if (depsCopy) applySolidMaterialToRoot(obj3d, obj3d.userData.matType, depsCopy);
                 window.selectedObj = obj3d;
                 transformControl.attach(obj3d);
                 solidCreateSyncTransformSpace();
+                solidCreateSyncMatPanelFromSelection();
                 markDraftDirty();
                 lightMoved = true;
                 needsUpdate = true;
-                try { window.changeMat(window.matType); } catch (_eMat) {}
                 try {
                     requestAnimationFrame(() => {
                         try {
@@ -2205,17 +2356,20 @@
                 const model = gltf.scene;
                 solidCreateStampGlbModelMaterials(model);
                 model.userData = { type: 'glb', url: solidCreateNormalizeModelUrlForJson(url) };
+                model.userData.matType = normalizeSolidMatType(src.userData.matType != null ? src.userData.matType : (window.matType || 'origin'));
+                const depsCopyG = solidCreateEnsureMatDeps();
+                if (depsCopyG) applySolidMaterialToRoot(model, model.userData.matType, depsCopyG);
                 model.position.set(px, py, pz);
                 model.rotation.set(rx, ry, rz);
                 model.scale.set(sx, sy, sz);
                 editorGroup.add(model);
                 window.selectedObj = model;
                 transformControl.attach(model);
+                solidCreateSyncMatPanelFromSelection();
                 markDraftDirty();
                 lightMoved = true;
                 needsUpdate = true;
                 try { model.updateMatrixWorld(true); } catch (_eMw) {}
-                try { window.changeMat(window.matType); } catch (_eMat) {}
                 try {
                     requestAnimationFrame(() => {
                         try {
@@ -2617,8 +2771,9 @@
         transformControl.attach(obj3d);
         window.selectedObj = obj3d;
         solidCreateSyncTransformSpace();
+        solidCreateApplyMatToNewRoot(obj3d);
+        solidCreateSyncMatPanelFromSelection();
         markDraftDirty();
-        try { window.changeMat(window.matType); } catch (_eMat) {}
         requestAnimationFrame(() => { requestAnimationFrame(() => {
         if (obj3d.parent === editorGroup && obj3d.userData && obj3d.userData.type === 'builtin' && !obj3d.userData.noGroundSnap) {
         obj3d.updateWorldMatrix(true, true);
@@ -2635,7 +2790,7 @@
         if (glbGen !== window._editorGlbInsertGen) { disposeLoadedGltfRoot(gltf.scene); return; }
         const model = gltf.scene; solidCreateStampGlbModelMaterials(model); const box = new THREE.Box3().setFromObject(model); const size = box.getSize(new THREE.Vector3()); if (size.y > 0.001) { const scaleFactor = 4.0 / size.y; model.scale.set(scaleFactor, scaleFactor, scaleFactor); }
         box.setFromObject(model); const center = box.getCenter(new THREE.Vector3()); const minY = box.min.y; model.position.x -= center.x; model.position.z -= center.z; model.position.y -= minY;
-        model.userData = { type: 'glb', url: solidCreateNormalizeModelUrlForJson(url) }; editorGroup.add(model); transformControl.attach(model); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_glb'); } catch (_ePl) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { window.changeMat(window.matType); } catch (_eMat) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }, (error) => { alert("模型加载失败，请检查路径是否对应 '../../docs/model/' 目录"); }); };
+        model.userData = { type: 'glb', url: solidCreateNormalizeModelUrlForJson(url) }; editorGroup.add(model); solidCreateApplyMatToNewRoot(model); transformControl.attach(model); window.selectedObj = model; solidCreateSyncMatPanelFromSelection(); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_glb'); } catch (_ePl) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }, (error) => { alert("模型加载失败，请检查路径是否对应 '../../docs/model/' 目录"); }); };
         window.currentEditorMode = 'translate';
         window.syncSolidAnnoDrawPassThrough = function(e) {
             const pm = window.PluginManager;
@@ -2676,7 +2831,69 @@
         function installSolidCreateAnnotationDetailUI() {
             const ta = document.getElementById('solid-create-anno-detail');
             const hint = document.getElementById('solid-create-anno-detail-hint');
+            const occludeSel = document.getElementById('solid-create-occlude-select');
+            const projectBtn = document.getElementById('solid-create-project-straight-btn');
+            const labelCircleCb = document.getElementById('solid-create-label-circle');
+            const OCCLUDE_OPTS = ['0.25', '0.1', '-0.05', '-0.2', '-0.35', '-0.55', '-0.8'];
+            const DEFAULT_OCCLUDE = -0.05;
             if (!ta || !window.PluginManager) return;
+            function getSelectedClassicLeader() {
+                if (!window.AnnotationManager || window.AnnotationManager.selectedId == null || !Array.isArray(window.annoDataList)) return null;
+                return window.annoDataList.find(function (a) { return a.id === window.AnnotationManager.selectedId; }) || null;
+            }
+            function syncLabelCircleCb() {
+                if (!labelCircleCb) return;
+                const d = getSelectedClassicLeader();
+                labelCircleCb.disabled = !d;
+                labelCircleCb.checked = !!(d && d.labelShape === 'circle');
+            }
+            function nearestOccludeOption(v) {
+                const n = (typeof v === 'number' && isFinite(v)) ? v : DEFAULT_OCCLUDE;
+                let best = OCCLUDE_OPTS[2], bestD = Infinity;
+                for (let i = 0; i < OCCLUDE_OPTS.length; i++) {
+                    const d = Math.abs(parseFloat(OCCLUDE_OPTS[i]) - n);
+                    if (d < bestD) { bestD = d; best = OCCLUDE_OPTS[i]; }
+                }
+                return best;
+            }
+            function getOccludeTarget() {
+                if (window.AnnotationManager && window.AnnotationManager.selectedId != null && Array.isArray(window.annoDataList)) {
+                    const d = window.annoDataList.find(function (a) { return a.id === window.AnnotationManager.selectedId; });
+                    if (d) return d;
+                }
+                if (window.DashedLineManager && window.DashedLineManager.selectedId != null && Array.isArray(window.dashedLineList)) {
+                    const d = window.dashedLineList.find(function (a) { return a.id === window.DashedLineManager.selectedId; });
+                    if (d && d.kind === 'straight') return d;
+                }
+                return null;
+            }
+            function getSelectedStraight() {
+                if (!window.DashedLineManager || window.DashedLineManager.selectedId == null || !Array.isArray(window.dashedLineList)) return null;
+                const d = window.dashedLineList.find(function (a) { return a.id === window.DashedLineManager.selectedId; });
+                return (d && d.kind === 'straight') ? d : null;
+            }
+            const PROJECT_TIP = '【投到面】仅作用于当前选中的直线。\n\n按当前相机视角，把直线首尾在屏幕上的连线沿视线投到「该线所属模型」朝向屏幕的外表面，生成贴面折线（仍为直线类型，可多点）。\n空隙/未命中处会跳过；有效点过少则失败且不改原线。\n不改动标注图层叠放顺序。';
+            const UNPROJECT_TIP = '【取消投面】将当前贴面折线还原为真直线（仅保留首尾两点）。\n\n不重新投影、不删除标注，也不改动图层叠放顺序。';
+            function syncProjectStraightBtn() {
+                if (!projectBtn) return;
+                const d = getSelectedStraight();
+                projectBtn.disabled = !d;
+                if (!d) {
+                    projectBtn.textContent = '投到面';
+                    projectBtn.title = PROJECT_TIP;
+                    return;
+                }
+                const isTrue = window.DashedLineManager && typeof window.DashedLineManager.isTrueStraight === 'function'
+                    ? window.DashedLineManager.isTrueStraight(d)
+                    : (d.points && d.points.length === 2);
+                if (isTrue) {
+                    projectBtn.textContent = '投到面';
+                    projectBtn.title = PROJECT_TIP;
+                } else {
+                    projectBtn.textContent = '取消投面';
+                    projectBtn.title = UNPROJECT_TIP;
+                }
+            }
             function syncPanel() {
                 let text = '';
                 let title = '未选中标注';
@@ -2709,8 +2926,101 @@
                 ta.disabled = !active;
                 ta.value = text;
                 if (hint) hint.textContent = title;
+                if (occludeSel) {
+                    const ocTarget = getOccludeTarget();
+                    occludeSel.disabled = !ocTarget;
+                    if (ocTarget) occludeSel.value = nearestOccludeOption(ocTarget.occludeDot);
+                    else occludeSel.value = String(DEFAULT_OCCLUDE);
+                }
+                syncLabelCircleCb();
+                syncProjectStraightBtn();
             }
             window.solidCreateSyncAnnoDetailPanel = syncPanel;
+            if (labelCircleCb) {
+                labelCircleCb.addEventListener('change', function () {
+                    const d = getSelectedClassicLeader();
+                    if (!d) {
+                        this.checked = false;
+                        this.disabled = true;
+                        return;
+                    }
+                    if (this.checked) d.labelShape = 'circle';
+                    else delete d.labelShape;
+                    d.collapsed = false;
+                    try {
+                        if (window.AnnotationManager) {
+                            window.AnnotationManager.invalidateExpandedWidth(d);
+                            if (typeof window.AnnotationManager.applyLabelShapeUI === 'function') {
+                                window.AnnotationManager.applyLabelShapeUI(d);
+                            }
+                            if (d.labelShape !== 'circle' && typeof window.AnnotationManager.refreshCollapseButton === 'function') {
+                                window.AnnotationManager.refreshCollapseButton(d);
+                            }
+                        }
+                    } catch (_eShape) {}
+                    if (typeof needsUpdate !== 'undefined') needsUpdate = true;
+                    try { if (typeof markDraftDirty === 'function') markDraftDirty(); } catch (_e) {}
+                });
+            }
+            if (projectBtn) {
+                projectBtn.addEventListener('click', function () {
+                    const d = getSelectedStraight();
+                    if (!d) {
+                        if (window.showToast) window.showToast('请先选中一条直线', true);
+                        return;
+                    }
+                    const mgr = window.DashedLineManager;
+                    if (!mgr) {
+                        if (window.showToast) window.showToast('投影功能不可用', true);
+                        return;
+                    }
+                    const isTrue = typeof mgr.isTrueStraight === 'function' ? mgr.isTrueStraight(d) : (d.points && d.points.length === 2);
+                    if (isTrue) {
+                        if (typeof mgr.projectSelectedStraightToSurface !== 'function') {
+                            if (window.showToast) window.showToast('投影功能不可用', true);
+                            return;
+                        }
+                        const cam = (typeof camera !== 'undefined') ? camera : null;
+                        const scn = (typeof scene !== 'undefined') ? scene : null;
+                        const res = mgr.projectSelectedStraightToSurface(cam, scn);
+                        if (!res || !res.ok) {
+                            const map = {
+                                no_selection: '请先选中一条直线',
+                                not_straight: '请先选中一条直线',
+                                behind_camera: '端点在相机背后，请调整视角',
+                                too_short: '线段在屏幕上过短',
+                                too_few_hits: '命中点过少（空隙太多），未改动原线',
+                                bad_data: '直线数据不完整',
+                                no_camera: '相机/场景未就绪'
+                            };
+                            const msg = (res && map[res.reason]) ? map[res.reason] : '投影失败';
+                            if (window.showToast) window.showToast(msg, true);
+                        }
+                    } else {
+                        if (typeof mgr.unprojectSelectedStraightToChord !== 'function') {
+                            if (window.showToast) window.showToast('取消投面不可用', true);
+                            return;
+                        }
+                        const res = mgr.unprojectSelectedStraightToChord();
+                        if (!res || !res.ok) {
+                            if (window.showToast) window.showToast('取消投面失败', true);
+                        }
+                    }
+                    syncProjectStraightBtn();
+                });
+            }
+            if (occludeSel) {
+                occludeSel.addEventListener('change', function () {
+                    const d = getOccludeTarget();
+                    if (!d) return;
+                    const n = parseFloat(this.value);
+                    if (!isFinite(n)) return;
+                    if (Math.abs(n - DEFAULT_OCCLUDE) < 1e-6) delete d.occludeDot;
+                    else d.occludeDot = n;
+                    if (typeof needsUpdate !== 'undefined') needsUpdate = true;
+                    try { if (typeof markDraftDirty === 'function') markDraftDirty(); } catch (_e) {}
+                });
+            }
             ta.addEventListener('input', function () {
                 const v = this.value;
                 function setOn(mgr, list) {
@@ -2749,12 +3059,12 @@
             syncPanel();
             setInterval(function () {
                 try {
-                    if (document.activeElement === ta) return;
+                    if (document.activeElement === ta || document.activeElement === occludeSel || document.activeElement === labelCircleCb) return;
                     syncPanel();
                 } catch (_e) {}
             }, 2000);
         }
-        function init() { installSolidCreateAnnotationDetailUI(); const container = document.getElementById('canvas-container'); addHwLog("SolidCreate 初始化开始..."); // 【优化 3】：初始化时，自动读取上次存入缓存的颜色数据
+        function init() { installSolidCreateAnnotationDetailUI(); installSolidCreatePerspectiveUI(); const container = document.getElementById('canvas-container'); addHwLog("SolidCreate 初始化开始..."); // 【优化 3】：初始化时，自动读取上次存入缓存的颜色数据
         const cachedColor = localStorage.getItem('solid_obj_color_cache'); if (cachedColor) { const picker = document.getElementById('obj-color-picker'); if (picker) picker.value = cachedColor; }
         const cachedBoldColor = localStorage.getItem('solid_anno_bold_color_cache'); if (cachedBoldColor) { const boldPicker = document.getElementById('anno-bold-color-picker'); if (boldPicker) boldPicker.value = cachedBoldColor; }
         try {
@@ -2786,7 +3096,7 @@
         initMobileFrameToggleUI();
         initSolidCreatePanelResize();
         scene = new THREE.Scene(); scene.backgroundRotation = new THREE.Euler(); scene.environmentRotation = new THREE.Euler();
-        camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); try {
+        camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100); camera.position.set(7.5, 8.8, 14); camera.zoom = 0.52; camera.updateProjectionMatrix(); try { if (typeof window.solidCreateSyncPerspectiveSlider === 'function') window.solidCreateSyncPerspectiveSlider(); } catch (_ePerspInit) {} try {
         renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', precision: 'highp', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: true });
         RectAreaLightUniformsLib.init();
         renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.2) : Math.min(window.devicePixelRatio, 1.5)); renderer.setSize(window.innerWidth, window.innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; if ('outputColorSpace' in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMappingExposure = Number(_solidPtCfg.toneMappingExposureBase || 0.7);
@@ -2970,17 +3280,21 @@
         if (__d) window.hwLog(`[Log-Ray] 射线命中: ground (地面), 执行 detach`);
         transformControl.detach(); window.selectedObj = null;
         solidCreateSyncTransformSpace();
+        try { solidCreateSyncMatPanelFromSelection(); } catch (_eMatSel) {}
         } else { while(obj.parent && obj.parent !== editorGroup) obj = obj.parent;
        window.selectedObj = obj; if (__d) window.hwLog(`[Log-Ray] 射线命中模型: ${obj.userData.type||'unknown'}. 准备挂载, 当前mode: ${window.currentEditorMode}`);
         if (['translate', 'rotate', 'scale'].includes(window.currentEditorMode)) { transformControl.setMode(window.currentEditorMode); transformControl.attach(obj); if (__d) window.hwLog(`[Log-Ray] 成功执行 attach`); } else { transformControl.detach(); if (__d) window.hwLog(`[Log-Ray] mode不匹配，执行 detach`); }
         solidCreateSyncTransformSpace();
+        try { solidCreateSyncMatPanelFromSelection(); } catch (_eMatSel2) {}
         } } else { if (__d) window.hwLog(`[Log-Ray] 射线未命中任何物体(包括地面), 执行 detach`); transformControl.detach(); window.selectedObj = null;
         solidCreateSyncTransformSpace();
+        try { solidCreateSyncMatPanelFromSelection(); } catch (_eMatSel3) {}
         } }); // 清理掉之前用于排错的界面盒子
         const oldDebug = document.getElementById('anno-debug-panel'); if(oldDebug) oldDebug.remove();
         plasterMat = new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, roughness: 0.95, metalness: 0.0 }); flatMat = plasterMat.clone(); flatMat.flatShading = true; sphereMat = plasterMat.clone(); sphereMat.roughness = 0.6;
         // 【架构重构】：必须在任何读取 UI 状态的函数（如 buildEnvironment）之前，注入 DOM 模具！
         if (window.ControlPanel) window.ControlPanel.inject({ mode: 'producer' });
+        try { solidCreateSyncMatPanelFromSelection(); } catch (_eMatInit) {}
         if (window.SkyEnvLight && window.SkyEnvLight.mountUI) window.SkyEnvLight.mountUI();
         window.setSkyLightScale = function(v) {
         window.envSkyLightScale = Math.min(1, Math.max(0, parseFloat(v) || 0));
@@ -3021,7 +3335,18 @@
         const on = !!cb.checked;
         try { localStorage.setItem(SOLID_CREATE_LIGHT_INDICATOR_KEY, on ? '1' : '0'); } catch (_e) {}
         try { if (window.LightIndicatorManager && window.LightIndicatorManager.setEnabled) window.LightIndicatorManager.setEnabled(on); } catch (_e2) {}
+        try { if (window.GroundAxesHelperManager && window.GroundAxesHelperManager.setEnabled) window.GroundAxesHelperManager.setEnabled(on); } catch (_e2b) {}
         try { if (on && window.__solidLightIndicatorShow) window.__solidLightIndicatorShow(1400); } catch (_e3) {}
+        });
+        })();
+        (function bindNoInterModelShadowToggle() {
+        const cb = document.getElementById('no-inter-model-shadow-toggle');
+        if (!cb) return;
+        cb.checked = !!window.__solidNoInterModelShadow;
+        cb.addEventListener('change', () => {
+        window.__solidNoInterModelShadow = !!cb.checked;
+        try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.syncShadows) window.__solidPreviewLighting.syncShadows(); } catch (_eSs) {}
+        try { if (typeof window.markDraftDirty === 'function') window.markDraftDirty(); } catch (_eDr) {}
         });
         })();
         window.LightIndicatorManager.init({
@@ -3037,10 +3362,16 @@
         getLightSize: () => Number(document.getElementById('lightSize') && document.getElementById('lightSize').value),
         getTempColor: (k) => solidGetTempColorFromKelvin100(THREE, k),
         });
+        try {
+        if (window.GroundAxesHelperManager && typeof window.GroundAxesHelperManager.init === 'function') {
+        window.GroundAxesHelperManager.init({ getScene: () => scene, enabled: _liEnabled });
+        }
+        } catch (_eAxesInit) {}
         window.__solidLightIndicatorShow = function(ms) {
         const base = Number(ms) || 1200;
         const holdMs = base + SOLID_CREATE_LIGHT_INDICATOR_EXTRA_HOLD_MS;
         try { if (window.LightIndicatorManager && window.LightIndicatorManager.showTemporarily) window.LightIndicatorManager.showTemporarily(holdMs); } catch (_eLI1) {}
+        try { if (window.GroundAxesHelperManager && window.GroundAxesHelperManager.showTemporarily) window.GroundAxesHelperManager.showTemporarily(holdMs); } catch (_eAxesShow) {}
         };
         }
         } catch (_eLI) {}

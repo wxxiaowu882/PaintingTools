@@ -6,6 +6,12 @@ window.AnnotationManager = {
     isPlacing: false,
     activeData: null,
     _cachedControls: null,
+    _cachedScene: null,
+    _anchorDrag: null,
+    _anchorDragOrbitWasEnabled: null,
+    ANCHOR_DOT_R: 3,
+    ANCHOR_DOT_R_SEL: 4,
+    ANCHOR_RING_R: 6,
 
     onSceneHit: function (context) {
         if (window.currentEditorMode !== 'annotate') return;
@@ -68,6 +74,7 @@ window.AnnotationManager = {
     onClearScene: function () {
         if (!window.annoDataList) return;
         this.cancelInteractivePlacing();
+        this._cancelAnchorDrag();
         window.annoDataList.forEach(data => {
             if (data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj);
             const dom = document.getElementById('dom_' + data.id);
@@ -75,6 +82,7 @@ window.AnnotationManager = {
             if (data.svgPath) data.svgPath.remove();
             if (data.svgGlowPath) data.svgGlowPath.remove();
             if (data.svgCircle) data.svgCircle.remove();
+            if (data.svgAnchorRing) data.svgAnchorRing.remove();
             if (typeof data.cleanupEvents === 'function') data.cleanupEvents();
         });
         window.annoDataList = [];
@@ -82,6 +90,8 @@ window.AnnotationManager = {
         this.isPlacing = false;
         this.activeData = null;
         this._cachedControls = null;
+        const handlesSvg = document.getElementById('anno-anchor-handles');
+        if (handlesSvg) handlesSvg.innerHTML = '';
     },
 
     onLoadItem: function (ctx) {
@@ -135,7 +145,7 @@ window.AnnotationManager = {
                     parseFloat(c.userData.localNormal.z.toFixed(3))
                 ];
             }
-            annotations.push({
+            const entry = {
                 id: aData.id,
                 annotationKind: 'leader',
                 text: aData.text,
@@ -157,7 +167,12 @@ window.AnnotationManager = {
                 localNormal: norm,
                 baseDist: aData.baseDist,
                 baseScale: aData.baseScale
-            });
+            };
+            if (aData.labelShape === 'circle') entry.labelShape = 'circle';
+            if (typeof aData.occludeDot === 'number' && isFinite(aData.occludeDot)) {
+                entry.occludeDot = parseFloat(aData.occludeDot.toFixed(2));
+            }
+            annotations.push(entry);
         });
         return annotations;
     },
@@ -424,6 +439,90 @@ window.AnnotationManager = {
     invalidateExpandedWidth: function (data) {
         if (!data) return;
         try { delete data._labelExpandedWidthPx; } catch (_e) { data._labelExpandedWidthPx = null; }
+        try { delete data._labelCircleDiameterPx; } catch (_e2) { data._labelCircleDiameterPx = null; }
+    },
+
+    isCircleLabel: function (data) {
+        return !!(data && data.labelShape === 'circle');
+    },
+
+    /**
+     * 圆形标签：正圆、小内边距、文字居中、隐藏收起；直径随内容变大（最小约 18px）。
+     * 矩形：去掉 is-circle，清 inline 宽高后交还现有折叠/展开逻辑。
+     */
+    applyLabelShapeUI: function (data) {
+        const div = data && data.domEl;
+        if (!div) return;
+        const textEl = this.getLabelTextEl(div);
+        const btn = div.querySelector('.anno-collapse-btn');
+        const editing = div.classList.contains('editing');
+        if (!this.isCircleLabel(data)) {
+            div.classList.remove('is-circle');
+            div.style.height = '';
+            div.style.minWidth = '';
+            div.style.minHeight = '';
+            if (!editing) {
+                // 宽由 applyCollapsedUI / refreshCollapseButton 接管
+            }
+            return;
+        }
+        data.collapsed = false;
+        div.classList.remove('collapsed');
+        div.classList.add('is-circle');
+        if (btn) btn.style.display = 'none';
+        div.classList.remove('has-collapse-btn');
+        if (textEl) {
+            textEl.style.width = '';
+            textEl.style.height = '';
+        }
+        // 每次重算直径，避免改 padding/字号后仍用旧缓存导致单字不居中
+        try { delete data._labelCircleDiameterPx; } catch (_eE) { data._labelCircleDiameterPx = null; }
+        let d = 0;
+        const prevW = div.style.width;
+        const prevH = div.style.height;
+        const prevMinW = div.style.minWidth;
+        const prevMinH = div.style.minHeight;
+        try {
+            div.style.width = 'max-content';
+            div.style.height = 'auto';
+            div.style.minWidth = '';
+            div.style.minHeight = '';
+            void div.offsetWidth;
+            let w = Math.ceil(div.getBoundingClientRect().width);
+            let h = Math.ceil(div.getBoundingClientRect().height);
+            try {
+                if (textEl) {
+                    const cs = window.getComputedStyle(div);
+                    const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0)
+                        + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0);
+                    const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+                        + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+                    // 用文字内容盒尺寸，避免 line-height 把单字圆拉成竖椭圆观感
+                    const tw = Math.ceil(textEl.scrollWidth || textEl.offsetWidth || 0);
+                    const th = Math.ceil(textEl.scrollHeight || textEl.offsetHeight || 0);
+                    const content = Math.max(tw, th);
+                    w = Math.max(w, content + padX);
+                    h = Math.max(h, content + padY);
+                }
+            } catch (_ePad) {}
+            d = Math.max(18, w, h);
+            if (!editing && d > 1) data._labelCircleDiameterPx = d;
+        } catch (_eM) {
+            d = 18;
+        } finally {
+            if (!(d > 1)) {
+                div.style.width = prevW;
+                div.style.height = prevH;
+                div.style.minWidth = prevMinW;
+                div.style.minHeight = prevMinH;
+            }
+        }
+        if (d > 1) {
+            div.style.width = d + 'px';
+            div.style.height = d + 'px';
+            div.style.minWidth = d + 'px';
+            div.style.minHeight = d + 'px';
+        }
     },
 
     /**
@@ -434,6 +533,7 @@ window.AnnotationManager = {
      */
     ensureExpandedWidthPx: function (data) {
         if (!data) return 0;
+        if (this.isCircleLabel(data)) return 0;
         const cached = data._labelExpandedWidthPx;
         if (cached > 0 && isFinite(cached)) return cached;
         const div = data.domEl;
@@ -479,6 +579,10 @@ window.AnnotationManager = {
     applyExpandedWidthStyle: function (data) {
         const div = data && data.domEl;
         if (!div) return;
+        if (this.isCircleLabel(data)) {
+            this.applyLabelShapeUI(data);
+            return;
+        }
         const w = this.ensureExpandedWidthPx(data);
         if (w > 0) div.style.width = w + 'px';
     },
@@ -486,6 +590,10 @@ window.AnnotationManager = {
     applyCollapsedUI: function (data) {
         const div = data && data.domEl;
         if (!div) return;
+        if (this.isCircleLabel(data)) {
+            this.applyLabelShapeUI(data);
+            return;
+        }
         const textEl = this.getLabelTextEl(div);
         const btn = div.querySelector('.anno-collapse-btn');
         const editing = div.classList.contains('editing');
@@ -526,6 +634,10 @@ window.AnnotationManager = {
     refreshCollapseButton: function (data) {
         const div = data && data.domEl;
         if (!div) return;
+        if (this.isCircleLabel(data)) {
+            this.applyLabelShapeUI(data);
+            return;
+        }
         const textEl = this.getLabelTextEl(div);
         const btn = div.querySelector('.anno-collapse-btn');
         if (!btn || !textEl) return;
@@ -562,6 +674,7 @@ window.AnnotationManager = {
 
     toggleCollapsed: function (data) {
         if (!data) return;
+        if (this.isCircleLabel(data)) return;
         data.collapsed = !data.collapsed;
         this.applyCollapsedUI(data);
         this.refreshCollapseButton(data);
@@ -571,11 +684,196 @@ window.AnnotationManager = {
         }
     },
 
+    _isUnderRoot: function (obj, root) {
+        let cur = obj;
+        while (cur) {
+            if (cur === root) return true;
+            cur = cur.parent;
+        }
+        return false;
+    },
+    _worldNormalFromHit: function (hit) {
+        return hit.face
+            ? hit.face.normal.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize()
+            : new THREE.Vector3(0, 1, 0);
+    },
+    _raycastHitOnParent: function (clientX, clientY, parentObj) {
+        if (!parentObj || !this._cachedCamera || !this._cachedScene) return null;
+        if (!this._raycaster) this._raycaster = new THREE.Raycaster();
+        if (!this._ndc) this._ndc = new THREE.Vector2();
+        this._ndc.set((clientX / window.innerWidth) * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
+        this._raycaster.setFromCamera(this._ndc, this._cachedCamera);
+        const intersects = this._raycaster.intersectObjects(this._cachedScene.children, true)
+            .filter(res => res.object.isMesh && res.object.visible && res.object.name !== 'transformControl' && !(res.object.name && res.object.name.includes('helper')));
+        for (let i = 0; i < intersects.length; i++) {
+            const res = intersects[i];
+            if (res.object === parentObj || this._isUnderRoot(res.object, parentObj)) return res;
+        }
+        return null;
+    },
+    _canInteractAnchorDrag: function (data, e) {
+        if (window.__SOLID_CONSUMER__) return false;
+        if (this.isPlacing) return false;
+        if (data.domEl && data.domEl.classList.contains('editing')) return false;
+        if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return false;
+        if (e && e.button != null && e.button !== 0) return false;
+        if (this.selectedId !== data.id) return false;
+        return true;
+    },
+    _applyAnchorFromWorldHit: function (data, worldPoint, worldNormal) {
+        const anchor = data.anchorObj;
+        const parent = anchor && anchor.parent;
+        if (!parent || !worldPoint) return;
+        anchor.position.copy(parent.worldToLocal(worldPoint.clone()));
+        if (worldNormal) {
+            const localNormalPt = parent.worldToLocal(worldPoint.clone().add(worldNormal));
+            anchor.userData.localNormal = localNormalPt.sub(anchor.position).normalize();
+        }
+    },
+    _pauseOrbitForAnchorDrag: function () {
+        if (this._anchorDragOrbitWasEnabled !== null) return;
+        try {
+            if (window.controls) {
+                this._anchorDragOrbitWasEnabled = !!window.controls.enabled;
+                window.controls.enabled = false;
+            } else { this._anchorDragOrbitWasEnabled = null; }
+        } catch (_e) { this._anchorDragOrbitWasEnabled = null; }
+    },
+    _resumeOrbitForAnchorDrag: function () {
+        if (this._anchorDragOrbitWasEnabled !== null) {
+            try { if (window.controls) window.controls.enabled = this._anchorDragOrbitWasEnabled; } catch (_e2) {}
+            this._anchorDragOrbitWasEnabled = null;
+        }
+    },
+    _syncAnchorHandle: function (data, isSelected) {
+        if (!data) return;
+        const canDrag = isSelected && !window.__SOLID_CONSUMER__;
+        const dragging = !!(this._anchorDrag && this._anchorDrag.dataId === data.id);
+        const dotR = canDrag ? this.ANCHOR_DOT_R_SEL : this.ANCHOR_DOT_R;
+        if (data.svgCircle) data.svgCircle.setAttribute('r', String(dotR));
+        if (data.svgAnchorRing) {
+            data.svgAnchorRing.setAttribute('r', String(this.ANCHOR_RING_R));
+            data.svgAnchorRing.setAttribute('stroke', data.color);
+            data.svgAnchorRing.style.pointerEvents = canDrag ? 'auto' : 'none';
+            data.svgAnchorRing.style.cursor = dragging ? 'grabbing' : (canDrag ? 'grab' : 'default');
+        }
+    },
+    _ensureAnchorHandlesSvg: function () {
+        this.ensureDOM();
+        const layer = document.getElementById('anno-layer');
+        if (!layer) return null;
+        let handles = document.getElementById('anno-anchor-handles');
+        if (!handles) {
+            const ns = 'http://www.w3.org/2000/svg';
+            handles = document.createElementNS(ns, 'svg');
+            handles.id = 'anno-anchor-handles';
+            handles.setAttribute('style', 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:100001;overflow:visible;');
+            layer.appendChild(handles);
+        }
+        return handles;
+    },
+    _createAnchorRingElement: function (data, handlesSvg) {
+        const ns = 'http://www.w3.org/2000/svg';
+        const mgr = this;
+        const ring = document.createElementNS(ns, 'circle');
+        ring.setAttribute('r', String(this.ANCHOR_RING_R));
+        ring.setAttribute('fill', 'transparent');
+        ring.setAttribute('stroke', data.color);
+        ring.setAttribute('stroke-width', '1.5');
+        ring.setAttribute('opacity', '0.85');
+        ring.style.pointerEvents = 'none';
+        ring.style.display = 'none';
+        ring.addEventListener('pointerdown', e => { mgr._beginAnchorDrag(data, e); }, { passive: false });
+        handlesSvg.appendChild(ring);
+        data.svgAnchorRing = ring;
+    },
+    /** 锚点拖动手柄置于 #anno-layer 顶层，避免被标签 div 挡住；热更新场景补建 */
+    _ensureAnchorRing: function (data) {
+        if (!data || window.__SOLID_CONSUMER__) return;
+        const handlesSvg = this._ensureAnchorHandlesSvg();
+        if (!handlesSvg) return;
+        if (data.svgAnchorRing && data.svgAnchorRing.parentNode === handlesSvg) return;
+        if (data.svgAnchorRing && data.svgAnchorRing.parentNode) {
+            data.svgAnchorRing.remove();
+            data.svgAnchorRing = null;
+        }
+        if (!data.svgAnchorRing) this._createAnchorRingElement(data, handlesSvg);
+    },
+    _cleanupAnchorDragListeners: function () {
+        const st = this._anchorDrag;
+        if (!st || !st.captureEl) return;
+        if (st.onMove) {
+            try { st.captureEl.removeEventListener('pointermove', st.onMove, { passive: false }); } catch (_e1) { try { st.captureEl.removeEventListener('pointermove', st.onMove); } catch (_e1b) {} }
+        }
+        if (st.onUp) {
+            st.captureEl.removeEventListener('pointerup', st.onUp);
+            st.captureEl.removeEventListener('pointercancel', st.onUp);
+        }
+    },
+    _cancelAnchorDrag: function () {
+        const st = this._anchorDrag;
+        if (!st) return;
+        this._cleanupAnchorDragListeners();
+        this._anchorDrag = null;
+        this._resumeOrbitForAnchorDrag();
+    },
+    _endAnchorDrag: function (e) {
+        const st = this._anchorDrag;
+        if (!st) return;
+        if (e && st.pointerId !== undefined && e.pointerId !== undefined && e.pointerId !== st.pointerId) return;
+        const data = window.annoDataList.find(a => a.id === st.dataId);
+        this._cleanupAnchorDragListeners();
+        if (st.captureEl && e) { try { st.captureEl.releasePointerCapture(e.pointerId); } catch (_eRel) {} }
+        const moved = st.moved;
+        this._anchorDrag = null;
+        this._resumeOrbitForAnchorDrag();
+        if (data) this._syncAnchorHandle(data, this.selectedId === data.id);
+        if (moved) {
+            window.needsUpdate = true;
+            window.lightMoved = true;
+            try { if (typeof window.markDraftDirty === 'function') window.markDraftDirty(); } catch (_e) {}
+        }
+    },
+    _moveAnchorDrag: function (e) {
+        const st = this._anchorDrag;
+        if (!st || !e) return;
+        if (st.pointerId !== undefined && e.pointerId !== undefined && e.pointerId !== st.pointerId) return;
+        const data = window.annoDataList.find(a => a.id === st.dataId);
+        if (!data || !data.anchorObj || !data.anchorObj.parent) return;
+        const hit = this._raycastHitOnParent(e.clientX, e.clientY, data.anchorObj.parent);
+        if (!hit) return;
+        const wn = this._worldNormalFromHit(hit);
+        this._applyAnchorFromWorldHit(data, hit.point, wn);
+        st.moved = true;
+        window.needsUpdate = true;
+        try { if (e.cancelable) e.preventDefault(); } catch (_ePrev) {}
+    },
+    _beginAnchorDrag: function (data, e) {
+        if (!this._canInteractAnchorDrag(data, e)) return;
+        if (this._anchorDrag) this._endAnchorDrag(e);
+        e.stopPropagation();
+        e.preventDefault();
+        const captureEl = e.currentTarget;
+        const onMove = ev => this._moveAnchorDrag(ev);
+        const onUp = ev => this._endAnchorDrag(ev);
+        this._anchorDrag = { dataId: data.id, pointerId: e.pointerId, captureEl: captureEl, onMove: onMove, onUp: onUp, moved: false };
+        this._syncAnchorHandle(data, true);
+        this._pauseOrbitForAnchorDrag();
+        try { captureEl.setPointerCapture(e.pointerId); } catch (_eCap) {}
+        captureEl.addEventListener('pointermove', onMove, { passive: false });
+        captureEl.addEventListener('pointerup', onUp);
+        captureEl.addEventListener('pointercancel', onUp);
+    },
+
     highlightSelected: function () {
         document.querySelectorAll('.anno-dom').forEach(el => {
             el.style.boxShadow = 'none';
             el.style.borderColor = el.dataset.color || '#00d2ff';
             el.style.zIndex = '99999';
+        });
+        window.annoDataList.forEach(data => {
+            this._ensureAnchorRing(data);
+            this._syncAnchorHandle(data, false);
         });
         const picker = document.getElementById('obj-color-picker');
         if (this.selectedId !== null) {
@@ -586,7 +884,11 @@ window.AnnotationManager = {
                 el.style.borderColor = '#fff';
                 el.style.zIndex = '100000';
             }
-            if (data && picker) picker.value = data.color;
+            if (data) {
+                this._ensureAnchorRing(data);
+                this._syncAnchorHandle(data, true);
+                if (picker) picker.value = data.color;
+            }
         }
         if (picker) {
             picker.disabled = false;
@@ -599,8 +901,14 @@ window.AnnotationManager = {
         const cssText = `
                     #anno-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 50 !important; overflow: hidden; }
                     #anno-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+                    #anno-anchor-handles { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100001 !important; overflow: visible; }
                     .anno-dom { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; font-family: 'Inter', sans-serif; }
                     .anno-leader-label { border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.45; box-sizing: border-box; text-align: left; max-width: min(88vw, 360px); cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-block; vertical-align: top; touch-action: none; -webkit-user-select: none; }
+                    .anno-leader-label.is-circle { border-radius: 50%; padding: 1px; text-align: center; display: inline-flex; align-items: center; justify-content: center; max-width: none; overflow: hidden; line-height: 1; }
+                    .anno-leader-label.is-circle .anno-leader-text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; max-width: 100%; margin: 0; padding: 0; box-sizing: border-box; text-align: center; line-height: 1; white-space: pre-wrap; word-break: break-word; }
+                    .anno-leader-label.is-circle .anno-collapse-btn { display: none !important; }
+                    .anno-leader-label.is-circle.editing { padding: 2px !important; display: inline-flex !important; align-items: center; justify-content: center; max-height: none; overflow: visible; line-height: 1; }
+                    .anno-leader-label.is-circle.editing .anno-leader-text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; outline: none; }
                     .anno-leader-label.has-collapse-btn { /* − 叠右上角，不占独立一列 */ }
                     .anno-leader-text { display: block; white-space: pre-wrap; word-break: break-word; max-width: 100%; box-sizing: border-box; }
                     .anno-leader-label.collapsed { width: fit-content; max-width: min(88vw, 360px); padding-right: 30px; }
@@ -709,7 +1017,14 @@ window.AnnotationManager = {
             div.classList.add('editing');
             div.classList.remove('collapsed');
             textEl.style.width = '';
-            div.style.width = '';
+            if (!window.AnnotationManager.isCircleLabel(data)) {
+                div.style.width = '';
+                div.style.height = '';
+                div.style.minWidth = '';
+                div.style.minHeight = '';
+            } else {
+                window.AnnotationManager.applyLabelShapeUI(data);
+            }
             btn.style.display = 'none';
             textEl.contentEditable = true;
             textEl.style.cursor = 'text';
@@ -729,7 +1044,11 @@ window.AnnotationManager = {
             textEl.style.cursor = '';
             window.AnnotationManager.applyLabelToDOM(div, data);
             window.AnnotationManager.invalidateExpandedWidth(data);
-            window.AnnotationManager.refreshCollapseButton(data);
+            if (window.AnnotationManager.isCircleLabel(data)) {
+                window.AnnotationManager.applyLabelShapeUI(data);
+            } else {
+                window.AnnotationManager.refreshCollapseButton(data);
+            }
             window.needsUpdate = true;
         });
         textEl.addEventListener('paste', (e) => {
@@ -931,12 +1250,17 @@ window.AnnotationManager = {
         svg.appendChild(path);
         data.svgPath = path;
         const circle = document.createElementNS(ns, 'circle');
-        circle.setAttribute('r', '3');
+        circle.setAttribute('r', String(window.AnnotationManager.ANCHOR_DOT_R));
         circle.setAttribute('fill', data.color);
+        circle.style.pointerEvents = 'none';
         svg.appendChild(circle);
         data.svgCircle = circle;
+        this._ensureAnchorRing(data);
         const scheduleCollapseRefresh = () => {
-            try { window.AnnotationManager.refreshCollapseButton(data); } catch (_e) {}
+            try {
+                if (window.AnnotationManager.isCircleLabel(data)) window.AnnotationManager.applyLabelShapeUI(data);
+                else window.AnnotationManager.refreshCollapseButton(data);
+            } catch (_e) {}
         };
         if (typeof requestAnimationFrame === 'function') {
             requestAnimationFrame(() => requestAnimationFrame(scheduleCollapseRefresh));
@@ -976,7 +1300,7 @@ window.AnnotationManager = {
                 this._normalMatrix.getNormalMatrix(data.anchorObj.parent.matrixWorld);
                 this._currentWorldNormal.copy(data.anchorObj.userData.localNormal).applyMatrix3(this._normalMatrix).normalize();
                 this._viewDir.copy(camera.position).sub(this._tempV).normalize();
-                data.isOccluded = this._currentWorldNormal.dot(this._viewDir) < -0.05;
+                data.isOccluded = this._currentWorldNormal.dot(this._viewDir) < (typeof data.occludeDot === 'number' && isFinite(data.occludeDot) ? data.occludeDot : -0.05);
             } else {
                 data.isOccluded = false;
             }
@@ -1021,16 +1345,26 @@ window.AnnotationManager = {
                     data.svgCircle.setAttribute('cx', x);
                     data.svgCircle.setAttribute('cy', y);
                     data.svgCircle.setAttribute('opacity', '0.8');
+                    if (this.selectedId === data.id || data.svgAnchorRing) this._ensureAnchorRing(data);
+                    if (data.svgAnchorRing) {
+                        const canDrag = this.selectedId === data.id && !window.__SOLID_CONSUMER__;
+                        data.svgAnchorRing.setAttribute('cx', String(x));
+                        data.svgAnchorRing.setAttribute('cy', String(y));
+                        data.svgAnchorRing.setAttribute('opacity', '0.85');
+                        data.svgAnchorRing.style.display = canDrag ? '' : 'none';
+                    }
                 } else {
                     if (data.svgGlowPath) data.svgGlowPath.setAttribute('opacity', '0');
                     data.svgPath.setAttribute('opacity', '0');
                     data.svgCircle.setAttribute('opacity', '0');
+                    if (data.svgAnchorRing) data.svgAnchorRing.style.display = 'none';
                 }
             }
         });
     },
 
     clearAll: function () {
+        this._cancelAnchorDrag();
         window.annoDataList.forEach(data => {
             if (data.cleanupEvents) data.cleanupEvents();
             if (data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj);
@@ -1040,6 +1374,8 @@ window.AnnotationManager = {
         if (layer) layer.querySelectorAll('.anno-dom').forEach(el => el.remove());
         const svg = document.getElementById('anno-svg');
         if (svg) svg.innerHTML = '';
+        const handlesSvg = document.getElementById('anno-anchor-handles');
+        if (handlesSvg) handlesSvg.innerHTML = '';
         this.selectedId = null;
     },
 
@@ -1077,8 +1413,10 @@ window.AnnotationManager = {
                 isOccluded: false
             };
             if (_loadedRich) annoData.textRich = _loadedRich;
+            if (a.labelShape === 'circle') annoData.labelShape = 'circle';
             if (a.baseDist) annoData.baseDist = a.baseDist;
             if (a.baseScale) annoData.baseScale = a.baseScale;
+            if (typeof a.occludeDot === 'number' && isFinite(a.occludeDot)) annoData.occludeDot = a.occludeDot;
             window.annoDataList.push(annoData);
             this.buildDOM(annoData);
         });
@@ -1122,12 +1460,16 @@ window.addEventListener('keydown', e => {
     const idx = window.annoDataList.findIndex(a => a.id === id);
     if (idx > -1) {
         const data = window.annoDataList[idx];
+        if (window.AnnotationManager._anchorDrag && window.AnnotationManager._anchorDrag.dataId === id) {
+            window.AnnotationManager._cancelAnchorDrag();
+        }
         if (data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj);
         const div = document.getElementById('dom_' + id);
         if (div) div.remove();
         if (data.svgGlowPath) data.svgGlowPath.remove();
         if (data.svgPath) data.svgPath.remove();
         if (data.svgCircle) data.svgCircle.remove();
+        if (data.svgAnchorRing) data.svgAnchorRing.remove();
         if (data.cleanupEvents) data.cleanupEvents();
         window.annoDataList.splice(idx, 1);
         window.needsUpdate = true;
@@ -1152,11 +1494,13 @@ if (colorPicker) {
         if (data.svgPath) data.svgPath.setAttribute('stroke', data.color);
         if (data.svgGlowPath) data.svgGlowPath.setAttribute('stroke', data.color);
         if (data.svgCircle) data.svgCircle.setAttribute('fill', data.color);
+        if (data.svgAnchorRing) data.svgAnchorRing.setAttribute('stroke', data.color);
         window.needsUpdate = true;
     });
 }
 
 window.AnnotationManager.onUpdate = function (context) {
+    this._cachedScene = context.scene;
     if (window.showAnnotations !== false && context.camera) {
         this.updateScreenPositions(context.camera);
     }

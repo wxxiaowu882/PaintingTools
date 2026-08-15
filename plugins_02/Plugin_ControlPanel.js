@@ -56,6 +56,8 @@ window.ControlPanel = {
                         /* 强制提亮继承自原生 HTML 的暗色文字 */
                         .slider-label { color: rgba(255,255,255,0.7) !important; }
                         .slider-val { color: rgba(255,255,255,0.9) !important; }
+                        .slider-val-editable { cursor: text; user-select: none; }
+                        .slider-val-input { width: 100%; max-width: 40px; box-sizing: border-box; font-size: 9px; padding: 0 2px; text-align: right; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.35); border-radius: 2px; font-variant-numeric: tabular-nums; outline: none; flex: none; }
                         
                         /* 压缩滑块占用的纵向高度 */
                         input[type=range] { flex: 1; margin: 0 6px; -webkit-appearance: none; background: transparent; height: 22px; min-width: 0; outline: none; }
@@ -115,16 +117,16 @@ window.ControlPanel = {
                             </div>
                             
                             <div class="flex gap-2" style="margin-bottom:6px;">
-                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">方向</span><input type="range" id="lightAzimuth" min="0" max="360" value="113"><span id="azimuthVal" class="slider-val">113</span></div>
-                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">高度</span><input type="range" id="lightElevation" min="-90" max="85" value="45"><span id="elevationVal" class="slider-val">45</span></div>
+                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">方向</span><input type="range" id="lightAzimuth" min="0" max="360" value="113"><span id="azimuthVal" class="slider-val slider-val-editable" title="双击输入数值">113</span></div>
+                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">高度</span><input type="range" id="lightElevation" min="-90" max="85" value="45"><span id="elevationVal" class="slider-val slider-val-editable" title="双击输入数值">45</span></div>
                             </div> 
                             <div class="flex gap-2" style="margin-bottom:6px;">
-                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">距离</span><input type="range" id="lightDistance" min="5" max="40" value="21"><span id="distanceVal" class="slider-val">21</span></div>
-                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">色温</span><input type="range" id="lightTemp" min="30" max="90" value="38"><span id="tempVal" class="slider-val">3800</span></div>
+                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">距离</span><input type="range" id="lightDistance" min="5" max="40" value="21"><span id="distanceVal" class="slider-val slider-val-editable" title="双击输入数值">21</span></div>
+                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">色温</span><input type="range" id="lightTemp" min="30" max="90" value="38"><span id="tempVal" class="slider-val slider-val-editable" title="双击输入数值（单位 K）">3800</span></div>
                             </div> 
                             <div class="flex gap-2">
-                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">大小</span><input type="range" id="lightSize" min="1.0" max="25.0" step="0.1" value="1.9"><span id="sizeVal" class="slider-val">1.9</span></div>
-                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">强度</span><input type="range" id="lightIntensity" min="0.2" max="8" step="0.1" value="1.7"><span id="intensityVal" class="slider-val">1.7</span></div>
+                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">大小</span><input type="range" id="lightSize" min="1.0" max="25.0" step="0.1" value="1.9"><span id="sizeVal" class="slider-val slider-val-editable" title="双击输入数值">1.9</span></div>
+                                <div class="slider-row flex-1" style="margin-bottom:0;"><span class="slider-label">强度</span><input type="range" id="lightIntensity" min="0.2" max="8" step="0.1" value="1.7"><span id="intensityVal" class="slider-val slider-val-editable" title="双击输入数值">1.7</span></div>
                             </div>
                         </div>
 
@@ -215,21 +217,6 @@ window.ControlPanel = {
 
                         <div id="content-tab-assist" class="tab-content">
                             <div class="module-card" style="display:flex; flex-direction:column; gap:12px;">
-                                <div class="flex items-center" style="gap:6px; position:relative; z-index:103;">
-                                    <span style="color:rgba(255,255,255,0.8); font-size:11px; font-weight:bold; white-space:nowrap; width:50px;">模型材质</span> 
-                                    <div style="position:relative; flex:none; min-width:80px;">
-                                        <div class="custom-select-trigger" onclick="window.toggleCustomSelect(event, 'mat-options')" id="mat-trigger">自带材质</div>
-                                        <div class="custom-options" id="mat-options"> 
-                                            <div class="custom-option selected" onclick="window.selectCustomOpt('mat', 'origin', '自带材质', this)">自带材质</div>
-                                            <div class="custom-option" onclick="window.selectCustomOpt('mat', '0', '哑光石膏', this)">哑光石膏</div>
-                                            <div class="custom-option" onclick="window.selectCustomOpt('mat', '1', '亮面陶瓷', this)">亮面陶瓷</div> 
-                                            <div class="custom-option" onclick="window.selectCustomOpt('mat', '2', '镜面金属', this)">镜面金属</div>
-                                            <div class="custom-option" onclick="window.selectCustomOpt('mat', '3', '透明玻璃', this)">透明玻璃</div> 
-                                            <div class="custom-option" onclick="window.selectCustomOpt('mat', '4', '磨砂玻璃', this)">磨砂玻璃</div> 
-                                        </div> 
-                                    </div>
-                                </div>
-                                
                                 <div class="slider-row mb-0" style="align-items:center;">
                                     <label class="flex items-center cursor-pointer mb-0" style="width:auto; margin-right:4px;">
                                         <input type="checkbox" id="posterizeEnable" onchange="window.togglePosterize(this.checked)" class="flat-checkbox" style="width:14px; height:14px; margin-right:6px;"> 
