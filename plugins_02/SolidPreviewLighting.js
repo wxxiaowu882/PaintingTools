@@ -18,19 +18,24 @@ const SOLID_GROUND_SHADOW_PATCH_REVISION = 10;
 
 /**
  * 与 Solid.html 中 shouldSkipEnvProbe 条件一致，供消费端与生产端共用，避免各写一套导致行为分叉。
+ * 稳定期 / 全屏 loader 可见时跳过，避免与首帧 animate 抢主线程导致假死。
  * @param {() => { useAdvancedRender?: boolean; isLoadingScene?: boolean; currentSceneData?: unknown; currentSceneIndex?: number }} getFlags
  */
 export function solidRasterPreviewShouldSkipEnvProbe(getFlags) {
   return function shouldSkipEnvProbe(_reason) {
     try {
       const w = (typeof getFlags === 'function' ? getFlags() : {}) || {};
-      return !!(
-        w.useAdvancedRender ||
-        w.isLoadingScene ||
-        !w.currentSceneData ||
-        w.currentSceneIndex == null ||
-        w.currentSceneIndex < 0
-      );
+      if (w.useAdvancedRender || w.isLoadingScene || !w.currentSceneData || w.currentSceneIndex == null || w.currentSceneIndex < 0) {
+        return true;
+      }
+      if (typeof window !== 'undefined') {
+        if (window.__solidSceneStabilizing || window.__solidCreateSceneStabilizing) return true;
+        try {
+          const ld = document.getElementById('scene-loader');
+          if (ld && ld.style.display !== 'none' && parseFloat(ld.style.opacity || '1') > 0.05) return true;
+        } catch (_eLd) {}
+      }
+      return false;
     } catch (_e) {
       return false;
     }
@@ -57,6 +62,8 @@ export function createSolidPreviewLightingManager(opts) {
   const getLightState = typeof opts.getLightState === 'function' ? opts.getLightState : (() => opts.lightState || null); // expects { radius?: number }
   const getInteractionState = typeof opts.getInteractionState === 'function' ? opts.getInteractionState : (() => false);
   const shouldSkipEnvProbe = typeof opts.shouldSkipEnvProbe === 'function' ? opts.shouldSkipEnvProbe : () => false;
+  const onEnvProbeProgress = typeof opts.onEnvProbeProgress === 'function' ? opts.onEnvProbeProgress : null;
+  const onEnvProbeComplete = typeof opts.onEnvProbeComplete === 'function' ? opts.onEnvProbeComplete : null;
   // 模型互不投影：仍投地面，模型网格不 receiveShadow（默认读 window.__solidNoInterModelShadow）
   const getNoInterModelShadow = typeof opts.getNoInterModelShadow === 'function'
     ? opts.getNoInterModelShadow
@@ -2357,6 +2364,8 @@ export function createSolidPreviewLightingManager(opts) {
   let envProbeTimer = 0;
   let envProbeMaxTimer = 0;
   let lastRunAt = 0;
+  let _envProbeStageToken = 0;
+  let _envProbeStageRaf = 0;
   const minIntervalMs = typeof opts.envMinIntervalMs === 'number' ? opts.envMinIntervalMs : 2600;
   const debounceMs = typeof opts.envDebounceMs === 'number' ? opts.envDebounceMs : 220;
   const cubeSize = typeof opts.envCubeSize === 'number' ? opts.envCubeSize : (getIsMobile() ? 48 : 64);
@@ -2942,7 +2951,35 @@ export function createSolidPreviewLightingManager(opts) {
     }
   }
 
-  function _updateEnvProbeNow(reason) {
+  function _cancelEnvProbeStaged() {
+    _envProbeStageToken += 1;
+    if (_envProbeStageRaf) {
+      try { cancelAnimationFrame(_envProbeStageRaf); } catch (_eRaf) {}
+      _envProbeStageRaf = 0;
+    }
+  }
+
+  function _emitEnvProbeProgress(payload) {
+    try { if (onEnvProbeProgress) onEnvProbeProgress(payload); } catch (_e) {}
+  }
+
+  function _emitEnvProbeComplete(payload) {
+    try { if (onEnvProbeComplete) onEnvProbeComplete(payload); } catch (_e) {}
+  }
+
+  function _updateEnvProbeStaged(reason) {
+    const myToken = ++_envProbeStageToken;
+    if (_envProbeStageRaf) {
+      try { cancelAnimationFrame(_envProbeStageRaf); } catch (_eRaf0) {}
+      _envProbeStageRaf = 0;
+    }
+
+    const fail = (ok) => {
+      if (myToken !== _envProbeStageToken) return;
+      _envProbeStageRaf = 0;
+      _emitEnvProbeComplete({ reason: reason || 'unknown', ok: !!ok });
+    };
+
     try {
       if (!previewEnabled) return;
       if (shouldSkipEnvProbe(reason)) return;
@@ -3007,51 +3044,81 @@ export function createSolidPreviewLightingManager(opts) {
       const prevPos = cubeCam.position.clone();
       const shFreeze = _solidShIrrEnabled() && !!(irr && irr.freezeShWhileInteractive) && interact;
       let shAllOk = true;
-      for (let pi = 0; pi < probeCount; pi++) {
-        cubeCam.position.copy(probePositions[pi]);
+      let pi = 0;
+
+      _emitEnvProbeProgress({ index: 0, total: probeCount, reason: reason || 'unknown' });
+
+      const finalize = () => {
+        if (myToken !== _envProbeStageToken) return;
+        cubeCam.position.copy(prevPos);
         cubeCam.updateMatrixWorld(true);
-        cubeCam.update(renderer, scene);
+
         if (_solidShIrrEnabled()) {
-          if (!shFreeze) {
-            const ok = _computeShFromCubeRenderTarget(renderer, cubeRT, _probeShFlat[pi]);
-            if (!ok) shAllOk = false;
-          }
-        }
-        if (pmremRTs[pi]) { try { safeDispose(pmremRTs[pi]); } catch (_eD) {} pmremRTs[pi] = null; }
-        pmremRTs[pi] = pmremGen.fromCubemap(cubeRT.texture);
-      }
-      cubeCam.position.copy(prevPos);
-      cubeCam.updateMatrixWorld(true);
-
-      if (_solidShIrrEnabled()) {
-        _solidShLastValid = shFreeze ? _solidShLastValid : shAllOk;
-      } else {
-        _solidShLastValid = false;
-      }
-
-      try {
-        const baseSrc = pmremRTs[0];
-        if (basePmremRT && basePmremRT !== baseSrc) { try { safeDispose(basePmremRT); } catch (_eDb) {} }
-        basePmremRT = null;
-        if (baseSrc && baseSrc.texture) {
-          basePmremRT = baseSrc;
-          scene.environment = baseSrc.texture;
-          scene.environmentIntensity = getIsMobile() ? 0.22 : 0.26;
+          _solidShLastValid = shFreeze ? _solidShLastValid : shAllOk;
         } else {
+          _solidShLastValid = false;
+        }
+
+        try {
+          const baseSrc = pmremRTs[0];
+          if (basePmremRT && basePmremRT !== baseSrc) { try { safeDispose(basePmremRT); } catch (_eDb) {} }
+          basePmremRT = null;
+          if (baseSrc && baseSrc.texture) {
+            basePmremRT = baseSrc;
+            scene.environment = baseSrc.texture;
+            scene.environmentIntensity = getIsMobile() ? 0.22 : 0.26;
+          } else {
+            scene.environment = null;
+            scene.environmentIntensity = 1;
+          }
+        } catch (_eB) {
           scene.environment = null;
           scene.environmentIntensity = 1;
         }
-      } catch (_eB) {
-        scene.environment = null;
-        scene.environmentIntensity = 1;
-      }
 
-      _applyMultiEnvProbesToSceneGroup();
-      if (_solidShIrrEnabled()) _solidShPushUniformsFromState();
-      log('[RasterEnvProbe] multi updated (' + (reason || 'unknown') + '), cube=' + effectiveCubeSize + ' x3 sh=' + (_solidShIrrEnabled() ? (_solidShLastValid ? '1' : '0') : 'off'));
+        _applyMultiEnvProbesToSceneGroup();
+        if (_solidShIrrEnabled()) _solidShPushUniformsFromState();
+        log('[RasterEnvProbe] multi updated (' + (reason || 'unknown') + '), cube=' + effectiveCubeSize + ' x3 sh=' + (_solidShIrrEnabled() ? (_solidShLastValid ? '1' : '0') : 'off'));
+        _envProbeStageRaf = 0;
+        _emitEnvProbeComplete({ reason: reason || 'unknown', ok: true });
+      };
+
+      const stepOne = () => {
+        if (myToken !== _envProbeStageToken) return;
+        _envProbeStageRaf = 0;
+        try {
+          if (!previewEnabled || shouldSkipEnvProbe(reason)) { fail(false); return; }
+          if (pi >= probeCount) {
+            finalize();
+            return;
+          }
+          _emitEnvProbeProgress({ index: pi, total: probeCount, reason: reason || 'unknown' });
+          cubeCam.position.copy(probePositions[pi]);
+          cubeCam.updateMatrixWorld(true);
+          cubeCam.update(renderer, scene);
+          if (_solidShIrrEnabled()) {
+            if (!shFreeze) {
+              const ok = _computeShFromCubeRenderTarget(renderer, cubeRT, _probeShFlat[pi]);
+              if (!ok) shAllOk = false;
+            }
+          }
+          if (pmremRTs[pi]) { try { safeDispose(pmremRTs[pi]); } catch (_eD) {} pmremRTs[pi] = null; }
+          pmremRTs[pi] = pmremGen.fromCubemap(cubeRT.texture);
+          pi += 1;
+          _emitEnvProbeProgress({ index: pi, total: probeCount, reason: reason || 'unknown' });
+          _envProbeStageRaf = requestAnimationFrame(stepOne);
+        } catch (eStep) {
+          log('[RasterEnvProbe] staged step failed: ' + (eStep && eStep.message ? eStep.message : eStep));
+          try { _disposeEnvProbe(); } catch (_eDisp) {}
+          fail(false);
+        }
+      };
+
+      _envProbeStageRaf = requestAnimationFrame(stepOne);
     } catch (e) {
       log('[RasterEnvProbe] failed: ' + (e && e.message ? e.message : e));
-      _disposeEnvProbe();
+      try { _disposeEnvProbe(); } catch (_eDisp2) {}
+      fail(false);
     }
   }
 
@@ -3059,7 +3126,7 @@ export function createSolidPreviewLightingManager(opts) {
     if (!previewEnabled) return;
     const r = String(reason || '');
     // 换场景/增删物体后若仍沿用旧的 lastRunAt，会把首轮探针推迟整整一个 minInterval，表现为「SH 很久才出来」。
-    if (/scene_loaded|scene_changed|apply_scene|json_loaded|new_scene|delete_selected|add_builtin|add_glb|copy_builtin|copy_glb/i.test(r)) {
+    if (/scene_loaded|scene_changed|scene_settle|apply_scene|json_loaded|new_scene|delete_selected|add_builtin|add_glb|copy_builtin|copy_glb/i.test(r)) {
       lastRunAt = 0;
     }
     const irr = _irrCfg();
@@ -3067,17 +3134,19 @@ export function createSolidPreviewLightingManager(opts) {
     const debMax = Math.max(0, Number(irr.debounceMaxMs) || 0);
 
     if (envProbeTimer) { clearTimeout(envProbeTimer); envProbeTimer = 0; }
+    // 新请求到达时取消进行中的分帧探针，避免叠跑。
+    _cancelEnvProbeStaged();
     envProbeTimer = setTimeout(() => {
       envProbeTimer = 0;
       if (envProbeMaxTimer) { clearTimeout(envProbeMaxTimer); envProbeMaxTimer = 0; }
-      _updateEnvProbeNow(reason);
+      _updateEnvProbeStaged(reason);
     }, deb);
 
     if (debMax > 0 && !envProbeMaxTimer) {
       envProbeMaxTimer = setTimeout(() => {
         envProbeMaxTimer = 0;
         if (envProbeTimer) { clearTimeout(envProbeTimer); envProbeTimer = 0; }
-        _updateEnvProbeNow(reason);
+        _updateEnvProbeStaged(reason);
       }, debMax);
     }
   }
@@ -3101,6 +3170,7 @@ export function createSolidPreviewLightingManager(opts) {
       if (envProbeTimer) { clearTimeout(envProbeTimer); envProbeTimer = 0; }
       if (envProbeMaxTimer) { clearTimeout(envProbeMaxTimer); envProbeMaxTimer = 0; }
     } catch (_e) {}
+    _cancelEnvProbeStaged();
     _disposeEnvProbe();
   }
 

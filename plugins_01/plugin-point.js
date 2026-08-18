@@ -53,6 +53,22 @@ window.AnnotationPluginManager.register({
         el.style.transform = isHighlight ? 'scale(1.2)' : 'none';
         return htmlStr;
     },
+    // 拖移吸附：只改 pos/norm 与 DOM；同步 updateHotspot 才能让圆点跟着走
+    updateSurfacePose: function(p, posStr, normStr, viewer) {
+        if (!p || p.type !== 'point') return;
+        p.pos = posStr;
+        p.norm = normStr;
+        const el = viewer && viewer.querySelector ? viewer.querySelector(`[slot="${p.slot}"]`) : null;
+        if (el) {
+            el.setAttribute('data-position', posStr);
+            el.setAttribute('data-normal', normStr);
+        }
+        try {
+            if (viewer && typeof viewer.updateHotspot === 'function') {
+                viewer.updateHotspot({ name: p.slot, position: posStr, normal: normStr });
+            }
+        } catch (_eUh) {}
+    },
     mountDOM: function(p, viewer) {
         const el = document.createElement('button'); el.className = 'preview-hotspot';
         el.setAttribute('slot', p.slot); el.setAttribute('data-position', p.pos); el.setAttribute('data-normal', p.norm); el.setAttribute('data-visibility-attribute', 'visible'); el.setAttribute('visible', ''); el.setAttribute('data-id', p.id);

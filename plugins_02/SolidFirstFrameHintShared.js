@@ -1,9 +1,11 @@
-// 消费端 Solid.html：全屏 loader 淡出后、首帧 draw 就绪前的居中轻提示。
+// 消费端 Solid.html：全屏 loader 淡出后、首帧 draw + 光影探针就绪前的居中轻提示。
 
 const FADE_MS = 280;
 const READY_FRAMES = 2;
 const TIMEOUT_MS_MOBILE = 6000;
 const TIMEOUT_MS_DESKTOP = 4000;
+const DRAW_WEIGHT = 0.35;
+const PROBE_WEIGHT = 0.65;
 
 export function createSolidFirstFrameHintController({
   isMobile,
@@ -21,6 +23,8 @@ export function createSolidFirstFrameHintController({
   let displayProgress = 0;
   let fadeStartAt = 0;
   let drawnThisFrame = false;
+  let probeProgress = 0;
+  let probeDone = false;
 
   function _now() {
     return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -66,12 +70,34 @@ export function createSolidFirstFrameHintController({
     });
   }
 
+  function _targetProgress() {
+    const drawPart = Math.max(0, Math.min(1, readyFrames / READY_FRAMES));
+    const probePart = probeDone ? 1 : Math.max(0, Math.min(1, probeProgress));
+    return (drawPart * DRAW_WEIGHT + probePart * PROBE_WEIGHT) * 100;
+  }
+
+  function _syncLabel() {
+    if (!probeDone) {
+      if (probeProgress > 0.01) {
+        const n = Math.max(1, Math.round(probeProgress * 3));
+        _setText('光影探针 ' + Math.min(3, n) + '/3…');
+      } else {
+        _setText('正在计算光影…');
+      }
+      return;
+    }
+    if (readyFrames < READY_FRAMES) _setText('首帧渲染中…');
+    else _setText('即将完成…');
+  }
+
   function _resetVisual() {
     displayProgress = 0;
     readyFrames = 0;
     drawnThisFrame = false;
+    probeProgress = 0;
+    probeDone = false;
     _setBar(0);
-    _setText('首帧渲染中…');
+    _setText('正在计算光影…');
   }
 
   function disarm() {
@@ -103,6 +129,22 @@ export function createSolidFirstFrameHintController({
     const tok = opts && opts.sceneToken != null ? Number(opts.sceneToken) : sceneToken;
     if (tok !== sceneToken) return;
     drawnThisFrame = true;
+  }
+
+  function notifyProbeProgress(opts) {
+    if (state === 'idle' || state === 'fading') return;
+    const ratio = Math.max(0, Math.min(1, Number(opts && opts.ratio) || 0));
+    probeProgress = Math.max(probeProgress, ratio);
+    if (opts && opts.label) _setText(String(opts.label));
+    else _syncLabel();
+  }
+
+  function notifyProbeDone(opts) {
+    if (state === 'idle' || state === 'fading') return;
+    probeDone = true;
+    probeProgress = 1;
+    if (opts && opts.label) _setText(String(opts.label));
+    else _syncLabel();
   }
 
   function _beginFade() {
@@ -143,12 +185,12 @@ export function createSolidFirstFrameHintController({
       return;
     }
 
-    if (elapsed >= limit * 0.5) _setText('正在完成光影预览…');
-
-    displayProgress += (85 - displayProgress) * 0.06;
+    _syncLabel();
+    const target = Math.max(displayProgress, Math.min(92, _targetProgress()));
+    displayProgress += (target - displayProgress) * 0.18;
     _setBar(displayProgress);
 
-    if (readyFrames >= READY_FRAMES) {
+    if (readyFrames >= READY_FRAMES && probeDone) {
       _beginFade();
       return;
     }
@@ -159,5 +201,13 @@ export function createSolidFirstFrameHintController({
     return state !== 'idle';
   }
 
-  return { arm, disarm, notifyDraw, tick, isActive };
+  return {
+    arm,
+    disarm,
+    notifyDraw,
+    notifyProbeProgress,
+    notifyProbeDone,
+    tick,
+    isActive,
+  };
 }

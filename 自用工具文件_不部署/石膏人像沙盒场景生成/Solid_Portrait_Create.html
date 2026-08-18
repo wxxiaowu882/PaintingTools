@@ -21,6 +21,11 @@
     .env-btn:hover { color:#fff; background:rgba(255,255,255,0.15); } .env-btn.active { background:rgba(255,255,255,0.2); color:#fff; border-color:rgba(255,255,255,0.3); }
     #scene-loader{transition:opacity 1s;background:#050505;}
     #loader-subtext{font-size:10px;color:rgba(255,255,255,0.28);letter-spacing:0.06em;font-weight:200;line-height:1.5;text-align:center;max-width:min(88vw,340px);min-height:0;}
+    #solid-first-frame-hint{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:5500;pointer-events:none;opacity:0;transition:opacity 0.28s ease;}
+    #solid-first-frame-hint-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;max-width:min(88vw,300px);width:100%;padding:0 20px;box-sizing:border-box;}
+    #solid-first-frame-hint-bar-track{width:100%;height:2px;background:rgba(255,255,255,0.1);border-radius:1px;overflow:hidden;}
+    #solid-first-frame-hint-bar-fill{display:block;height:100%;width:100%;background:rgba(255,255,255,0.45);transform-origin:left center;transform:scaleX(0);will-change:transform;}
+    #solid-first-frame-hint-text{font-size:11px;color:rgba(255,255,255,0.42);letter-spacing:0.12em;font-weight:200;text-align:center;}
     /* 新增：编辑器专属UI样式 */
     .editor-panel { position:fixed; top:15px; left:15px; width:280px; background:rgba(20,20,20,0.85); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); border-radius:8px; z-index:500; padding:15px; color:#fff; box-shadow:0 8px 30px rgba(0,0,0,0.6); box-sizing:border-box; }
     /* 左栏：限高 + 列表吃剩余空间，底部保存区始终可见（避免被屏外遮挡） */
@@ -201,6 +206,7 @@
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { TransformControls } from 'three/addons/controls/TransformControls.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer';
     import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_SceneKeyPoints.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js'; import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js'; import '../../plugins_02/Plugin_LightIndicator.js'; import '../../plugins_02/Plugin_GroundAxesHelper.js';
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from '../../plugins_02/SolidPreviewLighting.js';
+    import { createSolidFirstFrameHintController } from '../../plugins_02/SolidFirstFrameHintShared.js';
     import { createSolidRasterLightRig } from '../../plugins_02/SolidRasterLightRigShared.js';
     import { createSolidRasterPreviewComposer } from '../../plugins_02/SolidRasterPreviewComposer.js';
     import { createSolidPathTracerSyncController } from '../../plugins_02/SolidPathTracerSyncShared.js';
@@ -231,6 +237,53 @@
         log: (msg) => { try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e) {} },
     });
     window.__solidGlbPersistCache = __solidGlbPersistCache;
+    let __solidFirstFrameHintCtrl = null;
+    function _solidInitFirstFrameHintController() {
+        if (__solidFirstFrameHintCtrl) return __solidFirstFrameHintCtrl;
+        __solidFirstFrameHintCtrl = createSolidFirstFrameHintController({
+            isMobile,
+            shouldArm: () => {
+                if (window.useAdvancedRender && pathTracer) return false;
+                if (window.PerfTester && window.PerfTester.isTesting) return false;
+                return true;
+            },
+            isLoaderVisible: () => {
+                const ld = document.getElementById('scene-loader');
+                if (!ld || ld.style.display === 'none') return false;
+                return parseFloat(ld.style.opacity || '1') > 0.05;
+            },
+        });
+        window.__solidFirstFrameHint = __solidFirstFrameHintCtrl;
+        return __solidFirstFrameHintCtrl;
+    }
+    function _solidNotifyFirstFrameDrawIfReady() {
+        try {
+            const h = _solidInitFirstFrameHintController();
+            if (h && h.notifyDraw) h.notifyDraw({ sceneToken: window._editorSceneLoadGen });
+        } catch (_eN) {}
+    }
+    function _solidOnEnvProbeProgressForHint(payload) {
+        try {
+            const h = _solidInitFirstFrameHintController();
+            if (!h || !h.isActive || !h.isActive()) return;
+            const total = Math.max(1, Number(payload && payload.total) || 3);
+            const index = Math.max(0, Number(payload && payload.index) || 0);
+            const ratio = Math.max(0, Math.min(1, index / total));
+            if (h.notifyProbeProgress) {
+                h.notifyProbeProgress({
+                    ratio,
+                    label: index <= 0 ? '正在计算光影…' : ('光影探针 ' + index + '/' + total + '…'),
+                });
+            }
+        } catch (_eP) {}
+    }
+    function _solidOnEnvProbeCompleteForHint(payload) {
+        try {
+            const h = _solidInitFirstFrameHintController();
+            if (!h || !h.isActive || !h.isActive()) return;
+            if (h.notifyProbeDone) h.notifyProbeDone();
+        } catch (_eC) {}
+    }
     const _solidPtCfg = (SOLID_PATH_TRACER_QUALITY && SOLID_PATH_TRACER_QUALITY.producer) ? SOLID_PATH_TRACER_QUALITY.producer : {};
     const _solidPtSync = createSolidPathTracerSyncController({
     minIntervalMs: Math.max(16, Number(_solidPtCfg.resetMinIntervalMs || 120)),
@@ -564,6 +617,8 @@
             currentSceneData: window.currentSceneData,
             currentSceneIndex: window.currentSceneIndex,
         })),
+    onEnvProbeProgress: _solidOnEnvProbeProgressForHint,
+    onEnvProbeComplete: _solidOnEnvProbeCompleteForHint,
     log: (msg) => { try { window.hwLog(String(msg)); } catch (_e) {} },
     safeDispose,
     });
@@ -591,9 +646,9 @@
         }
         try {
             const c = window.__solidRasterPreviewComposer;
-            if (c && c.tryRender()) return;
+            if (c && c.tryRender()) { _solidNotifyFirstFrameDrawIfReady(); return; }
         } catch (_eC) {}
-        try { renderer.render(scene, camera); } catch (_eR) {}
+        try { renderer.render(scene, camera); _solidNotifyFirstFrameDrawIfReady(); } catch (_eR) {}
     }
     function _solidScheduleRasterHeavyWarmup(reason) {
         try {
@@ -1223,7 +1278,7 @@
     function solidCreateSetLoaderProgressNow(p) { const v = Math.max(0, Math.min(100, Math.round(Number(p) || 0))); const fill = document.getElementById('scene-load-bar-fill'); const pct = document.getElementById('scene-load-pct'); if (fill) fill.style.transform = 'scaleX(' + (v / 100) + ')'; if (pct) pct.textContent = v + '%'; }
     function solidCreateLoaderShow() { const el = document.getElementById('scene-loader'); if (!el) return; el.style.display = 'flex'; el.style.opacity = '1'; }
     function solidCreateLoaderHide() { const el = document.getElementById('scene-loader'); if (!el) return; el.style.opacity = '0'; setTimeout(() => { if (el) el.style.display = 'none'; }, 380); }
-    window.__solidCreateSceneLoadUx = { running: false, target: 0, display: 0, raf: 0, timer: 0, timeoutTimer: 0, stepDone: 0, totalItems: 0, glbSlotProgress: [], glbDone: 0, glbTotal: 0, stalled: false, stabilizing: false, stableSince: 0, stableFrames: 0, minStableMs: 460, maxWaitMs: 3600, stabilizeStartAt: 0, settleDone: false };
+    window.__solidCreateSceneLoadUx = { running: false, target: 0, display: 0, raf: 0, timer: 0, timeoutTimer: 0, stepDone: 0, totalItems: 0, glbSlotProgress: [], glbDone: 0, glbTotal: 0, stalled: false, stabilizing: false, stableSince: 0, stableFrames: 0, minStableMs: 300, maxWaitMs: 3600, stabilizeStartAt: 0, settleDone: false };
     function solidCreateSceneLoadUxTick() { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; ux.display += (ux.target - ux.display) * 0.17; if (Math.abs(ux.target - ux.display) < 0.08) ux.display = ux.target; solidCreateSetLoaderProgressNow(ux.display); ux.raf = requestAnimationFrame(solidCreateSceneLoadUxTick); }
     function solidCreateSceneLoadUxStart(totalItems, glbCount) { const ux = window.__solidCreateSceneLoadUx; try { window.__solidCreateSceneStabilizing = false; } catch (_eS0) {} try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e0) {} try { if (ux.timer) clearInterval(ux.timer); } catch (_e1) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e2) {} ux.stabilizing = false; ux.settleDone = false; ux.stalled = false; ux.running = true; ux.target = 1; ux.display = 0; ux.stepDone = 0; ux.totalItems = Math.max(0, Number(totalItems) || 0); ux.glbTotal = Math.max(0, Number(glbCount) || 0); ux.glbSlotProgress = Array.from({ length: ux.glbTotal }, () => 0); ux.glbDone = 0; solidCreateLoaderShow(); solidCreateSetLoaderText('清理旧场景...'); solidCreateSetLoaderSubtext(''); solidCreateSetLoaderProgressNow(0); ux.raf = requestAnimationFrame(solidCreateSceneLoadUxTick); ux.timer = setInterval(() => { if (!ux.running) return; const fallback = Math.max(ux.target, Math.min(95, ux.display + 0.25)); ux.target = fallback; }, 420); ux.timeoutTimer = setTimeout(() => { if (!ux.running) return; ux.stalled = true; solidCreateSetLoaderText('正在优化显示，马上完成...'); solidCreateUpdateGlbLoadHint('正在优化显示，马上完成...'); ux.target = Math.max(ux.target, 95); }, STALL_HINT_MS); }
     function solidCreateSceneLoadUxSetTarget(p, text) { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; const v = Math.max(0, Math.min(99, Number(p) || 0)); ux.target = Math.max(ux.target, v); if (text) solidCreateSetLoaderText(text); }
@@ -1235,7 +1290,37 @@
     function solidCreateSceneLoadUxFinish() { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; ux.target = 100; solidCreateSetLoaderText('加载完成'); setTimeout(() => { try { if (ux.timer) clearInterval(ux.timer); } catch (_e0) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e1) {} ux.running = false; try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e2) {} solidCreateSetLoaderProgressNow(100); solidCreateLoaderHide(); }, 260); }
     function solidCreateSceneLoadUxFail(msg) { const ux = window.__solidCreateSceneLoadUx; if (!ux.running) return; solidCreateSetLoaderText(msg || '加载失败'); ux.target = Math.max(ux.target, 100); setTimeout(() => { try { if (ux.timer) clearInterval(ux.timer); } catch (_e0) {} try { if (ux.timeoutTimer) clearTimeout(ux.timeoutTimer); } catch (_e1) {} ux.running = false; try { if (ux.raf) cancelAnimationFrame(ux.raf); } catch (_e2) {} solidCreateSetLoaderProgressNow(100); solidCreateLoaderHide(); }, 520); }
     function solidCreateSceneLoadUxBeginStabilize(text) { const ux = window.__solidCreateSceneLoadUx; if (!ux) return; ux.stabilizing = true; ux.stableSince = 0; ux.stableFrames = 0; ux.settleDone = false; ux.stabilizeStartAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); ux.target = Math.max(ux.target, 97); if (text) solidCreateSetLoaderText(text); try { window.__solidCreateSceneStabilizing = true; } catch (_e) {} }
-    function solidCreateSceneLoadUxTickStabilize() { const ux = window.__solidCreateSceneLoadUx; if (!ux || !ux.running || !ux.stabilizing || ux.settleDone) return false; const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); const sceneReady = !window.isLoadingScene; if (sceneReady) { ux.stableFrames += 1; if (!ux.stableSince) ux.stableSince = now; } else { ux.stableFrames = 0; ux.stableSince = 0; } const stableMs = ux.stableSince ? (now - ux.stableSince) : 0; const hardTimeout = ux.stabilizeStartAt ? ((now - ux.stabilizeStartAt) > ux.maxWaitMs) : false; const ready = (sceneReady && ux.stableFrames >= 3 && stableMs >= ux.minStableMs) || hardTimeout; if (!ready) { ux.target = Math.max(ux.target, Math.min(99, 97 + Math.min(2, stableMs / 380))); return false; } ux.settleDone = true; ux.stabilizing = false; try { window.__solidCreateSceneStabilizing = false; } catch (_e2) {} solidCreateSceneLoadUxFinish(); return true; }
+    function solidCreateSceneLoadUxTickStabilize() {
+        const ux = window.__solidCreateSceneLoadUx;
+        if (!ux || !ux.running || !ux.stabilizing || ux.settleDone) return false;
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        const sceneReady = !window.isLoadingScene;
+        if (sceneReady) { ux.stableFrames += 1; if (!ux.stableSince) ux.stableSince = now; }
+        else { ux.stableFrames = 0; ux.stableSince = 0; }
+        const stableMs = ux.stableSince ? (now - ux.stableSince) : 0;
+        const hardTimeout = ux.stabilizeStartAt ? ((now - ux.stabilizeStartAt) > ux.maxWaitMs) : false;
+        const ready = (sceneReady && ux.stableFrames >= 2 && stableMs >= ux.minStableMs) || hardTimeout;
+        if (!ready) {
+            ux.target = Math.max(ux.target, Math.min(99, 97 + Math.min(2, stableMs / 380)));
+            return false;
+        }
+        ux.settleDone = true;
+        ux.stabilizing = false;
+        try { window.__solidCreateSceneStabilizing = false; } catch (_e2) {}
+        try { const _h = _solidInitFirstFrameHintController(); if (_h && _h.arm) _h.arm({ sceneToken: window._editorSceneLoadGen }); } catch (_eHintArm) {}
+        try {
+            if (!window.useAdvancedRender && window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) {
+                window.__solidPreviewLighting.requestEnvProbe('scene_settle');
+            } else {
+                const _h2 = _solidInitFirstFrameHintController();
+                if (_h2 && _h2.notifyProbeDone) _h2.notifyProbeDone();
+            }
+        } catch (_eProbeSettle) {
+            try { const _h3 = _solidInitFirstFrameHintController(); if (_h3 && _h3.notifyProbeDone) _h3.notifyProbeDone(); } catch (_eDone) {}
+        }
+        solidCreateSceneLoadUxFinish();
+        return true;
+    }
 
     async function maybeSaveDraft(force) { if (window.__isPageUnloading) return; if (_draftSaving) return; if (!force && !_draftDirty) return; if (!scene || !camera || !controls || !editorGroup) return; const now = Date.now();
     if (!force && now - _draftLastSavedAt < 1200) return; _draftSaving = true; try { const data = buildDraftSceneData();
@@ -1260,7 +1345,7 @@
         });
     }
 
-    function clearEditorSceneForRestore() { const _pm = _perfMark('clearEditorSceneForRestore(total)'); try { if (window.__solidGlbLoadQueue) window.__solidGlbLoadQueue.reset(); } catch (_eQ) {} window._editorSceneLoadGen++; try { transformControl.detach(); } catch (_e) {}
+    function clearEditorSceneForRestore() { const _pm = _perfMark('clearEditorSceneForRestore(total)'); try { if (window.__solidGlbLoadQueue) window.__solidGlbLoadQueue.reset(); } catch (_eQ) {} window._editorSceneLoadGen++; try { const _h = _solidInitFirstFrameHintController(); if (_h && _h.disarm) _h.disarm(); } catch (_eHintDis) {} try { transformControl.detach(); } catch (_e) {}
     try { if (window.AnnotationManager) window.AnnotationManager.clearAll(); } catch (_e) {}
     const children = editorGroup ? [...editorGroup.children] : [];
     // 先 remove，马上让主线程轻一点
@@ -1404,7 +1489,6 @@
     } catch (_eR1) {}
     });
     } catch (_eR0) {}
-    try { setTimeout(() => { try { if (!window.useAdvancedRender && window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed'); } catch (_eProbeIn2) {} }, 240); } catch (_eTIn2) {}
     }
     } catch (_eFirstConverge) {}
     if (window.useAdvancedRender) window.isLoadingScene = false;
@@ -2072,7 +2156,7 @@
         try { const data = JSON.parse(text); mergedData.push(data); } catch(e) { window.hwLog(fileHandle.name + " 解析跳过"); } }
         const targetHandle = await window.workDirHandle.getFileHandle(window.targetMasterFilename, {create: true}); const writable = await targetHandle.createWritable(); await writable.write(JSON.stringify(mergedData)); await writable.close();
         window.showToast(`成功合并 ${files.length} 个文件！`); } catch(e) { window.showToast("合并失败: " + e.message, true); } };
-        window.createNewScene = function() { window._editorSceneLoadGen++; transformControl.detach(); if(window.AnnotationManager) window.AnnotationManager.clearAll(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); document.getElementById('scene-name-input').value = ''; const _d = document.getElementById('scene-meta-detail-input'); if (_d) _d.value = ''; try { solidCreateSetMetaCategory(''); } catch (_eCat) {} try { solidCreateSyncKeyPointsEditorFromMeta({}); } catch (_eKp) {} window.currentFileHandle = null; if(document.getElementById('file-list-container').children.length > 0) { Array.from(document.getElementById('file-list-container').children).forEach(el => el.style.borderLeft = 'none'); } document.getElementById('btn-save-direct').innerText = '💾 保存新场景'; const cb = document.getElementById('crop-box'); cb.style.display = 'none'; const cachedCrop = localStorage.getItem('solidCropBoxCache'); if(cachedCrop) { const c = JSON.parse(cachedCrop); cb.style.left = c.left; cb.style.top = c.top; cb.style.width = c.width; cb.style.height = c.height; } else { cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }
+        window.createNewScene = function() { window._editorSceneLoadGen++; try { const _h = _solidInitFirstFrameHintController(); if (_h && _h.disarm) _h.disarm(); } catch (_eHintDis) {} transformControl.detach(); if(window.AnnotationManager) window.AnnotationManager.clearAll(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); document.getElementById('scene-name-input').value = ''; const _d = document.getElementById('scene-meta-detail-input'); if (_d) _d.value = ''; try { solidCreateSetMetaCategory(''); } catch (_eCat) {} try { solidCreateSyncKeyPointsEditorFromMeta({}); } catch (_eKp) {} window.currentFileHandle = null; if(document.getElementById('file-list-container').children.length > 0) { Array.from(document.getElementById('file-list-container').children).forEach(el => el.style.borderLeft = 'none'); } document.getElementById('btn-save-direct').innerText = '💾 保存新场景'; const cb = document.getElementById('crop-box'); cb.style.display = 'none'; const cachedCrop = localStorage.getItem('solidCropBoxCache'); if(cachedCrop) { const c = JSON.parse(cachedCrop); cb.style.left = c.left; cb.style.top = c.top; cb.style.width = c.width; cb.style.height = c.height; } else { cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }
         window._solidCreateDraftFileName = null; window.currentSceneData = null; solidCreateSyncSaveButtonText();
         window.__solidCreateHasExplicitScene = true;
         // 新建场景时同步重置相机/视线（方案 A）：对准世界原点，避免沿用上一场景/草稿导致取景框偏移
@@ -3569,6 +3653,7 @@
         if (document.hidden) { portraitAnimRafId = 0; return; }
         portraitAnimRafId = requestAnimationFrame(animate);
         try { if (typeof solidCreateSceneLoadUxTickStabilize === 'function') solidCreateSceneLoadUxTickStabilize(); } catch (_eStableTick) {}
+        try { const _h = _solidInitFirstFrameHintController(); if (_h && _h.tick) _h.tick({ sceneToken: window._editorSceneLoadGen }); } catch (_eHintTick) {}
         const _refreshPoster = () => { if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL(); };
         controls.update();
         const _now = performance.now();

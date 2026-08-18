@@ -228,6 +228,28 @@
             if (h && h.notifyDraw) h.notifyDraw({ sceneToken: window.__solidSceneLoadToken });
         } catch (_eN) {}
     }
+    function _solidOnEnvProbeProgressForHint(payload) {
+        try {
+            const h = _solidInitFirstFrameHintController();
+            if (!h || !h.isActive || !h.isActive()) return;
+            const total = Math.max(1, Number(payload && payload.total) || 3);
+            const index = Math.max(0, Number(payload && payload.index) || 0);
+            const ratio = Math.max(0, Math.min(1, index / total));
+            if (h.notifyProbeProgress) {
+                h.notifyProbeProgress({
+                    ratio,
+                    label: index <= 0 ? '正在计算光影…' : ('光影探针 ' + index + '/' + total + '…'),
+                });
+            }
+        } catch (_eP) {}
+    }
+    function _solidOnEnvProbeCompleteForHint(payload) {
+        try {
+            const h = _solidInitFirstFrameHintController();
+            if (!h || !h.isActive || !h.isActive()) return;
+            if (h.notifyProbeDone) h.notifyProbeDone();
+        } catch (_eC) {}
+    }
     /** PC：PathTracer 首帧会触发大量 HLSL 编译，ANGLE/D3D 上易 GL_OUT_OF_MEMORY；桌面端略降内部分辨率换稳定性 */
     function _solidPathTracerRenderScale() {
         if (isMobile) return _solidPt.renderScaleMobile;
@@ -956,6 +978,8 @@
             currentSceneData: window.currentSceneData,
             currentSceneIndex: window.currentSceneIndex,
         })),
+        onEnvProbeProgress: _solidOnEnvProbeProgressForHint,
+        onEnvProbeComplete: _solidOnEnvProbeCompleteForHint,
         log: (msg) => { try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e) {} },
         safeDispose,
     });
@@ -987,6 +1011,8 @@
                     currentSceneData: window.currentSceneData,
                     currentSceneIndex: window.currentSceneIndex,
                 })),
+                onEnvProbeProgress: _solidOnEnvProbeProgressForHint,
+                onEnvProbeComplete: _solidOnEnvProbeCompleteForHint,
                 log: (msg) => { try { if (window.hwLog) window.hwLog(String(msg)); } catch (_e) {} },
                 safeDispose,
             });
@@ -1136,7 +1162,7 @@
         if (st.phaseId !== 'glb_load') return;
         solidSetLoadPhase('glb_load', { overrideMain: overrideMain != null ? overrideMain : undefined, progressRatio: (st.glbTotal > 0) ? Math.min(1, st.glbDone / st.glbTotal) : 0 });
     }
-    window.__solidSceneLoadUx = { running: false, target: 0, display: 0, raf: 0, timer: 0, timeoutTimer: 0, stabilizing: false, stableSince: 0, stableFrames: 0, minStableMs: 460, maxWaitMs: 3600, stabilizeStartAt: 0, settleDone: false };
+    window.__solidSceneLoadUx = { running: false, target: 0, display: 0, raf: 0, timer: 0, timeoutTimer: 0, stabilizing: false, stableSince: 0, stableFrames: 0, minStableMs: 300, maxWaitMs: 3600, stabilizeStartAt: 0, settleDone: false };
     function solidSetLoaderProgressNow(p) {
         p = Math.max(0, Math.min(100, Math.round(Number(p) || 0)));
         const st = window.__solidLoaderUiState || { lastPct: -1, lastPctAt: 0 };
@@ -1175,7 +1201,7 @@
         }
         const stableMs = ux.stableSince ? (now - ux.stableSince) : 0;
         const hardTimeout = ux.stabilizeStartAt ? ((now - ux.stabilizeStartAt) > ux.maxWaitMs) : false;
-        const ready = (sceneReady && ux.stableFrames >= 3 && stableMs >= ux.minStableMs) || hardTimeout;
+        const ready = (sceneReady && ux.stableFrames >= 2 && stableMs >= ux.minStableMs) || hardTimeout;
         if (!ready) {
             ux.target = Math.max(ux.target, Math.min(SOLID_LOAD_PHASES.stabilize.hi - 1, SOLID_LOAD_PHASES.stabilize.lo + Math.min(2, stableMs / 380)));
             return false;
@@ -1186,6 +1212,16 @@
         setLoaderProgress(100);
         solidSceneLoadUxFinish();
         try { const _h = _solidInitFirstFrameHintController(); if (_h && _h.arm) _h.arm({ sceneToken: window.__solidSceneLoadToken }); } catch (_eHintArm) {}
+        try {
+            if (!window.useAdvancedRender && window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) {
+                window.__solidPreviewLighting.requestEnvProbe('scene_settle');
+            } else {
+                const _h2 = _solidInitFirstFrameHintController();
+                if (_h2 && _h2.notifyProbeDone) _h2.notifyProbeDone();
+            }
+        } catch (_eProbeSettle) {
+            try { const _h3 = _solidInitFirstFrameHintController(); if (_h3 && _h3.notifyProbeDone) _h3.notifyProbeDone(); } catch (_eDone) {}
+        }
         const ld = document.getElementById('scene-loader'); if (ld) { ld.style.opacity = '0'; setTimeout(() => { if (ld) ld.style.display = 'none'; }, 600); }
         return true;
     }
@@ -1706,9 +1742,9 @@
     if (window.useAdvancedRender && pathTracer) { pathTracer.updateMaterials(); lightPosUpdated = true; _solidPtSync.queueReset('scene_loaded'); }
     window.isLoadingScene = false;
     try { syncRenderButtons(); } catch (_eBtnScene) {}
-    await solidYieldLoadPhase('first_preview', 220);
+    await solidYieldLoadPhase('first_preview', 120);
     if (_isStale()) return;
-    try { if (!window.useAdvancedRender) { try { if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); } catch (_eSkyIn) {} try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('scene_changed'); else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed'); } catch(_eP0) {} try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD0) {} try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD1) {} }); } catch (_eR1) {} }); } catch (_eR0) {} try { setTimeout(() => { try { if (!window.useAdvancedRender && window.__solidPreviewLighting && window.__solidPreviewLighting.requestEnvProbe) window.__solidPreviewLighting.requestEnvProbe('scene_changed'); } catch (_eProbeIn2) {} }, 240); } catch (_eTIn2) {} } } catch(_eVrIn) {}
+    try { if (!window.useAdvancedRender) { try { if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); } catch (_eSkyIn) {} try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('scene_changed'); else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed'); } catch(_eP0) {} try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD0) {} try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD1) {} }); } catch (_eR1) {} }); } catch (_eR0) {} } } catch(_eVrIn) {}
     solidSceneLoadUxBeginStabilize();
     } catch (_ePhaseChain) {}
     })();
