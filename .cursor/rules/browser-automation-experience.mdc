@@ -1,0 +1,15 @@
+---
+description: 浏览器自动化任务的稳定工作流与目录约束
+alwaysApply: true
+---
+
+# 浏览器自动化工作流
+
+- 当用户要求“打开浏览器、自动化测试、截图、网页操作、生产端打标注”等任务时，先查看 `.cursor/browser-automation/README.md`，优先沿用其中的经验和目录约定。
+- 浏览器自动化脚本、模板、任务说明统一放到 `.cursor/browser-automation/`；运行产物统一放到 `.cursor/browser-automation/runs/`。
+- 不要再把 `pw_*.js`、`test_*.png` 之类的临时文件散落到仓库其它目录。
+- 仓库页面优先用本地 HTTP 服务访问，不要默认走 `file://`。
+- 启动本地静态服务时，不要误用 `serve -s` 这类 SPA 回退模式，以免把我们的 HTML 路由改写掉。
+- 涉及 `Solid_Portrait_Create.html` 时，默认先等 `#scene-loader` 消失并额外缓冲 1 到 2 秒。
+- 在 Solid 生产端切换标注工具时，优先使用原生 `#tool-mode-select`；经典引出线默认用 `Alt+Shift+拖拽`。
+- 每次浏览器自动化任务结束后，主动总结这次新增的经验教训，并清理无价值临时文件。

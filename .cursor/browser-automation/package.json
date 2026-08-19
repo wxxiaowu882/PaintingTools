@@ -1,0 +1,20 @@
+{
+  "name": "browser-automation",
+  "version": "1.0.0",
+  "description": "Local browser automation workspace for PaintingTools",
+  "main": "scripts/solid-create-smoke.js",
+  "scripts": {
+    "serve:repo": "node scripts/static-server.js",
+    "smoke:solid-create": "node scripts/solid-create-smoke.js",
+    "clean:runs": "node scripts/cleanup-runs.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@playwright/test": "^1.62.1",
+    "playwright": "^1.62.1",
+    "serve": "^14.2.6"
+  }
+}
