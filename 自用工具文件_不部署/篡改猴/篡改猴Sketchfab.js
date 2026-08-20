@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Sketchfab Model & Texture Dump (Ultimate GLB Version)
 // @namespace    Violentmonkey Scripts
-// @version      9.9.9
+// @version      9.9.10
 // @description  download sketchfab models as GLB with diagnostic panel (Fixed V9.9 Lockup & Texture Fallback Bug + Magic Byte MIME Fix)
 // @author       shitposting goddess & krapnik (Mod by Assistant)
 // @include      /^https?:\/\/(www\.)?sketchfab\.com\/.*/
@@ -26,7 +26,7 @@ panel.id = "sf-diag-panel";
 panel.style.cssText = "position:fixed; top:10px; right:10px; width:500px; background:rgba(20,20,20,0.95); border:1px solid #00ffcc; z-index:999999; border-radius:8px; font-family:sans-serif; color:#fff; overflow:hidden; transition:max-height 0.3s; max-height:85vh; display:flex; flex-direction:column; box-shadow: 0 5px 15px rgba(0,0,0,0.5);"; 
 var header = rootDoc.createElement("div"); 
 header.style.cssText = "padding:8px; background:#004466; cursor:pointer; font-weight:bold; font-size:14px; display:flex; justify-content:space-between; align-items:center;"; 
-header.innerHTML = "<span>🛠️ 完美全能工业级引擎 (v9.9.9 通用玻璃透射)</span><span id='sf-toggle-btn'>▼</span>";
+header.innerHTML = "<span>🛠️ 完美全能工业级引擎 (v9.9.10 通用玻璃壳)</span><span id='sf-toggle-btn'>▼</span>";
 header.onclick = function() {
 if(panel.style.maxHeight === "85vh") { panel.style.maxHeight = "34px"; rootDoc.getElementById('sf-toggle-btn').innerText = "▲"; }
 else { panel.style.maxHeight = "85vh"; rootDoc.getElementById('sf-toggle-btn').innerText = "▼"; } };
@@ -282,10 +282,19 @@ config.channels.opacityType = opacCh.type || "blend";
 config.channels.opacityIor = opacCh.ior;
 config.channels.opacityInvert = !!opacCh.invert;
 config.channels.opacityRoughness = (opacCh.roughnessFactor !== undefined) ? opacCh.roughnessFactor : null;
-// Sketchfab Opacity.type=additive = 玻璃/折射层（角膜、玻璃罩等），不是普通 alpha 遮罩
-if (String(opacCh.type || "").toLowerCase() === "additive") {
+let opacType = String(opacCh.type || "").toLowerCase();
+let opacFactor = (opacCh.factor !== undefined) ? Number(opacCh.factor) : 1;
+let opacIor = (opacCh.ior !== undefined && opacCh.ior !== null) ? Number(opacCh.ior) : null;
+// 通用玻璃壳：1) additive 折射层；2) 极低 alphaBlend + IOR（角膜外壳常见，睫毛等 factor≈1 不会误伤）
+let isGlassOpac = (opacType === "additive") ||
+((opacType === "alphablend" || opacType === "blend") && opacFactor <= 0.2 && opacIor !== null && opacIor > 1.01);
+if (isGlassOpac) {
 config.isGlass = true;
-config.channels.transmissionFactor = (opacCh.factor !== undefined) ? Number(opacCh.factor) : 1;
+config.glassDetect = (opacType === "additive") ? "additive" : ("alphaBlend+ior@" + opacFactor);
+// additive 常用 factor=1；alphaBlend 的低 factor 表示「几乎看不见实色」→ 透射用满量
+config.channels.transmissionFactor = (opacType === "additive")
+? ((opacCh.factor !== undefined) ? Number(opacCh.factor) : 1)
+: 1;
 if (opacCh.texture && opacCh.texture.uid) config.channels.transmissionUid = opacCh.texture.uid;
 config.alphaMode = "OPAQUE";
 // 玻璃默认要有清漆高光，才能看出「突出的玻璃壳」
@@ -341,7 +350,7 @@ addLog(`[金属度保护] ${config.name}: 无金属度贴图，metallicFactor �
 }
 // 玻璃/折射材质：不走普通 alpha 合并（避免黑底色+白遮罩变成实心黑/雾片）
 if (config.isGlass) {
-addLog(`[玻璃材质] ${config.name}: Opacity.type=additive → transmission+clearcoat`, "success");
+addLog(`[玻璃材质] ${config.name}: ${config.glassDetect || "glass"} → transmission+clearcoat`, "success");
 continue;
 }
 if (!config.channels.opacityUid) continue;
@@ -582,7 +591,7 @@ clean[k] = unsafeWindow.objects[k];
 }
 return clean;
 })(), isZUpFixed); var file_name = document.getElementsByClassName('model-name__label')[0]; file_name = file_name ? file_name.textContent.trim() : "sketchfab_extracted";
-saveFile(glbBlob, file_name + "_V9.9.9_Ultimate.glb"); addLog(`🎉 大功告成！探针复刻版已保存：${file_name}_V9.9.9_Ultimate.glb`, "success"); if(btn) { btn.innerText = "🚀 重新下载 GLB"; btn.style.background = "#5cb85c"; } } catch (err) { addLog("导出崩溃: " + err.message, "error"); console.error(err); } }
+saveFile(glbBlob, file_name + "_V9.9.10_Ultimate.glb"); addLog(`🎉 大功告成！探针复刻版已保存：${file_name}_V9.9.10_Ultimate.glb`, "success"); if(btn) { btn.innerText = "🚀 重新下载 GLB"; btn.style.background = "#5cb85c"; } } catch (err) { addLog("导出崩溃: " + err.message, "error"); console.error(err); } }
 unsafeWindow._sf_doDownload = dodownload;
 var parseobj = function(obj) { var list = []; if(obj._primitives) { obj._primitives.forEach(function(p) { if(p && p.indices) { list.push({ 'mode' : p.mode, 'indices' : p.indices._elements }); } }); }
 var attr = obj._attributes || {}; var uvSetsMap = {}; var uvItemSize = 2;
