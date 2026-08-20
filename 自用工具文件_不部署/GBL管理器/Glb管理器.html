@@ -1,0 +1,1295 @@
+<!DOCTYPE html> <html lang="zh-CN"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>GLB 标准化加工中心</title> <style>
+:root { --bg-dark: #0f1015; --panel-bg: #1a1b22; --text-main: #eaeaea; --text-sub: #8a8d93; --theme-color: #00d2ff; --accent-gold: #d4af37; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; padding: 0; background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; overflow: hidden; }
+#sidebar { width: 380px; flex-shrink: 0; background: var(--panel-bg); border-right: 1px solid #333; display: flex; flex-direction: column; z-index: 10; }
+#sidebar-resizer { width: 5px; background: #222; cursor: col-resize; z-index: 20; transition: background 0.2s; border-right: 1px solid #111; flex-shrink: 0; }
+#sidebar-resizer:hover, #sidebar-resizer.is-resizing { background: var(--theme-color); }
+/* 极度压缩的紧凑排版 */
+.sidebar-header { padding: 10px; border-bottom: 1px solid #333; display: flex; flex-direction: column; gap: 6px; } .title-bar { display: flex; justify-content: space-between; align-items: center; }
+.title-bar h2 { margin: 0; font-size: 15px; color: var(--theme-color); font-weight: normal; } .btn-group { display: flex; gap: 4px; flex-wrap: wrap; }
+button { background: #2a2b32; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; transition: 0.2s; }
+button:hover { background: #3a3b42; border-color: var(--theme-color); }
+button.primary { background: rgba(0, 210, 255, 0.1); border-color: var(--theme-color); color: var(--theme-color); }
+button.primary:hover { background: var(--theme-color); color: #000; }
+button.danger { background: rgba(217, 83, 79, 0.1); border-color: #d9534f; color: #d9534f; }
+button.danger:hover { background: #d9534f; color: #fff; }
+#btn-restore-dir { background: rgba(212, 175, 55, 0.15); border-color: var(--accent-gold); color: var(--accent-gold); }
+#btn-restore-dir:hover { background: var(--accent-gold); color: #000; }
+#btn-toggle-logs.has-error { background: #d9534f; color: #fff; border-color: #ff0000; animation: pulse 2s infinite; }
+#search-input { width: 100%; background: #111; border: 1px solid #444; color: #fff; border-radius: 4px; padding: 6px 10px; font-size: 11px; outline: none; transition: 0.2s; }
+#status-text { font-size: 10px; color: var(--text-sub); margin-top: 0px; word-break: break-all; }
+#tool-panel { padding: 6px 10px; border-bottom: 1px solid #333; background: #14151a; display: none; flex-direction: column; max-height: 40vh; overflow-y: auto; gap: 4px; }
+#tool-panel button { padding: 3px 6px; font-size: 10px; }
+.tool-section { border-top: 1px solid #2a2b32; padding-top: 4px; } .tool-section:first-child { border-top: none; }
+.tool-title { font-size: 10px; color: var(--text-sub); margin-bottom: 3px; display: flex; justify-content: space-between; align-items: center; } .tool-row { display: flex; gap: 4px; align-items: center; margin-bottom: 2px; }
+.tool-grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-bottom: 2px; }
+.tool-row input[type="number"], .tool-row input[type="text"] { background: #000; border: 1px solid #444; color: #00ffcc; border-radius: 4px; padding: 2px 4px; font-size: 10px; outline: none; text-align: center; }
+.tool-row span { font-size: 10px; color: #ccc; white-space: nowrap; } .slider-group { flex: 1; display: flex; align-items: center; gap: 6px; }
+.slider-group input { flex: 1; accent-color: var(--theme-color); height: 4px; } .slider-val { font-size: 10px; color: var(--theme-color); width: 25px; text-align: right; }
+#model-grid { flex: 1; overflow-y: auto; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; align-content: start; }
+#model-grid::-webkit-scrollbar { width: 6px; } #model-grid::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+.model-card { background: #222; border: 1px solid #333; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; transition: 0.2s; position: relative; min-height: 180px; }
+.model-card:hover, .model-card.active { border-color: var(--theme-color); box-shadow: 0 4px 15px rgba(0,210,255,0.15); } .model-card.active { background: #2a2b32; }
+.thumb-container { width: 100%; height: 130px; background: #000; position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+.thumb-img { width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 0.3s; padding: 5px; } .thumb-img.loaded { opacity: 1; }
+.file-size-tag { position: absolute; top: 6px; right: 6px; color: #00d2ff; font-family: monospace; font-size: 10px; font-weight: bold; text-shadow: 0 1px 3px rgba(0,0,0,0.8); pointer-events: none; z-index: 10; }
+.loading-spinner { position: absolute; width: 16px; height: 16px; border: 2px solid #444; border-top-color: var(--theme-color); border-radius: 50%; animation: spin 1s linear infinite; display: none; }
+.card-info { padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.3); flex-grow: 1; justify-content: space-between; }
+.model-name { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ccc; text-align: center; } .btn-row { display: flex; gap: 4px; width: 100%; }
+.rename-btn, .delete-btn { flex: 1; padding: 4px 0; font-size: 10px; cursor: pointer; border-radius: 4px; transition: 0.2s; text-align: center; border: 1px solid transparent; }
+.rename-btn { background: #333; color: #fff; border-color: #555; } .rename-btn:hover { background: var(--theme-color); color: #000; }
+.delete-btn { background: #4a2020; color: #fff; border-color: #6a3030; } .delete-btn:hover { background: #d9534f; }
+#main-view { flex: 1; position: relative; background: #050508; display: flex; flex-direction: column; overflow: hidden; }
+#main-viewer { width: 100%; height: 100%; outline: none; }
+#empty-state { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #444; font-size: 18px; letter-spacing: 2px; pointer-events: none; }
+#current-model-title { position: absolute; top: 20px; left: 30px; color: var(--theme-color); font-size: 18px; font-weight: 300; pointer-events: none; text-shadow: 0 2px 10px rgba(0,0,0,0.8); z-index: 5; }
+
+/* 视图浮动控制面板 */
+#view-controls { position: absolute; top: 20px; right: 30px; z-index: 10; display: none; flex-direction: column; gap: 8px; background: rgba(15, 16, 21, 0.85); border: 1px solid #333; border-radius: 6px; padding: 10px; backdrop-filter: blur(4px); box-shadow: 0 4px 15px rgba(0,0,0,0.5); min-width: 160px; }
+#btn-toggle-light { background: transparent; border: 1px solid var(--theme-color); color: var(--theme-color); border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px; transition: 0.2s; }
+#exposure-control { display: none; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px dashed #333; }
+#btn-toggle-grid { background: rgba(255,255,255,0.05); border: 1px solid #444; color: #ccc; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px; transition: 0.2s; } #btn-toggle-grid:hover { background: rgba(255,255,255,0.1); }
+#btn-view-mode { background: rgba(255,255,255,0.05); border: 1px solid #444; color: #ccc; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px; transition: 0.2s; }
+#btn-view-mode.is-box { border-color: var(--theme-color); color: var(--theme-color); }
+#btn-split-export { background: rgba(0, 210, 255, 0.1); border: 1px solid var(--theme-color); color: var(--theme-color); border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px; transition: 0.2s; }
+#btn-split-export:disabled { opacity: 0.4; cursor: not-allowed; border-color: #555; color: #888; background: transparent; }
+#split-overlay-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; display: none; touch-action: none; cursor: crosshair; }
+#split-marquee { position: absolute; border: 2px solid var(--theme-color); background: rgba(0, 210, 255, 0.18); pointer-events: none; z-index: 6; display: none; box-sizing: border-box; }
+
+#progress-container { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 40%; height: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 2px; overflow: hidden; display: none; z-index: 100; }
+#progress-bar { width: 0%; height: 100%; background: var(--theme-color); transition: width 0.1s ease-out; }
+#log-panel { position: absolute; bottom: 20px; right: 20px; width: 500px; height: 400px; background: rgba(15, 16, 21, 0.95); border: 1px solid var(--theme-color); border-radius: 6px; display: none; flex-direction: column; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.8); }
+#log-header { padding: 10px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; background: #1a1b22; font-size: 13px; }
+#log-content { flex: 1; overflow-y: auto; padding: 12px; font-family: monospace; font-size: 11px; color: #ccc; word-wrap: break-word; } .log-line { margin-bottom: 6px; border-bottom: 1px dashed #222; padding-bottom: 4px; line-height: 1.4; }
+.log-error { color: #ff4444; } .log-success { color: #00ffcc; } .log-warn { color: #ffbb33; }
+#global-loading { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.2); z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; color: var(--theme-color); font-size: 14px; font-weight: bold; letter-spacing: 1px; text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+#global-loading .loading-spinner { position: static; width: 50px; height: 50px; border-width: 4px; margin-bottom: 20px; box-shadow: 0 0 15px rgba(0,210,255,0.2); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+#custom-prompt-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:10000; display:none; justify-content:center; align-items:flex-start; padding-top:2vh; } #custom-prompt-box { background:#1a1b22; border:1px solid var(--theme-color); border-radius:8px; padding:20px; width:650px; box-shadow:0 4px 20px rgba(0,0,0,0.8); display:flex; flex-direction:column; gap:12px; } #custom-prompt-title { color:var(--text-main); font-size:14px; margin:0; } .input-wrapper { display:flex; align-items:center; background:#000; border:1px solid #444; border-radius:4px; padding:0 8px; transition:0.2s; } .input-wrapper:focus-within { border-color:var(--theme-color); } #custom-prompt-input { flex:1; background:transparent; border:none; color:#00ffcc; font-size:13px; padding:8px 0; outline:none; } .input-suffix { color:#666; font-size:13px; user-select:none; } #custom-prompt-btns { display:flex; justify-content:flex-end; gap:8px; margin-top:4px; } #custom-prompt-btns button { padding:6px 14px; font-size:12px; } </style> <script type="module" src="../../../docs/js/model-viewer.min.js"></script> <script type="importmap"> {
+"imports": { "three": "./three.module.js", "three/addons/loaders/GLTFLoader.js": "./GLTFLoader.js", "three/addons/loaders/GLTFExporter.js": "./GLTFExporter.js",
+"three/addons/loaders/DRACOLoader.js": "./DRACOLoader.js", "/build/three.module.js": "./three.module.js", "../../../build/three.module.js": "./three.module.js" } } </script> </head> <body>
+<div id="global-loading"><div class="loading-spinner"></div><div id="loading-msg">处理中...</div></div>
+<div id="sidebar"> <div class="sidebar-header"> <div class="title-bar"> <h2>模型标准化仓库</h2> <div class="btn-group"> <button id="btn-select-dir" class="primary" title="点击选择本地文件夹">新文件夹</button> <button id="btn-restore-dir" style="display:none;">📂 恢复</button> <button id="btn-refresh" title="刷新列表">↻</button> <button id="btn-rebuild-thumbs" title="强制重建所有缩略图">🔄</button> <button id="btn-toggle-logs" title="查看日志">📋</button> </div> </div> <input type="text" id="search-input" placeholder="🔍 搜索模型名称..." list="search-suggestions"><datalist id="search-suggestions"></datalist> <div id="status-text">请选择本地 GLB 文件夹</div> </div>
+<div id="tool-panel">
+<div id="panel-toggle" style="font-size:11px; color:var(--theme-color); text-align:center; cursor:pointer; padding-bottom:3px; border-bottom:1px solid #333; font-weight:bold; letter-spacing: 1px; transition: 0.2s;">▶ 展开调节面板</div>
+<div id="tool-panel-inner" style="display:none; flex-direction:column; gap:4px;">
+<div class="tool-section"> <div class="tool-title"><span>旋转修正 (90°步进)</span></div>
+<div class="tool-grid-6">
+<button id="btn-rot-x-cw">X 顺转</button> <button id="btn-rot-x-ccw">X 逆转</button>
+<button id="btn-rot-y-cw">Y 顺转</button> <button id="btn-rot-y-ccw">Y 逆转</button>
+<button id="btn-rot-z-cw">Z 顺转</button> <button id="btn-rot-z-ccw">Z 逆转</button>
+</div> </div>
+<div class="tool-section"> <div class="tool-title"><span>尺寸标准化与几何对齐 (cm)</span> <span id="orig-size-disp" style="color:var(--text-sub); font-size:10px;"></span></div> 
+<div style="display:flex; gap:4px; margin-bottom:2px;">
+<div class="tool-row" style="margin:0; justify-content:center; flex:1;"><span>高度:</span><input type="number" id="input-height" value="30" step="1" style="width:40px;"></div>
+<button id="btn-apply-scale" class="primary" style="margin:0; flex:1;">精准应用缩放</button> 
+<button id="btn-align-center" style="margin:0; flex:1;">强制底部中心对齐</button> 
+</div> </div> 
+<div class="tool-section"> <div class="tool-title"><span>材质与纯净度补偿</span></div> 
+<div class="tool-row"> <span>粗糙度</span>
+<div class="slider-group"><input type="range" id="slide-rough" min="-1" max="1" step="0.05" value="0"><div class="slider-val" id="val-rough">0</div></div>
+</div> <div class="tool-row"> <span>金属度</span>
+<div class="slider-group"><input type="range" id="slide-metal" min="-1" max="1" step="0.05" value="0"><div class="slider-val" id="val-metal">0</div></div>
+</div> <div class="tool-row"> <span>法线</span>
+<div class="slider-group"><input type="range" id="slide-normal" min="0" max="5" step="0.1" value="1"><div class="slider-val" id="val-normal">1</div></div>
+</div> </div>
+<div class="tool-section"> <div class="tool-title"><span>导出体积控制 (解决贴图暴增)</span></div> <div class="tool-row">
+<select id="sel-tex-size" style="flex:1; background:#000; color:#00ffcc; border:1px solid #444; border-radius:4px; font-size:10px; padding:2px; outline:none;">
+<option value="0">保留原始贴图 (易导致百兆文件)</option>
+<option value="2048">限制最高 2048 (画质与体积均衡)</option>
+<option value="1024" selected>限制最高 1024 (推荐: 极速且极小)</option>
+<option value="512">限制最高 512 (马赛克预警)</option>
+</select>
+</div> </div>
+<div class="tool-section" style="display:flex; flex-direction:column; gap:4px;">
+<div style="display:flex; justify-content:space-between; gap:4px;">
+<label style="font-size:10px; cursor:pointer; flex:1;"><input type="checkbox" id="check-remove-lights" checked> 移除灯光</label>
+<label style="font-size:10px; cursor:pointer; color: #ffbb33; flex:1.5;"><input type="checkbox" id="check-clean-uv"> 剥离UV与色彩(防爆)</label>
+</div>
+<div class="tool-row" style="background:rgba(0,255,204,0.05); padding:3px 4px; border-radius:4px; border:1px solid rgba(0,255,204,0.2);">
+<label style="font-size:10px; cursor:pointer; color:#00ffcc; white-space:nowrap; font-weight:bold;"><input type="checkbox" id="check-simplify"> 启用极限减面</label>
+<span style="font-size:10px; color:#888; margin-left:6px;">保留率:</span>
+<div class="slider-group"><input type="range" id="slide-simplify" min="0.05" max="0.95" step="0.05" value="0.3"><div class="slider-val" id="val-simplify">30%</div></div>
+</div>
+<div class="tool-row" style="margin:0;">
+<select id="sel-draco-mode" style="flex:1; background:#000; color:#d4af37; border:1px solid #444; border-radius:4px; font-size:10px; padding:3px; outline:none;">
+<option value="none">不使用 Draco 压缩</option>
+<option value="sequential" selected>Draco 展示压缩 scene/16 (推荐)</option>
+<option value="edgebreaker">Draco 极致压缩 (易内存溢出)</option>
+</select>
+</div>
+<button id="btn-export-save" class="primary" style="width:100%; padding:6px; font-weight:bold; font-size:12px; margin-top:2px;">⚡ 执行加工并另存为</button> </div> 
+</div> </div> <div id="model-grid"></div> </div>
+<div id="sidebar-resizer" title="拖动调整面板宽度"></div>
+<div id="main-view"> <div id="empty-state">请从左侧列表选择模型</div> <div id="current-model-title"></div> 
+<div id="view-controls">
+    <button id="btn-send-to-editor" style="display:none; background:rgba(46,204,113,0.15); border:1px solid #2ecc71; color:#2ecc71; border-radius:4px; padding:8px 12px; cursor:pointer; font-size:13px; font-weight:bold; transition:0.2s; margin-bottom:4px;" onmouseover="this.style.background='#2ecc71'; this.style.color='#000';" onmouseout="this.style.background='rgba(46,204,113,0.15)'; this.style.color='#2ecc71';">🎯 将此模型发送到编辑器</button>
+    <button id="btn-toggle-light">🌤️ 当前: 自然漫反射 (柔和)</button>
+    <div id="exposure-control">
+        <span style="font-size:11px; color:#ccc;">光强微调</span>
+        <input type="range" id="slide-exposure" min="0.5" max="3" step="0.1" value="1.3" style="flex:1; accent-color: #d4af37; height:4px;">
+        <span id="val-exposure" style="font-size:10px; color:#d4af37; width:20px; text-align:right;">1.3</span>
+    </div>
+    <button id="btn-toggle-grid">🌐 隐藏坐标网格</button>
+    <button id="btn-view-mode">🖱️ 当前: 旋转</button>
+    <button id="btn-split-export" disabled>拆出并另存为 (已选 0)</button>
+</div>
+<div id="progress-container"><div id="progress-bar"></div></div>
+<canvas id="split-overlay-canvas"></canvas>
+<div id="split-marquee"></div>
+<model-viewer id="main-viewer" camera-controls tone-mapping="aces" shadow-intensity="1" style="display:none;"></model-viewer> </div>
+<div id="log-panel"> <div id="log-header"> <span style="color:var(--theme-color)">运行终端 (全局排错模式)</span> <div class="btn-group"><button id="btn-clear-logs">清空</button><button id="btn-copy-logs">复制全部</button><button id="btn-close-logs">关闭</button></div> </div> <div id="log-content"></div> </div>
+<div id="custom-prompt-overlay"><div id="custom-prompt-box"><div id="custom-prompt-title">重命名模型</div><select id="custom-prompt-select" style="background:#000; border:1px solid #444; color:#00ffcc; padding:6px; border-radius:4px; outline:none; font-size:12px; cursor:pointer;"><option value="">-- 选择预设名称 (可选) --</option></select><div class="input-wrapper"><input type="text" id="custom-prompt-input" autocomplete="off" spellcheck="false"><span class="input-suffix">.glb</span></div><div id="custom-prompt-btns"><button id="btn-prompt-cancel">取消</button><button id="btn-prompt-ok" class="primary">确定</button></div></div></div>
+<script type="module"> import * as THREE from 'three'; import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'; import { GLTFExporter } from 'three/addons/loaders/GLTFExporter.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; window.errorLogs = []; window.isThreeProcessing = false; window.activeGltfLoads = new Set(); const logContent = document.getElementById('log-content'); const btnToggleLogs = document.getElementById('btn-toggle-logs');
+const quickNames = ["石膏头像_男童", "石膏头像_男中青年", "石膏头像_男老年","石膏头像_女童", "石膏头像_女中青年", "石膏头像_女老年","头部分面体","头部肌肉","表情","头像_带标注","真人头像_女","真人头像_男","真人头像_儿童","手","脚","五官","头骨","人物其它","静物_几何体","静物_瓶罐","静物_水果","静物_车","静物_其它","动物","其它"]; // 💡 在这里增删你的预设名字
+// 线上展示用 Draco：scene 量化 + position 16，减少多块模型接缝黑细丝（体积约多几个百分点）
+const DRACO_DISPLAY_SAFE = { quantizationVolume: 'scene', quantizePosition: 16, quantizeNormal: 12 };
+const customPrompt = (title, defaultText) => new Promise(resolve => { const overlay = document.getElementById('custom-prompt-overlay'); const input = document.getElementById('custom-prompt-input'); const select = document.getElementById('custom-prompt-select'); const btnOk = document.getElementById('btn-prompt-ok'); const btnCancel = document.getElementById('btn-prompt-cancel'); document.getElementById('custom-prompt-title').innerText = title; input.value = defaultText.replace(/\.glb$/i, ''); if (select.options.length === 1) { quickNames.forEach(n => { const op = document.createElement('option'); op.value = n; op.innerText = n; select.appendChild(op); }); } select.value = ""; select.onchange = () => { if (select.value) { let cv = input.value; quickNames.forEach(n => { if(cv.startsWith(n+'_')) cv = cv.substring(n.length+1); else if(cv === n) cv = ""; }); input.value = cv ? select.value + '_' + cv : select.value; input.focus(); } }; overlay.style.display = 'flex'; setTimeout(() => { input.focus(); input.select(); }, 50); const cleanup = () => { overlay.style.display = 'none'; btnOk.onclick = null; btnCancel.onclick = null; input.onkeydown = null; select.onchange = null; }; btnOk.onclick = () => { cleanup(); const val = input.value.trim(); resolve(val ? val + '.glb' : null); }; btnCancel.onclick = () => { cleanup(); resolve(null); }; input.onkeydown = (e) => { if (e.key === 'Enter') btnOk.click(); if (e.key === 'Escape') btnCancel.click(); }; });
+
+const logDebug = (msg, err=null) => {
+const errStr = err ? (err.stack || err.message || JSON.stringify(err)) : ''; const line = `[${new Date().toLocaleTimeString()}] ${msg} ${errStr}`; window.errorLogs.push(line); if(logContent){
+const div = document.createElement('div'); div.className = 'log-line';
+if(msg.includes('❌') || msg.includes('🚨') || err) { div.classList.add('log-error'); btnToggleLogs.classList.add('has-error'); }
+else if(msg.includes('✅')) div.classList.add('log-success'); else if(msg.includes('⚠️')) div.classList.add('log-warn');
+else if(msg.includes('排查') || msg.includes('【终极防线】')) div.style.color = '#d4af37';
+div.innerText = line; logContent.appendChild(div); logContent.scrollTop = logContent.scrollHeight; } };
+window.addEventListener('error', (e) => logDebug(`❌ [全局报错] ${e.message} at ${e.filename}:${e.lineno}`, e.error)); 
+window.addEventListener('unhandledrejection', (e) => { const errStr = (e.reason && typeof e.reason === 'object') ? JSON.stringify(e.reason) : String(e.reason); if(errStr.includes('abort(undefined)') || errStr.includes('ASSERTIONS') || errStr.includes('Aborted()')) { logDebug(`🚨 [WASM内存崩溃] 严重错误！WebAssembly 引擎内存溢出！触发自毁隔离...`, e.reason); if(globalDracoLoader){ globalDracoLoader.dispose(); globalDracoLoader = null; logDebug("♻️ DRACO 解码池已重置"); } window.activeGltfLoads.forEach(load => load.reject(new Error(`WASM崩溃: ${load.name}`))); window.activeGltfLoads.clear(); } else if(errStr.includes('Aborted(native code called abort)')) { logDebug(`🚨 [WASM内存溢出] 编码器OOM崩溃！请务必勾选左侧面板的【启用极限减面】后再试！`, e.reason); } else if(errStr.includes('Decoding failed')) { logDebug(`🚨 [Draco致命崩溃] 捕获到内部解码错误，正在强制释放堵塞的队列...`, e.reason); window.activeGltfLoads.forEach(load => load.reject(new Error(`Draco解码失败: ${load.name}`))); window.activeGltfLoads.clear(); } else { logDebug(`❌ [Promise崩溃] 异步任务失败`, e.reason); } });
+if (!window.showDirectoryPicker) logDebug("❌ 关键 API 不可用：当前浏览器不支持 showDirectoryPicker 或您正在 file:// 协议下运行。请使用 HTTPS 或 localhost 服务器。"); else logDebug("🟢 核心 API 已就绪，准备加载文件。");
+customElements.whenDefined('model-viewer').then(() => logDebug('🟢 model-viewer 预览组件已就绪')).catch(e => logDebug('❌ model-viewer 组件注册失败', e));
+setTimeout(() => { if (!customElements.get('model-viewer')) logDebug('❌ model-viewer 脚本未加载，右侧预览会黑屏。请确认 Live Server 下 ../../../docs/js/model-viewer.min.js 可访问'); }, 2500); const runHeavyTask = async (msg, taskFn) => {
+const loader = document.getElementById('global-loading'); document.getElementById('loading-msg').innerText = msg; loader.style.display = 'flex';
+await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); try { await taskFn(); } catch(e) { logDebug(`❌ 任务崩溃 [${msg}]`, e); } finally { loader.style.display = 'none'; } };
+let currentDirHandle = null; let modelFiles = []; let activeModel = null; let db; let isGeneratingThumb = false; let thumbQueue = []; const dbName = "GLBStandardDB"; const initDB = () => new Promise(res => {
+const req = indexedDB.open(dbName, 2);
+req.onupgradeneeded = e => { db = e.target.result; if(!db.objectStoreNames.contains('thumbs')) db.createObjectStore('thumbs', {keyPath: 'name'}); if(!db.objectStoreNames.contains('settings')) db.createObjectStore('settings'); };
+req.onsuccess = e => { db = e.target.result; res(); }; req.onerror = () => { logDebug("❌ IndexedDB 初始化失败"); res(); }; });
+const getThumb = (name) => new Promise(res => { if(!db) return res(null); const req = db.transaction('thumbs','readonly').objectStore('thumbs').get(name); req.onsuccess = e => res(e.target.result); req.onerror = () => res(null); });
+const saveThumb = (name, lastMod, dataUrl) => new Promise(res => { if(!db) return res(); const req = db.transaction('thumbs','readwrite').objectStore('thumbs').put({name, lastModified: lastMod, dataUrl}); req.onsuccess = () => res(); });
+
+const grid = document.getElementById('model-grid'); const mainViewer = document.getElementById('main-viewer');
+const toolPanel = document.getElementById('tool-panel'); const statusText = document.getElementById('status-text');
+
+// 缓存 UI 的打勾状态
+const selDracoMode = document.getElementById('sel-draco-mode');
+const checkCleanUV = document.getElementById('check-clean-uv');
+const checkSimplify = document.getElementById('check-simplify');
+const slideSimplify = document.getElementById('slide-simplify');
+const valSimplify = document.getElementById('val-simplify');
+selDracoMode.value = localStorage.getItem('draco_mode') || 'sequential';
+checkCleanUV.checked = localStorage.getItem('clean_uv') === 'true';
+checkSimplify.checked = localStorage.getItem('simplify_mesh') === 'true';
+slideSimplify.value = localStorage.getItem('simplify_ratio') || '0.3';
+valSimplify.innerText = Math.round(slideSimplify.value * 100) + '%';
+selDracoMode.onchange = () => localStorage.setItem('draco_mode', selDracoMode.value);
+checkCleanUV.onchange = () => localStorage.setItem('clean_uv', checkCleanUV.checked);
+checkSimplify.onchange = () => localStorage.setItem('simplify_mesh', checkSimplify.checked);
+slideSimplify.oninput = () => { valSimplify.innerText = Math.round(slideSimplify.value * 100) + '%'; localStorage.setItem('simplify_ratio', slideSimplify.value); };
+
+// ================= 【自定义平滑缩放引擎】 =================
+mainViewer.addEventListener('wheel', (e) => {
+    e.preventDefault(); e.stopImmediatePropagation(); 
+    const orbit = mainViewer.getCameraOrbit();
+    const zoomSensitivity = 0.002; 
+    let newRadius = orbit.radius + (e.deltaY * zoomSensitivity);
+    if (newRadius < 0.05) newRadius = 0.05;
+    mainViewer.cameraOrbit = `${orbit.theta}rad ${orbit.phi}rad ${newRadius}m`;
+}, { passive: false, capture: true });
+
+const inputHeight = document.getElementById('input-height'); inputHeight.value = localStorage.getItem('std_target_height') || 30;
+inputHeight.onchange = () => localStorage.setItem('std_target_height', inputHeight.value); let processingScene = null;
+
+let editorHelpers = null; 
+function createHelpers() { if (!editorHelpers) { editorHelpers = new THREE.Group(); editorHelpers.name = "EditorHelpers"; const gridHelper = new THREE.GridHelper(0.6, 6, 0x666666, 0x222222);
+gridHelper.position.y = 0.001; const axesHelper = new THREE.AxesHelper(1); editorHelpers.add(gridHelper); editorHelpers.add(axesHelper); } editorHelpers.visible = isGridVisible; return editorHelpers; }
+
+const viewControls = document.getElementById('view-controls');
+const btnSendToEditor = document.getElementById('btn-send-to-editor');
+if (window !== window.parent && btnSendToEditor) { btnSendToEditor.style.display = 'block'; btnSendToEditor.onclick = () => { if (activeModel) { window.parent.postMessage({ type: 'INSERT_GLB', path: activeModel.fullPath }, '*'); } }; }
+const toggleLightBtn = document.getElementById('btn-toggle-light');
+const slideExposure = document.getElementById('slide-exposure');
+const valExposure = document.getElementById('val-exposure');
+const exposureControl = document.getElementById('exposure-control');
+const btnToggleGrid = document.getElementById('btn-toggle-grid');
+
+let isStudioLight = localStorage.getItem('light_mode') === 'studio';
+let savedExp = localStorage.getItem('studio_exposure') || '1.3';
+let isGridVisible = localStorage.getItem('show_grid') !== 'false';
+
+slideExposure.value = savedExp; valExposure.innerText = savedExp;
+slideExposure.oninput = () => { valExposure.innerText = slideExposure.value; if(isStudioLight) mainViewer.setAttribute('exposure', slideExposure.value); };
+slideExposure.onchange = () => { localStorage.setItem('studio_exposure', slideExposure.value); };
+
+let studioEnvMap = null;
+const createStudioEnv = () => {
+    const cvs = document.createElement('canvas'); cvs.width = 1024; cvs.height = 512; const ctx = cvs.getContext('2d');
+    ctx.fillStyle = '#0a0a10'; ctx.fillRect(0, 0, 1024, 512);
+    const drawLight = (x, y, r, c1, c2) => { const g = ctx.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0,c1); g.addColorStop(1,c2); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); };
+    drawLight(896, 160, 200, 'rgba(255,255,255,1)', 'rgba(255,255,255,0)'); 
+    drawLight(128, 256, 240, 'rgba(150,165,180,1)', 'rgba(150,165,180,0)'); 
+    drawLight(512, 128, 150, 'rgba(220,220,220,1)', 'rgba(220,220,220,0)');   
+    drawLight(512, 128, 150, 'rgba(220,220,220,1)', 'rgba(220,220,220,0)'); 
+    return cvs.toDataURL('image/png');
+};
+const updateLightMode = () => {
+    // 天坑：KHR_materials_transmission（角膜/玻璃壳）在无 environment-image 时会被 model-viewer 画成实心白壳。
+    // 柔和模式也必须保留环境图；仅用内置 neutral，避免摄影棚硬高光。
+    if (isStudioLight) {
+        if (!studioEnvMap) studioEnvMap = createStudioEnv();
+        mainViewer.setAttribute('environment-image', studioEnvMap);
+        mainViewer.setAttribute('exposure', slideExposure.value); 
+        mainViewer.setAttribute('shadow-intensity', '2'); 
+        toggleLightBtn.innerText = "💡 当前: 摄影棚聚光 (硬朗)";
+        toggleLightBtn.style.color = "#d4af37"; toggleLightBtn.style.borderColor = "#d4af37";
+        exposureControl.style.display = 'flex';
+    } else {
+        mainViewer.setAttribute('environment-image', 'neutral');
+        mainViewer.setAttribute('exposure', '1');
+        mainViewer.setAttribute('shadow-intensity', '1');
+        toggleLightBtn.innerText = "🌤️ 当前: 自然漫反射 (柔和)";
+        toggleLightBtn.style.color = "var(--theme-color)"; toggleLightBtn.style.borderColor = "var(--theme-color)";
+        exposureControl.style.display = 'none';
+    }
+    localStorage.setItem('light_mode', isStudioLight ? 'studio' : 'natural');
+};
+toggleLightBtn.onclick = () => { isStudioLight = !isStudioLight; updateLightMode(); };
+updateLightMode(); 
+
+const updateGridUI = () => {
+    btnToggleGrid.innerText = isGridVisible ? "🌐 隐藏坐标网格" : "🌐 显示坐标网格";
+    btnToggleGrid.style.color = isGridVisible ? "#ccc" : "#666";
+    if (editorHelpers) editorHelpers.visible = isGridVisible;
+};
+btnToggleGrid.onclick = async () => {
+    isGridVisible = !isGridVisible;
+    localStorage.setItem('show_grid', isGridVisible);
+    updateGridUI();
+    if (processingScene) { await runHeavyTask("正在重新生成网格视图...", async () => { await updateViewerFromThree(true); }); }
+};
+updateGridUI();
+
+// ================= 【视口框选拆出】 =================
+const mainViewEl = document.getElementById('main-view');
+const splitCanvas = document.getElementById('split-overlay-canvas');
+const splitMarquee = document.getElementById('split-marquee');
+const btnViewMode = document.getElementById('btn-view-mode');
+const btnSplitExport = document.getElementById('btn-split-export');
+let isBoxSelectMode = false;
+let splitSelectedMeshes = [];
+let splitSelectedParts = [];
+let splitHighlightHelpers = [];
+let splitRafId = 0;
+let splitRenderer = null;
+let splitCamera = null;
+let splitSceneRoot = null;
+let splitLights = null;
+let splitRaycaster = null;
+const splitBoxHelper = new THREE.Box3();
+const splitCenterHelper = new THREE.Vector3();
+const splitNdcHelper = new THREE.Vector3();
+let splitDrag = null; // {x0,y0,x1,y1} 相对 mainView 的 CSS 像素
+
+const getMainViewRect = () => mainViewEl.getBoundingClientRect();
+
+const updateSplitExportBtn = () => {
+    const n = splitSelectedParts.length;
+    btnSplitExport.disabled = n === 0;
+    btnSplitExport.innerText = `拆出并另存为 (已选 ${n})`;
+};
+
+const ensureSplitRenderer = () => {
+    if (splitRenderer) return;
+    splitRenderer = new THREE.WebGLRenderer({ canvas: splitCanvas, antialias: true, alpha: false });
+    splitRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    if (THREE.SRGBColorSpace !== undefined) splitRenderer.outputColorSpace = THREE.SRGBColorSpace;
+    else if (THREE.sRGBEncoding !== undefined) splitRenderer.outputEncoding = THREE.sRGBEncoding;
+    if (THREE.ACESFilmicToneMapping !== undefined) {
+        splitRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+        splitRenderer.toneMappingExposure = 1;
+    }
+    splitCamera = new THREE.PerspectiveCamera(20, 1, 0.01, 1000);
+    splitSceneRoot = new THREE.Scene();
+    splitSceneRoot.background = new THREE.Color(0x050508);
+    splitLights = new THREE.Group();
+    splitLights.name = 'SplitSelectLights';
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+    const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(1, 1, 1).normalize();
+    const fill = new THREE.DirectionalLight(0xffffff, 0.6); fill.position.set(-1, 0, 1).normalize();
+    splitLights.add(hemi, key, fill);
+    splitSceneRoot.add(splitLights);
+    splitRaycaster = new THREE.Raycaster();
+};
+
+const resizeSplitRenderer = () => {
+    if (!splitRenderer || !splitCamera) return;
+    const rect = getMainViewRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    splitRenderer.setSize(w, h, false);
+    splitCanvas.style.width = '100%';
+    splitCanvas.style.height = '100%';
+    splitCamera.aspect = w / h;
+    splitCamera.updateProjectionMatrix();
+};
+
+/** 用手术台真实包围盒构图，只借用 model-viewer 的方位角，避免投影与所见错位 */
+const syncSplitCameraFromModelViewer = () => {
+    if (!splitCamera || !processingScene) return;
+    let theta = Math.PI / 4, phi = Math.PI * 75 / 180;
+    if (typeof mainViewer.getCameraOrbit === 'function') {
+        try {
+            const orbit = mainViewer.getCameraOrbit();
+            if (orbit && isFinite(orbit.theta) && isFinite(orbit.phi)) {
+                theta = Number(orbit.theta);
+                phi = Number(orbit.phi);
+            }
+        } catch (_) {}
+    }
+    let fov = 20;
+    const fovAttr = mainViewer.getAttribute('field-of-view');
+    if (fovAttr) {
+        const m = String(fovAttr).match(/([\d.]+)/);
+        if (m) fov = parseFloat(m[1]);
+    }
+    splitCamera.fov = fov;
+    processingScene.scene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(processingScene.scene);
+    const center = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    box.getCenter(center);
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z, 0.01);
+    const fovRad = THREE.MathUtils?.degToRad ? THREE.MathUtils.degToRad(fov) : (fov * Math.PI / 180);
+    const radius = (maxDim / (2 * Math.tan(fovRad / 2))) * 1.35;
+    splitCamera.position.set(
+        center.x + radius * Math.sin(phi) * Math.sin(theta),
+        center.y + radius * Math.cos(phi),
+        center.z + radius * Math.sin(phi) * Math.cos(theta)
+    );
+    splitCamera.near = Math.max(maxDim * 0.001, 0.001);
+    splitCamera.far = Math.max(maxDim * 100, 100);
+    splitCamera.lookAt(center);
+    splitCamera.updateProjectionMatrix();
+    splitCamera.updateMatrixWorld(true);
+};
+
+const clearSplitHighlightHelpers = () => {
+    splitHighlightHelpers.forEach(h => {
+        try {
+            if (h.parent) h.parent.remove(h);
+            if (h.geometry) h.geometry.dispose();
+            if (h.material) h.material.dispose();
+        } catch (_) {}
+    });
+    splitHighlightHelpers = [];
+};
+
+const clearSplitHighlights = () => {
+    clearSplitHighlightHelpers();
+    // 恢复整 mesh 材质替换
+    const restored = new Set();
+    splitSelectedParts.forEach(part => {
+        const mesh = part.mesh;
+        if (!mesh || restored.has(mesh)) return;
+        try {
+            if (mesh.userData._splitOrigMaterial !== undefined) {
+                const tinted = mesh.material;
+                mesh.material = mesh.userData._splitOrigMaterial;
+                delete mesh.userData._splitOrigMaterial;
+                const disposeMat = (m) => { try { if (m && m.dispose) m.dispose(); } catch (_) {} };
+                if (Array.isArray(tinted)) tinted.forEach(disposeMat); else disposeMat(tinted);
+            }
+        } catch (_) {}
+        restored.add(mesh);
+    });
+    splitSelectedParts = [];
+    splitSelectedMeshes = [];
+    updateSplitExportBtn();
+};
+
+/** 将 BufferGeometry 按三角面连通块拆分（不相连的「孤岛」各算一件） */
+const analyzeGeometryIslands = (geometry) => {
+    const pos = geometry && geometry.attributes && geometry.attributes.position;
+    if (!pos || pos.count < 3) return [{ triIndices: null }];
+    const indexed = !!geometry.index;
+    const idx = indexed ? geometry.index.array : null;
+    const triCount = indexed ? Math.floor(idx.length / 3) : Math.floor(pos.count / 3);
+    if (triCount <= 1) return [{ triIndices: null }];
+
+    const keyToCanon = new Map();
+    let canonCount = 0;
+    const canonOfVertex = (vi) => {
+        if (indexed) return vi;
+        const key = pos.getX(vi).toFixed(5) + ',' + pos.getY(vi).toFixed(5) + ',' + pos.getZ(vi).toFixed(5);
+        let id = keyToCanon.get(key);
+        if (id === undefined) { id = canonCount++; keyToCanon.set(key, id); }
+        return id;
+    };
+    const triCanon = (t) => {
+        if (indexed) return [idx[t * 3], idx[t * 3 + 1], idx[t * 3 + 2]];
+        return [canonOfVertex(t * 3), canonOfVertex(t * 3 + 1), canonOfVertex(t * 3 + 2)];
+    };
+    const ufSize = indexed ? pos.count : Math.max(canonCount, triCount * 3);
+    // 先扫一遍非索引以填满 canon（非索引时 canonOfVertex 会增长）
+    if (!indexed) {
+        for (let t = 0; t < triCount; t++) triCanon(t);
+    }
+    const parent = new Int32Array(indexed ? pos.count : canonCount);
+    for (let i = 0; i < parent.length; i++) parent[i] = i;
+    const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+    const unite = (a, b) => { a = find(a); b = find(b); if (a !== b) parent[b] = a; };
+
+    for (let t = 0; t < triCount; t++) {
+        const [a, b, c] = triCanon(t);
+        unite(a, b); unite(b, c);
+    }
+    const rootToTris = new Map();
+    for (let t = 0; t < triCount; t++) {
+        const root = find(triCanon(t)[0]);
+        if (!rootToTris.has(root)) rootToTris.set(root, []);
+        rootToTris.get(root).push(t);
+    }
+    const islands = Array.from(rootToTris.values());
+    if (islands.length <= 1) return [{ triIndices: null }];
+    return islands.map(tris => ({ triIndices: tris }));
+};
+
+const islandLocalBounds = (geometry, triIndices) => {
+    const box = new THREE.Box3();
+    const pos = geometry.attributes.position;
+    const idx = geometry.index ? geometry.index.array : null;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < triIndices.length; i++) {
+        const t = triIndices[i];
+        for (let k = 0; k < 3; k++) {
+            const vi = idx ? idx[t * 3 + k] : (t * 3 + k);
+            v.fromBufferAttribute(pos, vi);
+            box.expandByPoint(v);
+        }
+    }
+    return box;
+};
+
+const extractIslandGeometry = (geometry, triIndices) => {
+    const srcPos = geometry.attributes.position;
+    const srcNorm = geometry.attributes.normal;
+    const srcUv = geometry.attributes.uv;
+    const idx = geometry.index ? geometry.index.array : null;
+    const positions = [];
+    const normals = [];
+    const uvs = [];
+    const mapOldToNew = new Map();
+    const indices = [];
+    const readVert = (vi) => {
+        if (mapOldToNew.has(vi)) return mapOldToNew.get(vi);
+        const ni = positions.length / 3;
+        positions.push(srcPos.getX(vi), srcPos.getY(vi), srcPos.getZ(vi));
+        if (srcNorm) normals.push(srcNorm.getX(vi), srcNorm.getY(vi), srcNorm.getZ(vi));
+        if (srcUv) uvs.push(srcUv.getX(vi), srcUv.getY(vi));
+        mapOldToNew.set(vi, ni);
+        return ni;
+    };
+    for (let i = 0; i < triIndices.length; i++) {
+        const t = triIndices[i];
+        for (let k = 0; k < 3; k++) {
+            const vi = idx ? idx[t * 3 + k] : (t * 3 + k);
+            indices.push(readVert(vi));
+        }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    if (normals.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    else geo.computeVertexNormals();
+    if (uvs.length) geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    geo.computeBoundingBox();
+    geo.computeBoundingSphere();
+    return geo;
+};
+
+const collectSelectableParts = () => {
+    const parts = [];
+    if (!processingScene) return parts;
+    let meshIdx = 0;
+    processingScene.scene.traverse(node => {
+        if (!node.isMesh || !node.geometry) return;
+        if (!node.userData._splitIslandCache) {
+            node.userData._splitIslandCache = analyzeGeometryIslands(node.geometry);
+        }
+        const islands = node.userData._splitIslandCache;
+        if (islands.length === 1 && islands[0].triIndices === null) {
+            parts.push({ id: `m${meshIdx}`, mesh: node, triIndices: null });
+        } else {
+            islands.forEach((isl, j) => {
+                parts.push({ id: `m${meshIdx}_i${j}`, mesh: node, triIndices: isl.triIndices });
+            });
+        }
+        meshIdx++;
+    });
+    return parts;
+};
+
+const partCenterWorld = (part, out = new THREE.Vector3()) => {
+    part.mesh.updateMatrixWorld(true);
+    if (!part.triIndices) {
+        splitBoxHelper.setFromObject(part.mesh);
+        splitBoxHelper.getCenter(out);
+        return out;
+    }
+    const localBox = islandLocalBounds(part.mesh.geometry, part.triIndices);
+    localBox.getCenter(out);
+    out.applyMatrix4(part.mesh.matrixWorld);
+    return out;
+};
+
+const makeHighlightMaterial = () => new THREE.MeshStandardMaterial({
+    color: 0x2ec8ff,
+    emissive: 0x0099bb,
+    emissiveIntensity: 0.55,
+    roughness: 0.4,
+    metalness: 0.05,
+    side: THREE.DoubleSide
+});
+
+const applySplitHighlights = (parts) => {
+    clearSplitHighlights();
+    splitSelectedParts = parts;
+    splitSelectedMeshes = parts.map(p => p.mesh);
+    const wholeMeshTinted = new Set();
+    parts.forEach(part => {
+        const mesh = part.mesh;
+        if (part.triIndices) {
+            // 只高亮连通块：叠加蓝色孤岛 mesh，不动整模材质（避免三件一起变蓝）
+            try {
+                const geo = extractIslandGeometry(mesh.geometry, part.triIndices);
+                const overlay = new THREE.Mesh(geo, makeHighlightMaterial());
+                overlay.name = 'SplitIslandOverlay';
+                overlay.renderOrder = 999;
+                mesh.add(overlay);
+                splitHighlightHelpers.push(overlay);
+                if (typeof THREE.Box3Helper === 'function') {
+                    const helper = new THREE.Box3Helper(islandLocalBounds(mesh.geometry, part.triIndices), 0x00d2ff);
+                    helper.name = 'SplitSelectBoxHelper';
+                    mesh.add(helper);
+                    splitHighlightHelpers.push(helper);
+                }
+            } catch (err) {
+                logDebug('⚠️ 孤岛高亮失败', err);
+            }
+        } else if (!wholeMeshTinted.has(mesh)) {
+            wholeMeshTinted.add(mesh);
+            if (mesh.userData._splitOrigMaterial === undefined) {
+                mesh.userData._splitOrigMaterial = mesh.material;
+                mesh.material = makeHighlightMaterial();
+            }
+            try {
+                const helper = new THREE.BoxHelper(mesh, 0x00d2ff);
+                helper.name = 'SplitSelectBoxHelper';
+                splitSceneRoot.add(helper);
+                splitHighlightHelpers.push(helper);
+            } catch (_) {}
+        }
+    });
+    updateSplitExportBtn();
+};
+
+const stopSplitRenderLoop = () => {
+    if (splitRafId) { cancelAnimationFrame(splitRafId); splitRafId = 0; }
+};
+
+const renderSplitFrame = () => {
+    if (!isBoxSelectMode || !splitRenderer || !processingScene) { splitRafId = 0; return; }
+    splitHighlightHelpers.forEach(h => { try { if (h.isBoxHelper && h.update) h.update(); } catch (_) {} });
+    splitRenderer.render(splitSceneRoot, splitCamera);
+    splitRafId = requestAnimationFrame(renderSplitFrame);
+};
+
+const attachSplitSceneContent = () => {
+    if (!processingScene || !splitSceneRoot) return;
+    while (splitSceneRoot.children.length) splitSceneRoot.remove(splitSceneRoot.children[0]);
+    splitSceneRoot.add(splitLights);
+    splitSceneRoot.add(processingScene.scene);
+    const helpers = createHelpers();
+    if (helpers) splitSceneRoot.add(helpers);
+};
+
+const collectSceneMeshes = () => {
+    const list = [];
+    if (!processingScene) return list;
+    processingScene.scene.traverse(node => { if (node.isMesh) list.push(node); });
+    return list;
+};
+
+const exitBoxSelectMode = (opts = {}) => {
+    const { keepModeBtn = false } = opts;
+    stopSplitRenderLoop();
+    clearSplitHighlights();
+    splitDrag = null;
+    splitMarquee.style.display = 'none';
+    splitCanvas.style.display = 'none';
+    mainViewer.style.pointerEvents = '';
+    isBoxSelectMode = false;
+    if (!keepModeBtn) {
+        btnViewMode.classList.remove('is-box');
+        btnViewMode.innerText = '🖱️ 当前: 旋转';
+    }
+};
+
+const enterBoxSelectMode = () => {
+    if (!processingScene) { logDebug('⚠️ 尚未载入模型，无法进入框选'); return; }
+    ensureSplitRenderer();
+    // 换模后清孤岛缓存
+    processingScene.scene.traverse(n => { if (n.isMesh) delete n.userData._splitIslandCache; });
+    attachSplitSceneContent();
+    splitCanvas.style.display = 'block';
+    mainViewer.style.pointerEvents = 'none';
+    isBoxSelectMode = true;
+    resizeSplitRenderer();
+    syncSplitCameraFromModelViewer();
+    btnViewMode.classList.add('is-box');
+    btnViewMode.innerText = '📦 当前: 框选';
+    stopSplitRenderLoop();
+    renderSplitFrame();
+    const parts = collectSelectableParts();
+    const meshN = collectSceneMeshes().length;
+    logDebug(`📦 已进入框选模式（mesh=${meshN}，可选件/连通块=${parts.length}）`);
+};
+
+const setViewModeRotate = () => {
+    if (!isBoxSelectMode) return;
+    exitBoxSelectMode();
+    logDebug('🖱️ 已切回旋转模式');
+};
+
+const setViewModeBox = () => {
+    enterBoxSelectMode();
+};
+
+btnViewMode.onclick = () => {
+    if (!processingScene) { logDebug('⚠️ 请先选择模型'); return; }
+    if (isBoxSelectMode) setViewModeRotate();
+    else setViewModeBox();
+};
+
+const canvasPointFromEvent = (e) => {
+    const rect = getMainViewRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top, w: rect.width, h: rect.height };
+};
+
+const updateMarqueeDom = () => {
+    if (!splitDrag) { splitMarquee.style.display = 'none'; return; }
+    const x = Math.min(splitDrag.x0, splitDrag.x1);
+    const y = Math.min(splitDrag.y0, splitDrag.y1);
+    const w = Math.abs(splitDrag.x1 - splitDrag.x0);
+    const h = Math.abs(splitDrag.y1 - splitDrag.y0);
+    splitMarquee.style.display = 'block';
+    splitMarquee.style.left = x + 'px';
+    splitMarquee.style.top = y + 'px';
+    splitMarquee.style.width = w + 'px';
+    splitMarquee.style.height = h + 'px';
+};
+
+const pickPartsByCenterInRect = (xMin, yMin, xMax, yMax, cw, ch) => {
+    const parts = collectSelectableParts();
+    const picked = [];
+    const projections = [];
+    parts.forEach(part => {
+        partCenterWorld(part, splitCenterHelper);
+        splitNdcHelper.copy(splitCenterHelper).project(splitCamera);
+        if (splitNdcHelper.z > 1) return;
+        const sx = (splitNdcHelper.x * 0.5 + 0.5) * cw;
+        const sy = (-splitNdcHelper.y * 0.5 + 0.5) * ch;
+        projections.push({ id: part.id, sx: sx.toFixed(1), sy: sy.toFixed(1) });
+        if (sx >= xMin && sx <= xMax && sy >= yMin && sy <= yMax) picked.push(part);
+    });
+    return { picked, parts, projections };
+};
+
+const faceTriangleIndexFromHit = (hit) => {
+    if (hit.faceIndex !== undefined && hit.faceIndex !== null) return hit.faceIndex;
+    return null;
+};
+
+const pickPartsByRaySampleInRect = (xMin, yMin, xMax, yMax, cw, ch) => {
+    if (!splitRaycaster) return [];
+    const parts = collectSelectableParts();
+    const meshes = collectSceneMeshes();
+    if (!meshes.length) return [];
+    // mesh -> list of parts
+    const byMesh = new Map();
+    parts.forEach(p => {
+        if (!byMesh.has(p.mesh)) byMesh.set(p.mesh, []);
+        byMesh.get(p.mesh).push(p);
+    });
+    const hitSet = new Set();
+    const stepX = Math.max(6, (xMax - xMin) / 10);
+    const stepY = Math.max(6, (yMax - yMin) / 10);
+    for (let y = yMin; y <= yMax; y += stepY) {
+        for (let x = xMin; x <= xMax; x += stepX) {
+            const ndcX = (x / cw) * 2 - 1;
+            const ndcY = -(y / ch) * 2 + 1;
+            splitRaycaster.setFromCamera({ x: ndcX, y: ndcY }, splitCamera);
+            const hits = splitRaycaster.intersectObjects(meshes, false);
+            for (let i = 0; i < hits.length; i++) {
+                const hit = hits[i];
+                const candidates = byMesh.get(hit.object) || [];
+                if (!candidates.length) continue;
+                if (candidates.length === 1 && !candidates[0].triIndices) {
+                    hitSet.add(candidates[0]);
+                    continue;
+                }
+                const tri = faceTriangleIndexFromHit(hit);
+                if (tri === null) { hitSet.add(candidates[0]); continue; }
+                const matched = candidates.find(p => p.triIndices && p.triIndices.indexOf(tri) !== -1);
+                if (matched) hitSet.add(matched);
+            }
+        }
+    }
+    return Array.from(hitSet);
+};
+
+const settleBoxSelection = () => {
+    if (!processingScene || !splitDrag || !splitCamera) return;
+    const xMin = Math.min(splitDrag.x0, splitDrag.x1);
+    const xMax = Math.max(splitDrag.x0, splitDrag.x1);
+    const yMin = Math.min(splitDrag.y0, splitDrag.y1);
+    const yMax = Math.max(splitDrag.y0, splitDrag.y1);
+    const w = xMax - xMin;
+    const h = yMax - yMin;
+    if (w < 3 || h < 3) {
+        clearSplitHighlights();
+        logDebug('ℹ️ 框选过小，已清空选中');
+        return;
+    }
+    const rect = getMainViewRect();
+    const cw = rect.width || 1;
+    const ch = rect.height || 1;
+    resizeSplitRenderer();
+    syncSplitCameraFromModelViewer();
+    processingScene.scene.updateMatrixWorld(true);
+    let { picked, parts, projections } = pickPartsByCenterInRect(xMin, yMin, xMax, yMax, cw, ch);
+    let method = 'center';
+    if (!picked.length && parts.length) {
+        picked = pickPartsByRaySampleInRect(xMin, yMin, xMax, yMax, cw, ch);
+        method = 'ray-sample';
+    }
+    applySplitHighlights(picked);
+    logDebug(`✅ 框选完成[${method}]：选中 ${picked.length} / ${parts.length} 个可拆件；框=(${xMin.toFixed(0)},${yMin.toFixed(0)})-(${xMax.toFixed(0)},${yMax.toFixed(0)})`);
+    if (!picked.length && projections.length) {
+        logDebug(`排查 各件投影中心: ${projections.map(p => `${p.id}@(${p.sx},${p.sy})`).join(' | ')}`);
+    }
+};
+
+const isSplitUiEventTarget = (t) => !!(t && t.closest && t.closest('#view-controls, #log-panel, #tool-panel, #sidebar, button, input, select, label'));
+
+const onSplitPointerDown = (e) => {
+    if (!isBoxSelectMode) return;
+    if (e.button !== undefined && e.button !== 0) return;
+    if (isSplitUiEventTarget(e.target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try { mainViewEl.setPointerCapture(e.pointerId); } catch (_) {}
+    const p = canvasPointFromEvent(e);
+    splitDrag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+    updateMarqueeDom();
+};
+const onSplitPointerMove = (e) => {
+    if (!isBoxSelectMode || !splitDrag) return;
+    const p = canvasPointFromEvent(e);
+    splitDrag.x1 = p.x; splitDrag.y1 = p.y;
+    updateMarqueeDom();
+};
+const onSplitPointerUp = (e) => {
+    if (!splitDrag) return;
+    try { mainViewEl.releasePointerCapture(e.pointerId); } catch (_) {}
+    settleBoxSelection();
+    splitDrag = null;
+    splitMarquee.style.display = 'none';
+};
+mainViewEl.addEventListener('pointerdown', onSplitPointerDown);
+mainViewEl.addEventListener('pointermove', onSplitPointerMove);
+mainViewEl.addEventListener('pointerup', onSplitPointerUp);
+mainViewEl.addEventListener('pointercancel', onSplitPointerUp);
+window.addEventListener('resize', () => { if (isBoxSelectMode) { resizeSplitRenderer(); syncSplitCameraFromModelViewer(); } });
+
+const resetSplitSelectState = () => {
+    exitBoxSelectMode();
+};
+
+btnSplitExport.onclick = () => runHeavyTask('正在拆出选中 mesh 并另存为...', async () => {
+    if (!activeModel || !processingScene) { logDebug('⚠️ 无可用模型'); return; }
+    if (!splitSelectedParts.length) { logDebug('⚠️ 尚未框选任何 mesh'); return; }
+    logDebug(`🚀 开始拆出 ${splitSelectedParts.length} 个可拆件...`);
+    processingScene.scene.updateMatrixWorld(true);
+    const partsToExport = splitSelectedParts.slice();
+    clearSplitHighlights();
+
+    const exportScene = new THREE.Scene();
+    partsToExport.forEach(part => {
+        const mesh = part.mesh;
+        mesh.updateMatrixWorld(true);
+        let clone;
+        if (part.triIndices) {
+            const geo = extractIslandGeometry(mesh.geometry, part.triIndices);
+            const mat = Array.isArray(mesh.material) ? mesh.material[0].clone() : mesh.material.clone();
+            clone = new THREE.Mesh(geo, mat);
+        } else {
+            clone = mesh.clone(true);
+        }
+        clone.matrix.copy(mesh.matrixWorld);
+        clone.matrix.decompose(clone.position, clone.quaternion, clone.scale);
+        clone.matrixAutoUpdate = true;
+        exportScene.add(clone);
+    });
+
+    const exporter = new GLTFExporter();
+    const options = { binary: true };
+    const result = await new Promise((resolve, reject) => {
+        const onDone = (r) => resolve(r);
+        const onError = (err) => reject(err);
+        if (exporter.parse.length === 4) exporter.parse(exportScene, onDone, onError, options);
+        else exporter.parse(exportScene, onDone, options);
+    });
+
+    let newName = activeModel.name.replace(/\.glb$/i, '') + '_split.glb';
+    if (modelFiles.some(f => f.parent === activeModel.parent && f.name === newName)) {
+        const d = new Date();
+        const ts = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0') + String(d.getSeconds()).padStart(2,'0');
+        newName = newName.replace(/\.glb$/i, `_${ts}.glb`);
+        logDebug(`⚠️ 同名 split 已存在，自动追加后缀 -> ${newName}`);
+    }
+    const fixedSplit = reinjectPhysicalMaterialExtensions(result, exportScene);
+    const fileHandle = await activeModel.parent.getFileHandle(newName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(fixedSplit);
+    await writable.close();
+    logDebug(`✅ 拆出保存成功: ${newName}`);
+    await scanDirectory();
+});
+
+const panelToggle = document.getElementById('panel-toggle'); const panelInner = document.getElementById('tool-panel-inner');
+panelToggle.onclick = () => { const isVisible = panelInner.style.display !== 'none'; panelInner.style.display = isVisible ? 'none' : 'flex'; panelToggle.innerText = isVisible ? '▶ 展开调节面板' : '🔽 收起调节面板'; };
+const focusCameraOnModel = (keepAngle = false) => { if(!processingScene) return; processingScene.scene.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(processingScene.scene);
+const center = new THREE.Vector3(); box.getCenter(center); mainViewer.setAttribute('min-camera-orbit', 'auto auto 0m'); mainViewer.setAttribute('field-of-view', '20deg');
+mainViewer.setAttribute('camera-target', `0m ${center.y}m 0m`); if (keepAngle && typeof mainViewer.getCameraOrbit === 'function') { const o = mainViewer.getCameraOrbit();
+mainViewer.setAttribute('camera-orbit', `${o.theta}rad ${o.phi}rad 1.7m`); } else { mainViewer.setAttribute('camera-orbit', `45deg 75deg 1.7m`); } };
+
+let globalDracoLoader = null;
+const getDracoLoader = () => { 
+    if (!globalDracoLoader) { 
+        logDebug("🔧 [排查-WASM] 初始化全局唯一 DRACOLoader 实例 (本地 ./draco/ 解码器)..."); 
+        globalDracoLoader = new DRACOLoader(); 
+        globalDracoLoader.setDecoderPath('./draco/'); 
+        globalDracoLoader.setWorkerLimit(1); 
+    } 
+    return globalDracoLoader; 
+};
+const loadToThree = async (file, ctxName="未知") => { return new Promise(async (resolve, reject) => { logDebug(`⏳ [排查-GLTF] 开始读取文件流: ${ctxName}`);
+let isDone = false; const loadObj = { name: ctxName, reject: (err) => { if(!isDone){ isDone=true; reject(err); } } }; window.activeGltfLoads.add(loadObj);
+const timeoutId = setTimeout(() => { if(!isDone) { window.activeGltfLoads.delete(loadObj); logDebug(`🚨 [防挂死机制] 解析超时(30s)强制释放: ${ctxName}`); if(globalDracoLoader){ globalDracoLoader.dispose(); globalDracoLoader = null; } loadObj.reject(new Error("解析器无响应超时")); } }, 30000);
+try { const loader = new GLTFLoader(); 
+loader.setDRACOLoader(getDracoLoader()); const arrayBuffer = await file.arrayBuffer(); logDebug(`⏳ [排查-GLTF] ArrayBuffer就绪，移交底层解析: ${ctxName}`); 
+loader.parse(arrayBuffer, '', (gltf) => { if(isDone) return; isDone=true; clearTimeout(timeoutId); window.activeGltfLoads.delete(loadObj); logDebug(`✅ [排查-GLTF] 解析成功: ${ctxName}`); resolve(gltf); }, (err) => { if(isDone) return; isDone=true; clearTimeout(timeoutId); window.activeGltfLoads.delete(loadObj); const errStr = (err && err.isTrusted) ? 'Web Worker加载拦截 (通常由于缺失 draco_wasm_wrapper.js 或 CDN 被墙)' : String(err); logDebug(`❌ [排查-GLTF] 解析失败 [${ctxName}]:`, errStr); reject(err); }); } catch (e) { if(isDone) return; isDone=true; clearTimeout(timeoutId); window.activeGltfLoads.delete(loadObj); logDebug(`❌ [排查-GLTF] 致命异常 [${ctxName}]:`, e); reject(e); } }); };
+
+document.getElementById('btn-rot-x-cw').onclick = () => runHeavyTask("正在翻转模型...", async () => { if(!processingScene) return; processingScene.scene.rotateX(Math.PI/2); logDebug("🔄 绕 X 顺转 90°"); focusCameraOnModel(true); await updateViewerFromThree(false); });
+document.getElementById('btn-rot-x-ccw').onclick = () => runHeavyTask("正在翻转模型...", async () => { if(!processingScene) return; processingScene.scene.rotateX(-Math.PI/2); logDebug("🔄 绕 X 逆转 90°"); focusCameraOnModel(true); await updateViewerFromThree(false); });
+document.getElementById('btn-rot-y-cw').onclick = () => runHeavyTask("正在旋转模型...", async () => { if(!processingScene) return; processingScene.scene.rotateY(Math.PI/2); logDebug("🔄 绕 Y 顺转 90°"); focusCameraOnModel(true); await updateViewerFromThree(false); });
+document.getElementById('btn-rot-y-ccw').onclick = () => runHeavyTask("正在旋转模型...", async () => { if(!processingScene) return; processingScene.scene.rotateY(-Math.PI/2); logDebug("🔄 绕 Y 逆转 90°"); focusCameraOnModel(true); await updateViewerFromThree(false); });
+document.getElementById('btn-rot-z-cw').onclick = () => runHeavyTask("正在旋转模型...", async () => { if(!processingScene) return; processingScene.scene.rotateZ(Math.PI/2); logDebug("🔄 绕 Z 顺转 90°"); focusCameraOnModel(true); await updateViewerFromThree(false); });
+document.getElementById('btn-rot-z-ccw').onclick = () => runHeavyTask("正在旋转模型...", async () => { if(!processingScene) return; processingScene.scene.rotateZ(-Math.PI/2); logDebug("🔄 绕 Z 逆转 90°"); focusCameraOnModel(true); await updateViewerFromThree(false); });
+
+document.getElementById('btn-apply-scale').onclick = () => runHeavyTask("正在应用缩放...", async () => { 
+    if(!processingScene) return; 
+    logDebug("📐 准备重置比例引擎并进行绝对尺寸修正...");
+    processingScene.scene.scale.set(1, 1, 1);
+    processingScene.scene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(processingScene.scene); 
+    const realH = box.max.y - box.min.y; 
+    if(realH <= 0) { logDebug("❌ 模型高度为0，无法缩放"); return; }
+    const targetH = parseFloat(inputHeight.value) / 100; 
+    const absoluteFactor = targetH / realH; 
+    processingScene.scene.scale.set(absoluteFactor, absoluteFactor, absoluteFactor); 
+    processingScene.scene.updateMatrixWorld(true);
+    logDebug(`✅ 缩放已绝对精准到位，锁定倍率: x${absoluteFactor.toFixed(6)}`); 
+    focusCameraOnModel(true); await updateViewerFromThree(false); 
+});
+
+document.getElementById('btn-align-center').onclick = () => runHeavyTask("正在几何归零...", async () => { if(!processingScene) return; processingScene.scene.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(processingScene.scene);
+const center = new THREE.Vector3(); box.getCenter(center); processingScene.scene.position.x -= center.x; processingScene.scene.position.y -= box.min.y; processingScene.scene.position.z -= center.z; logDebug("📍 几何已归零并贴地");
+focusCameraOnModel(true); await updateViewerFromThree(false); }); 
+
+const applyMaterialsAndPreview = async () => { if(!processingScene) return; const rOffset = parseFloat(document.getElementById('slide-rough').value);
+const mOffset = parseFloat(document.getElementById('slide-metal').value); const nScale = parseFloat(document.getElementById('slide-normal').value); processingScene.scene.traverse(node => {
+if(node.isMesh && node.material) { const mats = Array.isArray(node.material) ? node.material : [node.material]; mats.forEach(m => { if((m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) && m.userData.origRoughness !== undefined) {
+m.roughness = Math.max(0, Math.min(1, m.userData.origRoughness + rOffset)); m.metalness = Math.max(0, Math.min(1, m.userData.origMetalness + mOffset));
+if(m.normalScale && m.userData.origNormalScale) m.normalScale.copy(m.userData.origNormalScale).multiplyScalar(nScale); } }); } }); logDebug("🎨 材质已预览更新"); await updateViewerFromThree(true); };
+['rough', 'metal', 'normal'].forEach(id => { const el = document.getElementById(`slide-${id}`); const valDisp = document.getElementById(`val-${id}`);
+el.oninput = () => { valDisp.innerText = el.value; }; el.onchange = () => runHeavyTask("正在重新编译材质...", async () => { await applyMaterialsAndPreview(); }); }); const toggleLights = async (update = true) => {
+if(!processingScene || !processingScene.userData.origLights) return; const remove = document.getElementById('check-remove-lights').checked; processingScene.userData.origLights.forEach(item => {
+if(remove) item.parent.remove(item.light); else item.parent.add(item.light); }); if(update) { logDebug(remove ? "💡 预览：物理光源已隐藏" : "💡 预览：物理光源已恢复"); await updateViewerFromThree(true); } };
+document.getElementById('check-remove-lights').onchange = () => runHeavyTask("正在装配物理灯光...", async () => { await toggleLights(true); });
+// 天坑：本页 Three r128 的 GLTFExporter 不写出 KHR_materials_transmission / clearcoat。
+// 手术台→预览/导出 会把玻璃壳变成「白底实心」。从场景 MeshPhysicalMaterial 按材质名通用回写（不特判模型）。
+const reinjectPhysicalMaterialExtensions = (glbBuffer, rootObject) => {
+try {
+    if (!glbBuffer || !rootObject) return glbBuffer;
+    const matsByName = Object.create(null);
+    rootObject.traverse(node => {
+        if (!node.isMesh || !node.material) return;
+        const list = Array.isArray(node.material) ? node.material : [node.material];
+        list.forEach(m => {
+            if (!m || !m.name) return;
+            const prev = matsByName[m.name];
+            if (!prev || (Number(m.transmission) || 0) > (Number(prev.transmission) || 0)) matsByName[m.name] = m;
+        });
+    });
+    const u8 = glbBuffer instanceof ArrayBuffer ? new Uint8Array(glbBuffer) : new Uint8Array(glbBuffer);
+    if (u8.byteLength < 28) return glbBuffer;
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    if (dv.getUint32(0, true) !== 0x46546C67) return glbBuffer;
+    const jsonLen = dv.getUint32(12, true);
+    const jsonStart = 20;
+    if (jsonStart + jsonLen > u8.byteLength) return glbBuffer;
+    const json = JSON.parse(new TextDecoder().decode(u8.subarray(jsonStart, jsonStart + jsonLen)));
+    if (!json.materials || !json.materials.length) return glbBuffer;
+    if (!json.extensionsUsed) json.extensionsUsed = [];
+    const ensureUsed = (name) => { if (!json.extensionsUsed.includes(name)) json.extensionsUsed.push(name); };
+    let patched = 0;
+    json.materials.forEach(jm => {
+        const m = matsByName[jm.name];
+        if (!m) return;
+        const transmission = Number(m.transmission) || 0;
+        const clearcoat = Number(m.clearcoat) || 0;
+        const clearcoatRoughness = Number(m.clearcoatRoughness) || 0;
+        if (transmission <= 0.001 && clearcoat <= 0.001) return;
+        if (!jm.extensions) jm.extensions = {};
+        if (transmission > 0.001) {
+            jm.extensions.KHR_materials_transmission = { transmissionFactor: transmission };
+            ensureUsed('KHR_materials_transmission');
+        }
+        if (clearcoat > 0.001) {
+            jm.extensions.KHR_materials_clearcoat = { clearcoatFactor: clearcoat, clearcoatRoughnessFactor: clearcoatRoughness };
+            ensureUsed('KHR_materials_clearcoat');
+        }
+        if (typeof m.ior === 'number' && m.ior > 1.01 && Math.abs(m.ior - 1.5) > 0.001) {
+            jm.extensions.KHR_materials_ior = { ior: m.ior };
+            ensureUsed('KHR_materials_ior');
+        }
+        patched++;
+    });
+    if (!patched) return glbBuffer;
+    const rest = u8.subarray(jsonStart + jsonLen);
+    let jsonStr = JSON.stringify(json);
+    const pad = (4 - (jsonStr.length % 4)) % 4;
+    if (pad) jsonStr += ' '.repeat(pad);
+    const jsonBytes = new TextEncoder().encode(jsonStr);
+    const totalLen = 12 + 8 + jsonBytes.length + rest.length;
+    const out = new ArrayBuffer(totalLen);
+    const outDv = new DataView(out);
+    const outU8 = new Uint8Array(out);
+    outDv.setUint32(0, 0x46546C67, true);
+    outDv.setUint32(4, 2, true);
+    outDv.setUint32(8, totalLen, true);
+    outDv.setUint32(12, jsonBytes.length, true);
+    outDv.setUint32(16, 0x4E4F534A, true);
+    outU8.set(jsonBytes, 20);
+    outU8.set(rest, 20 + jsonBytes.length);
+    logDebug(`✅ 已回写玻璃扩展 ${patched} 个材质 (transmission/clearcoat)`);
+    return out;
+} catch (e) {
+    logDebug('⚠️ 玻璃扩展回写失败，沿用原二进制流', e);
+    return glbBuffer;
+}
+};
+const updateViewerFromThree = (preserveCamera = true) => {
+return new Promise((resolve) => { if(!processingScene) return resolve(); try { if (preserveCamera && typeof mainViewer.getCameraOrbit === 'function') { const o = mainViewer.getCameraOrbit();
+const t = mainViewer.getCameraTarget(); mainViewer.setAttribute('camera-orbit', `${o.theta}rad ${o.phi}rad ${o.radius}m`); mainViewer.setAttribute('camera-target', `${t.x}m ${t.y}m ${t.z}m`); }
+const exporter = new GLTFExporter(); const options = { binary: true }; 
+const texLimit = parseInt(document.getElementById('sel-tex-size').value); if(texLimit > 0) options.maxTextureSize = texLimit;
+const previewScene = new THREE.Scene(); previewScene.add(processingScene.scene);
+if (isGridVisible) previewScene.add(createHelpers().clone()); const onDone = (result) => {
+if (!result || !result.byteLength) { logDebug("❌ 预览导出为空，请查看运行终端"); resolve(); return; }
+const fixed = reinjectPhysicalMaterialExtensions(result, processingScene.scene);
+const blob = new Blob([fixed], {type: 'model/gltf-binary'}); if(mainViewer.src && mainViewer.src.startsWith('blob:')) URL.revokeObjectURL(mainViewer.src.split('#')[0]);
+let settled = false; const finish = (ok, detail='') => { if (settled) return; settled = true;
+mainViewer.removeEventListener('load', onLoad); mainViewer.removeEventListener('error', onErr); clearTimeout(fallbackId);
+if (!ok) logDebug(`❌ model-viewer 预览加载失败${detail ? ': ' + detail : ''}`);
+if (isBoxSelectMode && processingScene) { attachSplitSceneContent(); syncSplitCameraFromModelViewer(); } resolve(); };
+const onLoad = () => finish(true); const onErr = (e) => finish(false, e && e.detail ? String(e.detail) : 'unknown');
+mainViewer.addEventListener('load', onLoad); mainViewer.addEventListener('error', onErr);
+mainViewer.src = URL.createObjectURL(blob) + '#.glb'; const fallbackId = setTimeout(() => finish(false, '3s 超时'), 3000); }; const onError = (err) => { logDebug("❌ 预览更新解析失败", err); if (isBoxSelectMode && processingScene) { attachSplitSceneContent(); } resolve(); };
+if (exporter.parse.length === 4) exporter.parse(previewScene, onDone, onError, options); else exporter.parse(previewScene, onDone, options); } catch(e) { logDebug("❌ 导出器同步崩溃", e); resolve(); } }); };
+
+document.getElementById('btn-export-save').onclick = () => runHeavyTask("正在打包输出二进制流...", async () => { if(!activeModel || !processingScene) return; logDebug("🚀 开始执行标准化导出...");
+const root = processingScene.scene; 
+const targetModelName = activeModel.name;
+const targetFullPath = activeModel.fullPath;
+const targetParent = activeModel.parent;
+
+if(checkCleanUV.checked) {
+    logDebug("🧹 正在深度抹除网格 UV 与 顶点颜色数据以防内存溢出...");
+    root.traverse(node => {
+        if(node.isMesh && node.geometry && node.geometry.deleteAttribute) {
+            node.geometry.deleteAttribute('uv');
+            node.geometry.deleteAttribute('uv2');
+            node.geometry.deleteAttribute('color');
+            node.geometry.deleteAttribute('tangent');
+        }
+    });
+}
+
+const exporter = new GLTFExporter(); const options = { binary: true }; 
+const texLimit = parseInt(document.getElementById('sel-tex-size').value); if(texLimit > 0) options.maxTextureSize = texLimit;
+
+const dracoMode = document.getElementById('sel-draco-mode').value;
+const isDraco = dracoMode !== 'none';
+const isSimplify = checkSimplify.checked;
+const isCleanUV = checkCleanUV.checked;
+const simplifyRatio = parseFloat(slideSimplify.value);
+
+const onDone = async (result) => { try {
+// 必须在 dispose 前按场景材质回写玻璃扩展（r128 Exporter 会丢）
+let finalData = reinjectPhysicalMaterialExtensions(result, root);
+
+logDebug("♻️ 正在断开并释放原始庞大模型内存，为计算引擎全力腾出运存空间...");
+resetSplitSelectState();
+root.traverse(child => { 
+    if (child.isMesh) { 
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) { 
+            if (Array.isArray(child.material)) child.material.forEach(m => { if(m.map) m.map.dispose(); m.dispose(); });
+            else { if(child.material.map) child.material.map.dispose(); child.material.dispose(); } 
+        } 
+    } 
+});
+processingScene = null;
+if(mainViewer.src && mainViewer.src.startsWith('blob:')) URL.revokeObjectURL(mainViewer.src.split('#')[0]);
+mainViewer.src = '';
+await new Promise(r => setTimeout(r, 100));
+
+if(isDraco || isSimplify || isCleanUV) {
+    logDebug("⏳ [几何管线] 正在拉取纯本地的 gltf-transform 组合包引擎...");
+    let WebIO, KHRONOS_EXTENSIONS, draco, weld, simplify;
+    try {
+        const mod = await import('./draco/gltf-transform-bundle.js');
+        WebIO = mod.WebIO; KHRONOS_EXTENSIONS = mod.KHRONOS_EXTENSIONS; draco = mod.draco; weld = mod.weld; simplify = mod.simplify;
+    } catch(err) {
+        throw new Error("⚠️ 缺失核心包：未能加载 ./draco/gltf-transform-bundle.js 文件，请确保您已按教程生成并放入该文件！");
+    }
+
+    const io = new WebIO().registerExtensions(KHRONOS_EXTENSIONS);
+    const doc = await io.readBinary(new Uint8Array(finalData));
+    result = null; 
+
+    if(isCleanUV) {
+        for (const mesh of doc.getRoot().listMeshes()) {
+            for (const prim of mesh.listPrimitives()) {
+                prim.setAttribute('TEXCOORD_0', null); prim.setAttribute('TEXCOORD_1', null);
+                prim.setAttribute('COLOR_0', null); prim.setAttribute('TANGENT', null);
+            }
+        }
+    }
+
+    if (isSimplify) {
+        logDebug("🔧 [阶段 1] 减面前拓扑缝合 (Weld, tolerance=1e-4)...");
+        await doc.transform(weld({ tolerance: 0.0001 }));
+        logDebug("♻️ 第一阶段完成，强制暂停 500ms 呼叫底层垃圾回收器 (GC) 清理废弃内存...");
+        await new Promise(r => setTimeout(r, 500));
+
+        logDebug("⏳ 正在加载本地减面核心引擎 (meshopt_simplifier)...");
+        let meshoptSimplifier;
+        try {
+            const mod = await import('./draco/meshopt_simplifier.module.js');
+            meshoptSimplifier = mod.meshoptSimplifier || mod.MeshoptSimplifier || mod.default || (Object.values(mod)[0]) || mod;
+            if(!meshoptSimplifier) throw new Error("模块为空");
+        } catch(err) {
+            throw new Error("⚠️ 缺少减面引擎或版本不兼容！");
+        }
+        if(typeof meshoptSimplifier.ready !== 'undefined') await meshoptSimplifier.ready;
+        
+        logDebug(`✂️ [阶段 2/3] 正在应用减面 (保留 ${Math.round(simplifyRatio*100)}%, lockBorder, error=0.001)...`);
+        await doc.transform(simplify({ simplifier: meshoptSimplifier, ratio: simplifyRatio, error: 0.001, lockBorder: true }));
+        logDebug("♻️ 第二阶段完成，强制暂停 500ms 回收数十兆的减面废弃缓存...");
+        await new Promise(r => setTimeout(r, 500));
+    } else if (isDraco) {
+        logDebug("🔧 跳过手动 Weld，交由 Draco 内置缝合（scene 量化 + position 16）");
+    }
+
+    if (isDraco) {
+        logDebug("⏳ 正在初始化本地 Draco WASM 引擎...");
+        const loadScript = (src) => new Promise((res, rej) => { if(document.querySelector(`script[src="${src}"]`)) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error(`本地依赖加载失败: ${src}`)); document.head.appendChild(s); });
+        await loadScript('./draco/draco_encoder.js');
+        await loadScript('./draco/draco_decoder.js');
+        const encoder = await window.DracoEncoderModule({ locateFile: (file) => './draco/' + file }); 
+        const decoder = await window.DracoDecoderModule({ locateFile: (file) => './draco/' + file });
+        io.registerDependencies({ 'draco3d.encoder': encoder, 'draco3d.decoder': decoder });
+        
+        logDebug(`🗜️ [阶段 3/3] Draco 展示安全压缩 (模式: ${dracoMode}, scene/16)...`);
+        await doc.transform(draco(Object.assign({ method: dracoMode }, DRACO_DISPLAY_SAFE)));
+        logDebug("♻️ 第三阶段完成，正在打包最终的二进制流...");
+    }
+
+    finalData = await io.writeBinary(doc);
+    logDebug(`✅ 几何管线终极处理完毕！最终导出极小体积: ${(finalData.byteLength/1024/1024).toFixed(2)}MB`);
+}
+
+const newName = targetModelName.replace('.glb', '') + '_std.glb';
+const newFullPath = targetFullPath.replace(targetModelName, newName);
+const fileHandle = await targetParent.getFileHandle(newName, { create: true });
+const writable = await fileHandle.createWritable(); await writable.write(finalData); await writable.close(); logDebug(`✅ 成功保存: ${newFullPath}`); 
+
+const newFile = await fileHandle.getFile(); const newModel = { handle: fileHandle, parent: targetParent, file: newFile, name: newName, fullPath: newFullPath };
+if(db) await new Promise(r => { const req = db.transaction('thumbs','readwrite').objectStore('thumbs').delete(newFullPath); req.onsuccess = req.onerror = r; });
+const existingIdx = modelFiles.findIndex(m => m.fullPath === newFullPath);
+if (existingIdx > -1) {
+    modelFiles[existingIdx] = newModel;
+    const card = Array.from(document.querySelectorAll('.model-card')).find(c => c.querySelector('.model-name').innerText === newFullPath);
+    if(card) {
+        card.__modelData = newModel;
+        card.querySelector('.file-size-tag').innerText = (newFile.size/1024/1024).toFixed(1) + 'M';
+        const imgEl = card.querySelector('.thumb-img'); imgEl.classList.remove('loaded'); imgEl.src = '';
+        newModel.thumbQueued = true;
+        thumbQueue.unshift({ file: newFile, name: newFullPath, imgEl: imgEl, spinner: card.querySelector('.loading-spinner') });
+        processThumbQueue();
+    }
+} else {
+    modelFiles.push(newModel); modelFiles.sort((a,b)=>a.fullPath.localeCompare(b.fullPath));
+    const newIdx = modelFiles.findIndex(m => m.fullPath === newFullPath); statusText.innerText = `共 ${modelFiles.length} 个模型`;
+    const card = document.createElement('div'); card.className = 'model-card'; const uid = Date.now();
+    card.innerHTML = `<div class="thumb-container" title="${newFullPath}"><div class="file-size-tag">${(newFile.size/1024/1024).toFixed(1)}M</div><div class="loading-spinner"></div><img class="thumb-img" id="thumb-${uid}"></div><div class="card-info"><div class="model-name">${newFullPath}</div><div class="btn-row"><button class="rename-btn">重命名</button><button class="delete-btn">删除</button></div></div>`;
+    card.__modelData = newModel;
+    card.onclick = (e) => { if(!e.target.closest('button')) previewModel(newModel, card); };
+    card.querySelector('.rename-btn').onclick = async (e) => { e.stopPropagation(); const nn = await customPrompt("请输入新的模型名称:", newName); if (!nn || nn === newName) return; try { let finalNn = nn; if (modelFiles.some(f => f.name === finalNn)) { const d = new Date(); const ts = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0') + String(d.getSeconds()).padStart(2,'0'); finalNn = finalNn.replace(/\.glb$/i, `_${ts}.glb`); logDebug(`⚠️ 同名文件已存在，自动追加后缀 -> ${finalNn}`); } logDebug(`正在通过读写方式重命名: ${newFullPath} -> ${finalNn}`); const oldHandle = await targetParent.getFileHandle(newName); const oldFile = await oldHandle.getFile(); const buffer = await oldFile.arrayBuffer(); const newHandle = await targetParent.getFileHandle(finalNn, { create: true }); const writable = await newHandle.createWritable(); await writable.write(buffer); await writable.close(); await targetParent.removeEntry(newName); if(db) { const thumb = await getThumb(newFullPath); if(thumb) { const nfp = newFullPath.replace(newName, finalNn); await saveThumb(nfp, thumb.lastModified, thumb.dataUrl); db.transaction('thumbs','readwrite').objectStore('thumbs').delete(newFullPath); } } if(activeModel && activeModel.fullPath === newFullPath) activeModel = null; await scanDirectory(); logDebug(`✅ 重命名成功`); } catch (err) { logDebug("❌ 重命名失败", err); alert("重命名失败: " + err.message); } };
+    card.querySelector('.delete-btn').onclick = async (e) => { e.stopPropagation(); if (!confirm(`确定要永久删除模型文件【${newFullPath}】吗？`)) return; try { logDebug(`正在删除: ${newFullPath}`); await targetParent.removeEntry(newName); if(db) db.transaction('thumbs', 'readwrite').objectStore('thumbs').delete(newFullPath); if(activeModel && activeModel.fullPath === newFullPath) { activeModel = null; processingScene = null; resetSplitSelectState(); document.getElementById('current-model-title').innerText = ''; mainViewer.style.display = 'none'; toolPanel.style.display = 'none'; viewControls.style.display = 'none'; document.getElementById('empty-state').style.display = 'block'; } card.remove(); modelFiles = modelFiles.filter(f => f.fullPath !== newFullPath); statusText.innerText = `共 ${modelFiles.length} 个模型`; updateSearchSuggestions(); logDebug(`✅ 删除成功`); } catch (err) { logDebug("❌ 删除失败", err); alert("删除失败: " + err.message); } };
+    if(grid.children[newIdx]) grid.insertBefore(card, grid.children[newIdx]); else grid.appendChild(card);
+    if(window.thumbObserver) window.thumbObserver.observe(card);
+    newModel.thumbQueued = true;
+    thumbQueue.unshift({ file: newFile, name: newFullPath, imgEl: card.querySelector(`#thumb-${uid}`), spinner: card.querySelector('.loading-spinner') });
+    processThumbQueue(); updateSearchSuggestions();
+}
+} catch(err) { logDebug("❌ 保存失败", err); } };
+const onError = (err) => logDebug("❌ 导出处理失败", err); if (exporter.parse.length === 4) exporter.parse(root, onDone, onError, options); else exporter.parse(root, onDone, options); }); 
+
+async function scanDirectory() {
+if (!currentDirHandle) return; const prevScroll = grid.scrollTop; statusText.innerText = "扫描中..."; modelFiles = []; grid.innerHTML = ''; try { 
+async function walk(dirHandle, path = '') { for await (const entry of dirHandle.values()) {
+if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.glb')) { const file = await entry.getFile(); const fullPath = path ? `${path}/${entry.name}` : entry.name;
+modelFiles.push({ handle: entry, parent: dirHandle, file, name: entry.name, fullPath });
+} else if (entry.kind === 'directory') { await walk(entry, path ? `${path}/${entry.name}` : entry.name); } } }
+await walk(currentDirHandle); modelFiles.sort((a,b)=>a.fullPath.localeCompare(b.fullPath)); statusText.innerText = `共 ${modelFiles.length} 个模型`; renderGrid(); grid.scrollTop = prevScroll; const searchInp = document.getElementById('search-input'); if(searchInp && searchInp.value) searchInp.dispatchEvent(new Event('input')); } catch(e) { logDebug("❌ 扫描失败", e); } }
+
+const updateSearchSuggestions = () => { const counts = {}; modelFiles.forEach(m => { m.name.replace(/\.glb$/i,'').split('_').forEach(t => { const tk = t.trim(); if(tk && !/^\d+$/.test(tk) && tk.toLowerCase() !== 'std') counts[tk] = (counts[tk]||0)+1; }); }); const dl = document.getElementById('search-suggestions'); dl.innerHTML = ''; const presets = [...new Set(quickNames)]; const dynamicTags = Object.keys(counts).filter(k => !presets.includes(k)).sort((a,b)=>counts[b]-counts[a]).slice(0,15); [...presets, ...dynamicTags].forEach(w => { const op = document.createElement('option'); op.value = w; dl.appendChild(op); }); };
+
+function renderGrid() { grid.innerHTML = ''; thumbQueue = []; updateSearchSuggestions();
+if(window.thumbObserver) window.thumbObserver.disconnect();
+window.thumbObserver = new IntersectionObserver((entries) => { entries.forEach(entry => { if (entry.isIntersecting) { const m = entry.target.__modelData; if (m && !m.thumbQueued) { m.thumbQueued = true;
+thumbQueue.push({ file: m.file, name: m.fullPath, imgEl: entry.target.querySelector('.thumb-img'), spinner: entry.target.querySelector('.loading-spinner') }); processThumbQueue(); } } }); }, { root: grid, rootMargin: '200px' });
+modelFiles.forEach((m, i) => { const card = document.createElement('div'); card.className = 'model-card'; if(activeModel && m.fullPath === activeModel.fullPath) card.classList.add('active');
+card.innerHTML = `<div class="thumb-container" title="${m.fullPath}"><div class="file-size-tag">${(m.file.size/1024/1024).toFixed(1)}M</div><div class="loading-spinner"></div><img class="thumb-img" id="thumb-${i}"></div><div class="card-info"><div class="model-name">${m.fullPath}</div><div class="btn-row"><button class="rename-btn">重命名</button><button class="delete-btn">删除</button></div></div>`;
+card.__modelData = m; card.onclick = (e) => { if(!e.target.closest('button')) previewModel(m, card); };
+card.querySelector('.rename-btn').onclick = async (e) => { e.stopPropagation(); const newName = await customPrompt("请输入新的模型名称:", m.name); if (!newName || newName === m.name) return; try { let finalName = newName; if (modelFiles.some(f => f.name === finalName)) { const d = new Date(); const ts = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0') + String(d.getSeconds()).padStart(2,'0'); finalName = finalName.replace(/\.glb$/i, `_${ts}.glb`); logDebug(`⚠️ 同名文件已存在，自动追加后缀 -> ${finalName}`); } logDebug(`正在通过读写方式重命名: ${m.fullPath} -> ${finalName}`); const oldFile = await m.handle.getFile(); const buffer = await oldFile.arrayBuffer(); const newHandle = await m.parent.getFileHandle(finalName, { create: true }); const writable = await newHandle.createWritable(); await writable.write(buffer); await writable.close(); await m.parent.removeEntry(m.name); if(db) { const thumb = await getThumb(m.fullPath); if(thumb) { const newFullPath = m.fullPath.replace(m.name, finalName); await saveThumb(newFullPath, thumb.lastModified, thumb.dataUrl); db.transaction('thumbs','readwrite').objectStore('thumbs').delete(m.fullPath); } } if(activeModel && activeModel.fullPath === m.fullPath) activeModel = null; await scanDirectory(); logDebug(`✅ 重命名成功`); } catch (err) { logDebug("❌ 重命名失败", err); alert("重命名失败: " + err.message); } };
+card.querySelector('.delete-btn').onclick = async (e) => { e.stopPropagation(); if (!confirm(`确定要永久删除模型文件【${m.fullPath}】吗？\n此操作直接从磁盘删除文件，无法通过回收站恢复！`)) return; try { logDebug(`正在删除: ${m.fullPath}`);
+await m.parent.removeEntry(m.name); if(db) db.transaction('thumbs', 'readwrite').objectStore('thumbs').delete(m.fullPath);
+if(activeModel && activeModel.fullPath === m.fullPath) { activeModel = null; processingScene = null; resetSplitSelectState(); document.getElementById('current-model-title').innerText = '';
+mainViewer.style.display = 'none'; toolPanel.style.display = 'none'; viewControls.style.display = 'none'; document.getElementById('empty-state').style.display = 'block'; }
+card.remove(); modelFiles = modelFiles.filter(f => f.fullPath !== m.fullPath); statusText.innerText = `共 ${modelFiles.length} 个模型`; updateSearchSuggestions(); logDebug(`✅ 删除成功`); } catch (err) { logDebug("❌ 删除失败 (权限不足或占用)", err); alert("删除失败: " + err.message); } }; grid.appendChild(card);
+window.thumbObserver.observe(card); }); }
+
+let isolatedThumbRenderer = null;
+async function processThumbQueue() { if (isGeneratingThumb || thumbQueue.length === 0) return; isGeneratingThumb = true; logDebug(`🚀 开始处理缩略图队列，数量: ${thumbQueue.length}`); 
+
+if (!isolatedThumbRenderer) {
+isolatedThumbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+isolatedThumbRenderer.setSize(350, 350); isolatedThumbRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+isolatedThumbRenderer.toneMappingExposure = 1.0; logDebug(`🔧 【终极防线】脱离 model-viewer 共享环境，启用原生 Three.js 独立渲染引擎...`);
+}
+
+while (thumbQueue.length > 0) { 
+while (window.isThreeProcessing) { logDebug(`⏳ [主视图排他锁] 确保前台资源不被占用...`); await new Promise(r => setTimeout(r, 500)); }
+const task = thumbQueue.shift(); logDebug(`📸 准备生成: ${task.name}`); task.spinner.style.display = 'block'; const cached = await getThumb(task.name);
+if (cached && cached.lastModified === task.file.lastModified) { logDebug(`⚡ 命中缓存: ${task.name}`); task.imgEl.src = cached.dataUrl; task.imgEl.classList.add('loaded'); task.spinner.style.display = 'none'; continue; }
+
+try { 
+const gltf = await loadToThree(task.file, task.name); const scene = new THREE.Scene();
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0); hemiLight.position.set(0, 1, 0); scene.add(hemiLight);
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.2); keyLight.position.set(1, 1, 1).normalize(); scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0xffffff, 0.6); fillLight.position.set(-1, 0, 1).normalize(); scene.add(fillLight);
+const backLight = new THREE.DirectionalLight(0xffffff, 0.8); backLight.position.set(0, 1, -1).normalize(); scene.add(backLight);
+
+const model = gltf.scene; scene.add(model);
+model.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(model);
+const size = box.getSize(new THREE.Vector3()); const center = box.getCenter(new THREE.Vector3());
+
+if (size.x === 0 && size.y === 0 && size.z === 0) { throw new Error("模型包围盒尺寸为0，跳过异常渲染。"); }
+const fov = 45; const maxDim = Math.max(size.x, size.y, size.z);
+const camera = new THREE.PerspectiveCamera(fov, 1, maxDim * 0.01 || 0.01, maxDim * 100 || 1000);
+const distance = (maxDim / (2 * Math.tan(Math.PI * fov / 360))) * 1.3;
+const theta = 45 * Math.PI / 180; const phi = 75 * Math.PI / 180;
+
+camera.position.set( center.x + distance * Math.sin(phi) * Math.sin(theta), center.y + distance * Math.cos(phi), center.z + distance * Math.sin(phi) * Math.cos(theta) );
+camera.lookAt(center);
+
+isolatedThumbRenderer.render(scene, camera); 
+isolatedThumbRenderer.render(scene, camera); // 双重渲染保障材质上载 GPU 完成
+const dataUrl = isolatedThumbRenderer.domElement.toDataURL('image/webp', 0.8);
+
+scene.traverse(child => { if (child.isMesh) { if (child.geometry) child.geometry.dispose();
+if (child.material) { if (Array.isArray(child.material)) child.material.forEach(m => { if(m.map) m.map.dispose(); m.dispose(); });
+else { if(child.material.map) child.material.map.dispose(); child.material.dispose(); } } } });
+isolatedThumbRenderer.clear();
+
+if(dataUrl && dataUrl.length > 1000) { task.imgEl.src = dataUrl; task.imgEl.classList.add('loaded');
+await saveThumb(task.name, task.file.lastModified, dataUrl); logDebug(`✅ 独立显存截图成功: ${task.name}`); } 
+else { logDebug(`⚠️ 截图异常: Base64长度过短`); }
+} catch(e) { logDebug(`❌ 截图时抛出异常: ${task.name}`, e); } 
+finally { task.spinner.style.display = 'none'; await new Promise(r => setTimeout(r, 100)); }
+} isGeneratingThumb = false; logDebug(`🎉 缩略图队列全部极速处理完毕`); }
+
+async function previewModel(model, cardEl) { document.querySelectorAll('.model-card').forEach(c => c.classList.remove('active'));
+cardEl.classList.add('active'); activeModel = model; document.getElementById('empty-state').style.display = 'none';
+mainViewer.style.display = 'block'; viewControls.style.display = 'flex'; document.getElementById('current-model-title').innerText = model.fullPath; toolPanel.style.display = 'flex';
+resetSplitSelectState();
+await runHeavyTask(`正在调入解析引擎: ${model.fullPath}`, async () => { window.isThreeProcessing = true; if(mainViewer.src && mainViewer.src.startsWith('blob:')) URL.revokeObjectURL(mainViewer.src.split('#')[0]);
+mainViewer.src = ''; mainViewer.removeAttribute('scale'); try { const freshFile = await model.handle.getFile(); model.file = freshFile; logDebug(`📂 正在将 ${model.fullPath} 载入 Three.js 手术台...`); processingScene = await loadToThree(freshFile, model.fullPath);
+processingScene.userData = { origLights: [] }; processingScene.scene.traverse(node => { if(node.isLight) processingScene.userData.origLights.push({ parent: node.parent, light: node }); if(node.isMesh && node.material) {
+const mats = Array.isArray(node.material) ? node.material : [node.material]; mats.forEach(m => { if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) { if (m.userData.origRoughness === undefined) {
+m.userData.origRoughness = (m.roughness !== undefined && !isNaN(m.roughness)) ? m.roughness : 0.5; m.userData.origMetalness = (m.metalness !== undefined && !isNaN(m.metalness)) ? m.metalness : 0.0;
+if(m.normalScale) m.userData.origNormalScale = m.normalScale.clone(); } } }); } });
+processingScene.scene.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(processingScene.scene); const size = new THREE.Vector3(); box.getSize(size);
+document.getElementById('orig-size-disp').innerText = `(物理原始尺寸: ${(size.x*100).toFixed(1)} x ${(size.y*100).toFixed(1)} x ${(size.z*100).toFixed(1)})`;
+['rough', 'metal'].forEach(id => { document.getElementById(`slide-${id}`).value = 0; document.getElementById(`val-${id}`).innerText = "0"; });
+document.getElementById('slide-normal').value = 1; document.getElementById('val-normal').innerText = "1"; await toggleLights(false); logDebug("🟢 手术台解析就绪，锁定物理中心并推送最终视图...");
+focusCameraOnModel(); await updateViewerFromThree(false); } catch(e) { logDebug("❌ 手术台载入彻底失败", e); } finally { window.isThreeProcessing = false; } }); }
+initDB().then(async () => { const reqDir = db.transaction('settings','readonly').objectStore('settings').get('lastDir'); reqDir.onsuccess = async (e) => {
+if(e.target.result) { currentDirHandle = e.target.result; document.getElementById('btn-select-dir').title = `当前已连接本地目录: [ ${currentDirHandle.name} ]`;
+if(await currentDirHandle.queryPermission({mode:'readwrite'}) === 'granted') await scanDirectory();
+else document.getElementById('btn-restore-dir').style.display='inline-block'; } }; }); document.getElementById('btn-select-dir').onclick = async () => {
+if (!window.showDirectoryPicker) { alert("当前浏览器不支持或处于非安全环境。"); return; }
+logDebug("📂 尝试打开文件夹选择器..."); try { currentDirHandle = await window.showDirectoryPicker({id: 'glb_manager_repo', mode:'readwrite'});
+if(db) db.transaction('settings','readwrite').objectStore('settings').put(currentDirHandle, 'lastDir');
+document.getElementById('btn-restore-dir').style.display='none'; document.getElementById('btn-select-dir').title = `当前已连接本地目录: [ ${currentDirHandle.name} ]`;
+await scanDirectory(); logDebug("✅ 文件夹已连接"); } catch (err) { if (err.name === 'AbortError') logDebug("ℹ️ 操作已取消"); else logDebug("❌ 选择文件夹失败", err); } };
+document.getElementById('btn-restore-dir').onclick = async () => { try { if(await currentDirHandle.requestPermission({mode:'readwrite'}) === 'granted') {
+document.getElementById('btn-restore-dir').style.display='none'; await scanDirectory(); } } catch(e) { logDebug("❌ 恢复权限失败", e); } };
+const searchInp = document.getElementById('search-input');
+searchInp.addEventListener('input', (e) => { const term = e.target.value.toLowerCase(); document.querySelectorAll('.model-card').forEach(card => { const name = card.querySelector('.model-name').innerText.toLowerCase(); card.style.display = name.includes(term) ? 'flex' : 'none'; }); });
+searchInp.addEventListener('mousedown', function(e) { if(this.value && e.offsetX > this.offsetWidth - 40) { this.value = ''; this.dispatchEvent(new Event('input')); } });
+document.getElementById('btn-toggle-logs').onclick = () => { const p = document.getElementById('log-panel'); p.style.display = p.style.display==='flex'?'none':'flex'; btnToggleLogs.classList.remove('has-error'); };
+document.getElementById('btn-close-logs').onclick = () => document.getElementById('log-panel').style.display='none';
+document.getElementById('btn-clear-logs').onclick = () => { window.errorLogs = []; logContent.innerHTML = ''; logDebug("✅ 日志已清空"); };
+document.getElementById('btn-copy-logs').onclick = () => { const txt = window.errorLogs.join('\n'); if(txt) navigator.clipboard.writeText(txt).then(()=>alert("日志已完整复制！可发送给我排错。")); };
+document.getElementById('btn-refresh').onclick = scanDirectory; 
+document.getElementById('btn-rebuild-thumbs').onclick = async () => { if (!db) return; if (!confirm("这将清除所有缓存并强制重新生成当前目录的所有缩略图，可能需要一些时间，确定执行吗？")) return; logDebug("🗑️ 正在清空缩略图缓存..."); const req = db.transaction('thumbs', 'readwrite').objectStore('thumbs').clear(); req.onsuccess = () => { logDebug("✅ 缓存已彻底清空，开始重建..."); scanDirectory(); }; req.onerror = (e) => logDebug("❌ 清空缓存失败", e); };
+
+// --- 拖动调整侧边栏宽度逻辑 ---
+const resizer = document.getElementById('sidebar-resizer');
+const sidebar = document.getElementById('sidebar');
+let isResizing = false;
+resizer.addEventListener('mousedown', () => { isResizing = true; resizer.classList.add('is-resizing'); document.body.style.userSelect = 'none'; document.body.style.cursor = 'col-resize'; });
+document.addEventListener('mousemove', (e) => { if(!isResizing) return; let w = e.clientX; if(w < 280) w = 280; if(w > window.innerWidth * 0.7) w = window.innerWidth * 0.7; sidebar.style.width = w + 'px'; });
+document.addEventListener('mouseup', () => { if(isResizing){ isResizing = false; resizer.classList.remove('is-resizing'); document.body.style.userSelect = ''; document.body.style.cursor = ''; }});
+// ------------------------------
+</script> </body> </html>

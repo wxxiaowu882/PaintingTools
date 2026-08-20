@@ -13,18 +13,19 @@
         
         { type: 'category', text: '肖像' },
         { id: '02', text: '头骨 · 骨点 · 肌肉', url: 'Portrait_c.html?lib=anatomy', color: '#A855F7' },
-        { id: '03', text: '头部造型规律', url: 'solid.html?sandbox=headform', color: '#D946EF' },
-        { id: '04', text: '肖像光影沙盒', url: 'solid.html?sandbox=portrait', color: '#F43F5E' },
-        { id: '05', text: '吴晓的作品', url: 'Gallery.html', color: '#EC4899' },
-        { id: '06', text: '课程预约', url: '', disabled: true, tag: 'Coming Soon' },
+        { id: '03', text: '五官', url: 'Portrait_c.html?lib=facial', color: '#C026D3' },
+        { id: '04', text: '头部造型规律', url: 'solid.html?sandbox=headform', color: '#D946EF' },
+        { id: '05', text: '肖像光影沙盒', url: 'solid.html?sandbox=portrait', color: '#F43F5E' },
+        { id: '06', text: '吴晓的作品', url: 'Gallery.html', color: '#EC4899' },
+        { id: '07', text: '课程预约', url: '', disabled: true, tag: 'Coming Soon' },
 
         { type: 'category', text: '实用工具' },
-        { id: '07', text: '色阶图生成 · 网格起型', url: 'GR.html', color: '#3B82F6' },
-        { id: '08', text: '智能调色 · 颜料管理', url: 'XStudio.html', color: '#A855F7' },
-        { id: '09', text: 'AR 线稿描摹', url: 'ARSketch.html', color: '#22C55E' },
+        { id: '08', text: '色阶图生成 · 网格起型', url: 'GR.html', color: '#3B82F6' },
+        { id: '09', text: '智能调色 · 颜料管理', url: 'XStudio.html', color: '#A855F7' },
+        { id: '10', text: 'AR 线稿描摹', url: 'ARSketch.html', color: '#22C55E' },
 
         { type: 'category', text: '游戏' },
-        { id: '10', text: '色感训练 · 光谱行者', url: 'games/ChromaWalker.html', color: '#F59E0B' },
+        { id: '11', text: '色感训练 · 光谱行者', url: 'games/ChromaWalker.html', color: '#F59E0B' },
 
         { type: 'footer', text: '© 2026 Hand-painted Workshop' }
     ];
