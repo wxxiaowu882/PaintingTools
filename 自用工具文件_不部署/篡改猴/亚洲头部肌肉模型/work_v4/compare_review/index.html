@@ -111,6 +111,36 @@
       display: block;
       pointer-events: none;
     }
+    .lm-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: all;
+      overflow: visible;
+    }
+    .lm-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 4px 6px;
+      background: #1e293b;
+      border-radius: 6px 6px 0 0;
+      font-size: 0.72rem;
+      color: #cbd5e1;
+    }
+    .lm-bar select, .lm-bar button {
+      font-size: 0.72rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: #e2e8f0;
+      cursor: pointer;
+    }
+    .lm-stat { color: #94a3b8; }
+    #lmToggle.active { background: #16a34a; color: #fff; }
     #viewerHost {
       width: 100%;
       height: min(78vh, 720px);
@@ -207,6 +237,7 @@
       <button type="button" data-mode="slider">拖拽叠图</button>
       <button type="button" data-mode="stack">上下对照</button>
       <button type="button" data-mode="viewer3d">3D预览 GLB</button>
+      <button type="button" id="lmToggle">锚点叠层 ⊕</button>
     </div>
   </header>
   <main>
@@ -219,6 +250,7 @@
     import * as THREE from "three";
     import { OrbitControls } from "./vendor/controls/OrbitControls.js";
     import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
+    import { createLandmarkController } from "./landmarks.js";
 
     const PRIMARY_VIEWS = [
       { id: "front", label: "正" },
@@ -251,6 +283,10 @@
     let viewer = null;
     let alignCache = new Map();
     let alignObservers = [];
+
+    const lmc = createLandmarkController(THREE);
+    let lmActive = false;
+    lmc.setOnRefresh(() => mountLandmarks());
 
     let assetRev = "";
 
@@ -668,10 +704,21 @@
         const pair = await getAlignPair(ref, ours);
         mountAlignedFrame(document.getElementById("frameBase"), pair.baseImg, pair.baseBox, pair.refBox);
         mountAlignedFrame(document.getElementById("frameOurs"), pair.oursImg, pair.oursBox, pair.refBox);
+        if (lmActive) {
+          await mountLandmarks();
+        }
       } catch (err) {
         console.error(err);
         elHint.textContent = "图片加载失败，请确认已生成正交截图。";
       }
+    }
+
+    async function mountLandmarks() {
+      const frameBase = document.getElementById("frameBase");
+      const frameOurs = document.getElementById("frameOurs");
+      if (!frameBase || !frameOurs) return;
+      const camMetaUrl = `ours/${candId}/camera_meta.json?v=${assetRev || Date.now()}`;
+      await lmc.mountOverlay({ frameBase, frameOurs, candId, viewId, camMetaUrl });
     }
 
     function setupSlider() {
@@ -720,13 +767,25 @@
       if (mode !== "viewer3d") render();
       else fillControls();
     });
-    document.querySelectorAll(".mode-bar button").forEach((btn) => {
+    document.querySelectorAll(".mode-bar button[data-mode]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        document.querySelectorAll(".mode-bar button").forEach((x) => x.classList.remove("active"));
+        document.querySelectorAll(".mode-bar button[data-mode]").forEach((x) => x.classList.remove("active"));
         btn.classList.add("active");
         mode = btn.getAttribute("data-mode");
         render();
       });
+    });
+
+    const lmToggleBtn = document.getElementById("lmToggle");
+    lmToggleBtn.addEventListener("click", async () => {
+      lmActive = !lmActive;
+      lmToggleBtn.classList.toggle("active", lmActive);
+      lmToggleBtn.textContent = lmActive ? "锚点叠层 ✓" : "锚点叠层 ⊕";
+      if (lmActive) {
+        await mountLandmarks();
+      } else {
+        lmc.clearOverlays();
+      }
     });
 
     fetch(`manifest.json?_=${Date.now()}`)

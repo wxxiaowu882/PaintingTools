@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Static server for compare_review with Cache-Control: no-store."""
+"""Static server for compare_review with Cache-Control: no-store.
+Bonus: POST /api/save-json { path: str, data: any } to save landmark JSON files.
+"""
 from __future__ import annotations
 
 import http.server
+import json
 import socketserver
-import sys
 import time
 import webbrowser
 from pathlib import Path
@@ -18,9 +20,41 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
+    def do_POST(self):
+        if self.path == "/api/save-json":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            try:
+                payload = json.loads(body)
+                rel = payload.get("path", "")
+                data = payload.get("data")
+                if not rel or ".." in rel or rel.startswith("/"):
+                    raise ValueError(f"bad path: {rel!r}")
+                target = (ROOT / rel).resolve()
+                if not str(target).startswith(str(ROOT)):
+                    raise ValueError("path escapes root")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+                resp = json.dumps({"ok": True}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(resp)))
+                self.end_headers()
+                self.wfile.write(resp)
+            except Exception as e:
+                msg = str(e).encode()
+                self.send_response(400)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", str(len(msg)))
+                self.end_headers()
+                self.wfile.write(msg)
+        else:
+            self.send_error(404)
+
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         self.send_header("Pragma", "no-cache")
+        self.send_header("Access-Control-Allow-Origin", "*")
         super().end_headers()
 
     def log_message(self, fmt, *args):
