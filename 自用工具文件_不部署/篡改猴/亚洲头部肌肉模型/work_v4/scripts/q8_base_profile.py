@@ -108,8 +108,7 @@ def run_base15_eval(tag: str) -> dict:
 def force_recolor():
     for obj_name, img, _sock in Q6B.albedo_images():
         if "Static" in obj_name:
-            mode = "static"
-            rem = R.remap_array(R.image_to_np(img), mode)
+            continue
         elif "Skiedras" in obj_name:
             R.reload_raw_texture(img, obj_name)
             mode = "skiedras"

@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "notes": "命名解剖点：正/侧主审。3D 点钉在头壳，再投到正交 PNG。不驱动改形。id 以 _L/_R 结尾的点默认同步镜像；按住 Shift 可单独调。自定义点：对称=custom_*_L/_R，不对称=custom_*，均可删除。",
+  "landmarks": [
+    {
+      "id": "trichion",
+      "label": "发际中",
+      "views": [
+        "front"
+      ],
+      "hint": "额部发际正中"
+    },
+    {
+      "id": "glabella",
+      "label": "眉心",
+      "views": [
+        "front"
+      ],
+      "hint": "两眉之间"
+    },
+    {
+      "id": "nasion",
+      "label": "鼻根",
+      "views": [
+        "front",
+        "side"
+      ],
+      "hint": "鼻梁最上凹"
+    },
+    {
+      "id": "endocanthion_L",
+      "label": "内眼角L",
+      "views": [
+        "front"
+      ],
+      "hint": "画面左侧内眼角"
+    },
+    {
+      "id": "endocanthion_R",
+      "label": "内眼角R",
+      "views": [
+        "front"
+      ],
+      "hint": "画面右侧内眼角"
+    },
+    {
+      "id": "exocanthion_L",
+      "label": "外眼角L",
+      "views": [
+        "front"
+      ],
+      "hint": "画面左侧外眼角"
+    },
+    {
+      "id": "exocanthion_R",
+      "label": "外眼角R",
+      "views": [
+        "front"
+      ],
+      "hint": "画面右侧外眼角"
+    },
+    {
+      "id": "alare_L",
+      "label": "鼻翼L",
+      "views": [
+        "front"
+      ],
+      "hint": "鼻翼最外"
+    },
+    {
+      "id": "alare_R",
+      "label": "鼻翼R",
+      "views": [
+        "front"
+      ],
+      "hint": "鼻翼最外"
+    },
+    {
+      "id": "pronasale",
+      "label": "鼻尖",
+      "views": [
+        "front",
+        "side"
+      ],
+      "hint": "鼻最前点"
+    },
+    {
+      "id": "cheilion_L",
+      "label": "口角L",
+      "views": [
+        "front"
+      ],
+      "hint": "嘴角"
+    },
+    {
+      "id": "cheilion_R",
+      "label": "口角R",
+      "views": [
+        "front"
+      ],
+      "hint": "嘴角"
+    },
+    {
+      "id": "zygion_L",
+      "label": "颧突L",
+      "views": [
+        "front"
+      ],
+      "hint": "颧骨最宽"
+    },
+    {
+      "id": "zygion_R",
+      "label": "颧突R",
+      "views": [
+        "front"
+      ],
+      "hint": "颧骨最宽"
+    },
+    {
+      "id": "gonion_L",
+      "label": "下颌角L",
+      "views": [
+        "side"
+      ],
+      "hint": "下颌角转折"
+    },
+    {
+      "id": "gonion_R",
+      "label": "下颌角R",
+      "views": [],
+      "hint": "下颌角转折"
+    },
+    {
+      "id": "masseter_mandible_kink_L",
+      "label": "咬肌下颌转折点L",
+      "views": [
+        "front"
+      ],
+      "hint": "咬肌外缘与下颌线的可见转折"
+    },
+    {
+      "id": "masseter_mandible_kink_R",
+      "label": "咬肌下颌转折点R",
+      "views": [
+        "front"
+      ],
+      "hint": "咬肌外缘与下颌线的可见转折"
+    },
+    {
+      "id": "gnathion",
+      "label": "颏下",
+      "views": [
+        "front",
+        "side"
+      ],
+      "hint": "下巴最低"
+    },
+    {
+      "id": "pogonion",
+      "label": "颏前",
+      "views": [
+        "side"
+      ],
+      "hint": "下巴最前"
+    },
+    {
+      "id": "tragion",
+      "label": "耳屏",
+      "views": [
+        "side"
+      ],
+      "hint": "耳屏前缘"
+    },
+    {
+      "id": "otobasion",
+      "label": "耳垂附",
+      "views": [
+        "side"
+      ],
+      "hint": "耳垂贴面处"
+    },
+    {
+      "id": "opisthocranion",
+      "label": "枕突",
+      "views": [
+        "side",
+        "back"
+      ],
+      "hint": "后枕最突"
+    },
+    {
+      "id": "vertex",
+      "label": "颅顶",
+      "views": [
+        "front",
+        "side",
+        "back"
+      ],
+      "hint": "头最高点"
+    },
+    {
+      "id": "custom_1787561362153",
+      "label": "测试",
+      "views": [
+        "front"
+      ],
+      "hint": "自定义"
+    },
+    {
+      "id": "custom_1787563453194",
+      "label": "鼻底",
+      "views": [
+        "front"
+      ],
+      "hint": "自定义",
+      "custom": true
+    },
+    {
+      "id": "custom_1787563482360_L",
+      "label": "颧骨L",
+      "views": [
+        "front"
+      ],
+      "hint": "自定义",
+      "custom": true
+    },
+    {
+      "id": "custom_1787563482360_R",
+      "label": "颧骨R",
+      "views": [
+        "front"
+      ],
+      "hint": "自定义",
+      "custom": true
+    }
+  ]
+}

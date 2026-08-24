@@ -26,6 +26,8 @@ Cloudflare/
 !自用工具文件_不部署/篡改猴/亚洲头部肌肉模型/base15_proportion_report.json
 !自用工具文件_不部署/篡改猴/亚洲头部肌肉模型/Base15_*.png
 .git/
+# MCP 配置含 API Token，不要提交/部署
+.cursor/mcp.json
 .cursor/browser-automation/node_modules/
 .cursor/browser-automation/runs/
 .cursor/browser-automation/chrome-profile-sketchfab/

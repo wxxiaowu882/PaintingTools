@@ -25,7 +25,7 @@ COMPARE_SIZE = 1600
 
 BG_MIN = 250.0
 STD_RATIO_MIN = 0.58          # ours ~0.41–0.52 on bad capture; Base has soft shading
-MEAN_DELTA_MAX = 18.0         # L2 vs Base fg mean; bad capture ~35
+MEAN_DELTA_MAX = 24.0         # pale Euro Static bone (zygoma gaps) lifts mean vs Base; 18 was for dark-slab era
 P95_RATIO_MIN = 0.88          # ours p95 172 vs Base 186
 P95_RATIO_MAX = 1.08
 HIST_L1_MAX = 0.55            # bad capture ~0.91

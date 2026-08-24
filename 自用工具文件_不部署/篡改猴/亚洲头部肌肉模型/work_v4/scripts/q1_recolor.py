@@ -152,11 +152,11 @@ def remap_array(arr: np.ndarray, mode: str) -> np.ndarray:
         near_white = (S < 0.20) & (V > 0.58)
         rgb[near_white] = 0.18 * rgb[near_white] + 0.82 * tgt
     elif mode == "static":
-        tgt = np.array([190 / 255, 188 / 255, 185 / 255], dtype=np.float32)
+        tgt = np.array([198 / 255, 194 / 255, 188 / 255], dtype=np.float32)
         lum = (0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2])[..., None]
-        grain = (lum - lum.mean()) * 0.10
-        base = np.clip(tgt + grain, 0.08, 0.80)
-        rgb = 0.10 * rgb + 0.90 * base
+        grain = (lum - lum.mean()) * 0.12
+        base = np.clip(tgt + grain, 0.28, 0.88)
+        rgb = 0.12 * rgb + 0.88 * base
     elif mode == "neck":
         tgt = np.array([175 / 255, 175 / 255, 178 / 255], dtype=np.float32)
         lum = (0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2])[..., None]

@@ -319,7 +319,7 @@ def assign_static_occipital_purple():
         if link.to_node == p and (link.to_socket.name or "").lower() in ("base color", "alpha", "normal"):
             purple.node_tree.links.remove(link)
     # Base15 occipital purple ≈ sampled temporalis band
-    p.inputs["Base Color"].default_value = (0.58, 0.50, 0.65, 1.0)
+    p.inputs["Base Color"].default_value = (0.50, 0.43, 0.56, 1.0)
     if "Roughness" in p.inputs:
         p.inputs["Roughness"].default_value = 0.55
     for key in ("Specular IOR Level", "Specular"):
@@ -351,34 +351,71 @@ def assign_static_occipital_purple():
 
 
 def flatten_static_shader(gray=(0.20, 0.215, 0.205, 1.0)):
-    """Solid gray underlay (slightly green-gray ≈ Base15 forehead). Keep Static normals; drop platysma normals."""
+    """Deprecated gray-slab path. Compare renders use shade_static_as_bone() instead."""
+    shade_static_as_bone()
+
+
+def shade_static_as_bone(rgb=(0.88, 0.86, 0.74, 1.0)):
+    """Euro Static IS the skull/fascia underlay — ivory albedo, not a gray slab.
+
+    Euro GLB layers:
+      Static  = bone + fascia (albedo ~RGB 224,220,189, median lum 0.96)
+      Deform / Skiedras = colored muscles
+      Plastyma = neck
+    Do not paint occipital purple onto Static (that is muscle, not bone).
+    Asian skull group stays hidden so a second skull never pokes through.
+    """
     static = get_obj("muscle", "Static")
+    bone_tex = TEXTURES / "euro_static_bone.png"
     if static:
-        if not static.material_slots:
-            static.data.materials.append(bpy.data.materials.new("Static"))
-        mat = static.material_slots[0].material
-        if mat:
+        for slot in static.material_slots:
+            mat = slot.material
+            if not mat:
+                continue
             if not mat.use_nodes:
                 mat.use_nodes = True
             nt = mat.node_tree
             p = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
-            if p:
-                for link in list(nt.links):
-                    sock = (link.to_socket.name or "").lower()
-                    if link.to_node == p and sock in ("base color", "alpha"):
-                        nt.links.remove(link)
-                p.inputs["Base Color"].default_value = gray
-                if "Roughness" in p.inputs:
-                    p.inputs["Roughness"].default_value = 0.62
-                for key in ("Specular IOR Level", "Specular"):
-                    if key in p.inputs:
-                        p.inputs[key].default_value = 0.18
-        assign_static_occipital_purple()
+            if not p:
+                continue
+            for link in list(nt.links):
+                sock = (link.to_socket.name or "").lower()
+                if link.to_node == p and sock in ("base color", "alpha"):
+                    nt.links.remove(link)
+            if bone_tex.exists():
+                img = bpy.data.images.get(bone_tex.name)
+                if img is None:
+                    img = bpy.data.images.load(str(bone_tex), check_existing=True)
+                tex = next((n for n in nt.nodes if n.type == "TEX_IMAGE" and n.image == img), None)
+                if tex is None:
+                    tex = nt.nodes.new("ShaderNodeTexImage")
+                    tex.image = img
+                    tex.location = (p.location.x - 320, p.location.y)
+                tex.image = img
+                nt.links.new(tex.outputs["Color"], p.inputs["Base Color"])
+            else:
+                p.inputs["Base Color"].default_value = rgb
+            if "Roughness" in p.inputs:
+                p.inputs["Roughness"].default_value = 0.48
+            for key in ("Specular IOR Level", "Specular"):
+                if key in p.inputs:
+                    p.inputs[key].default_value = 0.18
+            if "Metallic" in p.inputs:
+                p.inputs["Metallic"].default_value = 0.0
+            if "Emission Strength" in p.inputs:
+                p.inputs["Emission Strength"].default_value = 0.0
+            mat.blend_method = "OPAQUE"
+            # Slot 0 only: drop extra purple bone-paint slots.
+            break
+        if len(static.data.materials) > 1:
+            for poly in static.data.polygons:
+                poly.material_index = 0
+        print(f"[render] static ← euro ivory bone tex={bone_tex.exists()}")
     flatten_solid_principled(get_obj("muscle", "Plastyma"), (0.18, 0.18, 0.185, 1.0), unlink_normal=True)
 
 
 def prepare_compare_materials():
-    """Static/neck visible on white bg — Base15 has gray underlay, not white holes."""
+    """Muscle colors + ivory Static in gaps; neck gray. Do not hide bone with a gray slab."""
     dampen_compare_normals()
     try:
         import q1_recolor as R
@@ -387,11 +424,11 @@ def prepare_compare_materials():
         R.gray_plastyma_principled()
     except Exception as e:
         print(f"[warn] eye/neck material prep: {e}")
-    flatten_static_shader()
+    shade_static_as_bone()
 
 
 def prepare_compare_render(recolor: bool = False):
-    """Transparent film + solid Static gray; alpha composite to #FFF (do not flood-eat gray)."""
+    """Transparent film + ivory Static in muscle gaps; alpha composite to #FFF."""
     configure_color_management()
     setup_world_white(1.0)
     setup_compositor_white_bg()
@@ -418,7 +455,8 @@ def setup_lighting(objs=None, yaw_deg: float = 0.0, back_boost: bool = False):
         return Vector((x * cy - y * sy, x * sy + y * cy, z))
 
     # Front/side: Base fg mean ~138; back is brighter (~161) so extra key/fill.
-    rim_e, fill_e, key_e = (58, 20, 115) if back_boost else (30, 6, 64)
+    # Pale Static already lifts back/side; keep a mild back boost only.
+    rim_e, fill_e, key_e = (48, 14, 92) if back_boost else (30, 6, 64)
     for name, loc, energy in [
         ("Key", (1.2, -1.6, 1.4), key_e),
         ("Fill", (-1.4, -0.8, 0.9), fill_e),

@@ -81,9 +81,7 @@ def main():
         import q8_base_profile as Q8
 
         Q8.force_recolor()
-        C.darken_static_albedo()
-        C.flatten_static_shader()
-        print("[rerender] force_recolor once (before all views)")
+        print("[rerender] force_recolor once (before all views); Static→ivory bone")
     except Exception as e:
         print(f"[warn] force_recolor skipped: {e}")
 

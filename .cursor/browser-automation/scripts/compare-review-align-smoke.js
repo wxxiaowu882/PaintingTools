@@ -81,7 +81,7 @@ async function checkExposure(page) {
     const meanDelta = sb
       ? Math.hypot(so.mean[0] - sb.mean[0], so.mean[1] - sb.mean[1], so.mean[2] - sb.mean[2])
       : 0;
-    const colorDrift = sb ? meanDelta > 18 : so.meanMax > 165;
+    const colorDrift = sb ? meanDelta > 24 : so.meanMax > 165;
     const pass =
       bgOk &&
       !flat &&
