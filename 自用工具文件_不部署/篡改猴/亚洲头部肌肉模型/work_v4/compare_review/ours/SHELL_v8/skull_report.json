@@ -1,0 +1,102 @@
+{
+  "tag": "SHELL_v8",
+  "note": "自v7：侧视同向+Base15色；大型比例 hw 对齐",
+  "from": "SHELL_v7.blend",
+  "before": {
+    "soft": {
+      "size": [
+        0.4158460199832916,
+        0.32333260774612427,
+        0.41593942046165466
+      ],
+      "depth_over_width": 0.7775296436866596,
+      "height_over_width": 1.000224603516385,
+      "center": [
+        0.0,
+        0.0,
+        0.20000000298023224
+      ]
+    },
+    "cranial": {
+      "size": [
+        0.23246635496616364,
+        0.35249990224838257,
+        0.3126489520072937
+      ],
+      "depth_over_width": 1.516348042277732,
+      "height_over_width": 1.3449212986231962
+    }
+  },
+  "after": {
+    "soft": {
+      "size": [
+        0.41614866256713867,
+        0.2948598265647888,
+        0.45503777265548706
+      ],
+      "depth_over_width": 0.7085444531909749,
+      "height_over_width": 1.0934500422239715,
+      "center": [
+        0.0,
+        0.0,
+        0.20000001788139343
+      ]
+    },
+    "cranial": {
+      "size": [
+        0.23268163204193115,
+        0.32474982738494873,
+        0.3476425111293793
+      ],
+      "depth_over_width": 1.395683125200128,
+      "height_over_width": 1.4940694204290745
+    }
+  },
+  "proportion": {
+    "pass": false,
+    "notes": [
+      "hw_ratio: ref=1.269 test=1.114 err=12.2% (max 6%)",
+      "vault_ratio: OK ref=0.984 test=1.000",
+      "occiput_ratio: ref=0.997 test=0.902 err=9.6% (max 8%)",
+      "area_ratio: ref=1.0 test=0.285 err=71.5%",
+      "profile_rmse=0.1661 high (max 0.055)"
+    ],
+    "metrics": {
+      "hw_ratio": {
+        "ref": 1.268822393822394,
+        "test": 1.113785557986871,
+        "err": 0.12218954882130223,
+        "pass": false
+      },
+      "vault_ratio": {
+        "ref": 0.984073359073359,
+        "test": 1.0,
+        "err": 0.016184404119666557,
+        "pass": true
+      },
+      "occiput_ratio": {
+        "ref": 0.997104247104247,
+        "test": 0.9015317286652079,
+        "err": 0.09585007657584177,
+        "pass": false
+      },
+      "area_ratio": {
+        "ref": 1.0,
+        "test": 0.2849035009568389,
+        "err": 0.7150964990431611,
+        "pass": false
+      },
+      "profile_rmse": 0.16611920839058703
+    },
+    "ref_png": "D:\\Git仓库位置\\PaintingTools\\自用工具文件_不部署\\篡改猴\\亚洲头部肌肉模型\\Base15_侧.png",
+    "test_png": "D:\\Git仓库位置\\PaintingTools\\自用工具文件_不部署\\篡改猴\\亚洲头部肌肉模型\\work_v4\\compare_review\\ours\\SHELL_v8\\_probe_e3\\muscle_side.png"
+  },
+  "judgment": {
+    "chain": "v1→…→v7→v8",
+    "width_ratio": 1.0009260569160594,
+    "not_sphere_gate": true,
+    "proportion_pass": false,
+    "review_ortho": true,
+    "agent_pass": false
+  }
+}

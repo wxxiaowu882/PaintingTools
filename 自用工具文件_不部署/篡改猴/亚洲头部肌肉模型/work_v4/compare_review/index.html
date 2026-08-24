@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Base15 对照审阅</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js"
+    }
+  }
+  </script>
+  <style>
+    :root {
+      --bg: #1a1c1e;
+      --panel: #24272b;
+      --text: #f2f2f0;
+      --muted: #9aa0a6;
+      --accent: #c4a574;
+      --line: #3a3f45;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .sub { color: var(--muted); font-size: 0.85rem; line-height: 1.45; max-width: 960px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; align-items: center; }
+    label { font-size: 0.8rem; color: var(--muted); margin-right: 4px; }
+    select, button {
+      background: #2e3338;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+    button.active, .chip.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      background: #2e3338;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      color: var(--text);
+    }
+    main { padding: 16px 20px 40px; }
+    .mode-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .stage {
+      display: grid;
+      gap: 12px;
+    }
+    .stage.side { grid-template-columns: 1fr 1fr; }
+    .stage.stack { grid-template-columns: 1fr; }
+    .stage.viewer3d { grid-template-columns: 1fr; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .card h2 {
+      margin: 0;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card h2 span { color: var(--muted); font-weight: 400; font-size: 0.78rem; }
+    .frame {
+      background: #fff;
+      min-height: 280px;
+      aspect-ratio: 1 / 1;
+      position: relative;
+      overflow: hidden;
+    }
+    .frame img {
+      position: absolute;
+      max-width: none;
+      max-height: none;
+      display: block;
+      pointer-events: none;
+    }
+    #viewerHost {
+      width: 100%;
+      height: min(78vh, 720px);
+      background: #fff;
+      position: relative;
+    }
+    #viewerHost canvas { display: block; width: 100% !important; height: 100% !important; }
+    .viewer-status {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      background: rgba(0,0,0,0.45);
+      padding: 4px 8px;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+    .slider-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 960px;
+      margin: 0 auto;
+      aspect-ratio: 1 / 1;
+      background: #fff;
+      overflow: hidden;
+      user-select: none;
+      touch-action: none;
+    }
+    .slider-wrap .layer {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    .frame img,
+    .slider-wrap img {
+      position: absolute;
+      max-width: none;
+      max-height: none;
+      pointer-events: none;
+    }
+    .slider-wrap .top { clip-path: inset(0 50% 0 0); }
+    .slider-wrap .handle {
+      position: absolute;
+      top: 0; bottom: 0; left: 50%;
+      width: 2px;
+      background: var(--accent);
+      transform: translateX(-50%);
+    }
+    .slider-wrap .handle::after {
+      content: "";
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 28px; height: 28px;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(26, 28, 30, 0.85);
+    }
+    .hint { color: var(--muted); font-size: 0.8rem; margin-top: 8px; text-align: center; }
+    .note {
+      margin-top: 18px;
+      padding: 12px 14px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    .chip.aux { opacity: 0.72; border-style: dashed; }
+    .view-sep {
+      font-size: 0.72rem;
+      color: var(--muted);
+      padding: 6px 4px 6px 8px;
+      align-self: center;
+    }
+    @media (max-width: 860px) {
+      .stage.side { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Base15 ↔ 当前成果 对照审阅</h1>
+    <p class="sub">主审视角：<strong>正 / 侧 / 背</strong>（大型比例验收）。前侧/后侧仅辅助参考。均为正交取景，与 Base15 一致。</p>
+    <div class="row">
+      <label>候选版本</label>
+      <select id="cand"></select>
+      <label>视角</label>
+      <div class="chips" id="views"></div>
+    </div>
+    <div class="row mode-bar">
+      <button type="button" class="active" data-mode="side">并排对照</button>
+      <button type="button" data-mode="slider">拖拽叠图</button>
+      <button type="button" data-mode="stack">上下对照</button>
+      <button type="button" data-mode="viewer3d">3D预览 GLB</button>
+    </div>
+  </header>
+  <main>
+    <div id="stage" class="stage side"></div>
+    <p class="hint" id="hint"></p>
+    <p class="hint" style="opacity:0.55;font-size:0.72rem">对照页 v8 · 白底3D正交截取 · Base15调色 · 默认 SHELL_v8</p>
+    <div class="note" id="candNote"></div>
+  </main>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "./vendor/controls/OrbitControls.js";
+    import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
+
+    const PRIMARY_VIEWS = [
+      { id: "front", label: "正" },
+      { id: "side", label: "侧" },
+      { id: "back", label: "背" },
+    ];
+    const AUX_VIEWS = [
+      { id: "front_three_quarter", label: "前侧" },
+      { id: "rear_three_quarter", label: "后侧" },
+    ];
+    const VIEWS = [...PRIMARY_VIEWS, ...AUX_VIEWS];
+    const FALLBACK_CANDS = [
+      { id: "SKULL_v2", note: "人眼纠偏：加宽+略收前后", glb: true },
+      { id: "SKULL_v1", note: "上版正/顶别扭", glb: true },
+      { id: "PROP_v2", note: "已废弃坏例", glb: true },
+    ];
+    const GLB_CANDS = new Set(["SKULL_v2", "SKULL_v1", "PROP_v1", "PROP_v2"]);
+
+    let cands = FALLBACK_CANDS.slice();
+    let viewId = "front";
+    let mode = "side";
+    let candId = "PROP_v2";
+
+    const elCand = document.getElementById("cand");
+    const elViews = document.getElementById("views");
+    const elStage = document.getElementById("stage");
+    const elHint = document.getElementById("hint");
+    const elNote = document.getElementById("candNote");
+
+    let viewer = null;
+    let alignCache = new Map();
+    let alignObservers = [];
+
+    let assetRev = "";
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    function cornerBg(data, sw, sh) {
+      const pts = [[0, 0], [sw - 1, 0], [0, sh - 1], [sw - 1, sh - 1]];
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      for (const [x, y] of pts) {
+        const i = (y * sw + x) * 4;
+        r += data[i];
+        g += data[i + 1];
+        b += data[i + 2];
+      }
+      return { r: r / 4, g: g / 4, b: b / 4 };
+    }
+
+    function isForeground(i, data, bg, minDelta = 14) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      if (a < 8) return false;
+      const dr = Math.abs(r - bg.r);
+      const dg = Math.abs(g - bg.g);
+      const db = Math.abs(b - bg.b);
+      return dr + dg + db > minDelta;
+    }
+
+    function analyzeImage(img) {
+      const maxSide = 1200;
+      let sw = img.naturalWidth;
+      let sh = img.naturalHeight;
+      if (sw < 1 || sh < 1) {
+        return { left: 0, top: 0, right: 1, bottom: 1, w: 1, h: 1, cx: 0.5, cy: 0.5, span: 1 };
+      }
+      if (Math.max(sw, sh) > maxSide) {
+        const ds = maxSide / Math.max(sw, sh);
+        sw = Math.max(1, Math.round(sw * ds));
+        sh = Math.max(1, Math.round(sh * ds));
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = sw;
+      canvas.height = sh;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, sw, sh);
+      const data = ctx.getImageData(0, 0, sw, sh).data;
+      const bg = cornerBg(data, sw, sh);
+
+      let minX = sw;
+      let minY = sh;
+      let maxX = 0;
+      let maxY = 0;
+      let found = false;
+      for (let y = 0; y < sh; y++) {
+        for (let x = 0; x < sw; x++) {
+          if (!isForeground((y * sw + x) * 4, data, bg)) continue;
+          found = true;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+      if (!found) {
+        return { left: 0, top: 0, right: 1, bottom: 1, w: 1, h: 1, cx: 0.5, cy: 0.5, span: 1 };
+      }
+
+      const x0 = Math.floor(sw * 0.22);
+      const x1 = Math.ceil(sw * 0.78);
+      let headTop = sh;
+      let headBottom = -1;
+      let cxSum = 0;
+      let cxCount = 0;
+      for (let y = 0; y < sh; y++) {
+        let rowCount = 0;
+        let rowXSum = 0;
+        for (let x = x0; x < x1; x++) {
+          if (!isForeground((y * sw + x) * 4, data, bg)) continue;
+          rowCount++;
+          rowXSum += x;
+        }
+        if (rowCount >= 4) {
+          headTop = Math.min(headTop, y);
+          headBottom = Math.max(headBottom, y);
+          cxSum += rowXSum / rowCount;
+          cxCount++;
+        }
+      }
+      if (headBottom < 0) {
+        headTop = minY;
+        headBottom = maxY;
+        cxSum = (minX + maxX) * 0.5;
+        cxCount = 1;
+      }
+
+      const top = headTop / sh;
+      const bottom = (headBottom + 1) / sh;
+      const left = minX / sw;
+      const right = (maxX + 1) / sw;
+      const span = bottom - top;
+      const cx = (cxSum / Math.max(cxCount, 1)) / sw;
+      const cy = (top + bottom) * 0.5;
+      return { left, top, right, bottom, w: right - left, h: span, cx, cy, span };
+    }
+
+    async function fetchJson(url) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) return null;
+        return await r.json();
+      } catch {
+        return null;
+      }
+    }
+
+    function pickBox(meta, view) {
+      if (meta && meta[view] && typeof meta[view].span === "number") return meta[view];
+      return null;
+    }
+
+    async function getAlignPair(baseSrc, oursSrc) {
+      const key = `${viewId}|${candId}|${baseSrc}|${oursSrc}`;
+      if (alignCache.has(key)) return alignCache.get(key);
+      const [baseImg, oursImg] = await Promise.all([loadImage(baseSrc), loadImage(oursSrc)]);
+      // 大型对齐必须基于「PNG 可见轮廓」，不能用 Blender 3D 框（斜视图可差 10%+）
+      const refBox = analyzeImage(baseImg);
+      const baseBox = refBox;
+      const oursBox = analyzeImage(oursImg);
+      const pair = { baseImg, oursImg, refBox, baseBox, oursBox, source: { ref: "pixels", ours: "pixels" } };
+      alignCache.set(key, pair);
+      return pair;
+    }
+
+    function clearAlignObservers() {
+      alignObservers.forEach((ro) => ro.disconnect());
+      alignObservers = [];
+    }
+
+    function applyAlignedImage(host, imgEl, img, bbox, refBox) {
+      const paint = () => {
+        const w = host.clientWidth;
+        const h = host.clientHeight;
+        if (w < 2 || h < 2 || img.naturalWidth < 1 || img.naturalHeight < 1) return;
+        const refSpan = (refBox.span || refBox.h) * h;
+        const srcSpan = (bbox.span || bbox.h) * img.naturalHeight;
+        const scale = refSpan / Math.max(srcSpan, 1);
+        const dispW = img.naturalWidth * scale;
+        const dispH = img.naturalHeight * scale;
+        const left = (refBox.cx || 0.5) * w - (bbox.cx || 0.5) * dispW;
+        const top = refBox.top * h - bbox.top * dispH;
+        imgEl.style.width = `${dispW}px`;
+        imgEl.style.height = `${dispH}px`;
+        imgEl.style.left = `${left}px`;
+        imgEl.style.top = `${top}px`;
+        imgEl.dataset.headTop = String(refBox.top * h);
+        imgEl.dataset.headBottom = String(refBox.bottom * h);
+      };
+      const schedule = () => requestAnimationFrame(() => requestAnimationFrame(paint));
+      schedule();
+      imgEl.addEventListener("load", schedule);
+      const ro = new ResizeObserver(schedule);
+      ro.observe(host);
+      if (host.parentElement) ro.observe(host.parentElement);
+      alignObservers.push(ro);
+    }
+
+    function mountAlignedFrame(host, img, bbox, refBox) {
+      host.innerHTML = "";
+      const imgEl = document.createElement("img");
+      imgEl.alt = host.dataset.label || "";
+      imgEl.src = img.src;
+      imgEl.decoding = "async";
+      host.appendChild(imgEl);
+      applyAlignedImage(host, imgEl, img, bbox, refBox);
+    }
+
+    function baseUrl(view) { return `base15/${view}.png${assetRev ? "?v=" + assetRev : ""}`; }
+    function oursUrl(cand, view) { return `ours/${cand}/muscle_${view}.png${assetRev ? "?v=" + assetRev : ""}`; }
+    function glbUrl(cand) { return `glb/${cand}.glb${assetRev ? "?v=" + assetRev : ""}`; }
+    function hasGlb(cand) {
+      const c = cands.find((x) => x.id === cand);
+      if (c && typeof c.glb === "boolean") return c.glb;
+      return GLB_CANDS.has(cand);
+    }
+
+    function isPrimaryView(id) {
+      return PRIMARY_VIEWS.some((v) => v.id === id);
+    }
+
+    function fillControls() {
+      elCand.innerHTML = cands.map((c) => `<option value="${c.id}">${c.id}${hasGlb(c.id) ? " ·GLB" : ""}</option>`).join("");
+      elCand.value = candId;
+      const chip = (v, aux) =>
+        `<button type="button" class="chip${aux ? " aux" : ""}${v.id === viewId ? " active" : ""}" data-view="${v.id}">${v.label}</button>`;
+      elViews.innerHTML =
+        PRIMARY_VIEWS.map((v) => chip(v, false)).join("") +
+        `<span class="view-sep">辅助</span>` +
+        AUX_VIEWS.map((v) => chip(v, true)).join("");
+    }
+
+    function viewHint() {
+      if (mode === "viewer3d") return "";
+      if (!isPrimaryView(viewId)) {
+        return "辅助视角（前侧/后侧）：相机角与 Base15 画稿未必一致，勿作大型比例硬结论。请以正/侧/背为准。";
+      }
+      return mode === "side"
+        ? "主审「正/侧/背」：同一显示尺度（头顶/下巴对齐 Base15），优先看大型比例。"
+        : mode === "slider"
+          ? "主审视角：头顶/下巴已对齐；拖中间线看轮廓差。"
+          : "主审视角：上下排列，同一显示尺度。";
+    }
+
+    function currentNote() {
+      const c = cands.find((x) => x.id === candId);
+      return c ? c.note || "" : "";
+    }
+
+    function disposeViewer() {
+      if (!viewer) return;
+      cancelAnimationFrame(viewer.raf);
+      viewer.controls.dispose();
+      viewer.renderer.dispose();
+      if (viewer.ro) viewer.ro.disconnect();
+      viewer = null;
+    }
+
+    function fitCamera(camera, controls, object, host) {
+      const box = new THREE.Box3().setFromObject(object);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z, 1e-6);
+      const aspect = Math.max((host.clientWidth || 800) / Math.max(host.clientHeight || 560, 1), 1e-6);
+      const padding = 1.12;
+      const frustumHeight = maxDim * padding;
+      camera.left = (-frustumHeight * aspect) / 2;
+      camera.right = (frustumHeight * aspect) / 2;
+      camera.top = frustumHeight / 2;
+      camera.bottom = -frustumHeight / 2;
+      camera.near = -maxDim * 30;
+      camera.far = maxDim * 30;
+      camera.position.set(center.x, center.y, center.z + maxDim * 3);
+      camera.lookAt(center);
+      camera.updateProjectionMatrix();
+      controls.target.copy(center);
+      controls.update();
+      return frustumHeight;
+    }
+
+    function initViewer(host, statusEl, url) {
+      disposeViewer();
+      const w = host.clientWidth || 800;
+      const h = host.clientHeight || 560;
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xffffff);
+      const aspect = w / Math.max(h, 1);
+      const camera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, -1000, 1000);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(w, h, false);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 0.72;
+      host.innerHTML = "";
+      host.appendChild(renderer.domElement);
+      if (statusEl) host.appendChild(statusEl);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x888888, 0.75);
+      scene.add(hemi);
+      const dir = new THREE.DirectionalLight(0xffffff, 0.85);
+      dir.position.set(2.2, 3.5, 2.8);
+      scene.add(dir);
+      const fill = new THREE.DirectionalLight(0xf0f0f0, 0.32);
+      fill.position.set(-2.5, 1.2, -1.5);
+      scene.add(fill);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+
+      const loader = new GLTFLoader();
+      statusEl.textContent = "加载中… " + url;
+      loader.load(
+        url,
+        (gltf) => {
+          const root = gltf.scene || gltf.scenes[0];
+          scene.add(root);
+          const frustumHeight = fitCamera(camera, controls, root, host);
+          statusEl.textContent = "正交 · 白底 · 拖拽旋转 · " + candId;
+          viewer.frustumHeight = frustumHeight;
+        },
+        undefined,
+        (err) => {
+          console.error(err);
+          statusEl.textContent = "加载失败：当前候选可能没有 GLB（请选 PROP_v1 / PROP_v2）";
+        }
+      );
+
+      const tick = () => {
+        viewer.raf = requestAnimationFrame(tick);
+        controls.update();
+        renderer.render(scene, camera);
+      };
+
+      const ro = new ResizeObserver(() => {
+        const nw = host.clientWidth;
+        const nh = host.clientHeight;
+        if (nw < 2 || nh < 2) return;
+        const aspect = nw / nh;
+        const fh = viewer.frustumHeight || 1;
+        camera.left = (-fh * aspect) / 2;
+        camera.right = (fh * aspect) / 2;
+        camera.top = fh / 2;
+        camera.bottom = -fh / 2;
+        camera.updateProjectionMatrix();
+        renderer.setSize(nw, nh, false);
+      });
+      ro.observe(host);
+
+      viewer = { scene, camera, renderer, controls, raf: 0, ro, frustumHeight: 1 };
+      tick();
+    }
+
+    async function render() {
+      alignCache.clear();
+      const ref = baseUrl(viewId);
+      const ours = oursUrl(candId, viewId);
+      const vLabel = (VIEWS.find((v) => v.id === viewId) || {}).label || viewId;
+      elNote.textContent = `当前：${candId} · ${mode === "viewer3d" ? "3D GLB" : vLabel}。${currentNote()}`;
+
+      if (mode === "viewer3d") {
+        clearAlignObservers();
+        elStage.className = "stage viewer3d";
+        const ok = hasGlb(candId);
+        elStage.innerHTML = `
+          <div class="card">
+            <h2>3D 预览 <span>${candId}${ok ? ".glb" : "（无 GLB）"} · 正交</span></h2>
+            <div id="viewerHost"><div class="viewer-status" id="viewerStatus"></div></div>
+          </div>`;
+        elHint.textContent = viewHint() || (ok
+          ? "正交 3D 预览：与 Base15 / 静态渲染同一观察方式，可旋转看真实三维比例。"
+          : "该候选未导出 GLB。");
+        if (ok) {
+          const host = document.getElementById("viewerHost");
+          const status = document.getElementById("viewerStatus");
+          initViewer(host, status, glbUrl(candId));
+        } else {
+          disposeViewer();
+        }
+        return;
+      }
+
+      disposeViewer();
+      clearAlignObservers();
+      elStage.className = "stage " + (mode === "stack" ? "stack" : mode === "side" ? "side" : "stack");
+
+      if (mode === "slider") {
+        elStage.innerHTML = `
+          <div class="card">
+            <h2>拖拽对照 <span>左半 Base15 · 右半 我们的 · 同尺度对齐</span></h2>
+            <div class="slider-wrap" id="slider">
+              <div class="layer" id="layerOurs"></div>
+              <div class="layer top" id="layerBase"></div>
+              <div class="handle" id="handle"></div>
+            </div>
+          </div>`;
+        elHint.textContent = viewHint() || "头顶/下巴已按 Base15 尺度对齐；按住中间线左右拖动看轮廓差。";
+        try {
+          const pair = await getAlignPair(ref, ours);
+          mountAlignedFrame(document.getElementById("layerBase"), pair.baseImg, pair.baseBox, pair.refBox);
+          mountAlignedFrame(document.getElementById("layerOurs"), pair.oursImg, pair.oursBox, pair.refBox);
+          setupSlider();
+        } catch (err) {
+          console.error(err);
+          elHint.textContent = "图片加载失败，请确认已生成正交截图。";
+        }
+        return;
+      }
+
+      elStage.innerHTML = `
+        <div class="card">
+          <h2>Base15 <span>${vLabel}</span></h2>
+          <div class="frame" id="frameBase" data-label="Base15"></div>
+        </div>
+        <div class="card">
+          <h2>${candId} <span>${vLabel}</span></h2>
+          <div class="frame" id="frameOurs" data-label="${candId}"></div>
+        </div>`;
+      elHint.textContent = viewHint() || (mode === "side"
+        ? "左右并排：同一显示尺度（头顶/下巴对齐 Base15），便于直接比轮廓与比例。"
+        : "上下排列，同一显示尺度。");
+      try {
+        const pair = await getAlignPair(ref, ours);
+        mountAlignedFrame(document.getElementById("frameBase"), pair.baseImg, pair.baseBox, pair.refBox);
+        mountAlignedFrame(document.getElementById("frameOurs"), pair.oursImg, pair.oursBox, pair.refBox);
+      } catch (err) {
+        console.error(err);
+        elHint.textContent = "图片加载失败，请确认已生成正交截图。";
+      }
+    }
+
+    function setupSlider() {
+      const wrap = document.getElementById("slider");
+      const topLayer = document.getElementById("layerBase");
+      const handle = document.getElementById("handle");
+      if (!wrap || !topLayer) return;
+      const setX = (clientX) => {
+        const r = wrap.getBoundingClientRect();
+        let t = (clientX - r.left) / r.width;
+        t = Math.max(0.02, Math.min(0.98, t));
+        topLayer.style.clipPath = `inset(0 ${(1 - t) * 100}% 0 0)`;
+        handle.style.left = `${t * 100}%`;
+      };
+      const onMove = (e) => {
+        const x = e.touches ? e.touches[0].clientX : e.clientX;
+        setX(x);
+      };
+      const stop = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", stop);
+        window.removeEventListener("touchmove", onMove);
+        window.removeEventListener("touchend", stop);
+      };
+      wrap.addEventListener("pointerdown", (e) => {
+        setX(e.clientX);
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", stop);
+      });
+      wrap.addEventListener("touchstart", (e) => {
+        setX(e.touches[0].clientX);
+        window.addEventListener("touchmove", onMove, { passive: true });
+        window.addEventListener("touchend", stop);
+      }, { passive: true });
+    }
+
+    elCand.addEventListener("change", () => {
+      candId = elCand.value;
+      render();
+    });
+    elViews.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-view]");
+      if (!b) return;
+      viewId = b.getAttribute("data-view");
+      fillControls();
+      if (mode !== "viewer3d") render();
+      else fillControls();
+    });
+    document.querySelectorAll(".mode-bar button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".mode-bar button").forEach((x) => x.classList.remove("active"));
+        btn.classList.add("active");
+        mode = btn.getAttribute("data-mode");
+        render();
+      });
+    });
+
+    fetch(`manifest.json?_=${Date.now()}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && Array.isArray(data.candidates) && data.candidates.length) {
+          cands = data.candidates.map((c) => ({
+            ...c,
+            glb: typeof c.glb === "boolean" ? c.glb : GLB_CANDS.has(c.id),
+          }));
+          const prefer =
+            cands.find((c) => c.id === data.default_review) ||
+            cands.find((c) => c.id === data.stage) ||
+            cands[0];
+          candId = prefer.id;
+          assetRev = data.asset_rev || "";
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        fillControls();
+        render();
+      });
+  </script>
+</body>
+</html>

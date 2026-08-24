@@ -1,0 +1,39 @@
+{
+  "pass": false,
+  "notes": [
+    "hw_ratio: ref=1.269 test=1.092 err=13.9% (max 6%)",
+    "vault_ratio: OK ref=0.984 test=1.000",
+    "occiput_ratio: ref=0.997 test=0.901 err=9.6% (max 8%)",
+    "area_ratio: ref=1.0 test=0.287 err=71.3%",
+    "profile_rmse=0.1644 high (max 0.055)"
+  ],
+  "metrics": {
+    "hw_ratio": {
+      "ref": 1.268822393822394,
+      "test": 1.0920770877944326,
+      "err": 0.1392986968771152,
+      "pass": false
+    },
+    "vault_ratio": {
+      "ref": 0.984073359073359,
+      "test": 1.0,
+      "err": 0.016184404119666557,
+      "pass": true
+    },
+    "occiput_ratio": {
+      "ref": 0.997104247104247,
+      "test": 0.9014989293361885,
+      "err": 0.09588297115944695,
+      "pass": false
+    },
+    "area_ratio": {
+      "ref": 1.0,
+      "test": 0.2872913906682173,
+      "err": 0.7127086093317827,
+      "pass": false
+    },
+    "profile_rmse": 0.1644278584967173
+  },
+  "ref_png": "D:\\Git仓库位置\\PaintingTools\\自用工具文件_不部署\\篡改猴\\亚洲头部肌肉模型\\Base15_侧.png",
+  "test_png": "D:\\Git仓库位置\\PaintingTools\\自用工具文件_不部署\\篡改猴\\亚洲头部肌肉模型\\work_v4\\compare_review\\ours\\SHELL_v8\\_probe_e4\\muscle_side.png"
+}

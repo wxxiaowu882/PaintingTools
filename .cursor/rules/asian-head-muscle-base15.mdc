@@ -1,0 +1,32 @@
+---
+description: 亚洲头部肌肉 Base15 对照任务 — 交付前自测、白底正交渲染、主审三视验收
+globs: 自用工具文件_不部署/篡改猴/亚洲头部肌肉模型/**/*
+alwaysApply: false
+---
+
+# 亚洲头肌 × Base15 任务规则（摘要）
+
+完整文档：`自用工具文件_不部署/篡改猴/亚洲头部肌肉模型/work_v4/任务规则与验收.md`
+
+## 交付铁律
+
+1. **未经 AI 自测 PASS，不得请用户验收。** 跑 `python work_v4/scripts/selftest_primary_review.py <候选ID>`，mandatory 全过才算交付。
+
+## 自测 = 用户对图标准
+
+- **2.1** 成果图必须 Blender **3D 正交**渲染；主审正/侧/背与 Base **顶底对齐**、**同向**（侧视不可镜像）、机位与 `VIEW_SPECS_PRIMARY` 一致。
+- **2.2** 截图与 3D 预览背景均为 **#FFFFFF**；肌肉色彩与 Base 同一套；**mandatory** `verify_render_visual.py` 比 shading/直方图/额部 hue
+- **漏检防再发**：禁止仅用 exposure mean 代表色彩 PASS；用户指出的缺陷须先补门禁再修图（见规则文档 §8）
+- **2.3** 主审三视 **大型比例** 与 Base 一致；侧视细比例 eval 为 optional WARN。
+- **2.5** **正交**为主，禁止明显透视截图。
+
+## 迭代与防回归
+
+3. **先大型比例，再局部**；每步单点改动 + 自测闭环。  
+4. **最小 diff**；改渲染/相机/色彩/对齐后必重跑自测；勿删 whiten subprocess、侧视 flip 等已验收 workaround。
+
+## 关键路径
+
+- 对照页：`work_v4/compare_review/`（http://127.0.0.1:8765/，禁 file://）
+- 重渲：`blender --background --python work_v4/scripts/rerender_compare_views.py -- SHELL_vN`
+- 白底后处理须见 `[whiten]` 日志，禁止 `[warn] whiten skip (no PIL)` 仍交付

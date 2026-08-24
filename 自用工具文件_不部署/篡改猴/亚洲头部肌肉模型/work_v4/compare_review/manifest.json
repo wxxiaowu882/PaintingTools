@@ -1,0 +1,46 @@
+{
+  "candidates": [
+    {
+      "id": "SHELL_v8",
+      "blend": "SHELL_v8.blend",
+      "note": "自v7：侧视同向+Base15色；大型比例 hw 对齐",
+      "glb": true
+    },
+    {
+      "id": "SHELL_v7",
+      "blend": "SHELL_v7.blend",
+      "note": "上版·后枕+下颌",
+      "glb": true
+    },
+    {
+      "id": "SHELL_v6",
+      "blend": "SHELL_v6.blend",
+      "note": "后枕加强",
+      "glb": true
+    },
+    {
+      "id": "SHELL_v1",
+      "blend": "SHELL_v1.blend",
+      "note": "基线·约60分",
+      "glb": true
+    },
+    {
+      "id": "SHELL_v2",
+      "blend": "SHELL_v2.blend",
+      "note": "坏例·球形头颅",
+      "glb": true
+    }
+  ],
+  "stage": "SHELL_v8",
+  "default_review": "SHELL_v8",
+  "asset_rev": "20260824h",
+  "never_promote": [
+    "SHELL_v2"
+  ],
+  "review_ortho": true,
+  "primary_views": [
+    "front",
+    "side",
+    "back"
+  ]
+}

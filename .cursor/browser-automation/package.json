@@ -6,7 +6,12 @@
   "scripts": {
     "serve:repo": "node scripts/static-server.js",
     "smoke:solid-create": "node scripts/solid-create-smoke.js",
-    "clean:runs": "node scripts/cleanup-runs.js"
+    "clean:runs": "node scripts/cleanup-runs.js",
+    "sketchfab:login": "node scripts/sketchfab-batch-download.js --login",
+    "sketchfab:batch": "node scripts/sketchfab-batch-download.js",
+    "sketchfab:ui": "node scripts/sketchfab-batch-ui-server.js",
+    "smoke:compare-align": "node scripts/compare-review-align-smoke.js",
+    "selftest:compare-web": "node scripts/compare-review-web-selftest.js"
   },
   "keywords": [],
   "author": "",

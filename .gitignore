@@ -1,10 +1,23 @@
 # 排除不需要上传到 Cloudflare 的文件夹
 历史备份文件/
 历史部署压缩包/
+# 站点运维知识库与密钥（本地给 Cursor 用；绝不能作为网站公开路径）
+Cloudflare/
 自用工具文件_不部署/*
 !自用工具文件_不部署/石膏人像沙盒场景生成/
+!自用工具文件_不部署/篡改猴/
 自用工具文件_不部署/石膏人像沙盒场景生成/*
 !自用工具文件_不部署/石膏人像沙盒场景生成/Solid_Portrait_Create.html
+自用工具文件_不部署/篡改猴/*
+!自用工具文件_不部署/篡改猴/亚洲头部肌肉模型/
+自用工具文件_不部署/篡改猴/亚洲头部肌肉模型/*
+!自用工具文件_不部署/篡改猴/亚洲头部肌肉模型/work_v4/
+!自用工具文件_不部署/篡改猴/亚洲头部肌肉模型/打开对照页.bat
+!自用工具文件_不部署/篡改猴/亚洲头部肌肉模型/制作策略_修订.md
+!自用工具文件_不部署/篡改猴/亚洲头部肌肉模型/base15_proportion_report.json
+!自用工具文件_不部署/篡改猴/亚洲头部肌肉模型/Base15_*.png
 .git/
 .cursor/browser-automation/node_modules/
 .cursor/browser-automation/runs/
+.cursor/browser-automation/chrome-profile-sketchfab/
+node_modules/

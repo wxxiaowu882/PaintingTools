@@ -1,0 +1,17 @@
+# Regeneratable / large binaries — rerun scripts to reproduce
+*.blend
+*.blend1
+*.glb
+checkpoints/
+stages/
+asian_head_muscles_base15*
+
+compare_review/glb/
+compare_review/_selftest/
+compare_review/_exp_probe/
+compare_review/_exp_probe*/
+compare_review/ours/*
+!compare_review/ours/SHELL_v8/
+
+textures/*_raw.png
+textures/*_base15.png
