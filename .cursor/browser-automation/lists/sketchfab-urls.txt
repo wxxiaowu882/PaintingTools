@@ -1,0 +1,9 @@
+# Sketchfab 批量下载 URL 列表
+# 每行一个模型页链接或 32 位模型 ID；# 开头为注释
+#
+# 运行：
+#   cd .cursor/browser-automation
+#   npm run sketchfab:login          # 首次：浏览器里登录 Sketchfab
+#   npm run sketchfab:batch -- --list lists/sketchfab-urls.txt
+
+https://sketchfab.com/3d-models/3d-head-scan-shader-testing-a93fd43dd1eb485eb8bcb9f5afae50d8

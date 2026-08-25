@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sketchfab 批量下载控制台</title>
+<style>
+  :root {
+    --bg: #12141a;
+    --panel: #1a1d26;
+    --line: #2c3140;
+    --text: #e8eaef;
+    --muted: #9aa3b5;
+    --accent: #3dd6c6;
+    --accent-dim: #1e4f4a;
+    --warn: #e6a23c;
+    --danger: #e47474;
+    --ok: #5dcf8a;
+    --pending: #6b7385;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: radial-gradient(1200px 600px at 10% -10%, #1b2433 0%, var(--bg) 55%);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 28px 20px 48px;
+  }
+  h1 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 22px;
+    line-height: 1.5;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .card h2 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin: 10px 0 6px;
+  }
+  textarea, input[type="text"], input[type="number"] {
+    width: 100%;
+    background: #0e1016;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 13px;
+    outline: none;
+  }
+  textarea:focus, input:focus { border-color: var(--accent); }
+  textarea {
+    min-height: 220px;
+    resize: vertical;
+    font-family: ui-monospace, Consolas, monospace;
+    line-height: 1.45;
+  }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  button {
+    border: 1px solid var(--line);
+    background: #242836;
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button:hover { border-color: #4a5166; }
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  button.primary {
+    background: linear-gradient(180deg, #2bbfaf, #1f9e91);
+    border-color: #1c8a7f;
+    color: #06221f;
+    font-weight: 650;
+  }
+  button.warn {
+    background: #3a2f1c;
+    border-color: #6d5424;
+    color: #ffd89a;
+  }
+  button.danger {
+    background: #3a2222;
+    border-color: #6d3434;
+    color: #ffc0c0;
+  }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #10131a;
+    border: 1px solid var(--line);
+    font-size: 12px;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--pending);
+  }
+  .dot.idle { background: var(--muted); }
+  .dot.login, .dot.running { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  .dot.stopping { background: var(--warn); }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 12px 0;
+  }
+  .stat {
+    background: #10131a;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+  }
+  .stat b { display: block; font-size: 20px; margin-bottom: 2px; }
+  .stat span { font-size: 11px; color: var(--muted); }
+  .queue {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 280px;
+    overflow: auto;
+  }
+  .queue li {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px;
+    border-bottom: 1px solid #222633;
+    font-size: 12px;
+  }
+  .badge {
+    flex: 0 0 auto;
+    min-width: 52px;
+    text-align: center;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    background: #2a2f3c;
+    color: var(--muted);
+  }
+  .badge.pending { background: #2a2f3c; }
+  .badge.running { background: var(--accent-dim); color: var(--accent); }
+  .badge.ok { background: #1d3a29; color: var(--ok); }
+  .badge.fail { background: #3a2222; color: var(--danger); }
+  .q-main { min-width: 0; flex: 1; }
+  .q-id { color: var(--text); word-break: break-all; }
+  .q-raw { color: var(--muted); margin-top: 3px; word-break: break-all; }
+  .q-file { color: var(--ok); margin-top: 3px; word-break: break-all; }
+  .q-err { color: var(--danger); margin-top: 3px; word-break: break-all; }
+  #logBox {
+    height: 260px;
+    overflow: auto;
+    background: #0b0d12;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .log-line { border-bottom: 1px solid #1a1e28; padding: 2px 0; white-space: pre-wrap; }
+  .log-line.info { color: #c9d0dc; }
+  .log-line.success { color: var(--ok); }
+  .log-line.warn { color: var(--warn); }
+  .log-line.error { color: var(--danger); }
+  .hint {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .banner-err {
+    display: none;
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid #6d3434;
+    background: #2a1818;
+    color: #ffc9c9;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .banner-err.show { display: block; }
+  .banner-err code {
+    background: #1a1010;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  .banner-err a { color: #7de0d4; }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="connBanner" class="banner-err">
+    <strong>连不上下载服务。</strong>
+    这个页面不能用 Live Server（5500）打开——它只提供静态文件，点「开始下载」会出现 HTTP 405/404。<br />
+    请在终端执行：<code>cd .cursor/browser-automation</code> → <code>npm run sketchfab:ui</code><br />
+    然后打开：<a href="http://127.0.0.1:18999/">http://127.0.0.1:18999/</a>
+    <div class="row" style="margin-top:8px">
+      <button id="btnReconnect" type="button" class="primary">重新连接</button>
+      <button id="btnOpenCorrect" type="button">打开正确地址</button>
+    </div>
+  </div>
+  <div class="topbar">
+    <div>
+      <h1>Sketchfab 批量下载</h1>
+      <div class="sub">在本页配置链接、点按钮即可。会打开 Chrome 跑导出，GLB 存到你指定的文件夹。</div>
+    </div>
+    <div class="status-pill"><span class="dot idle" id="modeDot"></span><span id="modeText">空闲</span></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>1. 模型列表</h2>
+      <label>每行一个 Sketchfab 链接或 32 位模型 ID（# 开头是注释）</label>
+      <textarea id="urlsText" placeholder="https://sketchfab.com/3d-models/...."></textarea>
+      <label>保存目录</label>
+      <input id="outDir" type="text" />
+      <label>单个模型最长等待（分钟）</label>
+      <input id="timeoutMin" type="number" min="2" max="30" step="1" value="8" />
+      <div class="row">
+        <button id="btnSave" type="button">💾 保存列表到本地</button>
+        <button id="btnLogin" type="button" class="warn">🔑 打开登录</button>
+        <button id="btnLoginDone" type="button" disabled>✅ 我已登录完成</button>
+      </div>
+      <div class="row">
+        <button id="btnStart" type="button" class="primary">▶ 开始下载</button>
+        <button id="btnStop" type="button" class="danger" disabled>⏹ 停止</button>
+      </div>
+      <p class="hint">
+        第一次请先点「打开登录」，在弹出的 Chrome 登录 Sketchfab，再点「我已登录完成」。<br />
+        商店模型没登录会失败。下载时请尽量别关那个自动化 Chrome 窗口。
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>2. 进度</h2>
+      <div class="stats">
+        <div class="stat"><b id="statTotal">0</b><span>总数</span></div>
+        <div class="stat"><b id="statOk" style="color:var(--ok)">0</b><span>成功</span></div>
+        <div class="stat"><b id="statFail" style="color:var(--danger)">0</b><span>失败</span></div>
+      </div>
+      <ul class="queue" id="queue"></ul>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="topbar" style="margin-bottom:10px">
+      <h2 style="margin:0">3. 运行日志</h2>
+      <div class="row" style="margin:0">
+        <button id="btnCopyLog" type="button">📋 复制日志</button>
+        <button id="btnClearLog" type="button">清空显示</button>
+      </div>
+    </div>
+    <div id="logBox"></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const modeMap = { idle: '空闲', login: '等待登录', running: '下载中', stopping: '正在停止' };
+let localLogs = [];
+
+function renderState(st) {
+  if (!st) return;
+  $('modeText').innerText = modeMap[st.mode] || st.mode;
+  const dot = $('modeDot');
+  dot.className = 'dot ' + (st.mode || 'idle');
+  $('urlsText').value = st.urlsText || $('urlsText').value;
+  $('outDir').value = st.outDir || '';
+  if (st.timeoutMs) $('timeoutMin').value = Math.round(st.timeoutMs / 60000);
+
+  const busy = st.mode === 'running' || st.mode === 'stopping' || st.mode === 'login';
+  $('btnStart').disabled = busy;
+  $('btnStop').disabled = !(st.mode === 'running' || st.mode === 'stopping');
+  $('btnLogin').disabled = busy;
+  $('btnLoginDone').disabled = !st.loginPending;
+  $('btnSave').disabled = st.mode === 'running';
+
+  $('statTotal').innerText = st.total || 0;
+  $('statOk').innerText = st.okCount || 0;
+  $('statFail').innerText = st.failCount || 0;
+
+  const q = $('queue');
+  q.innerHTML = '';
+  (st.items || []).forEach((it) => {
+    const li = document.createElement('li');
+    const badge = document.createElement('span');
+    badge.className = 'badge ' + (it.status || 'pending');
+    badge.innerText = ({ pending: '等待', running: '进行中', ok: '成功', fail: '失败' })[it.status] || it.status;
+    const main = document.createElement('div');
+    main.className = 'q-main';
+    main.innerHTML = `<div class="q-id">${it.id}</div><div class="q-raw">${escapeHtml(it.raw || '')}</div>`;
+    if (it.result && it.result.file) {
+      const f = document.createElement('div');
+      f.className = 'q-file';
+      f.innerText = it.result.file;
+      main.appendChild(f);
+    }
+    if (it.result && it.result.error) {
+      const e = document.createElement('div');
+      e.className = 'q-err';
+      e.innerText = it.result.error;
+      main.appendChild(e);
+    }
+    li.appendChild(badge);
+    li.appendChild(main);
+    q.appendChild(li);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function appendLog(entry) {
+  if (!entry) return;
+  localLogs.push(entry);
+  const box = $('logBox');
+  const div = document.createElement('div');
+  div.className = 'log-line ' + (entry.level || 'info');
+  div.innerText = `[${entry.t}] ${entry.message}`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+async function api(path, method, body) {
+  const res = await fetch(path, {
+    method: method || 'GET',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.ok === false) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+
+function collectForm() {
+  return {
+    urlsText: $('urlsText').value,
+    outDir: $('outDir').value.trim(),
+    timeoutMs: Math.max(2, Number($('timeoutMin').value) || 8) * 60000
+  };
+}
+
+$('btnSave').onclick = async () => {
+  try {
+    const data = await api('/api/config', 'POST', collectForm());
+    renderState(data.state);
+  } catch (e) { alert('保存失败：' + e.message); }
+};
+
+$('btnLogin').onclick = async () => {
+  try {
+    await api('/api/config', 'POST', collectForm());
+    await api('/api/login/start', 'POST', {});
+  } catch (e) { alert(e.message); }
+};
+
+$('btnLoginDone').onclick = async () => {
+  try { await api('/api/login/done', 'POST', {}); }
+  catch (e) { alert(e.message); }
+};
+
+$('btnStart').onclick = async () => {
+  try {
+    const form = collectForm();
+    if (!form.urlsText.trim()) return alert('请先粘贴模型链接');
+    await api('/api/start', 'POST', form);
+  } catch (e) { alert(e.message); }
+};
+
+$('btnStop').onclick = async () => {
+  try { await api('/api/stop', 'POST', {}); }
+  catch (e) { alert(e.message); }
+};
+
+$('btnCopyLog').onclick = async () => {
+  const text = localLogs.map((l) => `[${l.t}] ${l.message}`).join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    alert('日志已复制');
+  } catch (_e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    alert('日志已复制');
+  }
+};
+
+$('btnClearLog').onclick = () => {
+  localLogs = [];
+  $('logBox').innerHTML = '';
+};
+
+async function boot() {
+  const data = await api('/api/state');
+  $('connBanner').classList.remove('show');
+  renderState(data.state);
+  (data.logs || []).forEach(appendLog);
+
+  const es = new EventSource('/api/events');
+  es.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.state) renderState(msg.state);
+      if (msg.type === 'hello' && msg.logs) {
+        $('logBox').innerHTML = '';
+        localLogs = [];
+        msg.logs.forEach(appendLog);
+      }
+      if (msg.type === 'log' && msg.entry) appendLog(msg.entry);
+    } catch (_e) {}
+  };
+}
+
+function showOffline(err) {
+  const port = location.port || '(默认)';
+  const live = port === '5500' || /liveserver/i.test(navigator.userAgent);
+  $('connBanner').classList.add('show');
+  $('logBox').innerText =
+    '无法连接下载服务：' + (err && err.message ? err.message : err) +
+    '\n当前地址：' + location.href +
+    '\n' + (live || port === '5500'
+      ? '你现在用的是 Live Server，不能跑下载。请改用 npm run sketchfab:ui，打开 http://127.0.0.1:18999/'
+      : '请先运行：cd .cursor/browser-automation && npm run sketchfab:ui');
+}
+
+$('btnReconnect').onclick = () => {
+  boot().catch(showOffline);
+};
+
+$('btnOpenCorrect').onclick = () => {
+  window.open('http://127.0.0.1:18999/', '_blank');
+};
+
+const wrongHost = location.port && location.port !== '18999';
+if (wrongHost) {
+  showOffline(new Error('页面开在端口 ' + location.port + '，正确端口是 18999'));
+}
+boot().catch(showOffline);
+</script>
+</body>
+</html>

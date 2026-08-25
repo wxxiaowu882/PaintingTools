@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Sketchfab Model & Texture Dump (Ultimate GLB Version)
 // @namespace    Violentmonkey Scripts
-// @version      9.9.10
-// @description  download sketchfab models as GLB with diagnostic panel (Fixed V9.9 Lockup & Texture Fallback Bug + Magic Byte MIME Fix)
+// @version      9.9.85
+// @description  download sketchfab models as GLB (v9.9.85: Static bone = Diffuse×Tekstura ivory)
 // @author       shitposting goddess & krapnik (Mod by Assistant)
 // @include      /^https?:\/\/(www\.)?sketchfab\.com\/.*/
 // @match        *://*.sketchfab.com/3d-models/**
@@ -26,7 +26,7 @@ panel.id = "sf-diag-panel";
 panel.style.cssText = "position:fixed; top:10px; right:10px; width:500px; background:rgba(20,20,20,0.95); border:1px solid #00ffcc; z-index:999999; border-radius:8px; font-family:sans-serif; color:#fff; overflow:hidden; transition:max-height 0.3s; max-height:85vh; display:flex; flex-direction:column; box-shadow: 0 5px 15px rgba(0,0,0,0.5);"; 
 var header = rootDoc.createElement("div"); 
 header.style.cssText = "padding:8px; background:#004466; cursor:pointer; font-weight:bold; font-size:14px; display:flex; justify-content:space-between; align-items:center;"; 
-header.innerHTML = "<span>🛠️ 完美全能工业级引擎 (v9.9.10 通用玻璃壳)</span><span id='sf-toggle-btn'>▼</span>";
+header.innerHTML = "<span>🛠️ 完美全能工业级引擎 (v9.9.19 Matcap优先)</span><span id='sf-toggle-btn'>▼</span>";
 header.onclick = function() {
 if(panel.style.maxHeight === "85vh") { panel.style.maxHeight = "34px"; rootDoc.getElementById('sf-toggle-btn').innerText = "▲"; }
 else { panel.style.maxHeight = "85vh"; rootDoc.getElementById('sf-toggle-btn').innerText = "▼"; } };
@@ -135,7 +135,7 @@ if (uvSets[i] && uvSets[i].length >= 4) return uvSets[i];
 }
 return null;
 }
-function buildNormalizedUV(uvArray) {
+function computeUvDivisor(uvArray) {
 let overOne = 0;
 let vals = [];
 for (let k = 0; k < uvArray.length; k++) {
@@ -152,14 +152,442 @@ else if (p95 <= 4095) uvDivisor = 4095.0;
 else if (p95 <= 65535) uvDivisor = 65535.0;
 else uvDivisor = p95;
 }
-// WebGL/OpenGL：V=0 在贴图底边；glTF：V=0 在贴图顶边。从 viewer 截获的 UV 必须翻 V，否则会采到 UV 岛外的填充斜纹（脸变木纹、眼球采到红底）。
-let flipV = true;
+return uvDivisor;
+}
+function buildNormalizedUV(uvArray, flipV) {
+if (flipV === undefined || flipV === null) flipV = true;
+let uvDivisor = computeUvDivisor(uvArray);
 let f32_uv = new Float32Array(uvArray.length);
 for (let k = 0; k < uvArray.length; k += 2) {
 f32_uv[k] = uvArray[k] / uvDivisor;
-f32_uv[k + 1] = 1.0 - (uvArray[k + 1] / uvDivisor);
+let v = uvArray[k + 1] / uvDivisor;
+f32_uv[k + 1] = flipV ? (1.0 - v) : v;
 }
-return { f32: f32_uv, divisor: uvDivisor, flipV: flipV };
+return { f32: f32_uv, divisor: uvDivisor, flipV: !!flipV };
+}
+/* 用底色贴图在 UV 采样点上的局部反差，自动决定是否 flipV。
+   Male face：不翻会采到岛外斜纹填充；本头扫模型：一律翻 V 反而木纹。 */
+function scoreUvMappingOnAlbedo(uvArray, divisor, flipV, pixels, w, h) {
+let nVert = Math.floor(uvArray.length / 2);
+if (nVert < 8 || !pixels || w < 8 || h < 8) return -1;
+let step = Math.max(1, Math.floor(nVert / 180));
+let sumLocal = 0, samples = 0;
+for (let vi = 0; vi < nVert; vi += step) {
+let u = uvArray[vi * 2] / divisor;
+let v0 = uvArray[vi * 2 + 1] / divisor;
+let v = flipV ? (1.0 - v0) : v0;
+u = u - Math.floor(u); v = v - Math.floor(v);
+if (u < 0) u += 1; if (v < 0) v += 1;
+let x = Math.min(w - 2, Math.max(1, Math.floor(u * (w - 1))));
+let y = Math.min(h - 2, Math.max(1, Math.floor(v * (h - 1))));
+function lum(xx, yy) {
+let i = (yy * w + xx) * 4;
+return 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
+}
+let c = lum(x, y);
+let d = Math.abs(c - lum(x + 1, y)) + Math.abs(c - lum(x - 1, y)) + Math.abs(c - lum(x, y + 1)) + Math.abs(c - lum(x, y - 1));
+sumLocal += d; samples++;
+}
+return samples > 0 ? (sumLocal / samples) : -1;
+}
+function loadBlobToImageData(blob, maxSide) {
+return new Promise(function(resolve, reject) {
+let img = new Image();
+img.onload = function() {
+try {
+let w = img.naturalWidth || img.width;
+let h = img.naturalHeight || img.height;
+if (!w || !h) { reject(new Error("empty image")); return; }
+let scale = 1;
+if (maxSide && Math.max(w, h) > maxSide) scale = maxSide / Math.max(w, h);
+let cw = Math.max(1, Math.round(w * scale));
+let ch = Math.max(1, Math.round(h * scale));
+let c = document.createElement("canvas"); c.width = cw; c.height = ch;
+let ctx = c.getContext("2d", { willReadFrequently: true });
+ctx.drawImage(img, 0, 0, cw, ch);
+resolve({ data: ctx.getImageData(0, 0, cw, ch).data, w: cw, h: ch });
+} catch (e) { reject(e); }
+};
+img.onerror = function() { reject(new Error("image load failed")); };
+img.src = URL.createObjectURL(blob);
+});
+}
+function sampleLum(data, w, h, x, y) {
+x = Math.max(0, Math.min(w - 1, x | 0));
+y = Math.max(0, Math.min(h - 1, y | 0));
+let i = (y * w + x) * 4;
+return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+}
+async function scoreAlbedoStreakiness(blob) {
+try {
+let id = await loadBlobToImageData(blob, 256);
+let data = id.data, w = id.w, h = id.h;
+let diag = 0, horiz = 0, n = 0;
+for (let y = 2; y < h - 2; y += 3) {
+for (let x = 2; x < w - 2; x += 3) {
+let c = sampleLum(data, w, h, x, y);
+diag += Math.abs(c - sampleLum(data, w, h, x + 2, y + 2));
+horiz += Math.abs(c - sampleLum(data, w, h, x + 2, y));
+n++;
+}
+}
+if (!n) return 0;
+return (diag / n) / Math.max(1e-3, (horiz / n));
+} catch (e) { return 0; }
+}
+async function scoreFaceStructure(blob) {
+try {
+let id = await loadBlobToImageData(blob, 256);
+let data = id.data, w = id.w, h = id.h;
+let x0 = Math.floor(w * 0.25), x1 = Math.floor(w * 0.75);
+let y0 = Math.floor(h * 0.12), y1 = Math.floor(h * 0.62);
+let sum = 0, sum2 = 0, dark = 0, n = 0, edge = 0;
+for (let y = y0; y < y1; y += 2) {
+for (let x = x0; x < x1; x += 2) {
+let c = sampleLum(data, w, h, x, y);
+sum += c; sum2 += c * c; n++;
+if (c < 40) dark++;
+edge += Math.abs(c - sampleLum(data, w, h, x + 2, y)) + Math.abs(c - sampleLum(data, w, h, x, y + 2));
+}
+}
+if (!n) return 0;
+let mean = sum / n;
+let varc = Math.max(0, sum2 / n - mean * mean);
+return Math.sqrt(varc) * 0.35 + (dark / n) * 80 + (edge / n) * 0.15;
+} catch (e) { return 0; }
+}
+async function synthesizeAlbedoFromSpecular(specBlob, colourBlob, matcapBlob) {
+// v9.9.34 通用：强模糊 Colour 染色（不用 Colour 高频，防斜纹树杈）+ Spec 低频明暗 + Spec 细暗线毛发。
+// Spec 暗腔压暗；贴图外 gutter 近黑。不做 alpha 打洞。Matcap 不烘进 albedo。
+let cr = 208, cg = 165, cb = 142;
+let colourSoftData = null, colourSharpData = null, colourSoftW = 0, colourSoftH = 0;
+if (colourBlob) {
+try {
+let imgC = await new Promise(function(resolve, reject) {
+let im = new Image();
+im.onload = function() { resolve(im); };
+im.onerror = function() { reject(new Error("colour load failed")); };
+im.src = URL.createObjectURL(colourBlob);
+});
+let csw = imgC.naturalWidth || imgC.width, csh = imgC.naturalHeight || imgC.height;
+let cMax = 768;
+let csc = Math.min(1, cMax / Math.max(csw, csh));
+colourSoftW = Math.max(1, Math.round(csw * csc));
+colourSoftH = Math.max(1, Math.round(csh * csc));
+let ccan = document.createElement("canvas"); ccan.width = colourSoftW; ccan.height = colourSoftH;
+let cctx = ccan.getContext("2d", { willReadFrequently: true });
+cctx.filter = "blur(16px)";
+cctx.drawImage(imgC, 0, 0, colourSoftW, colourSoftH);
+cctx.filter = "none";
+colourSoftData = cctx.getImageData(0, 0, colourSoftW, colourSoftH).data;
+// 高频细节层：鬓角发丝/雀斑在 Sketchfab 里来自 Colour，不能只留 16px 糊底
+cctx.clearRect(0, 0, colourSoftW, colourSoftH);
+cctx.filter = "blur(1.5px)";
+cctx.drawImage(imgC, 0, 0, colourSoftW, colourSoftH);
+cctx.filter = "none";
+colourSharpData = cctx.getImageData(0, 0, colourSoftW, colourSoftH).data;
+let n0 = 0, r0 = 0, g0 = 0, b0 = 0, chromaAcc = 0;
+for (let i = 0; i < colourSoftData.length; i += 16) {
+r0 += colourSoftData[i]; g0 += colourSoftData[i + 1]; b0 += colourSoftData[i + 2]; n0++;
+let m = (colourSoftData[i] + colourSoftData[i + 1] + colourSoftData[i + 2]) / 3;
+chromaAcc += Math.abs(colourSoftData[i] - m) + Math.abs(colourSoftData[i + 1] - m) + Math.abs(colourSoftData[i + 2] - m);
+}
+if (n0) {
+cr = r0 / n0; cg = g0 / n0; cb = b0 / n0;
+if ((chromaAcc / n0) < 12) { cr = 214; cg = 168; cb = 142; colourSoftData = null; colourSharpData = null; }
+}
+} catch (e) { colourSoftData = null; colourSharpData = null; }
+}
+if (matcapBlob) {
+try {
+let mid = await loadBlobToImageData(matcapBlob, 96);
+let md = mid.data, mw = mid.w, mh = mid.h, cx = (mw - 1) * 0.5, cy = (mh - 1) * 0.5, R = Math.min(cx, cy);
+let r = 0, g = 0, b = 0, n = 0;
+for (let y = 0; y < mh; y += 2) for (let x = 0; x < mw; x += 2) {
+let d = Math.hypot(x - cx, y - cy) / Math.max(1e-3, R);
+if (d < 0.28 || d > 0.62) continue;
+let i = (y * mw + x) * 4; r += md[i]; g += md[i + 1]; b += md[i + 2]; n++;
+}
+if (n > 8) {
+cr = cr * 0.82 + (r / n) * 0.18;
+cg = cg * 0.82 + (g / n) * 0.18;
+cb = cb * 0.82 + (b / n) * 0.18;
+}
+} catch (e) {}
+}
+let img = await new Promise(function(resolve, reject) {
+let im = new Image();
+im.onload = function() { resolve(im); };
+im.onerror = function() { reject(new Error("spec load failed")); };
+im.src = URL.createObjectURL(specBlob);
+});
+let sw = img.naturalWidth || img.width, sh = img.naturalHeight || img.height;
+let maxSide = 1536;
+let scale = Math.min(1, maxSide / Math.max(sw, sh));
+let w = Math.max(1, Math.round(sw * scale)), h = Math.max(1, Math.round(sh * scale));
+let canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+let ctx = canvas.getContext("2d", { willReadFrequently: true });
+ctx.drawImage(img, 0, 0, w, h);
+let sharp = ctx.getImageData(0, 0, w, h);
+let shd = sharp.data;
+ctx.clearRect(0, 0, w, h);
+ctx.filter = "blur(18px)";
+ctx.drawImage(img, 0, 0, w, h);
+ctx.filter = "none";
+let soft = ctx.getImageData(0, 0, w, h);
+let sd = soft.data;
+let ys = [];
+for (let i = 0; i < sd.length; i += 4) {
+let y = 0.299 * sd[i] + 0.587 * sd[i + 1] + 0.114 * sd[i + 2];
+let ys0 = 0.299 * shd[i] + 0.587 * shd[i + 1] + 0.114 * shd[i + 2];
+if (ys0 > 4) ys.push(y);
+}
+ys.sort(function(a, b) { return a - b; });
+let p8 = ys[Math.floor(ys.length * 0.08)] || 8;
+let p92 = ys[Math.floor(ys.length * 0.92)] || 55;
+let out = ctx.createImageData(w, h);
+for (let i = 0; i < sd.length; i += 4) {
+let ySharp = 0.299 * shd[i] + 0.587 * shd[i + 1] + 0.114 * shd[i + 2];
+let y = 0.299 * sd[i] + 0.587 * sd[i + 1] + 0.114 * sd[i + 2];
+let px = (i / 4) % w, py = Math.floor((i / 4) / w);
+let pr = cr, pg = cg, pb = cb;
+if (colourSoftData && colourSoftW > 0) {
+let cx = Math.min(colourSoftW - 1, Math.max(0, Math.round(px / w * (colourSoftW - 1))));
+let cy = Math.min(colourSoftH - 1, Math.max(0, Math.round(py / h * (colourSoftH - 1))));
+let ci = (cy * colourSoftW + cx) * 4;
+// v9.9.36：软 Colour 弱染色；毛发=Colour mid 更暗 ∩ Spec 暗
+pr = cr * 0.92 + colourSoftData[ci] * 0.08;
+pg = cg * 0.92 + colourSoftData[ci + 1] * 0.08;
+pb = cb * 0.92 + colourSoftData[ci + 2] * 0.08;
+}
+{
+let cLum = 0.299 * pr + 0.587 * pg + 0.114 * pb;
+if (cLum < 105 && y < p8 * 1.85) {
+pr = Math.min(255, pr * 0.82 + 10);
+pg = Math.min(255, pg * 0.76 + 7);
+pb = Math.min(255, pb * 0.72 + 5);
+} else {
+let mean = (pr + pg + pb) / 3;
+pr = mean * 0.68 + pr * 0.32;
+pg = mean * 0.68 + pg * 0.32;
+pb = mean * 0.68 + pb * 0.32;
+pr = Math.min(255, pr * 0.35 + 186 * 0.65);
+pg = Math.min(255, pg * 0.35 + 168 * 0.65);
+pb = Math.min(255, pb * 0.32 + 166 * 0.68);
+let u = (y - p8) / Math.max(1e-3, p92 - p8);
+u = Math.max(0, Math.min(1, u));
+let flush = 4 * u * (1 - u);
+pr = Math.min(255, pr + flush * 12);
+pg = Math.min(255, pg + flush * 5);
+pb = Math.min(255, pb + flush * 9);
+}
+}
+if (colourSoftData && colourSoftW > 0) {
+let cx2 = Math.min(colourSoftW - 1, Math.max(0, Math.round(px / w * (colourSoftW - 1))));
+let cy2 = Math.min(colourSoftH - 1, Math.max(0, Math.round(py / h * (colourSoftH - 1))));
+let ci2 = (cy2 * colourSoftW + cx2) * 4;
+let sR = colourSoftData[ci2], sG = colourSoftData[ci2 + 1], sB = colourSoftData[ci2 + 2];
+sL = 0.299 * sR + 0.587 * sG + 0.114 * sB;
+// v9.9.71：取消 Colour 软暗铺毛发（易脏斑）；眉睫改几何近眼喷涂
+if (ySharp <= 0.35) {
+out.data[i] = Math.min(255, 120 + pr * 0.25);
+out.data[i + 1] = Math.min(255, 108 + pg * 0.22);
+out.data[i + 2] = Math.min(255, 100 + pb * 0.20);
+out.data[i + 3] = 255;
+continue;
+}
+}
+// v9.9.37：Spec 只轻微提亮，不再按暗腔压暗
+let t = (y - p8) / Math.max(1e-3, p92 - p8);
+t = Math.max(0, Math.min(1, t));
+t = t * t * (3 - 2 * t);
+let lum = 0.98 + 0.16 * t;
+out.data[i] = Math.min(255, pr * lum);
+out.data[i + 1] = Math.min(255, pg * lum);
+out.data[i + 2] = Math.min(255, pb * lum);
+out.data[i + 3] = 255;
+}
+ctx.putImageData(out, 0, 0);
+return await new Promise(function(resolve, reject) {
+canvas.toBlob(function(b) { if (b) resolve(b); else reject(new Error("synth albedo failed")); }, "image/jpeg", 0.92);
+});
+}
+async function synthesizeEyeballAlbedo(irisRgb) {
+irisRgb = irisRgb || [0.22, 0.28, 0.34];
+let size = 512;
+let canvas = document.createElement("canvas"); canvas.width = size; canvas.height = size;
+let ctx = canvas.getContext("2d", { willReadFrequently: true });
+let img = ctx.createImageData(size, size);
+// 瞳孔中心略上移：开孔里不至于只露出下半虹膜
+let cx = (size - 1) * 0.5, cy = (size - 1) * 0.5, R = size * 0.48;
+let ir = irisRgb[0] * 255, ig = irisRgb[1] * 255, ib = irisRgb[2] * 255;
+let hx = -0.12, hy = -0.18, hr = 0.07;
+for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+let dx = (x - cx) / R, dy = (y - cy) / R;
+let d = Math.hypot(dx, dy);
+let i = (y * size + x) * 4;
+let ang = Math.atan2(dy, dx);
+let fiber = 0.78 + 0.22 * Math.sin(ang * 22.0 + d * 10.0) * Math.sin(ang * 6.0);
+let r = 8, g = 6, b = 5;
+if (d > 0.96) {
+r = 38; g = 27; b = 23;
+} else if (d < 0.30) {
+// 瞳孔：开孔中心必须能读出黑点
+let k = d / 0.30;
+r = 3 + 10 * k; g = 2 + 8 * k; b = 2 + 8 * k;
+} else if (d < 0.72) {
+let t = (d - 0.30) / 0.42;
+let limbus = t > 0.78 ? (1 - (t - 0.78) / 0.22) * 0.45 + 0.55 : 1;
+let shade = (0.78 + 0.22 * fiber) * limbus * (0.88 + 0.18 * (1 - t));
+r = Math.min(255, ir * shade);
+g = Math.min(255, ig * shade);
+b = Math.min(255, ib * shade * 1.04);
+} else {
+let t = Math.min(1, (d - 0.72) / 0.24);
+let vein = 0.97 + 0.03 * Math.sin(ang * 8 + d * 20);
+let sr = 105 * vein, sg = 96 * vein, sb = 90 * vein;
+r = sr * (1 - t) + 38 * t;
+g = sg * (1 - t) + 27 * t;
+b = sb * (1 - t) + 23 * t;
+}
+// 湿润高光点
+let hd = Math.hypot(dx - hx, dy - hy);
+if (hd < hr && d < 0.72) {
+let w = 1 - hd / hr;
+w = w * w;
+r = Math.min(255, r + (165 - r) * w * 0.28);
+g = Math.min(255, g + (172 - g) * w * 0.28);
+b = Math.min(255, b + (178 - b) * w * 0.28);
+}
+img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = b; img.data[i + 3] = 255;
+}
+ctx.putImageData(img, 0, 0);
+return await new Promise(function(resolve, reject) {
+canvas.toBlob(function(b) { if (b) resolve(b); else reject(new Error("eyeball albedo failed")); }, "image/jpeg", 0.92);
+});
+}
+function buildSphericalUVsFromPositions(vertexF32, normalF32) {
+// 通用：近隐无 UV 眼球 → 法线定朝向平面 UV；软钳防平铺
+let n = vertexF32.length / 3;
+let pos = vertexF32, nrm = normalF32;
+let c0 = [pos[0], pos[1], pos[2]], c1 = [pos[0], pos[1], pos[2]];
+let maxD = -1;
+for (let i = 0; i < n; i++) {
+let d = Math.hypot(pos[i * 3] - c0[0], pos[i * 3 + 1] - c0[1], pos[i * 3 + 2] - c0[2]);
+if (d > maxD) { maxD = d; c1 = [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]]; }
+}
+for (let iter = 0; iter < 8; iter++) {
+let s0 = [0, 0, 0], s1 = [0, 0, 0], n0 = 0, n1 = 0;
+for (let i = 0; i < n; i++) {
+let x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+let d0 = Math.hypot(x - c0[0], y - c0[1], z - c0[2]);
+let d1 = Math.hypot(x - c1[0], y - c1[1], z - c1[2]);
+if (d0 <= d1) { s0[0] += x; s0[1] += y; s0[2] += z; n0++; }
+else { s1[0] += x; s1[1] += y; s1[2] += z; n1++; }
+}
+if (n0) c0 = [s0[0] / n0, s0[1] / n0, s0[2] / n0];
+if (n1) c1 = [s1[0] / n1, s1[1] / n1, s1[2] / n1];
+}
+function fyCross(a, b) {
+let x = a[1] * b[2] - a[2] * b[1], y = a[2] * b[0] - a[0] * b[2], z = a[0] * b[1] - a[1] * b[0];
+let L = Math.hypot(x, y, z) || 1;
+return [x / L, y / L, z / L];
+}
+function fwdOf(c, other) {
+let sx = 0, sy = 0, sz = 0, k = 0;
+for (let i = 0; i < n; i++) {
+let x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+let d = Math.hypot(x - c[0], y - c[1], z - c[2]);
+let dO = Math.hypot(x - other[0], y - other[1], z - other[2]);
+if (d > dO) continue;
+if (nrm) { sx += nrm[i * 3]; sy += nrm[i * 3 + 1]; sz += nrm[i * 3 + 2]; k++; }
+}
+let fx = sx, fy = sy, fz = sz;
+let fl = Math.hypot(fx, fy, fz);
+if (k < 8 || fl < 1e-6) { fx = 0; fy = 0; fz = 1; }
+else { fx /= fl; fy /= fl; fz /= fl; }
+return [fx, fy, fz];
+}
+function pack(c, other) {
+let fwd = fwdOf(c, other);
+let ux = 0, uy = 1, uz = 0;
+if (Math.abs(fwd[1]) > 0.9) { ux = 1; uy = 0; uz = 0; }
+let rx = uy * fwd[2] - uz * fwd[1], ry = uz * fwd[0] - ux * fwd[2], rz = ux * fwd[1] - uy * fwd[0];
+let rl = Math.hypot(rx, ry, rz) || 1;
+rx /= rl; ry /= rl; rz /= rl;
+let up = fyCross(fwd, [rx, ry, rz]);
+ux = up[0]; uy = up[1]; uz = up[2];
+let dots = [];
+for (let i = 0; i < n; i++) {
+let x = pos[i * 3] - c[0], y = pos[i * 3 + 1] - c[1], z = pos[i * 3 + 2] - c[2];
+if (Math.hypot(x, y, z) > 0.55) continue;
+dots.push({ i: i, pr: x * fwd[0] + y * fwd[1] + z * fwd[2] });
+}
+dots.sort(function(a, b) { return b.pr - a.pr; });
+let top = dots.slice(0, Math.max(24, Math.floor(dots.length * 0.10)));
+let ox = 0, oy = 0, oz = 0;
+for (let qi = 0; qi < top.length; qi++) {
+let q = top[qi];
+ox += pos[q.i * 3]; oy += pos[q.i * 3 + 1]; oz += pos[q.i * 3 + 2];
+}
+ox /= top.length; oy /= top.length; oz /= top.length;
+let rs = top.map(function(q) {
+let x = pos[q.i * 3] - ox, y = pos[q.i * 3 + 1] - oy, z = pos[q.i * 3 + 2] - oz;
+return Math.hypot(x * rx + y * ry + z * rz, x * ux + y * uy + z * uz);
+}).sort(function(a, b) { return a - b; });
+let eyeRad = rs[Math.floor(rs.length * 0.5)] || 0.22;
+let rad = eyeRad * 0.42;
+return { ox: ox, oy: oy, oz: oz, rad: rad, rx: rx, ry: ry, rz: rz, ux: ux, uy: uy, uz: uz, fwd: fwd };
+}
+let p0 = pack(c0, c1), p1 = pack(c1, c0);
+let uvs = new Float32Array(n * 2);
+for (let i = 0; i < n; i++) {
+let x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+let d0 = Math.hypot(x - c0[0], y - c0[1], z - c0[2]);
+let d1 = Math.hypot(x - c1[0], y - c1[1], z - c1[2]);
+let p = d0 <= d1 ? p0 : p1;
+let dx = x - p.ox, dy = y - p.oy, dz = z - p.oz;
+let ru = (dx * p.rx + dy * p.ry + dz * p.rz) / (2 * p.rad);
+let rv = -(dx * p.ux + dy * p.uy + dz * p.uz) / (2 * p.rad);
+let rd = Math.hypot(ru, rv);
+if (rd > 0.40) { let s = 0.40 / rd; ru *= s; rv *= s; }
+uvs[i * 2] = 0.5 + ru;
+uvs[i * 2 + 1] = 0.5 + rv;
+}
+function recenterCluster(c, other, fwd) {
+let su = 0, sv = 0, sk = 0;
+for (let i = 0; i < n; i++) {
+let x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+let d0 = Math.hypot(x - c0[0], y - c0[1], z - c0[2]);
+let d1 = Math.hypot(x - c1[0], y - c1[1], z - c1[2]);
+let inC = (c === c0) ? d0 <= d1 : d1 < d0;
+if (!inC) continue;
+if (nrm) {
+let nd = nrm[i * 3] * fwd[0] + nrm[i * 3 + 1] * fwd[1] + nrm[i * 3 + 2] * fwd[2];
+if (nd < 0.32) continue;
+}
+let u = uvs[i * 2], v = uvs[i * 2 + 1];
+if (Math.hypot(u - 0.5, v - 0.5) > 0.38) continue;
+su += u; sv += v; sk++;
+}
+if (sk < 12) return;
+let du = 0.5 - su / sk, dv = 0.5 - sv / sk;
+for (let i = 0; i < n; i++) {
+let d0 = Math.hypot(pos[i * 3] - c0[0], pos[i * 3 + 1] - c0[1], pos[i * 3 + 2] - c0[2]);
+let d1 = Math.hypot(pos[i * 3] - c1[0], pos[i * 3 + 1] - c1[1], pos[i * 3 + 2] - c1[2]);
+let inC = (c === c0) ? d0 <= d1 : d1 < d0;
+if (!inC) continue;
+uvs[i * 2] += du;
+uvs[i * 2 + 1] += dv;
+}
+}
+recenterCluster(c0, c1, p0.fwd);
+recenterCluster(c1, c0, p1.fwd);
+return uvs;
+}
+async function chooseFlipVForAlbedo(uvArray, albedoBlob) {
+// v9.9.12+：始终 flipV。矩阵验证对 Sketchfab 导出 UV 与贴图对齐更稳；自适应曾在斜纹 Diffuse 上误判。
+return { flipV: true, scoreFlip: -1, scoreNo: -1, reason: "always_flipV", ratio: 0 };
 }
 // ================= 原生纯 JS GLB 构建器 =================
 async function buildGLB(models, texturesMap, fixZUp = false) { addLog(`--> 1/3: 启动【究极统计算法装配引擎】${fixZUp ? '(已开启 Z-Up 矫正)' : ''}...`, "info");
@@ -260,6 +688,10 @@ if (score > bestScore) { bestScore = score; c_uid = (ch.texture && ch.texture.ui
 c_factor = ch.factor !== undefined ? ch.factor : 1.0; } } }
 config.channels.albedoUid = c_uid; config.channels.albedoTexCoord = c_texCoord; config.channels.albedoFactor = c_factor;
 config.channels.albedoColor = [c_color[0] * c_factor, c_color[1] * c_factor, c_color[2] * c_factor];
+let specCh = m.channels.SpecularPBR || m.channels.SpecularF0 || m.channels.SpecularColor;
+if (specCh && specCh.enable !== false && specCh.texture && specCh.texture.uid) config.channels.specularUid = specCh.texture.uid;
+let matcapCh = m.channels.Matcap;
+if (matcapCh && matcapCh.enable !== false && matcapCh.texture && matcapCh.texture.uid) config.channels.matcapUid = matcapCh.texture.uid;
 let normCh = m.channels.NormalMap; if (normCh && normCh.enable !== false && normCh.texture) { config.channels.normalUid = normCh.texture.uid; if(normCh.factor !== undefined) config.channels.normalFactor = normCh.factor; }
 let aoCh = m.channels.AOPBR; if (aoCh && aoCh.enable !== false && aoCh.texture) { config.channels.aoUid = aoCh.texture.uid; if(aoCh.factor !== undefined) config.channels.aoFactor = aoCh.factor; }
 let roughCh = m.channels.RoughnessPBR || m.channels.GlossinessPBR;
@@ -285,13 +717,15 @@ config.channels.opacityRoughness = (opacCh.roughnessFactor !== undefined) ? opac
 let opacType = String(opacCh.type || "").toLowerCase();
 let opacFactor = (opacCh.factor !== undefined) ? Number(opacCh.factor) : 1;
 let opacIor = (opacCh.ior !== undefined && opacCh.ior !== null) ? Number(opacCh.ior) : null;
-// 通用玻璃壳：1) additive 折射层；2) 极低 alphaBlend + IOR（角膜外壳常见，睫毛等 factor≈1 不会误伤）
+// 通用玻璃壳（勿把「近隐无贴图层」强行做成浅色玻璃——无虹膜贴图时会在眼窝发白光）：
+// 1) additive 折射层
+// 2) 极低 alphaBlend + IOR（角膜外壳，与眼睛模型同一规则）
 let isGlassOpac = (opacType === "additive") ||
 ((opacType === "alphablend" || opacType === "blend") && opacFactor <= 0.2 && opacIor !== null && opacIor > 1.01);
 if (isGlassOpac) {
 config.isGlass = true;
 config.glassDetect = (opacType === "additive") ? "additive" : ("alphaBlend+ior@" + opacFactor);
-// additive 常用 factor=1；alphaBlend 的低 factor 表示「几乎看不见实色」→ 透射用满量
+// additive 常用 factor=1；alphaBlend+IOR 低 factor → 满透射角膜
 config.channels.transmissionFactor = (opacType === "additive")
 ? ((opacCh.factor !== undefined) ? Number(opacCh.factor) : 1)
 : 1;
@@ -307,6 +741,13 @@ config.channels.clearcoatRoughness = (config.channels.opacityRoughness !== null 
 if (opacCh.texture) { config.channels.opacityUid = opacCh.texture.uid; config.alphaMode = "BLEND"; }
 config.channels.opacityFactor = opacCh.factor !== undefined ? opacCh.factor : 1;
 if (config.channels.opacityFactor < 0.95) config.alphaMode = "BLEND";
+// 近隐无贴图球体（常见于眼球）：不要导出成 2% 透明石膏眼窝。有 Matcap 的模型里按实心眼球处理。
+if (!config.channels.albedoUid && !config.channels.opacityUid && Number(config.channels.opacityFactor) < 0.08) {
+config.sfEyeball = true;
+config.alphaMode = "OPAQUE";
+config.channels.opacityFactor = 1;
+addLog(`[眼球层] ${config.name}: 近隐无贴图 → 实心眼球 extras.sfEyeball`, "info");
+}
 }
 }
 apiMatConfig[config.name] = config; if (m.id) apiMatConfig[m.id] = config; } }); } } }
@@ -383,6 +824,144 @@ if (config.alphaMode === "MASK") config.alphaCutoff = 0.4;
 addLog(`[透明度合并] ${config.name}: RGB=${albName || 'solid'}×${rgbScale.toFixed(3)} + A=${opcName}×${alphaScale.toFixed(3)} -> ${newName}`, "success");
 } catch (e) { addLog(`[透明度合并失败] ${config.name}: ${e.message || e}`, "warn"); }
 }
+// v9.9.85：Static 骨色 = Diffuse 明暗 × Tekstura 象牙色（禁止 Spec→粉肤合成 / Matcap）
+async function synthesizeStaticBoneAlbedo(diffuseBlob, teksturaBlob) {
+let d = await loadBlobToImageData(diffuseBlob, 2048);
+let t = await loadBlobToImageData(teksturaBlob, 2048);
+let w = Math.max(d.w, t.w), h = Math.max(d.h, t.h);
+function resize(src, sw, sh, dw, dh) {
+if (sw === dw && sh === dh) return src.data;
+let c = document.createElement("canvas"); c.width = dw; c.height = dh;
+let ctx = c.getContext("2d", { willReadFrequently: true });
+let tmp = document.createElement("canvas"); tmp.width = sw; tmp.height = sh;
+tmp.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(src.data), sw, sh), 0, 0);
+ctx.drawImage(tmp, 0, 0, dw, dh);
+return ctx.getImageData(0, 0, dw, dh).data;
+}
+let dd = resize(d, d.w, d.h, w, h);
+let tt = resize(t, t.w, t.h, w, h);
+let gr = 0, gg = 0, gb = 0, gn = 0;
+for (let i = 0; i < tt.length; i += 4) {
+let lum = 0.299 * tt[i] + 0.587 * tt[i + 1] + 0.114 * tt[i + 2];
+if (lum > 210) { gr += tt[i]; gg += tt[i + 1]; gb += tt[i + 2]; gn++; }
+}
+if (gn < 8) { gr = 224; gg = 220; gb = 189; gn = 1; }
+else { gr /= gn; gg /= gn; gb /= gn; }
+let out = new Uint8ClampedArray(w * h * 4);
+for (let i = 0; i < out.length; i += 4) {
+let L = (0.299 * dd[i] + 0.587 * dd[i + 1] + 0.114 * dd[i + 2]) / 255;
+// 略抬整体，贴近 Sketchfab 颧骨暖象牙
+let gain = Math.min(1.15, 0.92 + L * 0.35);
+out[i] = Math.max(0, Math.min(255, Math.round(gr * L * gain)));
+out[i + 1] = Math.max(0, Math.min(255, Math.round(gg * L * gain)));
+out[i + 2] = Math.max(0, Math.min(255, Math.round(gb * L * gain)));
+out[i + 3] = 255;
+}
+let c = document.createElement("canvas"); c.width = w; c.height = h;
+c.getContext("2d").putImageData(new ImageData(out, w, h), 0, 0);
+return await new Promise(function(resolve, reject) {
+c.toBlob(function(b) { if (b) resolve(b); else reject(new Error("bone albedo blob fail")); }, "image/jpeg", 0.92);
+});
+}
+async function fixAnatomyChartMaterial(config, texturesMap) {
+if (!config || !config.name) return false;
+let matBase = String(config.name).trim().split(/\s+/)[0];
+if (!/^(Static|Deform|Acs|Plastyma|Melns|Skiedras)/i.test(matBase)) return false;
+let keys = Object.keys(texturesMap);
+config.sfMatcap = false;
+delete config.sfMatcapName;
+if (config.channels) config.channels.matcapUid = null;
+config._skipStreakSalvage = true;
+if (/^static$/i.test(matBase)) {
+let texName = keys.find(function(n) { return /^Static[_\s].*tekstura/i.test(n); });
+let difName = keys.find(function(n) { return /^Static[_\s].*diffuse/i.test(n); });
+if (texName && difName && texturesMap[texName] && texturesMap[difName]) {
+try {
+let boneBlob = await synthesizeStaticBoneAlbedo(texturesMap[difName], texturesMap[texName]);
+let boneName = "synth_static_bone_diffuse_x_tekstura.jpg";
+texturesMap[boneName] = boneBlob;
+config.mergedAlbedoName = boneName;
+config._forceAlbedoName = null;
+addLog(`[解剖底色] ${config.name}: Diffuse×Tekstura → ${boneName}（象牙骨，禁 Matcap）`, "success");
+return true;
+} catch (e) {
+addLog(`[解剖底色] Static 合成失败: ${e && e.message}，回退 Tekstura`, "warn");
+}
+}
+if (texName) {
+config._forceAlbedoName = texName;
+config.mergedAlbedoName = null;
+addLog(`[解剖底色] ${config.name}: 回退绑定 ${texName}`, "success");
+}
+return true;
+}
+let albName = getTexNameByUid(config.channels.albedoUid);
+let albLower = String(albName || '').toLowerCase();
+let prefer = ['col', 'diffuse', 'tekstura'];
+if (!albName || /spec|normal|ao|alpha|norm|synth/i.test(albLower)) {
+let pick = null;
+for (let pi = 0; pi < prefer.length; pi++) {
+let pat = prefer[pi];
+pick = keys.find(function(n) { return new RegExp('^' + matBase + '[_\\s].*' + pat, 'i').test(n); });
+if (pick) break;
+}
+if (pick && pick !== albName) {
+config._forceAlbedoName = pick;
+config.mergedAlbedoName = null;
+addLog(`[解剖底色] ${config.name}: 改绑 ${albName || '空'} → ${pick}`, "success");
+}
+}
+return true;
+}
+// V9.9.25：Diffuse 斜纹时通用抢救。Colour 低频色+Spec 结构作 map；有 Matcap → extras.sfMatcap 嵌入（管理器 MeshMatcap）；无 Matcap → 软 Spec PBR 兜底
+addLog(`--> 检查底色质量 (斜纹 Diffuse → Colour低频+Spec / Matcap嵌入)...`, "info");
+for (let mKey in apiMatConfig) { await fixAnatomyChartMaterial(apiMatConfig[mKey], texturesMap); }
+for (let mKey in apiMatConfig) {
+let config = apiMatConfig[mKey];
+if (!config || config.isGlass || config.mergedAlbedoName || config._skipStreakSalvage) continue;
+let albName = getTexNameByUid(config.channels.albedoUid);
+let specName = getTexNameByUid(config.channels.specularUid);
+if (!specName) {
+let keys = Object.keys(texturesMap);
+specName = keys.find(function(n) { return /^spec(\.|$|_)/i.test(n) || /specular/i.test(n); }) || null;
+if (specName && /sss|gloss|rough|metal|norm|ao|opacit/i.test(specName)) specName = null;
+}
+if (!albName || !specName) continue;
+if (!texturesMap[albName] || !texturesMap[specName]) continue;
+try {
+let streak = await scoreAlbedoStreakiness(texturesMap[albName]);
+let faceScore = await scoreFaceStructure(texturesMap[specName]);
+let albFace = await scoreFaceStructure(texturesMap[albName]);
+addLog(`[底色评分] ${config.name}: Diffuse streak=${streak.toFixed(2)} face=${albFace.toFixed(1)} | Spec face=${faceScore.toFixed(1)}${config.channels.matcapUid ? " | 有Matcap" : ""}`, "info");
+let shouldSalvage = (faceScore >= 20 && faceScore > albFace * 2.5) ||
+(streak >= 1.08 && faceScore > albFace * 1.5 && faceScore >= 18) ||
+(!!config.channels.matcapUid && faceScore >= 22 && faceScore > albFace * 2);
+if (!shouldSalvage) continue;
+let matcapName = getTexNameByUid(config.channels.matcapUid);
+let matcapBlob = (matcapName && texturesMap[matcapName]) ? texturesMap[matcapName] : null;
+if (!matcapBlob) {
+let mk = Object.keys(texturesMap).find(function(n) { return /matcap|skin_soft/i.test(n); });
+if (mk) { matcapBlob = texturesMap[mk]; matcapName = mk; }
+}
+// 通用：Colour 低频 + Spec 结构；Matcap 仅微调主色，光感留给管理器 MeshMatcap
+let synth = await synthesizeAlbedoFromSpecular(texturesMap[specName], texturesMap[albName], matcapBlob);
+let newName = (matcapBlob ? "synth_albedo_colourLF_spec__" : "synth_albedo_soft_spec__") + String(specName).replace(/\.(jpg|jpeg|png|webp)$/i, "") + ".png";
+newName = newName.replace(/[^\w.\-]+/g, "_");
+texturesMap[newName] = synth;
+config.mergedAlbedoName = newName;
+config.alphaMode = "OPAQUE";
+if (matcapBlob) {
+config.sfMatcap = true;
+config.sfMatcapName = matcapName;
+config.channels.roughnessFactor = 1;
+config.channels.metallicFactor = 0;
+addLog(`[底色抢救] ${config.name}: 斜纹Diffuse → Colour低频+Spec + Matcap(${matcapName})`, "success");
+} else {
+if (config.channels.roughnessFactor === undefined) config.channels.roughnessFactor = 0.55;
+addLog(`[底色抢救] ${config.name}: 斜纹Diffuse → Colour低频+Spec → ${newName}`, "success");
+}
+} catch (e) { addLog(`[底色抢救失败] ${config.name}: ${e.message || e}`, "warn"); }
+}
 let textureEntries = Object.entries(texturesMap);
 let texMeta = []; for (let i = 0; i < textureEntries.length; i++) { let [name, blob] = textureEntries[i]; let webGLIdx = unsafeWindow.textureIdMap[name] !== undefined ? unsafeWindow.textureIdMap[name] : -1;
 let arrayBuffer = await blob.arrayBuffer(); let bvIdx = addBufferView(arrayBuffer); let imgIdx = json.images.length;
@@ -396,6 +975,8 @@ json.images.push({ bufferView: bvIdx, mimeType: mimeType, name: name }); json.te
 // -------------------------------------------------------------------------------------------------
 
 texMeta.push({ name: name.toLowerCase(), index: i, originalName: name, webGLIdx: webGLIdx }); }
+let findTexIdx = (tName) => { if(!tName) return -1; let tm = texMeta.find(t => t.originalName === tName); return tm ? tm.index : -1; };
+let findTexIdxByUid = (uid) => { let tName = getTexNameByUid(uid); return findTexIdx(tName); };
 json.materials.push({ name: "Untextured_BaseMat_Opaque", pbrMetallicRoughness: { baseColorFactor: [0.95, 0.95, 0.95, 1.0], metallicFactor: 0.1, roughnessFactor: 0.7 }, doubleSided: true, alphaMode: "OPAQUE" });
 let untexturedMatIdx = json.materials.length - 1;
 addLog(`--> API材质库已载入 ${Object.keys(apiMatConfig).length} 项，禁用名称猜测兜底。`, "info");
@@ -420,11 +1001,27 @@ let uvChannel = (apiConfig && apiConfig.channels.albedoTexCoord !== undefined) ?
 let uvRaw = getUVSet(obj.uvSets, uvChannel);
 let hasUV = false; let uvMeta = null;
 if (uvRaw && uvRaw.length >= 4) {
-uvMeta = buildNormalizedUV(uvRaw instanceof Float32Array ? uvRaw : new Float32Array(uvRaw));
+let uvArr = uvRaw instanceof Float32Array ? uvRaw : new Float32Array(uvRaw);
+let albedoBlobForUv = null;
+if (apiConfig) {
+let albNameForUv = apiConfig.mergedAlbedoName ? apiConfig.mergedAlbedoName : getTexNameByUid(apiConfig.channels.albedoUid);
+if (albNameForUv && texturesMap[albNameForUv]) albedoBlobForUv = texturesMap[albNameForUv];
+}
+let flipDecision = await chooseFlipVForAlbedo(uvArr, albedoBlobForUv);
+uvMeta = buildNormalizedUV(uvArr, flipDecision.flipV);
 let uvVertCount = Math.floor(uvMeta.f32.length / 2);
-addLog(`[UV] ${originalMatName||mName}: ch=${uvChannel} divisor=${uvMeta.divisor} flipV=${uvMeta.flipV} pos=${vertexCount} uv=${uvVertCount}`, uvVertCount === vertexCount ? "info" : "warn");
+addLog(`[UV] ${originalMatName||mName}: ch=${uvChannel} divisor=${uvMeta.divisor} flipV=${uvMeta.flipV} (${flipDecision.reason} flip=${flipDecision.scoreFlip.toFixed(1)} no=${flipDecision.scoreNo.toFixed(1)} ratio=${(flipDecision.ratio||0).toFixed(2)}) pos=${vertexCount} uv=${uvVertCount}`, uvVertCount === vertexCount ? "info" : "warn");
 if (uvVertCount === vertexCount) {
 let bvU = addBufferView(uvMeta.f32, 34962); attributes.TEXCOORD_0 = addAccessor(bvU, 5126, vertexCount, "VEC2"); hasUV = true;
+}
+}
+// 通用：近隐眼球无 UV → 由顶点位置生成球面 UV，供程序化虹膜贴图
+if (!hasUV && apiConfig && apiConfig.sfEyeball) {
+let sph = buildSphericalUVsFromPositions(f32pos, (obj.normal && obj.normal.length >= vertexCount * 3) ? new Float32Array(obj.normal) : null);
+if (sph && sph.length === vertexCount * 2) {
+let bvU = addBufferView(sph, 34962); attributes.TEXCOORD_0 = addAccessor(bvU, 5126, vertexCount, "VEC2"); hasUV = true;
+apiConfig._sfEyeballSphericalUV = true;
+addLog(`[UV] ${originalMatName||mName}: 无UV眼球 → 球面UV(${vertexCount})`, "success");
 }
 }
 let assignedMat = untexturedMatIdx;
@@ -436,9 +1033,14 @@ else if (apiConfig.channels.opacityFactor !== undefined) a = apiConfig.channels.
 }
 let roughDefault = (apiConfig && apiConfig.channels.roughnessFactor !== undefined) ? apiConfig.channels.roughnessFactor : 0.6;
 let metalDefault = (apiConfig && apiConfig.channels.metallicFactor !== undefined) ? apiConfig.channels.metallicFactor : 0.05;
-// 通用玻璃层（Opacity.type=additive）：白底 + 透射 + 清漆高光，保留几何凸起上的玻璃感
+// 通用玻璃层：透射 + 清漆高光（仅 additive / alphaBlend+IOR；近隐无贴图层保持 BLEND，避免预览变白底实心）
 if (apiConfig && apiConfig.isGlass) {
 r = 1; g = 1; b = 1; a = 1;
+if (apiConfig.channels.albedoColor && !apiConfig.channels.albedoUid) {
+r = apiConfig.channels.albedoColor[0];
+g = apiConfig.channels.albedoColor[1];
+b = apiConfig.channels.albedoColor[2];
+}
 metalDefault = 0;
 // 玻璃壳用 Opacity.roughnessFactor（角膜常为 0），不要用眼球 Roughness 贴图因子把壳磨成哑光
 if (apiConfig.channels.opacityRoughness !== null && apiConfig.channels.opacityRoughness !== undefined) {
@@ -450,6 +1052,47 @@ matAlphaMode = "OPAQUE";
 }
 let newMat = { name: originalMatName || mName, pbrMetallicRoughness: { baseColorFactor: [r, g, b, a], metallicFactor: metalDefault, roughnessFactor: roughDefault }, doubleSided: true, alphaMode: matAlphaMode };
 if (apiConfig && apiConfig.alphaCutoff !== undefined) newMat.alphaCutoff = apiConfig.alphaCutoff;
+if (apiConfig && apiConfig.sfEyeball) {
+// 通用：近隐无贴图层 → 湿润眼球 + 程序化虹膜（球面 UV）。禁止 skin_* / gray Matcap 当底色。
+newMat.alphaMode = "OPAQUE";
+newMat.pbrMetallicRoughness.baseColorFactor = [1, 1, 1, 1];
+newMat.pbrMetallicRoughness.metallicFactor = 0;
+newMat.pbrMetallicRoughness.roughnessFactor = 0.18;
+if (!apiConfig.sfEyeballIrisName) {
+try {
+let irisBlob = await synthesizeEyeballAlbedo([0.22, 0.28, 0.34]);
+let irisName = "synth_eyeball_iris.jpg";
+texturesMap[irisName] = irisBlob;
+// 立即入库，便于 findTexIdx
+let irisU8 = new Uint8Array(await irisBlob.arrayBuffer());
+let irisBv = addBufferView(irisU8);
+let irisImgIdx = json.images.length;
+json.images.push({ bufferView: irisBv, mimeType: "image/jpeg", name: irisName });
+json.textures.push({ source: irisImgIdx });
+texMeta.push({ name: irisName.toLowerCase(), index: json.textures.length - 1, originalName: irisName, webGLIdx: -1 });
+apiConfig.sfEyeballIrisName = irisName;
+addLog(`[眼球层] ${originalMatName||mName}: 程序化虹膜贴图 ${irisName}`, "success");
+} catch (eIris) {
+addLog(`[眼球层] 虹膜合成失败: ${eIris && eIris.message}`, "warn");
+}
+}
+if (apiConfig.sfEyeballIrisName) {
+let irisIdx = findTexIdx(apiConfig.sfEyeballIrisName);
+if (irisIdx !== -1) {
+newMat.pbrMetallicRoughness.baseColorTexture = { index: irisIdx };
+}
+}
+newMat.extras = Object.assign({}, newMat.extras || {}, { sfEyeball: true, sfEyeballIris: !!apiConfig.sfEyeballIrisName });
+addLog(`[材质绑定] ${originalMatName||mName}: extras.sfEyeball 程序化虹膜${apiConfig._sfEyeballSphericalUV ? "+球面UV" : ""}`, "success");
+}
+if (apiConfig && apiConfig.unlit) {
+if (!json.extensionsUsed) json.extensionsUsed = [];
+if (!json.extensionsUsed.includes("KHR_materials_unlit")) json.extensionsUsed.push("KHR_materials_unlit");
+newMat.extensions = Object.assign({}, newMat.extensions, { KHR_materials_unlit: {} });
+newMat.pbrMetallicRoughness.metallicFactor = 0;
+newMat.pbrMetallicRoughness.roughnessFactor = 1;
+addLog(`[材质绑定] ${originalMatName||mName}: KHR_materials_unlit（Matcap抢救底色，禁止管理器二次打光）`, "success");
+}
 if (apiConfig && apiConfig.isGlass) {
 if (!json.extensionsUsed) json.extensionsUsed = [];
 if (!json.extensionsUsed.includes("KHR_materials_transmission")) json.extensionsUsed.push("KHR_materials_transmission");
@@ -471,8 +1114,6 @@ if (ior > 1.01) newMat.extensions.KHR_materials_ior = { ior: ior };
 addLog(`[材质绑定] ${originalMatName||mName}: 玻璃 transmission=${newMat.extensions.KHR_materials_transmission.transmissionFactor} clearcoat=${newMat.extensions.KHR_materials_clearcoat.clearcoatFactor} ior=${ior} rough=${roughDefault}`, "success");
 }
 let texFound = false;
-let findTexIdx = (tName) => { if(!tName) return -1; let tm = texMeta.find(t => t.originalName === tName); return tm ? tm.index : -1; };
-let findTexIdxByUid = (uid) => { let tName = getTexNameByUid(uid); return findTexIdx(tName); };
 if (hasUV && apiConfig) {
 if (apiConfig.isGlass) {
 texFound = true;
@@ -493,14 +1134,36 @@ addLog(`[材质绑定] ${originalMatName||mName}: 跳过平坦透明贴图(${tNa
 let normIdx = findTexIdxByUid(apiConfig.channels.normalUid);
 if (normIdx !== -1) { newMat.normalTexture = { index: normIdx }; if (apiConfig.channels.normalFactor !== undefined) newMat.normalTexture.scale = apiConfig.channels.normalFactor; }
 } else {
-let albedoName = apiConfig.mergedAlbedoName ? apiConfig.mergedAlbedoName : getTexNameByUid(apiConfig.channels.albedoUid);
-if (albedoName && !apiConfig.mergedAlbedoName && !isAlbedoLikeName(albedoName)) {
+let albedoName = apiConfig.mergedAlbedoName ? apiConfig.mergedAlbedoName : (apiConfig._forceAlbedoName || getTexNameByUid(apiConfig.channels.albedoUid));
+if (albedoName && !apiConfig.mergedAlbedoName && !apiConfig._forceAlbedoName && !isAlbedoLikeName(albedoName)) {
 addLog(`[材质绑定] ${originalMatName||mName}: 底色槽为非颜色贴图(${albedoName})，保留灰阶+透明度合并结果，不回退 Base_Color`, "warn");
 }
 let albIdx = findTexIdx(albedoName); if (albIdx === -1 && albedoName) albIdx = findTexIdxByUid(apiConfig.channels.albedoUid);
 if (albIdx !== -1 && albedoName) { newMat.pbrMetallicRoughness.baseColorTexture = { index: albIdx }; texFound = true; addLog(`[材质绑定] ${originalMatName||mName} -> ${albedoName}`, "api"); }
+if (apiConfig.sfMatcap) {
+let mcIdx = findTexIdx(apiConfig.sfMatcapName);
+if (mcIdx === -1) {
+let mk = texMeta.find(function(t) { return /matcap|skin_soft/i.test(t.originalName || ""); });
+if (mk) mcIdx = mk.index;
+}
+if (mcIdx !== -1) {
+newMat.emissiveFactor = [0, 0, 0];
+newMat.emissiveTexture = { index: mcIdx };
+newMat.extras = Object.assign({}, newMat.extras || {}, { sfMatcap: true, sfMatcapTexName: apiConfig.sfMatcapName || "matcap" });
+addLog(`[材质绑定] ${originalMatName||mName}: 嵌入 Matcap → emissiveTexture + extras.sfMatcap（管理器 MeshMatcap 直出）`, "success");
+}
+}
+if (apiConfig.sfEyeball && apiConfig.sfEyeballIrisName) {
+let irisIdx2 = findTexIdx(apiConfig.sfEyeballIrisName);
+if (irisIdx2 !== -1) {
+newMat.pbrMetallicRoughness.baseColorTexture = { index: irisIdx2 };
+newMat.extras = Object.assign({}, newMat.extras || {}, { sfEyeball: true, sfEyeballIris: true });
+}
+}
+if (!apiConfig.unlit) {
 let normIdx = findTexIdxByUid(apiConfig.channels.normalUid);
 if (normIdx !== -1) { newMat.normalTexture = { index: normIdx }; if (apiConfig.channels.normalFactor !== undefined) newMat.normalTexture.scale = apiConfig.channels.normalFactor; }
+if (!apiConfig.sfMatcap) {
 let aoIdx = findTexIdxByUid(apiConfig.channels.aoUid);
 if (aoIdx !== -1) { newMat.occlusionTexture = { index: aoIdx }; if (apiConfig.channels.aoFactor !== undefined) newMat.occlusionTexture.strength = apiConfig.channels.aoFactor; }
 let mrIdx = findTexIdx(apiConfig.packedMRName);
@@ -510,7 +1173,9 @@ addLog(`[材质绑定] ${originalMatName||mName} metallicRoughness -> ${apiConfi
 }
 }
 }
-if (!texFound && apiConfig && apiConfig.channels.albedoColor && !apiConfig.isGlass) {
+}
+}
+if (!texFound && apiConfig && apiConfig.channels.albedoColor && !apiConfig.isGlass && !apiConfig.sfEyeball) {
 newMat.pbrMetallicRoughness.baseColorFactor[0] = apiConfig.channels.albedoColor[0];
 newMat.pbrMetallicRoughness.baseColorFactor[1] = apiConfig.channels.albedoColor[1];
 newMat.pbrMetallicRoughness.baseColorFactor[2] = apiConfig.channels.albedoColor[2];
@@ -591,7 +1256,7 @@ clean[k] = unsafeWindow.objects[k];
 }
 return clean;
 })(), isZUpFixed); var file_name = document.getElementsByClassName('model-name__label')[0]; file_name = file_name ? file_name.textContent.trim() : "sketchfab_extracted";
-saveFile(glbBlob, file_name + "_V9.9.10_Ultimate.glb"); addLog(`🎉 大功告成！探针复刻版已保存：${file_name}_V9.9.10_Ultimate.glb`, "success"); if(btn) { btn.innerText = "🚀 重新下载 GLB"; btn.style.background = "#5cb85c"; } } catch (err) { addLog("导出崩溃: " + err.message, "error"); console.error(err); } }
+saveFile(glbBlob, file_name + "_V9.9.83_Ultimate.glb"); addLog(`🎉 大功告成！探针复刻版已保存：${file_name}_V9.9.83_Ultimate.glb`, "success"); if(btn) { btn.innerText = "🚀 重新下载 GLB"; btn.style.background = "#5cb85c"; } } catch (err) { addLog("导出崩溃: " + err.message, "error"); console.error(err); } }
 unsafeWindow._sf_doDownload = dodownload;
 var parseobj = function(obj) { var list = []; if(obj._primitives) { obj._primitives.forEach(function(p) { if(p && p.indices) { list.push({ 'mode' : p.mode, 'indices' : p.indices._elements }); } }); }
 var attr = obj._attributes || {}; var uvSetsMap = {}; var uvItemSize = 2;
@@ -703,6 +1368,49 @@ if (t.images && t.images.length) merged[t.uid].images = merged[t.uid].images.con
 }
 return Object.values(merged);
 }
+async function fetchMatcapsIntoCatalog() {
+// 通用：Matcap 不在 /textures 里，在 /matcaps；不拉则 UID 对不上、Matcap 优先装配失效
+try {
+let urls = [
+`https://sketchfab.com/i/models/${model_id}/matcaps?optimized=1`,
+`https://sketchfab.com/i/models/${model_id}/matcaps`
+];
+let merged = {};
+for (let ui = 0; ui < urls.length; ui++) {
+try {
+let res = await fetch(urls[ui], { credentials: "include" });
+if (!res.ok) continue;
+let j = await res.json();
+let arr = j.results || [];
+for (let i = 0; i < arr.length; i++) {
+let t = arr[i]; if (!t || !t.uid) continue;
+if (!merged[t.uid]) merged[t.uid] = { uid: t.uid, name: t.name || ("matcap_" + t.uid + ".png"), url: t.url, images: [], _isMatcap: true };
+if (t.name) merged[t.uid].name = t.name;
+if (t.images && t.images.length) merged[t.uid].images = merged[t.uid].images.concat(t.images);
+}
+} catch (e) {}
+}
+let list = Object.values(merged);
+if (!list.length) { addLog("Matcap 接口无结果（本模型可能未使用 Matcap）", "info"); return 0; }
+for (let i = 0; i < list.length; i++) {
+let tex = list[i];
+let existed = originTextureArr.find(function(t) { return t.uid === tex.uid; });
+if (existed) {
+existed.images = (existed.images || []).concat(tex.images || []);
+existed._isMatcap = true;
+if (tex.name) existed.name = tex.name;
+} else {
+originTextureArr.push(tex);
+}
+}
+coverTexture(list);
+addLog(`Matcap 目录已合并：${list.length} 张（/matcaps 接口）`, "success");
+return list.length;
+} catch (e) {
+addLog("Matcap 目录拉取失败: " + (e.message || e), "warn");
+return 0;
+}
+}
 function imageUrlScore(url) {
 if (!url) return 0;
 let u = String(url).toLowerCase();
@@ -732,6 +1440,8 @@ let score = w * h;
 if (score <= 0) score = imageUrlScore(item.url);
 if (Number(item.size || 0) > 0) score += Number(item.size);
 if (/\.png(\?|$|#)/i.test(item.url)) score += 500000;
+// 优先 Sketchfab 已处理档（带 format），避开无 format 的超大原档（部分模型原档 UV 填充异常）
+if (item.options && item.options.format) score += 50000000;
 if (score > bestScore) { bestScore = score; best = item; }
 }
 return best || pool[pool.length - 1];
@@ -950,6 +1660,7 @@ function flipY(arr, width, height) { const length = width * height * 4; const ro
 async function dumpWebGLTextureData() { if(unsafeWindow.isDumping) return; unsafeWindow.isDumping = true; processedCnt = 0; successCnt = 0;
 var btnTex = document.getElementById("sf-btn-tex"); if(btnTex) { btnTex.innerText = "⏳ 正在直连抓取高清贴图..."; btnTex.disabled = true; }
 refreshTextureCatalog();
+await fetchMatcapsIntoCatalog();
 await waitForTextureMetadataReady();
 /* V9.9.1: 完全摆脱对 WebGL 挂钩顺序的依赖，保证官方贴图绝对被高清下载，不会空载变成顶点色马赛克 */
 if (originTextureArr && originTextureArr.length > 0) { addLog(`启动直连引擎，拉取 ${originTextureArr.length} 张官方贴图...`, "info");
@@ -960,7 +1671,7 @@ let res = await fetch(maxImg.url); let blob = await res.blob();
 if (await storeTextureBlob(officialName, blob, 0, { source: "official" })) {
 successCnt++;
 let m = getTextureMeta(officialName);
-addLog(`官方高清入库 -> ${officialName} [${m ? (m.w + "x" + m.h) : "未知尺寸"}] 方差:${m && m.variance ? m.variance.toFixed(1) : "?"}`, "success");
+addLog(`官方高清入库 -> ${officialName} [${m ? (m.w + "x" + m.h) : "未知尺寸"}] 方差:${m && m.variance ? m.variance.toFixed(1) : "?"}${tex._isMatcap ? " [Matcap]" : ""}`, "success");
 } else {
 addLog(`官方URL不可解码，等待GPU回填: ${officialName}`, "warn");
 }
