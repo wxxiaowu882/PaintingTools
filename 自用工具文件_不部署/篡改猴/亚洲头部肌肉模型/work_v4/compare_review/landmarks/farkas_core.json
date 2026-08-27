@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "notes": "Farkas / FaceBase 颅面人体测量命名。软组织表面点钉在欧版 Static 壳上（Type3 用最外/最低等可复现规则）。出处：Farkas Anthropometry of the Head and Face；FaceBase 3D Facial Norms。不自动拟合人群均值。",
+  "landmarks": [
+    {
+      "id": "trichion",
+      "label": "发际中",
+      "pair": null,
+      "views": ["front"],
+      "hint": "额部发际正中（tr）"
+    },
+    {
+      "id": "glabella",
+      "label": "眉心",
+      "pair": null,
+      "views": ["front", "side"],
+      "hint": "两眉之间最突（g）"
+    },
+    {
+      "id": "nasion",
+      "label": "鼻根",
+      "pair": null,
+      "views": ["front", "side"],
+      "hint": "鼻梁最上凹，鼻额缝水平（n）"
+    },
+    {
+      "id": "subnasale",
+      "label": "鼻底",
+      "pair": null,
+      "views": ["front", "side"],
+      "hint": "鼻中隔与上唇交界中点（sn）"
+    },
+    {
+      "id": "pronasale",
+      "label": "鼻尖",
+      "pair": null,
+      "views": ["front", "side"],
+      "hint": "鼻最前点（prn）"
+    },
+    {
+      "id": "endocanthion_L",
+      "label": "内眼角L",
+      "pair": "endocanthion_R",
+      "views": ["front"],
+      "hint": "内眦（en）"
+    },
+    {
+      "id": "endocanthion_R",
+      "label": "内眼角R",
+      "pair": "endocanthion_L",
+      "views": ["front"],
+      "hint": "内眦（en）"
+    },
+    {
+      "id": "exocanthion_L",
+      "label": "外眼角L",
+      "pair": "exocanthion_R",
+      "views": ["front"],
+      "hint": "外眦（ex）"
+    },
+    {
+      "id": "exocanthion_R",
+      "label": "外眼角R",
+      "pair": "exocanthion_L",
+      "views": ["front"],
+      "hint": "外眦（ex）"
+    },
+    {
+      "id": "alare_L",
+      "label": "鼻翼L",
+      "pair": "alare_R",
+      "views": ["front"],
+      "hint": "鼻翼最外（al）"
+    },
+    {
+      "id": "alare_R",
+      "label": "鼻翼R",
+      "pair": "alare_L",
+      "views": ["front"],
+      "hint": "鼻翼最外（al）"
+    },
+    {
+      "id": "zygion_L",
+      "label": "颧突L",
+      "pair": "zygion_R",
+      "views": ["front", "side"],
+      "hint": "颧弓最外点，定 bizygomatic（zy，Type3）"
+    },
+    {
+      "id": "zygion_R",
+      "label": "颧突R",
+      "pair": "zygion_L",
+      "views": ["front", "side"],
+      "hint": "颧弓最外点（zy）"
+    },
+    {
+      "id": "gonion_L",
+      "label": "下颌角L",
+      "pair": "gonion_R",
+      "views": ["front", "side"],
+      "hint": "下颌角最外/转折（go，Type3）"
+    },
+    {
+      "id": "gonion_R",
+      "label": "下颌角R",
+      "pair": "gonion_L",
+      "views": ["front", "side"],
+      "hint": "下颌角最外/转折（go）"
+    },
+    {
+      "id": "gnathion",
+      "label": "颏下",
+      "pair": null,
+      "views": ["front", "side"],
+      "hint": "颏下最低中点（gn）"
+    },
+    {
+      "id": "pogonion",
+      "label": "颏前",
+      "pair": null,
+      "views": ["side"],
+      "hint": "颏最前中点（pg）"
+    },
+    {
+      "id": "tragion_L",
+      "label": "耳屏L",
+      "pair": "tragion_R",
+      "views": ["side"],
+      "hint": "耳屏切迹上缘（t）"
+    },
+    {
+      "id": "tragion_R",
+      "label": "耳屏R",
+      "pair": "tragion_L",
+      "views": ["side"],
+      "hint": "耳屏切迹上缘（t）"
+    },
+    {
+      "id": "vertex",
+      "label": "颅顶",
+      "pair": null,
+      "views": ["front", "side", "back"],
+      "hint": "头最高点（v）"
+    },
+    {
+      "id": "opisthocranion",
+      "label": "枕突",
+      "pair": null,
+      "views": ["side", "back"],
+      "hint": "后枕最突（op）"
+    }
+  ]
+}

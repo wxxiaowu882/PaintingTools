@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "notes": "语义滑块对应 Farkas 经典线性量。坐标系：glTF 加载后 Three.js Y-up（x 左右，y 上下，z 前后）。value 为世界坐标位移（米）。亚洲比例以 Base15 对照拧，不自动套人群均值表。",
+  "sliders": [
+    {
+      "id": "bizygomatic",
+      "label": "颧宽 zy–zy",
+      "measure": "bizygomatic breadth (zy-zy)",
+      "min": -0.02,
+      "max": 0.02,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "zygion_L", "axis": "x", "sign": -1 },
+        { "id": "zygion_R", "axis": "x", "sign": 1 }
+      ]
+    },
+    {
+      "id": "bigonial",
+      "label": "下颌宽 go–go",
+      "measure": "bigonial breadth (go-go)",
+      "min": -0.02,
+      "max": 0.02,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "gonion_L", "axis": "x", "sign": -1 },
+        { "id": "gonion_R", "axis": "x", "sign": 1 }
+      ]
+    },
+    {
+      "id": "face_height",
+      "label": "面高 n–gn",
+      "measure": "morphological face height (n-gn)",
+      "min": -0.02,
+      "max": 0.02,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "nasion", "axis": "y", "sign": 0.35 },
+        { "id": "glabella", "axis": "y", "sign": 0.25 },
+        { "id": "subnasale", "axis": "y", "sign": -0.15 },
+        { "id": "gnathion", "axis": "y", "sign": -0.65 },
+        { "id": "pogonion", "axis": "y", "sign": -0.45 }
+      ]
+    },
+    {
+      "id": "upper_third",
+      "label": "上庭 tr–g",
+      "measure": "trichion–glabella (upper facial third)",
+      "min": -0.015,
+      "max": 0.015,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "trichion", "axis": "y", "sign": 1 },
+        { "id": "vertex", "axis": "y", "sign": 0.4 }
+      ]
+    },
+    {
+      "id": "mid_third",
+      "label": "中庭 g–sn",
+      "measure": "glabella–subnasale (mid facial third)",
+      "min": -0.015,
+      "max": 0.015,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "glabella", "axis": "y", "sign": 0.5 },
+        { "id": "nasion", "axis": "y", "sign": 0.25 },
+        { "id": "subnasale", "axis": "y", "sign": -0.5 }
+      ]
+    },
+    {
+      "id": "lower_third",
+      "label": "下庭 sn–gn",
+      "measure": "subnasale–gnathion (lower facial third)",
+      "min": -0.015,
+      "max": 0.015,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "subnasale", "axis": "y", "sign": 0.35 },
+        { "id": "gnathion", "axis": "y", "sign": -0.65 },
+        { "id": "pogonion", "axis": "y", "sign": -0.5 }
+      ]
+    },
+    {
+      "id": "nose_proj",
+      "label": "鼻突 prn",
+      "measure": "nasal tip projection (prn sagittal)",
+      "min": -0.015,
+      "max": 0.015,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "pronasale", "axis": "z", "sign": 1 },
+        { "id": "alare_L", "axis": "z", "sign": 0.35 },
+        { "id": "alare_R", "axis": "z", "sign": 0.35 }
+      ]
+    },
+    {
+      "id": "nose_width",
+      "label": "鼻宽 al–al",
+      "measure": "nose width (al-al)",
+      "min": -0.012,
+      "max": 0.012,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "alare_L", "axis": "x", "sign": -1 },
+        { "id": "alare_R", "axis": "x", "sign": 1 }
+      ]
+    },
+    {
+      "id": "chin_proj",
+      "label": "颏突 pg",
+      "measure": "chin projection (pg sagittal)",
+      "min": -0.015,
+      "max": 0.015,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "pogonion", "axis": "z", "sign": 1 },
+        { "id": "gnathion", "axis": "z", "sign": 0.45 }
+      ]
+    },
+    {
+      "id": "face_depth",
+      "label": "面深 / 耳前",
+      "measure": "tragion relative depth (t vs midface)",
+      "min": -0.02,
+      "max": 0.02,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "tragion_L", "axis": "z", "sign": -1 },
+        { "id": "tragion_R", "axis": "z", "sign": -1 },
+        { "id": "opisthocranion", "axis": "z", "sign": -0.5 }
+      ]
+    },
+    {
+      "id": "biocular",
+      "label": "眼外宽 ex–ex",
+      "measure": "biocular width (ex-ex)",
+      "min": -0.012,
+      "max": 0.012,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "exocanthion_L", "axis": "x", "sign": -1 },
+        { "id": "exocanthion_R", "axis": "x", "sign": 1 },
+        { "id": "endocanthion_L", "axis": "x", "sign": -0.35 },
+        { "id": "endocanthion_R", "axis": "x", "sign": 0.35 }
+      ]
+    },
+    {
+      "id": "cranial_length",
+      "label": "头长 g–op",
+      "measure": "head length (glabella–opisthocranion approx)",
+      "min": -0.02,
+      "max": 0.02,
+      "step": 0.0005,
+      "default": 0,
+      "effects": [
+        { "id": "opisthocranion", "axis": "z", "sign": -0.7 },
+        { "id": "glabella", "axis": "z", "sign": 0.3 },
+        { "id": "vertex", "axis": "y", "sign": 0.2 }
+      ]
+    }
+  ]
+}

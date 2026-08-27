@@ -48,6 +48,46 @@
   - 添加一条测试标注
   - 输出截图到 `runs/`
 
+- `BASE_URL=http://127.0.0.1:8765 node scripts/bone-morph-smoke.js`
+  - compare_review「骨相拧形」：加载欧版、Farkas 控制点、颧宽滑条、Reset、回到并排 2D
+  - 前提：`compare_review/serve_nocache.py` 已在 8765
+
+- `BASE_URL=http://127.0.0.1:8765 node scripts/bone-morph-pick-hard.js`
+  - 选肌硬测：flood-fill 连通域点选、贴图像素改色、恢复、鼠标选肌按钮
+  - 须全部 ✓ 再交付用户验收
+
+- `BASE_URL=http://127.0.0.1:8765 node scripts/bone-morph-hsl.js`
+  - 整肌色相选区 + 色相/饱和度/明度（Ctrl+U 式）；保留明暗；隔离自测
+  - 须全部 ✓ 再交付用户验收
+
+- `BASE_URL=http://127.0.0.1:8765 node scripts/bone-morph-hsl-scopes.js`
+  - 灰肌选区覆盖 + HSL 三态（全部 / 所有肌肉 / 选定）作用域对比与清除独立性
+  - 须全部 ✓ 再交付用户验收
+
+- `BASE_URL=http://127.0.0.1:8765 node scripts/bone-morph-bone-mottle.js`
+  - 头骨偏白不变；颈背中灰可调；灰区无彩虹斑驳
+  - 须全部 ✓ 再交付用户验收
+
+- `BASE_URL=http://127.0.0.1:8765 node scripts/bone-morph-bone-vs-gray.js`
+  - 对照用户场景（H=-55/S=19）：中灰 162 变色、Static 奶油颅骨不变、Deform 浅冷灰（帽状腱膜）可变
+  - 须全部 ✓ 再交付用户验收
+
+- `BASE_URL=http://127.0.0.1:8765 node scripts/bone-morph-visual-hsl.js`
+  - 视觉验收：所有肌肉 H=-85/S=25/L=-30；PNG 取样 + 射线；颅骨奶油不变、颈前变色、Skiedras/Deform 绿与冷灰可变
+  - 须全部 ✓ 再交付用户验收
+
+- `BASE_URL=http://127.0.0.1:8765 node scripts/bone-morph-pick-smooth.js`
+- `BASE_URL=http://127.0.0.1:8765 node scripts/bone-morph-semantic-parts.js` — 语义色块整部件选中 + HSL
+- `BASE_URL=http://127.0.0.1:8765 node scripts/bone-morph-plastyma-sheet.js` — 颈阔肌整层纤维灰选中 + HSL
+  - 滑块顺滑（rAF + live 缓冲）；耳/颈/背整块选肌可点可调；截图 `01-ear` / `02-neck` / `03-back`
+  - 须全部 ✓ 再交付用户验收
+
+- `BASE_URL=http://127.0.0.1:18080 node scripts/gnm-workshop-ux-smoke.js`
+  - GNM 头模工坊：加载、253/383 能力条、预设、滑条拖进视口、单项重置、导出 30cm extras
+
+- `BASE_URL=http://127.0.0.1:18080 npm run smoke:gnm-align-overlay`
+  - GNM × 欧版对齐叠显：加载完成、透明度、正/侧视；欧版用 `align-overlay/assets/euro_muscle.glb`（= 参考用_欧洲人头部肌肉…）
+
 ### 环境变量（可选）
 
 - `BASE_URL`

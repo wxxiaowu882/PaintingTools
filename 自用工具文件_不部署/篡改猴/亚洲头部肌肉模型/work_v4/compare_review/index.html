@@ -79,7 +79,142 @@
     }
     .stage.side { grid-template-columns: 1fr 1fr; }
     .stage.stack { grid-template-columns: 1fr; }
-    .stage.viewer3d { grid-template-columns: 1fr; }
+    .stage.viewer3d { grid-template-columns: 1fr 1fr; }
+    .stage.morph {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(280px, 340px);
+      align-items: stretch;
+    }
+    .stage.morph .card {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .stage.morph .viewer-host,
+    .stage.morph .morph-ref-frame {
+      width: 100%;
+      height: min(78vh, 720px);
+      min-height: 360px;
+      aspect-ratio: auto;
+      background: #fff;
+      position: relative;
+      overflow: hidden;
+      flex: 1 1 auto;
+    }
+    .stage.morph .morph-ref-frame img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      max-width: none;
+      max-height: none;
+    }
+    @media (max-width: 1100px) {
+      .stage.morph { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 900px) {
+      .stage.viewer3d { grid-template-columns: 1fr; }
+    }
+    .morph-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px 14px;
+      max-height: min(78vh, 720px);
+      overflow: auto;
+      font-size: 0.78rem;
+    }
+    .morph-panel h3 {
+      margin: 10px 0 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .morph-panel h3:first-child { margin-top: 0; }
+    .morph-tabs {
+      display: flex;
+      gap: 4px;
+      margin: 0 0 10px;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--panel);
+      padding-bottom: 4px;
+    }
+    .morph-tabs button {
+      flex: 1;
+      font-size: 0.72rem;
+      padding: 6px 4px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: #2a2e33;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .morph-tabs button.on {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: #32383f;
+    }
+    .morph-pane[hidden] { display: none !important; }
+    .morph-pick-banner {
+      margin: 0 0 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: #2a2e33;
+      line-height: 1.35;
+    }
+    .morph-pick-banner strong { color: var(--accent); }
+    .morph-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      align-items: center;
+      margin: 4px 0;
+    }
+    .morph-row label { color: var(--text); font-size: 0.75rem; margin: 0; }
+    .morph-row input[type="range"] { width: 100%; }
+    .morph-row .val { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 3.2em; text-align: right; }
+    .morph-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    .morph-actions button { font-size: 0.72rem; padding: 5px 8px; }
+    .morph-actions button.on { border-color: var(--accent); color: var(--accent); }
+    .morph-xyz { display: grid; grid-template-columns: 28px 1fr; gap: 4px 8px; align-items: center; }
+    .morph-xyz input[type="number"] {
+      width: 100%;
+      background: #2e3338;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 4px 6px;
+      font: inherit;
+    }
+    .morph-select {
+      width: 100%;
+      margin-bottom: 6px;
+    }
+    .morph-history {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 180px;
+      overflow: auto;
+    }
+    .morph-history li {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 8px;
+      margin: 4px 0;
+      cursor: pointer;
+      background: #2a2e33;
+    }
+    .morph-history li:hover { border-color: var(--accent); }
+    .morph-history .meta { color: var(--muted); font-size: 0.68rem; }
+    .morph-history .del {
+      float: right;
+      font-size: 0.68rem;
+      padding: 2px 6px;
+    }
     .card {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -141,13 +276,13 @@
     }
     .lm-stat { color: #94a3b8; }
     #lmToggle.active { background: #16a34a; color: #fff; }
-    #viewerHost {
+    .viewer-host {
       width: 100%;
       height: min(78vh, 720px);
       background: #fff;
       position: relative;
     }
-    #viewerHost canvas { display: block; width: 100% !important; height: 100% !important; }
+    .viewer-host canvas { display: block; width: 100% !important; height: 100% !important; }
     .viewer-status {
       position: absolute;
       left: 12px;
@@ -237,6 +372,7 @@
       <button type="button" data-mode="slider">拖拽叠图</button>
       <button type="button" data-mode="stack">上下对照</button>
       <button type="button" data-mode="viewer3d">3D预览 GLB</button>
+      <button type="button" data-mode="morph">骨相拧形</button>
       <button type="button" id="lmToggle">锚点叠层 ⊕</button>
     </div>
   </header>
@@ -251,7 +387,10 @@
     import * as THREE from "three";
     import { OrbitControls } from "./vendor/controls/OrbitControls.js";
     import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
+    import { DRACOLoader } from "./vendor/loaders/DRACOLoader.js";
     import { createLandmarkController } from "./landmarks.js";
+    import { createBoneMorphController } from "./bone_morph.js";
+    import { GLTFExporter } from "./vendor/exporters/GLTFExporter.js";
 
     const PRIMARY_VIEWS = [
       { id: "front", label: "正" },
@@ -274,6 +413,8 @@
     let viewId = "front";
     let mode = "side";
     let candId = "PROP_v2";
+    const boneMorph = createBoneMorphController(THREE);
+    let morphBusy = false;
 
     const elCand = document.getElementById("cand");
     const elViews = document.getElementById("views");
@@ -281,7 +422,8 @@
     const elHint = document.getElementById("hint");
     const elNote = document.getElementById("candNote");
 
-    let viewer = null;
+    let viewers = [];
+    let syncingOrbit = false;
     let alignCache = new Map();
     let alignObservers = [];
 
@@ -500,6 +642,9 @@
 
     function viewHint() {
       if (mode === "viewer3d") return "";
+      if (mode === "morph") {
+        return "骨相拧形：欧版中性底 + Farkas 控制点/语义滑块。右栏对照 Base15（切正/侧/背）。可自加点。";
+      }
       if (!isPrimaryView(viewId)) {
         return "辅助视角（前侧/后侧）：相机角与 Base15 画稿未必一致，勿作大型比例硬结论。请以正/侧/背为准。";
       }
@@ -515,13 +660,553 @@
       return c ? c.note || "" : "";
     }
 
+    function euroGlbUrl() {
+      // 对照源：参考用_欧洲人头部肌肉_20260324204416_opt.glb（副本 glb/euro_ref.glb）
+      return `glb/euro_ref.glb${assetRev ? "?v=" + assetRev : ""}`;
+    }
+
+    function makeGltfLoader() {
+      const loader = new GLTFLoader();
+      const draco = new DRACOLoader();
+      draco.setDecoderPath("./vendor/draco/gltf/");
+      loader.setDRACOLoader(draco);
+      return loader;
+    }
+
     function disposeViewer() {
-      if (!viewer) return;
-      cancelAnimationFrame(viewer.raf);
-      viewer.controls.dispose();
-      viewer.renderer.dispose();
-      if (viewer.ro) viewer.ro.disconnect();
-      viewer = null;
+      boneMorph.dispose();
+      for (const v of viewers) {
+        cancelAnimationFrame(v.raf);
+        if (v.controls) v.controls.dispose();
+        if (v.renderer) v.renderer.dispose();
+        if (v.ro) v.ro.disconnect();
+      }
+      viewers = [];
+      syncingOrbit = false;
+    }
+
+    let morphPanelTab = "morph";
+    let morphPanelPickToken = "";
+    let morphPanelDelegated = false;
+
+    function morphPickBannerHtml(st) {
+      if (st.pickMuscleMode) {
+        return `<div class="morph-pick-banner" id="morphPickBanner">选部中：点击模型上的色块部件（已禁用旋转）</div>`;
+      }
+      if (st.hslScope === "selected" && st.selectedMeshKey && st.selectedRegionKey) {
+        const mesh = (st.meshes || []).find((m) => m.key === st.selectedMeshKey);
+        const name = st.selectedPartLabel || st.selectedRegionHex || "部件";
+        const px = st.selectedRegionPixels ? ` · ${st.selectedRegionPixels}px` : "";
+        return `<div class="morph-pick-banner" id="morphPickBanner">已选：<strong>${name}</strong>${px}<br/><span style="color:var(--muted)">${mesh?.name || st.selectedMeshKey}</span></div>`;
+      }
+      if (st.hslScope === "selected") {
+        return `<div class="morph-pick-banner" id="morphPickBanner" style="color:var(--muted)">作用域「选定」：直接点击模型色块，或点「选部」/ Alt+点击</div>`;
+      }
+      return "";
+    }
+
+    function updateMorphPickBanner(host, st) {
+      const html = morphPickBannerHtml(st);
+      const el = host.querySelector("#morphPickBanner");
+      if (!html) {
+        el?.remove();
+        return;
+      }
+      if (el) el.outerHTML = html;
+      else host.querySelector('[data-morph-pane="color"]')?.insertAdjacentHTML("afterbegin", html);
+    }
+
+    function setupMorphPanelDelegation(host) {
+      if (morphPanelDelegated || !host) return;
+      morphPanelDelegated = true;
+      host.addEventListener("click", (e) => {
+        const tabBtn = e.target.closest("[data-morph-tab]");
+        if (tabBtn) {
+          morphPanelTab = tabBtn.getAttribute("data-morph-tab") || "morph";
+          fillMorphPanel();
+          return;
+        }
+        const id = e.target.id;
+        if (id === "morphAdd") {
+          boneMorph.setAddMode(true, true);
+          fillMorphPanel();
+        } else if (id === "morphAddAsym") {
+          boneMorph.setAddMode(true, false);
+          fillMorphPanel();
+        } else if (id === "morphDel") {
+          boneMorph.deletePoint(boneMorph.getState().selectedId);
+          fillMorphPanel();
+        } else if (id === "morphMirror") {
+          boneMorph.setMirrorLock(!boneMorph.getState().mirrorLock);
+          fillMorphPanel();
+        } else if (id === "morphEditRest") {
+          boneMorph.setEditRest(!boneMorph.getState().editRest);
+          fillMorphPanel();
+        } else if (id === "morphPickMesh") {
+          boneMorph.setPickMuscleMode(!boneMorph.getState().pickMuscleMode);
+          morphPanelTab = "color";
+          fillMorphPanel();
+        } else if (id === "morphHslScopeAll") {
+          boneMorph.setHslScope("all");
+          fillMorphPanel();
+        } else if (id === "morphHslScopeMuscles") {
+          boneMorph.setHslScope("muscles");
+          fillMorphPanel();
+        } else if (id === "morphHslScopeSelected") {
+          boneMorph.setHslScope("selected");
+          morphPanelTab = "color";
+          fillMorphPanel();
+        } else if (id === "morphMeshColorReset") {
+          boneMorph.clearSelectedMeshColor();
+          fillMorphPanel();
+        } else if (id === "morphHistSave") {
+          (async () => {
+            const label = prompt("版本名称（可空）", "") ?? "";
+            try {
+              const vid = await boneMorph.saveHistoryVersion(label.trim() || undefined);
+              document.getElementById("morphStatus").textContent = "已写入历史 " + vid;
+              fillMorphPanel();
+            } catch (err) {
+              alert("保存历史失败：" + err.message);
+            }
+          })();
+        } else if (id === "morphReset") {
+          boneMorph.resetMorph();
+          fillMorphPanel();
+        } else if (id === "morphReseed") {
+          if (!confirm("用 Static 表面极值重新播种 rest，并清零拧形？")) return;
+          boneMorph.reseed();
+          fillMorphPanel();
+        } else if (id === "morphSaveRest") {
+          boneMorph.saveRest().then(
+            () => {
+              document.getElementById("morphStatus").textContent = "rest 已保存";
+            },
+            (err) => alert("保存 rest 失败：" + err.message)
+          );
+        } else if (id === "morphSaveSession") {
+          boneMorph.saveSession().then(
+            () => {
+              document.getElementById("morphStatus").textContent = "session 已保存";
+            },
+            (err) => alert("保存 session 失败：" + err.message)
+          );
+        } else if (id === "morphExport") {
+          exportWarpedGlb();
+        }
+        const del = e.target.closest("[data-hist-del]");
+        if (del) {
+          e.stopPropagation();
+          const hid = del.getAttribute("data-hist-del");
+          if (!confirm("删除该历史版本？")) return;
+          boneMorph.deleteHistoryVersion(hid).then(
+            () => fillMorphPanel(),
+            (err) => alert(err.message)
+          );
+          return;
+        }
+        const li = e.target.closest("[data-hist]");
+        if (li) {
+          const hid = li.getAttribute("data-hist");
+          boneMorph.loadHistoryVersion(hid).then(
+            () => {
+              document.getElementById("morphStatus").textContent = "已加载 " + hid;
+              fillMorphPanel();
+            },
+            (err) => alert("加载失败：" + err.message)
+          );
+        }
+      });
+      host.addEventListener("change", (e) => {
+        if (e.target.id === "morphPointSelect") {
+          boneMorph.setSelected(e.target.value);
+          patchMorphPanel();
+          return;
+        }
+        if (e.target.matches("[data-xyz]")) {
+          const st2 = boneMorph.getState();
+          const pid = st2.selectedId;
+          if (!pid) return;
+          const cur = (st2.xyzOffset[pid] || [0, 0, 0]).slice();
+          cur[parseInt(e.target.getAttribute("data-xyz"), 10)] = parseFloat(e.target.value) || 0;
+          boneMorph.setXyz(pid, cur[0], cur[1], cur[2]);
+          return;
+        }
+        if (e.target.id === "morphHslH" || e.target.id === "morphHslS" || e.target.id === "morphHslL") {
+          applyMorphHslFromUi(host, true);
+        }
+      });
+      host.addEventListener("input", (e) => {
+        if (e.target.matches("[data-slider]")) {
+          boneMorph.setSlider(e.target.getAttribute("data-slider"), parseFloat(e.target.value));
+          const row = e.target.closest(".morph-row");
+          if (row) row.querySelector(".val").textContent = Number(e.target.value).toFixed(4);
+          return;
+        }
+        if (e.target.id === "morphHslH" || e.target.id === "morphHslS" || e.target.id === "morphHslL") {
+          applyMorphHslFromUi(host, false);
+        }
+      });
+    }
+
+    function applyMorphHslFromUi(host, notify) {
+      const h = parseFloat(host.querySelector("#morphHslH")?.value || "0");
+      const s = parseFloat(host.querySelector("#morphHslS")?.value || "0");
+      const l = parseFloat(host.querySelector("#morphHslL")?.value || "0");
+      const hv = host.querySelector("#morphHslHVal");
+      const sv = host.querySelector("#morphHslSVal");
+      const lv = host.querySelector("#morphHslLVal");
+      if (hv) hv.textContent = `${Math.round(h)}°`;
+      if (sv) sv.textContent = `${Math.round(s)}`;
+      if (lv) lv.textContent = `${Math.round(l)}`;
+      boneMorph.setScopeHsl(h / 360, s / 100, l / 100, {
+        notify,
+        immediate: !!notify,
+      });
+    }
+
+    function patchMorphPanel() {
+      const host = document.getElementById("morphPanel");
+      if (!host || !host.querySelector("[data-morph-tab]")) {
+        fillMorphPanel();
+        return;
+      }
+      const st = boneMorph.getState();
+      const pickToken = `${st.selectedMeshKey}|${st.selectedRegionKey}`;
+      if (st.selectedRegionKey && pickToken !== morphPanelPickToken) {
+        morphPanelPickToken = pickToken;
+        morphPanelTab = "color";
+        fillMorphPanel();
+        return;
+      }
+      const status = host.querySelector("#morphStatus");
+      if (status) {
+        status.textContent = st.hasRest
+          ? `点 ${st.pointIds.length} · 选中 ${st.selectedId || "—"}`
+          : "无 rest";
+      }
+      updateMorphPickBanner(host, st);
+      const hslNeedPick =
+        st.hslScope === "selected" && !(st.selectedMeshKey && st.selectedRegionKey);
+      ["morphHslH", "morphHslS", "morphHslL"].forEach((id) => {
+        const el = host.querySelector("#" + id);
+        if (el) el.disabled = hslNeedPick;
+      });
+      const rh = st.regionHsl || {};
+      const hEl = host.querySelector("#morphHslH");
+      const sEl = host.querySelector("#morphHslS");
+      const lEl = host.querySelector("#morphHslL");
+      const hDeg = Math.round((rh.dh || 0) * 360);
+      const sPct = Math.round((rh.ds || 0) * 100);
+      const lPct = Math.round((rh.dl || 0) * 100);
+      if (hEl && document.activeElement !== hEl) {
+        hEl.value = String(hDeg);
+        const v = host.querySelector("#morphHslHVal");
+        if (v) v.textContent = `${hDeg}°`;
+      }
+      if (sEl && document.activeElement !== sEl) {
+        sEl.value = String(sPct);
+        const v = host.querySelector("#morphHslSVal");
+        if (v) v.textContent = `${sPct}`;
+      }
+      if (lEl && document.activeElement !== lEl) {
+        lEl.value = String(lPct);
+        const v = host.querySelector("#morphHslLVal");
+        if (v) v.textContent = `${lPct}`;
+      }
+      host.querySelectorAll("[data-slider]").forEach((el) => {
+        if (document.activeElement === el) return;
+        const sid = el.getAttribute("data-slider");
+        const v = st.sliderValues[sid] ?? 0;
+        el.value = v;
+        const row = el.closest(".morph-row");
+        if (row) row.querySelector(".val").textContent = Number(v).toFixed(4);
+      });
+      host.querySelectorAll("[data-morph-tab]").forEach((btn) => {
+        btn.classList.toggle("on", btn.getAttribute("data-morph-tab") === morphPanelTab);
+      });
+      host.querySelectorAll("[data-morph-pane]").forEach((pane) => {
+        pane.hidden = pane.getAttribute("data-morph-pane") !== morphPanelTab;
+      });
+      host.querySelector("#morphPickMesh")?.classList.toggle("on", st.pickMuscleMode);
+      host.querySelector("#morphHslScopeAll")?.classList.toggle("on", st.hslScope === "all");
+      host.querySelector("#morphHslScopeMuscles")?.classList.toggle("on", st.hslScope === "muscles");
+      host.querySelector("#morphHslScopeSelected")?.classList.toggle("on", st.hslScope === "selected");
+    }
+
+    function fillMorphPanel() {
+      const host = document.getElementById("morphPanel");
+      if (!host) return;
+      const st = boneMorph.getState();
+      const sel = st.selectedId;
+      const xyz = (st.xyzOffset[sel] || [0, 0, 0]).map((n) => Number(n.toFixed(5)));
+      const pointOpts = st.pointIds
+        .map((id) => {
+          const lm = (st.farkas.landmarks || []).find((l) => l.id === id);
+          const custom = st.customMeta[id];
+          const label = lm?.label || custom?.label || id;
+          return `<option value="${id}"${id === sel ? " selected" : ""}>${label} (${id})</option>`;
+        })
+        .join("");
+      const sliders = (st.sliderDefs.sliders || [])
+        .map((s) => {
+          const v = st.sliderValues[s.id] ?? s.default ?? 0;
+          return `<div class="morph-row">
+            <label title="${s.measure || ""}">${s.label}</label>
+            <span class="val">${Number(v).toFixed(4)}</span>
+            <input type="range" data-slider="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" style="grid-column:1/-1" />
+          </div>`;
+        })
+        .join("");
+      const hist = (st.history || [])
+        .map(
+          (v) => `<li data-hist="${v.id}">
+            <button type="button" class="del" data-hist-del="${v.id}">删</button>
+            <div><strong>${v.label || v.id}</strong></div>
+            <div class="meta">${(v.createdAt || "").replace("T", " ").slice(0, 19)} · ${v.pointCount || "?"}点 · ${v.sliderSummary || ""}</div>
+          </li>`
+        )
+        .join("") || `<li class="meta" style="cursor:default">暂无历史版本</li>`;
+      const hslDisabled =
+        st.hslScope === "selected" && !(st.selectedMeshKey && st.selectedRegionKey);
+      const tabBtn = (id, label) =>
+        `<button type="button" data-morph-tab="${id}" class="${morphPanelTab === id ? "on" : ""}">${label}</button>`;
+      const pickToken = `${st.selectedMeshKey}|${st.selectedRegionKey}`;
+      if (st.selectedRegionKey) morphPanelPickToken = pickToken;
+      host.innerHTML = `
+        <div class="morph-tabs">
+          ${tabBtn("morph", "拧形")}
+          ${tabBtn("color", "设色")}
+          ${tabBtn("io", "存档")}
+        </div>
+        <div class="morph-pane" data-morph-pane="morph"${morphPanelTab !== "morph" ? " hidden" : ""}>
+          <h3>语义滑块（Farkas 测量）</h3>
+          <p style="color:var(--muted);margin:0 0 8px;line-height:1.4">以欧版中性姿为 0；不对齐 SHELL。拖控制点仅沿世界 X/Y/Z 正交轴。</p>
+          ${sliders || "<p class='lm-stat'>滑块定义未加载</p>"}
+          <h3>控制点</h3>
+          <select class="morph-select" id="morphPointSelect">${pointOpts}</select>
+          <div class="morph-actions">
+            <button type="button" id="morphAdd" class="${st.addMode ? "on" : ""}">加点${st.addSymmetric ? "(对称)" : ""}</button>
+            <button type="button" id="morphAddAsym">加点(单)</button>
+            <button type="button" id="morphDel">删当前</button>
+            <button type="button" id="morphMirror" class="${st.mirrorLock ? "on" : ""}">镜像${st.mirrorLock ? "开" : "关"}</button>
+            <button type="button" id="morphEditRest" class="${st.editRest ? "on" : ""}">${st.editRest ? "拖rest" : "拖目标"}</button>
+          </div>
+          <details class="morph-adv">
+            <summary>单点 XYZ 偏移</summary>
+            <div class="morph-xyz" style="margin-top:6px">
+              <span>dx</span><input type="number" step="0.0005" data-xyz="0" value="${xyz[0]}" />
+              <span>dy</span><input type="number" step="0.0005" data-xyz="1" value="${xyz[1]}" />
+              <span>dz</span><input type="number" step="0.0005" data-xyz="2" value="${xyz[2]}" />
+            </div>
+          </details>
+        </div>
+        <div class="morph-pane" data-morph-pane="color"${morphPanelTab !== "color" ? " hidden" : ""}>
+          ${morphPickBannerHtml(st)}
+          <p style="color:var(--muted);margin:0 0 6px;line-height:1.35">作用域：<strong>全部</strong>=所有贴图；<strong>所有肌肉</strong>=肌层整张；<strong>选定</strong>=语义色块整块。滑条像 PS Ctrl+U。</p>
+          <div class="morph-actions">
+            <button type="button" id="morphHslScopeAll" class="${st.hslScope === "all" ? "on" : ""}">全部</button>
+            <button type="button" id="morphHslScopeMuscles" class="${st.hslScope === "muscles" ? "on" : ""}">所有肌肉</button>
+            <button type="button" id="morphHslScopeSelected" class="${st.hslScope === "selected" ? "on" : ""}">选定</button>
+          </div>
+          <div class="morph-actions">
+            <button type="button" id="morphPickMesh" class="${st.pickMuscleMode ? "on" : ""}">选部</button>
+            <button type="button" id="morphMeshColorReset">恢复原色</button>
+          </div>
+          <div class="morph-row" style="margin-top:6px">
+            <label>色相</label>
+            <span class="val" id="morphHslHVal">${Math.round((st.regionHsl?.dh || 0) * 360)}°</span>
+            <input type="range" id="morphHslH" min="-180" max="180" step="1" value="${Math.round((st.regionHsl?.dh || 0) * 360)}" style="grid-column:1/-1"${hslDisabled ? " disabled" : ""} />
+          </div>
+          <div class="morph-row">
+            <label>饱和度</label>
+            <span class="val" id="morphHslSVal">${Math.round((st.regionHsl?.ds || 0) * 100)}</span>
+            <input type="range" id="morphHslS" min="-100" max="100" step="1" value="${Math.round((st.regionHsl?.ds || 0) * 100)}" style="grid-column:1/-1"${hslDisabled ? " disabled" : ""} />
+          </div>
+          <div class="morph-row">
+            <label>明度</label>
+            <span class="val" id="morphHslLVal">${Math.round((st.regionHsl?.dl || 0) * 100)}</span>
+            <input type="range" id="morphHslL" min="-100" max="100" step="1" value="${Math.round((st.regionHsl?.dl || 0) * 100)}" style="grid-column:1/-1"${hslDisabled ? " disabled" : ""} />
+          </div>
+        </div>
+        <div class="morph-pane" data-morph-pane="io"${morphPanelTab !== "io" ? " hidden" : ""}>
+          <h3>历史版本</h3>
+          <div class="morph-actions">
+            <button type="button" id="morphHistSave">保存到历史</button>
+          </div>
+          <ul class="morph-history" id="morphHistList">${hist}</ul>
+          <h3>存档 / 导出</h3>
+          <div class="morph-actions">
+            <button type="button" id="morphReset">Reset 拧形</button>
+            <button type="button" id="morphReseed">重新播种 rest</button>
+            <button type="button" id="morphSaveRest">保存 rest</button>
+            <button type="button" id="morphSaveSession">保存 session</button>
+            <button type="button" id="morphExport">下载 warped GLB</button>
+          </div>
+        </div>
+        <p class="lm-stat" id="morphStatus">${st.hasRest ? `点 ${st.pointIds.length} · 选中 ${sel || "—"}` : "无 rest"}</p>
+      `;
+      setupMorphPanelDelegation(host);
+    }
+
+    function exportWarpedGlb() {
+      const root = boneMorph.getRoot();
+      if (!root) {
+        alert("尚未加载模型");
+        return;
+      }
+      const markers = boneMorph.markerGroup();
+      if (markers) markers.visible = false;
+      const exporter = new GLTFExporter();
+      exporter.parse(
+        root,
+        (result) => {
+          if (markers) markers.visible = true;
+          const blob =
+            result instanceof ArrayBuffer
+              ? new Blob([result], { type: "model/gltf-binary" })
+              : new Blob([JSON.stringify(result)], { type: "application/json" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "euro_bone_morph_warped.glb";
+          a.click();
+          URL.revokeObjectURL(a.href);
+          const st = document.getElementById("morphStatus");
+          if (st) st.textContent = "已下载 warped GLB";
+        },
+        (err) => {
+          if (markers) markers.visible = true;
+          console.error(err);
+          alert("导出失败：" + (err?.message || err));
+        },
+        { binary: true }
+      );
+    }
+
+    function mountMorphBaseRef() {
+      const host = document.getElementById("morphBaseFrame");
+      if (!host) return;
+      const v = ["front", "side", "back"].includes(viewId) ? viewId : "side";
+      host.innerHTML = "";
+      const img = document.createElement("img");
+      img.alt = "Base15";
+      img.src = baseUrl(v);
+      host.appendChild(img);
+    }
+
+    async function initMorphViewer(host, statusEl) {
+      const w = host.clientWidth || 800;
+      const h = host.clientHeight || 560;
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xffffff);
+      const aspect = w / Math.max(h, 1);
+      const camera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, -1000, 1000);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(w, h, false);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.LinearToneMapping;
+      renderer.toneMappingExposure = 1.35;
+      host.innerHTML = "";
+      host.appendChild(renderer.domElement);
+      if (statusEl) host.appendChild(statusEl);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0xd0d0d0, 1.35);
+      scene.add(hemi);
+      const dir = new THREE.DirectionalLight(0xffffff, 1.25);
+      dir.position.set(2.2, 3.5, 2.8);
+      scene.add(dir);
+      const fill = new THREE.DirectionalLight(0xffffff, 0.7);
+      fill.position.set(-2.5, 1.2, -1.5);
+      scene.add(fill);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+
+      const slot = {
+        scene,
+        camera,
+        renderer,
+        controls,
+        raf: 0,
+        ro: null,
+        frustumHeight: 1,
+        baseRadius: 1,
+        ready: false,
+        label: "morph",
+      };
+      viewers.push(slot);
+
+      statusEl.textContent = "加载欧版…";
+      const loader = makeGltfLoader();
+      loader.load(
+        euroGlbUrl(),
+        async (gltf) => {
+          const root = gltf.scene || gltf.scenes[0];
+          root.traverse((obj) => {
+            if (!obj.isMesh || !obj.material) return;
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            for (const mat of mats) {
+              if (!mat) continue;
+              if ("metalness" in mat) mat.metalness = 0;
+              if ("roughness" in mat) mat.roughness = Math.max(Number(mat.roughness) || 0.5, 0.48);
+              mat.needsUpdate = true;
+            }
+          });
+          scene.add(root);
+          const fit = fitCamera(camera, controls, root, host);
+          slot.frustumHeight = fit.frustumHeight;
+          slot.baseRadius = fit.baseRadius;
+          slot.ready = true;
+          try {
+            await boneMorph.attach({
+              root,
+              scene,
+              camera,
+              domElement: renderer.domElement,
+              controls,
+              onChange: () => {
+                requestAnimationFrame(() => patchMorphPanel());
+              },
+            });
+            window.__boneMorph = boneMorph;
+            statusEl.textContent = "骨相拧形 · 拖点/滑块 · 欧版";
+            fillMorphPanel();
+          } catch (e) {
+            console.error(e);
+            statusEl.textContent = "拧形初始化失败：" + e.message;
+          }
+        },
+        undefined,
+        (err) => {
+          console.error(err);
+          statusEl.textContent = "欧版加载失败";
+        }
+      );
+
+      const tick = () => {
+        slot.raf = requestAnimationFrame(tick);
+        controls.update();
+        renderer.render(scene, camera);
+      };
+      const ro = new ResizeObserver(() => {
+        const nw = host.clientWidth;
+        const nh = host.clientHeight;
+        if (nw < 2 || nh < 2) return;
+        const a = nw / nh;
+        const fh = slot.frustumHeight || 1;
+        camera.left = (-fh * a) / 2;
+        camera.right = (fh * a) / 2;
+        camera.top = fh / 2;
+        camera.bottom = -fh / 2;
+        camera.updateProjectionMatrix();
+        renderer.setSize(nw, nh, false);
+      });
+      ro.observe(host);
+      slot.ro = ro;
+      tick();
+      return slot;
     }
 
     function fitCamera(camera, controls, object, host) {
@@ -538,16 +1223,44 @@
       camera.bottom = -frustumHeight / 2;
       camera.near = -maxDim * 30;
       camera.far = maxDim * 30;
+      camera.zoom = 1;
       camera.position.set(center.x, center.y, center.z + maxDim * 3);
       camera.lookAt(center);
       camera.updateProjectionMatrix();
       controls.target.copy(center);
       controls.update();
-      return frustumHeight;
+      return { frustumHeight, baseRadius: maxDim * 3 };
     }
 
-    function initViewer(host, statusEl, url) {
-      disposeViewer();
+    function applyOrbitFrom(source, target) {
+      if (!source || !target || !source.ready || !target.ready) return;
+      const offset = new THREE.Vector3().subVectors(source.camera.position, source.controls.target);
+      const sph = new THREE.Spherical().setFromVector3(offset);
+      const radius = target.baseRadius || sph.radius;
+      const next = new THREE.Vector3().setFromSpherical(
+        new THREE.Spherical(radius, sph.phi, sph.theta)
+      );
+      target.camera.position.copy(target.controls.target).add(next);
+      target.camera.zoom = source.camera.zoom;
+      target.camera.up.copy(source.camera.up);
+      target.camera.updateProjectionMatrix();
+      target.camera.lookAt(target.controls.target);
+      target.controls.update();
+    }
+
+    function bindOrbitSync(slot) {
+      slot.controls.addEventListener("change", () => {
+        if (syncingOrbit || !slot.ready) return;
+        syncingOrbit = true;
+        for (const other of viewers) {
+          if (other === slot) continue;
+          applyOrbitFrom(slot, other);
+        }
+        syncingOrbit = false;
+      });
+    }
+
+    function initViewer(host, statusEl, url, label) {
       const w = host.clientWidth || 800;
       const h = host.clientHeight || 560;
       const scene = new THREE.Scene();
@@ -580,7 +1293,22 @@
       controls.enableDamping = true;
       controls.dampingFactor = 0.06;
 
-      const loader = new GLTFLoader();
+      const slot = {
+        scene,
+        camera,
+        renderer,
+        controls,
+        raf: 0,
+        ro: null,
+        frustumHeight: 1,
+        baseRadius: 1,
+        ready: false,
+        label,
+      };
+      viewers.push(slot);
+      bindOrbitSync(slot);
+
+      const loader = makeGltfLoader();
       statusEl.textContent = "加载中… " + url;
       loader.load(
         url,
@@ -597,19 +1325,24 @@
             }
           });
           scene.add(root);
-          const frustumHeight = fitCamera(camera, controls, root, host);
-          statusEl.textContent = "正交 · 白底 · 拖拽旋转 · " + candId;
-          viewer.frustumHeight = frustumHeight;
+          const fit = fitCamera(camera, controls, root, host);
+          slot.frustumHeight = fit.frustumHeight;
+          slot.baseRadius = fit.baseRadius;
+          slot.ready = true;
+          statusEl.textContent = "正交 · 白底 · 拖拽旋转 · " + label;
+          // If peer already ready, match its orbit so both open with the same view.
+          const peer = viewers.find((v) => v !== slot && v.ready);
+          if (peer) applyOrbitFrom(peer, slot);
         },
         undefined,
         (err) => {
-          console.error(err);
-          statusEl.textContent = "加载失败：当前候选可能没有 GLB（请选 PROP_v1 / PROP_v2）";
+          console.error(label, url, err);
+          statusEl.textContent = "加载失败：" + label + "（见控制台）";
         }
       );
 
       const tick = () => {
-        viewer.raf = requestAnimationFrame(tick);
+        slot.raf = requestAnimationFrame(tick);
         controls.update();
         renderer.render(scene, camera);
       };
@@ -618,19 +1351,19 @@
         const nw = host.clientWidth;
         const nh = host.clientHeight;
         if (nw < 2 || nh < 2) return;
-        const aspect = nw / nh;
-        const fh = viewer.frustumHeight || 1;
-        camera.left = (-fh * aspect) / 2;
-        camera.right = (fh * aspect) / 2;
+        const a = nw / nh;
+        const fh = slot.frustumHeight || 1;
+        camera.left = (-fh * a) / 2;
+        camera.right = (fh * a) / 2;
         camera.top = fh / 2;
         camera.bottom = -fh / 2;
         camera.updateProjectionMatrix();
         renderer.setSize(nw, nh, false);
       });
       ro.observe(host);
-
-      viewer = { scene, camera, renderer, controls, raf: 0, ro, frustumHeight: 1 };
+      slot.ro = ro;
       tick();
+      return slot;
     }
 
     async function render() {
@@ -638,7 +1371,35 @@
       const ref = baseUrl(viewId);
       const ours = oursUrl(candId, viewId);
       const vLabel = (VIEWS.find((v) => v.id === viewId) || {}).label || viewId;
-      elNote.textContent = `当前：${candId} · ${mode === "viewer3d" ? "3D GLB" : vLabel}。${currentNote()}`;
+      elNote.textContent = `当前：${candId} · ${
+        mode === "viewer3d" ? "3D GLB" : mode === "morph" ? "骨相拧形" : vLabel
+      }。${currentNote()}`;
+
+      if (mode === "morph") {
+        clearAlignObservers();
+        morphPanelDelegated = false;
+        morphPanelPickToken = "";
+        elStage.className = "stage morph";
+        const refView = ["front", "side", "back"].includes(viewId) ? viewId : "side";
+        elStage.innerHTML = `
+          <div class="card">
+            <h2>Base15 对照 <span>${refView}</span></h2>
+            <div class="morph-ref-frame" id="morphBaseFrame"></div>
+          </div>
+          <div class="card">
+            <h2>欧版 · 可拧 <span>euro_ref · Farkas / TPS</span></h2>
+            <div class="viewer-host" id="viewerHostMorph"><div class="viewer-status" id="viewerStatusMorph"></div></div>
+          </div>
+          <div class="morph-panel" id="morphPanel"><p class="lm-stat">加载中…</p></div>`;
+        elHint.textContent = viewHint();
+        disposeViewer();
+        mountMorphBaseRef();
+        initMorphViewer(
+          document.getElementById("viewerHostMorph"),
+          document.getElementById("viewerStatusMorph")
+        );
+        return;
+      }
 
       if (mode === "viewer3d") {
         clearAlignObservers();
@@ -646,18 +1407,32 @@
         const ok = hasGlb(candId);
         elStage.innerHTML = `
           <div class="card">
-            <h2>3D 预览 <span>${candId}${ok ? ".glb" : "（无 GLB）"} · 正交</span></h2>
-            <div id="viewerHost"><div class="viewer-status" id="viewerStatus"></div></div>
+            <h2>欧版参考 <span>参考用_欧洲人头部肌肉… · 正交</span></h2>
+            <div class="viewer-host" id="viewerHostEuro"><div class="viewer-status" id="viewerStatusEuro"></div></div>
+          </div>
+          <div class="card">
+            <h2>当前成果 <span>${candId}${ok ? ".glb" : "（无 GLB）"} · 正交</span></h2>
+            <div class="viewer-host" id="viewerHostOurs"><div class="viewer-status" id="viewerStatusOurs"></div></div>
           </div>`;
         elHint.textContent = viewHint() || (ok
-          ? "正交 3D 预览：与 Base15 / 静态渲染同一观察方式，可旋转看真实三维比例。"
-          : "该候选未导出 GLB。");
+          ? "左右双 3D：左欧版 / 右当前候选。拖拽任一侧，另一侧视角联动。"
+          : "左侧为欧版参考；右侧候选未导出 GLB。");
+        disposeViewer();
+        initViewer(
+          document.getElementById("viewerHostEuro"),
+          document.getElementById("viewerStatusEuro"),
+          euroGlbUrl(),
+          "欧版"
+        );
         if (ok) {
-          const host = document.getElementById("viewerHost");
-          const status = document.getElementById("viewerStatus");
-          initViewer(host, status, glbUrl(candId));
+          initViewer(
+            document.getElementById("viewerHostOurs"),
+            document.getElementById("viewerStatusOurs"),
+            glbUrl(candId),
+            candId
+          );
         } else {
-          disposeViewer();
+          document.getElementById("viewerStatusOurs").textContent = "该候选未导出 GLB。";
         }
         return;
       }
@@ -765,6 +1540,15 @@
       if (!b) return;
       viewId = b.getAttribute("data-view");
       fillControls();
+      if (mode === "morph") {
+        mountMorphBaseRef();
+        const h2 = elStage.querySelector(".card:nth-child(1) h2 span");
+        if (h2) {
+          const refView = ["front", "side", "back"].includes(viewId) ? viewId : "side";
+          h2.textContent = refView;
+        }
+        return;
+      }
       if (mode !== "viewer3d") render();
       else fillControls();
     });
