@@ -68,6 +68,9 @@ class ReuseTCPServer(socketserver.TCPServer):
 
 
 def main() -> int:
+    import sys
+
+    no_browser = "--no-browser" in sys.argv
     if not (ROOT / "index.html").exists():
         print(f"[错误] 找不到 index.html：{ROOT / 'index.html'}")
         return 1
@@ -87,12 +90,13 @@ def main() -> int:
     out("按 Ctrl+C 可停止服务。")
     # Bind first, then open browser — avoids blank page / connection refused.
     time.sleep(0.2)
-    try:
-        webbrowser.open(URL)
-        out("已请求打开浏览器。若没弹出窗口，请手动打开上面的地址。")
-    except Exception as e:
-        out(f"[警告] 自动打开浏览器失败：{e}")
-        out(f"请手动打开：{URL}")
+    if not no_browser:
+        try:
+            webbrowser.open(URL)
+            out("已请求打开浏览器。若没弹出窗口，请手动打开上面的地址。")
+        except Exception as e:
+            out(f"[警告] 自动打开浏览器失败：{e}")
+            out(f"请手动打开：{URL}")
 
     try:
         httpd.serve_forever()

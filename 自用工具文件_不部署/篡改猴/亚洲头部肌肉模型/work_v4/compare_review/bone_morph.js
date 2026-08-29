@@ -2157,21 +2157,12 @@ export function createBoneMorphController(THREE_NS) {
     const markerObjs = Object.values(markers);
     const hitsM = raycaster.intersectObjects(markerObjs, false);
 
-    // 选部：显式选部 / Alt / 作用域「选定」时点 mesh（控制点仍优先）
-    let wantPick = pickMuscleMode || ev.altKey;
-    if (
-      !wantPick &&
-      hslScope === "selected" &&
-      ev.button === 0 &&
-      !hitsM.length
-    ) {
-      const meshHits = raycaster.intersectObjects(listMeshes(), false);
-      if (meshHits.length && meshHits[0].uv) wantPick = true;
-    }
+    // 选部：仅 Alt+左键（普通点击留给旋转 / 锚点；控制点仍优先于选部）
+    const wantPick = ev.altKey && ev.button === 0;
 
     // 选部优先：capture 阶段 + 暂禁旋转
     if (wantPick) {
-      if ((ev.altKey || hslScope === "selected") && controls && !pickMuscleMode) {
+      if (controls) {
         controlsSavedEnabled = controls.enabled;
         controls.enabled = false;
       }
@@ -2180,9 +2171,6 @@ export function createBoneMorphController(THREE_NS) {
       ev.stopPropagation();
       if (!ok) {
         onChange();
-      }
-      if (!ok && pickMuscleMode) {
-        // 保持选部模式，提示用户再点
       }
       return;
     }

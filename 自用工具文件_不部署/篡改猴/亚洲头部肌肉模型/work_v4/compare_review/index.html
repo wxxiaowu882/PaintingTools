@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>Base15 对照审阅</title>
+  <title>头部肌肉色彩变更</title>
   <script type="importmap">
   {
     "imports": {
@@ -215,6 +215,29 @@
       font-size: 0.68rem;
       padding: 2px 6px;
     }
+    .morph-point-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: min(42vh, 360px);
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #252a2f;
+    }
+    .morph-point-list li {
+      padding: 5px 8px;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+      line-height: 1.3;
+    }
+    .morph-point-list li:last-child { border-bottom: none; }
+    .morph-point-list li:hover { background: #2f363d; }
+    .morph-point-list li.on {
+      background: #32383f;
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+    .morph-point-list .meta { color: var(--muted); font-size: 0.66rem; }
     .card {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -359,7 +382,7 @@
 </head>
 <body>
   <header>
-    <h1>Base15 ↔ 当前成果 对照审阅</h1>
+    <h1>头部肌肉色彩变更</h1>
     <p class="sub">主审视角：<strong>正 / 侧 / 背</strong>（大型比例验收）。前侧/后侧仅辅助参考。均为正交取景，与 Base15 一致。</p>
     <div class="row">
       <label>候选版本</label>
@@ -685,14 +708,31 @@
       syncingOrbit = false;
     }
 
-    let morphPanelTab = "morph";
+    let morphPanelTab = "anchors";
     let morphPanelPickToken = "";
     let morphPanelDelegated = false;
 
+    function morphPointLabel(st, id) {
+      const lm = (st.farkas.landmarks || []).find((l) => l.id === id);
+      const custom = st.customMeta[id];
+      return lm?.label || custom?.label || id;
+    }
+
+    function morphPointListHtml(st) {
+      const sel = st.selectedId;
+      return (
+        st.pointIds
+          .map((id) => {
+            const label = morphPointLabel(st, id);
+            const on = id === sel ? ' class="on"' : "";
+            return `<li data-point="${id}"${on}><strong>${label}</strong><div class="meta">${id}</div></li>`;
+          })
+          .join("") ||
+        `<li class="meta" style="cursor:default;padding:8px">暂无锚点（请先加载 rest 或加点）</li>`
+      );
+    }
+
     function morphPickBannerHtml(st) {
-      if (st.pickMuscleMode) {
-        return `<div class="morph-pick-banner" id="morphPickBanner">选部中：点击模型上的色块部件（已禁用旋转）</div>`;
-      }
       if (st.hslScope === "selected" && st.selectedMeshKey && st.selectedRegionKey) {
         const mesh = (st.meshes || []).find((m) => m.key === st.selectedMeshKey);
         const name = st.selectedPartLabel || st.selectedRegionHex || "部件";
@@ -700,7 +740,7 @@
         return `<div class="morph-pick-banner" id="morphPickBanner">已选：<strong>${name}</strong>${px}<br/><span style="color:var(--muted)">${mesh?.name || st.selectedMeshKey}</span></div>`;
       }
       if (st.hslScope === "selected") {
-        return `<div class="morph-pick-banner" id="morphPickBanner" style="color:var(--muted)">作用域「选定」：直接点击模型色块，或点「选部」/ Alt+点击</div>`;
+        return `<div class="morph-pick-banner" id="morphPickBanner" style="color:var(--muted)">作用域「选定」：按住 <strong>Alt</strong> + 鼠标左键点击模型色块选部</div>`;
       }
       return "";
     }
@@ -729,9 +769,11 @@
         const id = e.target.id;
         if (id === "morphAdd") {
           boneMorph.setAddMode(true, true);
+          morphPanelTab = "anchors";
           fillMorphPanel();
         } else if (id === "morphAddAsym") {
           boneMorph.setAddMode(true, false);
+          morphPanelTab = "anchors";
           fillMorphPanel();
         } else if (id === "morphDel") {
           boneMorph.deletePoint(boneMorph.getState().selectedId);
@@ -741,10 +783,6 @@
           fillMorphPanel();
         } else if (id === "morphEditRest") {
           boneMorph.setEditRest(!boneMorph.getState().editRest);
-          fillMorphPanel();
-        } else if (id === "morphPickMesh") {
-          boneMorph.setPickMuscleMode(!boneMorph.getState().pickMuscleMode);
-          morphPanelTab = "color";
           fillMorphPanel();
         } else if (id === "morphHslScopeAll") {
           boneMorph.setHslScope("all");
@@ -815,6 +853,12 @@
             },
             (err) => alert("加载失败：" + err.message)
           );
+          return;
+        }
+        const pt = e.target.closest("[data-point]");
+        if (pt) {
+          boneMorph.setSelected(pt.getAttribute("data-point"));
+          patchMorphPanel();
         }
       });
       host.addEventListener("change", (e) => {
@@ -928,7 +972,13 @@
       host.querySelectorAll("[data-morph-pane]").forEach((pane) => {
         pane.hidden = pane.getAttribute("data-morph-pane") !== morphPanelTab;
       });
-      host.querySelector("#morphPickMesh")?.classList.toggle("on", st.pickMuscleMode);
+      host.querySelectorAll("[data-point]").forEach((li) => {
+        li.classList.toggle("on", li.getAttribute("data-point") === st.selectedId);
+      });
+      const ptSel = host.querySelector("#morphPointSelect");
+      if (ptSel && document.activeElement !== ptSel) {
+        ptSel.value = st.selectedId || "";
+      }
       host.querySelector("#morphHslScopeAll")?.classList.toggle("on", st.hslScope === "all");
       host.querySelector("#morphHslScopeMuscles")?.classList.toggle("on", st.hslScope === "muscles");
       host.querySelector("#morphHslScopeSelected")?.classList.toggle("on", st.hslScope === "selected");
@@ -940,11 +990,10 @@
       const st = boneMorph.getState();
       const sel = st.selectedId;
       const xyz = (st.xyzOffset[sel] || [0, 0, 0]).map((n) => Number(n.toFixed(5)));
+      const pointList = morphPointListHtml(st);
       const pointOpts = st.pointIds
         .map((id) => {
-          const lm = (st.farkas.landmarks || []).find((l) => l.id === id);
-          const custom = st.customMeta[id];
-          const label = lm?.label || custom?.label || id;
+          const label = morphPointLabel(st, id);
           return `<option value="${id}"${id === sel ? " selected" : ""}>${label} (${id})</option>`;
         })
         .join("");
@@ -975,16 +1024,16 @@
       if (st.selectedRegionKey) morphPanelPickToken = pickToken;
       host.innerHTML = `
         <div class="morph-tabs">
+          ${tabBtn("anchors", "锚点")}
           ${tabBtn("morph", "拧形")}
           ${tabBtn("color", "设色")}
           ${tabBtn("io", "存档")}
         </div>
-        <div class="morph-pane" data-morph-pane="morph"${morphPanelTab !== "morph" ? " hidden" : ""}>
-          <h3>语义滑块（Farkas 测量）</h3>
-          <p style="color:var(--muted);margin:0 0 8px;line-height:1.4">以欧版中性姿为 0；不对齐 SHELL。拖控制点仅沿世界 X/Y/Z 正交轴。</p>
-          ${sliders || "<p class='lm-stat'>滑块定义未加载</p>"}
-          <h3>控制点</h3>
-          <select class="morph-select" id="morphPointSelect">${pointOpts}</select>
+        <div class="morph-pane" data-morph-pane="anchors"${morphPanelTab !== "anchors" ? " hidden" : ""}>
+          <h3>锚点列表</h3>
+          <p style="color:var(--muted);margin:0 0 6px;line-height:1.35">点击选中 · 拖 3D 球体沿 X/Y/Z 轴 · 共 ${st.pointIds.length} 点</p>
+          <ul class="morph-point-list" id="morphPointList">${pointList}</ul>
+          <select class="morph-select" id="morphPointSelect" title="快速跳转">${pointOpts}</select>
           <div class="morph-actions">
             <button type="button" id="morphAdd" class="${st.addMode ? "on" : ""}">加点${st.addSymmetric ? "(对称)" : ""}</button>
             <button type="button" id="morphAddAsym">加点(单)</button>
@@ -1001,16 +1050,21 @@
             </div>
           </details>
         </div>
+        <div class="morph-pane" data-morph-pane="morph"${morphPanelTab !== "morph" ? " hidden" : ""}>
+          <h3>语义滑块（Farkas 测量）</h3>
+          <p style="color:var(--muted);margin:0 0 8px;line-height:1.4">以欧版中性姿为 0；不对齐 SHELL。拖锚点仅沿世界 X/Y/Z 正交轴。</p>
+          ${sliders || "<p class='lm-stat'>滑块定义未加载</p>"}
+        </div>
         <div class="morph-pane" data-morph-pane="color"${morphPanelTab !== "color" ? " hidden" : ""}>
           ${morphPickBannerHtml(st)}
           <p style="color:var(--muted);margin:0 0 6px;line-height:1.35">作用域：<strong>全部</strong>=所有贴图；<strong>所有肌肉</strong>=肌层整张；<strong>选定</strong>=语义色块整块。滑条像 PS Ctrl+U。</p>
+          <p style="color:var(--accent);margin:0 0 8px;line-height:1.4">选部快捷键：<strong>Alt + 鼠标左键</strong> 点击模型上的色块（普通左键只旋转视角，不会选部）。</p>
           <div class="morph-actions">
             <button type="button" id="morphHslScopeAll" class="${st.hslScope === "all" ? "on" : ""}">全部</button>
             <button type="button" id="morphHslScopeMuscles" class="${st.hslScope === "muscles" ? "on" : ""}">所有肌肉</button>
             <button type="button" id="morphHslScopeSelected" class="${st.hslScope === "selected" ? "on" : ""}">选定</button>
           </div>
           <div class="morph-actions">
-            <button type="button" id="morphPickMesh" class="${st.pickMuscleMode ? "on" : ""}">选部</button>
             <button type="button" id="morphMeshColorReset">恢复原色</button>
           </div>
           <div class="morph-row" style="margin-top:6px">
@@ -1379,6 +1433,7 @@
         clearAlignObservers();
         morphPanelDelegated = false;
         morphPanelPickToken = "";
+        morphPanelTab = "anchors";
         elStage.className = "stage morph";
         const refView = ["front", "side", "back"].includes(viewId) ? viewId : "side";
         elStage.innerHTML = `
@@ -1398,6 +1453,8 @@
           document.getElementById("viewerHostMorph"),
           document.getElementById("viewerStatusMorph")
         );
+        if (lmActive) await mountLandmarks();
+        else document.getElementById("lmToolbar").innerHTML = "";
         return;
       }
 
@@ -1434,6 +1491,8 @@
         } else {
           document.getElementById("viewerStatusOurs").textContent = "该候选未导出 GLB。";
         }
+        if (lmActive) await mountLandmarks();
+        else document.getElementById("lmToolbar").innerHTML = "";
         return;
       }
 
@@ -1490,9 +1549,19 @@
     }
 
     async function mountLandmarks() {
+      const lmHost = document.getElementById("lmToolbar");
+      if (mode === "morph" || mode === "viewer3d") {
+        if (lmHost && lmActive) {
+          lmHost.innerHTML = `<div class="lm-bar"><span class="lm-stat">2D 锚点叠层仅用于并排/叠图/上下对照；骨相拧形请在右栏「锚点」页查看列表。</span></div>`;
+        }
+        return;
+      }
       const frameBase = document.getElementById("frameBase");
       const frameOurs = document.getElementById("frameOurs");
-      if (!frameBase || !frameOurs) return;
+      if (!frameBase || !frameOurs) {
+        if (lmHost) lmHost.innerHTML = "";
+        return;
+      }
       const camMetaUrl = `ours/${candId}/camera_meta.json?v=${assetRev || Date.now()}`;
       await lmc.mountOverlay({ frameBase, frameOurs, candId, viewId, camMetaUrl });
     }
