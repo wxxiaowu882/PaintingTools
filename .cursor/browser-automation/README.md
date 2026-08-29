@@ -83,10 +83,16 @@
   - 须全部 ✓ 再交付用户验收
 
 - `BASE_URL=http://127.0.0.1:18080 node scripts/gnm-workshop-ux-smoke.js`
-  - GNM 头模工坊：加载、253/383 能力条、预设、滑条拖进视口、单项重置、导出 30cm extras
+  - GNM 头模工坊：加载、253/383 能力条、**眼球分层（虹膜/巩膜）**、预设、滑条拖进视口、单项重置、导出 30cm extras
 
 - `BASE_URL=http://127.0.0.1:18080 npm run smoke:gnm-align-overlay`
-  - GNM × 欧版对齐叠显：加载完成、透明度、正/侧视；欧版用 `align-overlay/assets/euro_muscle.glb`（= 参考用_欧洲人头部肌肉…）
+  - GNM × 欧版对齐叠显：加载、黑斑门禁、**眼球 ROI**、路标编辑
+
+- `BASE_URL=http://127.0.0.1:18080 npm run smoke:gnm-bake-pack`
+  - 烘焙包全流程：叠显导出 → 工坊加载 → 滑条驱动肌肉变形 → 导出欧版肌肉 GLB
+
+- `BASE_URL=http://127.0.0.1:18080 npm run smoke:gnm-workshop`
+  - 同 `gnm-workshop-ux-smoke.js`（工坊 UX 冒烟）
 
 ### 环境变量（可选）
 

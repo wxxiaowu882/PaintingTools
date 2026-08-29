@@ -1,0 +1,579 @@
+{
+  "version": 2,
+  "defaultCommonIds": [
+    "id00_bulk",
+    "id01_height_chin",
+    "id02_depth",
+    "id03_width_nose",
+    "id04_tall_thick",
+    "id05_face_narrow",
+    "id06_cheek_narrow",
+    "id07_cheek_wide",
+    "id08_forehead_side",
+    "id09_cheek_vs_skull",
+    "id10_chin_forward",
+    "id11_midline_fwd",
+    "id13_cheek_flare",
+    "id17_cheek_taper",
+    "id_eye0",
+    "id_eye1",
+    "id_eye2",
+    "id_teeth0",
+    "id_teeth1",
+    "id_teeth2"
+  ],
+  "defaultExpressionIds": [
+    "ex_mouth_open",
+    "ex_smile",
+    "ex_mouth_aux_a",
+    "ex_brow_pair_0",
+    "ex_brow_pair_1",
+    "ex_brow_pair_2",
+    "ex_brow_pair_3",
+    "ex_tongue_0",
+    "ex_pupils"
+  ],
+  "commonControls": [
+    {
+      "id": "id00_bulk",
+      "name": "头面体量（宽+深）",
+      "hint": "实测：正值整体变小、变窄、变扁。旧名「头面宽度」不准确。",
+      "kind": "identity",
+      "index": 0,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id01_height_chin",
+      "name": "颅高 ↔ 颏位",
+      "hint": "实测：正值头变矮、变宽、颏略前。旧名「颧骨高度」不符。",
+      "kind": "identity",
+      "index": 1,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id02_depth",
+      "name": "头前后厚度（扁/长）",
+      "hint": "实测：正值朝向深度变扁。旧名「额部宽度」不符；你说的「扁/长」多半是这一维。",
+      "kind": "identity",
+      "index": 2,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id03_width_nose",
+      "name": "面宽 · 鼻尖前后",
+      "hint": "实测：正值面宽增、鼻尖后收。旧名「鼻梁高度」严重不符。",
+      "kind": "identity",
+      "index": 3,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id04_tall_thick",
+      "name": "颅高 · 前后厚",
+      "hint": "实测：正值变高、变厚。旧名「下颌角度」不符。",
+      "kind": "identity",
+      "index": 4,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id05_face_narrow",
+      "name": "头面横向收束",
+      "hint": "实测：正值头面变窄。旧名「眉弓凸度」不符。",
+      "kind": "identity",
+      "index": 5,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id06_cheek_narrow",
+      "name": "颧颊收窄",
+      "hint": "实测：正值颊区变窄。旧名「颧骨宽度」方向也不稳，以实测为准。",
+      "kind": "identity",
+      "index": 6,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id07_cheek_wide",
+      "name": "面中颊宽",
+      "hint": "实测：正值颊区明显变宽。",
+      "kind": "identity",
+      "index": 7,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id08_forehead_side",
+      "name": "额侧展开",
+      "hint": "实测：正值额侧收窄、头宽略减。",
+      "kind": "identity",
+      "index": 8,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id09_cheek_vs_skull",
+      "name": "颊宽 ↔ 颅宽",
+      "hint": "实测：正值颊收、颅略宽。",
+      "kind": "identity",
+      "index": 9,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id10_chin_forward",
+      "name": "颏前感 · 颅高微调",
+      "hint": "实测：正值颏前、头略高。旧名「下颌宽度」不符。",
+      "kind": "identity",
+      "index": 10,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id11_midline_fwd",
+      "name": "中线前后（鼻区）",
+      "hint": "实测：正值鼻区前突、头变厚。比「鼻梁高」更接近，但仍是混叠 PCA。",
+      "kind": "identity",
+      "index": 11,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id12_crown_width",
+      "name": "顶颅宽度微调",
+      "hint": "实测：正值略收窄。",
+      "kind": "identity",
+      "index": 12,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id13_cheek_flare",
+      "name": "颧颊外扩",
+      "hint": "实测：正值颊外侧变宽。",
+      "kind": "identity",
+      "index": 13,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id14_asym_mix",
+      "name": "头宽 · 颏后收混叠",
+      "hint": "实测：小幅宽深与颏变化，混叠明显。",
+      "kind": "identity",
+      "index": 14,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id15_depth_cheek",
+      "name": "前后厚 · 颊收",
+      "hint": "实测：正值略增厚、颊略收。",
+      "kind": "identity",
+      "index": 15,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id17_cheek_taper",
+      "name": "面颊收束",
+      "hint": "实测：正值颊明显收窄。旧名「颏部突度」不符。",
+      "kind": "identity",
+      "index": 17,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id20_nose_micro",
+      "name": "鼻区微调（弱）",
+      "hint": "实测：幅度较小的鼻/口唇混叠。旧名「面中长度」不符。",
+      "kind": "identity",
+      "index": 20,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id_eye0",
+      "name": "眼球外形 0",
+      "hint": "身份·眼球 PCA 第 0 维（eyes_000）。",
+      "kind": "identity",
+      "index": 170,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id_eye1",
+      "name": "眼球外形 1",
+      "hint": "身份·眼球 PCA 第 1 维（eyes_001）。",
+      "kind": "identity",
+      "index": 171,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id_eye2",
+      "name": "眼球外形 2",
+      "hint": "身份·眼球 PCA 第 2 维（eyes_002）。",
+      "kind": "identity",
+      "index": 172,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id_teeth0",
+      "name": "牙齿外形 0",
+      "hint": "身份·牙齿 PCA 第 0 维（teeth_000）。",
+      "kind": "identity",
+      "index": 173,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id_teeth1",
+      "name": "牙齿外形 1",
+      "hint": "身份·牙齿 PCA 第 1 维。",
+      "kind": "identity",
+      "index": 174,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "id_teeth2",
+      "name": "牙齿外形 2",
+      "hint": "身份·牙齿 PCA 第 2 维。",
+      "kind": "identity",
+      "index": 175,
+      "range": [
+        -3,
+        3
+      ]
+    }
+  ],
+  "commonExpressionControls": [
+    {
+      "id": "ex_mouth_open",
+      "name": "张嘴",
+      "hint": "正向=张嘴。下脸主维 200 的 PCA 正方向实测是闭嘴，故用配方取反并叠加强化维。张嘴属表情，非姿态。",
+      "kind": "expression",
+      "index": 200,
+      "weights": [
+        {
+          "index": 200,
+          "scale": -1
+        },
+        {
+          "index": 201,
+          "scale": 0.4
+        },
+        {
+          "index": 204,
+          "scale": -0.28
+        }
+      ],
+      "range": [
+        0,
+        3
+      ]
+    },
+    {
+      "id": "ex_smile",
+      "name": "轻笑口角",
+      "hint": "正向=口角上提倾向（多维配方）。",
+      "kind": "expression",
+      "index": 206,
+      "weights": [
+        {
+          "index": 206,
+          "scale": -1
+        },
+        {
+          "index": 203,
+          "scale": -0.7
+        },
+        {
+          "index": 208,
+          "scale": -0.55
+        },
+        {
+          "index": 219,
+          "scale": -0.45
+        }
+      ],
+      "range": [
+        0,
+        3
+      ]
+    },
+    {
+      "id": "ex_mouth_aux_a",
+      "name": "口型辅维 A",
+      "hint": "下脸 region_001。正值下牙略下移，可与张嘴叠加。",
+      "kind": "expression",
+      "index": 201,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "ex_brow_pair_0",
+      "name": "眼区主维 0（双眼同步）",
+      "hint": "左眼 0 + 右眼 100。勾选「左右眼同步」时两侧同值。",
+      "kind": "expression",
+      "index": 0,
+      "mirrorIndex": 100,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "ex_brow_pair_1",
+      "name": "眼区主维 1（双眼同步）",
+      "hint": "左眼 1 + 右眼 101。",
+      "kind": "expression",
+      "index": 1,
+      "mirrorIndex": 101,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "ex_brow_pair_2",
+      "name": "眼区主维 2（双眼同步）",
+      "hint": "左眼 2 + 右眼 102。",
+      "kind": "expression",
+      "index": 2,
+      "mirrorIndex": 102,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "ex_brow_pair_3",
+      "name": "眼区主维 3（双眼同步）",
+      "hint": "左眼 3 + 右眼 103。",
+      "kind": "expression",
+      "index": 3,
+      "mirrorIndex": 103,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "ex_tongue_0",
+      "name": "舌形 0",
+      "hint": "表情·舌分量起始维。",
+      "kind": "expression",
+      "index": 350,
+      "range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "ex_pupils",
+      "name": "瞳孔/虹膜维",
+      "hint": "表情末维 pupils（通常影响虹膜相关）。",
+      "kind": "expression",
+      "index": 382,
+      "range": [
+        -3,
+        3
+      ]
+    }
+  ],
+  "identityGroups": [
+    {
+      "id": "head",
+      "name": "头颅与面骨外形",
+      "prefix": "head_",
+      "start": 0,
+      "count": 170
+    },
+    {
+      "id": "eyes",
+      "name": "眼球外形",
+      "prefix": "eyes_",
+      "start": 170,
+      "count": 3
+    },
+    {
+      "id": "teeth",
+      "name": "牙齿外形",
+      "prefix": "teeth_",
+      "start": 173,
+      "count": 80
+    }
+  ],
+  "expressionGroups": [
+    {
+      "id": "left_eye",
+      "name": "左眼区表情",
+      "prefix": "left_eye_region_",
+      "start": 0,
+      "count": 100
+    },
+    {
+      "id": "right_eye",
+      "name": "右眼区表情",
+      "prefix": "right_eye_region_",
+      "start": 100,
+      "count": 100
+    },
+    {
+      "id": "lower_face",
+      "name": "下脸表情（含张嘴）",
+      "prefix": "lower_face_region_",
+      "start": 200,
+      "count": 150
+    },
+    {
+      "id": "tongue",
+      "name": "舌",
+      "prefix": "tongue_",
+      "start": 350,
+      "count": 32
+    },
+    {
+      "id": "pupils",
+      "name": "瞳孔",
+      "prefix": "pupils_",
+      "start": 382,
+      "count": 1
+    }
+  ],
+  "joints": [
+    {
+      "id": "neck",
+      "name": "颈",
+      "index": 0
+    },
+    {
+      "id": "head",
+      "name": "头",
+      "index": 1
+    },
+    {
+      "id": "left_eye",
+      "name": "左眼",
+      "index": 2
+    },
+    {
+      "id": "right_eye",
+      "name": "右眼",
+      "index": 3
+    }
+  ],
+  "components": [
+    {
+      "id": "skin",
+      "name": "皮肤",
+      "index": 0
+    },
+    {
+      "id": "left_eye",
+      "name": "左眼",
+      "index": 1
+    },
+    {
+      "id": "right_eye",
+      "name": "右眼",
+      "index": 2
+    },
+    {
+      "id": "upper_teeth_and_gums",
+      "name": "上牙与牙龈",
+      "index": 3
+    },
+    {
+      "id": "lower_teeth_and_gums",
+      "name": "下牙与牙龈",
+      "index": 4
+    },
+    {
+      "id": "tongue",
+      "name": "舌",
+      "index": 5
+    }
+  ],
+  "identityProbeLabels": {
+    "0": "头面体量（宽+深）",
+    "1": "颅高↔颏位",
+    "2": "头前后厚度（扁/长）",
+    "3": "面宽·鼻尖前后",
+    "4": "颅高·前后厚",
+    "5": "头面横向收束",
+    "6": "颧颊收窄",
+    "7": "面中颊宽",
+    "8": "额侧展开",
+    "9": "颊宽↔颅宽",
+    "10": "颏前感",
+    "11": "中线前后（鼻区）",
+    "12": "顶颅宽度微调",
+    "13": "颧颊外扩",
+    "17": "面颊收束",
+    "20": "鼻区微调（弱）"
+  },
+  "expressionProbeLabels": {
+    "200": "下脸主维（PCA正=抿嘴；张嘴请用负向/张嘴配方）",
+    "201": "口型辅维A（正=下牙略下）",
+    "203": "口型辅维B",
+    "204": "口型辅维（张嘴配方用）",
+    "206": "轻笑相关维",
+    "208": "口型辅维C"
+  }
+}

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GNM 头模工坊</title>
+  <link rel="stylesheet" href="./css/workshop.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "../../../docs/js/three_164/three.module.js",
+      "three/addons/": "../../../docs/js/three_164/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="loading-overlay">
+    <div id="loading-label">准备中…</div>
+    <div id="loading-track"><div id="loading-bar"></div></div>
+  </div>
+
+  <div id="app">
+    <header id="toolbar">
+      <strong class="brand">GNM 头模工坊</strong>
+      <a class="btn link-btn" href="./align-overlay/index.html" title="欧版肌肉对齐到 GNM 中性头，叠显对比">对齐叠显</a>
+      <label>标题 <input id="field-title" type="text" value="gnm_head" /></label>
+      <label>备注 <input id="field-note" type="text" placeholder="可选" style="width:180px" /></label>
+      <span class="grow"></span>
+      <label>导出档
+        <select id="export-tier">
+          <option value="light">课用·轻</option>
+          <option value="standard" selected>课用·标准</option>
+          <option value="full">制作·完整</option>
+        </select>
+      </label>
+      <label><input id="export-draco" type="checkbox" checked /> Draco 压缩</label>
+      <button type="button" class="btn" id="btn-import">导入 GLB</button>
+      <input id="file-import" type="file" accept=".glb,model/gltf-binary" hidden />
+      <button type="button" class="btn" id="btn-export-euro" title="导出当前映射变形后的欧版肌肉 GLB">导出欧版肌肉</button>
+      <button type="button" class="btn primary" id="btn-export">导出 GNM GLB</button>
+    </header>
+
+    <div id="capability-bar">
+      <span><strong>身份 253</strong> <span class="cap-seg">（头 170 · 眼 3 · 牙 80）</span></span>
+      <span><strong>表情 383</strong> <span class="cap-seg">（左眼 100 · 右眼 100 · 下脸 150 · 舌…）</span></span>
+      <span class="cap-seg">导出固定 <strong style="color:var(--text)">30cm 高 · 底部中心对齐</strong></span>
+    </div>
+
+    <div id="puppet-bar">
+      <label class="puppet-op" title="调节 GNM 头模叠显透明度，便于对照欧版肌肉">
+        GNM
+        <input id="gnm-opacity" type="range" min="0" max="100" value="100" />
+        <span id="gnm-opacity-val">100%</span>
+      </label>
+      <label class="puppet-flag" title="加载叠显导出的烘焙 GLB + map.json，滑条驱动 GNM 形变映射到欧版肌肉">
+        <input id="muscle-enable" type="checkbox" />
+        欧版肌肉映射
+      </label>
+      <button type="button" class="btn" id="btn-load-bake">加载烘焙包</button>
+      <input id="bake-pack-files" type="file" accept=".glb,.json,model/gltf-binary,application/json" multiple hidden />
+      <label class="puppet-op">欧版
+        <input id="muscle-opacity" type="range" min="0" max="100" value="75" />
+        <span id="muscle-opacity-val">75%</span>
+      </label>
+      <details class="puppet-legacy">
+        <summary>实验：历史版提线木偶</summary>
+        <label class="puppet-flag">
+          <input id="puppet-enable" type="checkbox" />
+          启用
+        </label>
+        <select id="puppet-version" title="来自 align-overlay/landmarks/history">
+          <option value="">加载列表…</option>
+        </select>
+        <button type="button" class="btn" id="puppet-rebind">重绑路标</button>
+      </details>
+      <span id="muscle-hint" class="puppet-hint">请从「对齐叠显」导出烘焙包（GLB 内已含映射表）后加载</span>
+    </div>
+
+    <div id="main">
+      <aside id="preset-rail" aria-label="身份与表情预设">
+        <div class="preset-rail-tabs" role="tablist">
+          <button type="button" class="preset-rail-tab is-active" data-preset-tab="identity" role="tab">身份</button>
+          <button type="button" class="preset-rail-tab" data-preset-tab="expression" role="tab">表情</button>
+        </div>
+        <div id="preset-rail-body"></div>
+      </aside>
+      <div id="viewport-wrap">
+        <canvas id="view-canvas"></canvas>
+      </div>
+      <aside id="sidebar">
+        <div id="sidebar-head">
+          <h1>参数</h1>
+        </div>
+        <div id="controls-root"></div>
+      </aside>
+    </div>
+
+    <footer id="status-bar">
+      <span id="status-text">启动中…</span>
+      <span>基于 Google GNM（Apache-2.0）· 见 <a href="./NOTICE" target="_blank">NOTICE</a></span>
+    </footer>
+  </div>
+
+  <script type="module" src="./js/app.js?v=20260829-display5"></script>
+</body>
+</html>

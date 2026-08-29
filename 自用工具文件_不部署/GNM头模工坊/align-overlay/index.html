@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GNM × 欧版肌肉 · 对齐叠显</title>
+  <!-- Live Server 会监听整个仓库；并行改其它目录时会不停刷新。默认拦截；本页开发加 ?live=1 -->
+  <script>
+  (function () {
+    if (/(?:\?|&)live(?:=1|$)/.test(location.search)) return;
+    if (!/^550\d$/.test(location.port)) return;
+    var _reload = location.reload.bind(location);
+    location.reload = function () {
+      console.info('[align-overlay] 已拦截 Live Server 自动刷新；手动 F5 可刷新，或 URL 加 ?live=1');
+    };
+    var OrigWS = window.WebSocket;
+    window.WebSocket = function (url, protocols) {
+      var s = String(url || '');
+      if (/livereload|35729/.test(s)) {
+        console.info('[align-overlay] 已拦截 Live Server WebSocket');
+        return {
+          close: function () {},
+          send: function () {},
+          addEventListener: function () {},
+          removeEventListener: function () {},
+          dispatchEvent: function () { return false; },
+          readyState: 3,
+          CONNECTING: 0,
+          OPEN: 1,
+          CLOSING: 2,
+          CLOSED: 3,
+        };
+      }
+      return protocols !== undefined ? new OrigWS(url, protocols) : new OrigWS(url);
+    };
+    window.WebSocket.prototype = OrigWS.prototype;
+    window.WebSocket.CONNECTING = OrigWS.CONNECTING;
+    window.WebSocket.OPEN = OrigWS.OPEN;
+    window.WebSocket.CLOSING = OrigWS.CLOSING;
+    window.WebSocket.CLOSED = OrigWS.CLOSED;
+  })();
+  </script>
+  <link rel="stylesheet" href="./css/overlay.css?v=20260828-listsort1" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "../../../docs/js/three_164/three.module.js",
+      "three/addons/": "../../../docs/js/three_164/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="loading">
+    <div id="loading-title">加载 GNM 与欧版肌肉…</div>
+    <div id="loading-detail" class="loading-detail">准备中</div>
+    <div id="loading-track"><div id="loading-bar"></div></div>
+    <pre id="loading-error" class="loading-error hidden"></pre>
+  </div>
+
+  <div id="app">
+    <header id="toolbar">
+      <span class="brand">GNM × 欧版 · 对齐叠显</span>
+      <label class="legend-gnm">GNM 透明度
+        <input id="op-gnm" type="range" min="0" max="100" value="55" />
+        <span id="op-gnm-val">55%</span>
+      </label>
+      <label class="legend-euro">欧版 透明度
+        <input id="op-euro" type="range" min="0" max="100" value="100" />
+        <span id="op-euro-val">100%</span>
+      </label>
+      <button type="button" id="btn-model-switch" title="在 GNM 与欧版之间切换（只显示一侧模型与对应路标列表）">切换模型</button>
+      <button type="button" id="btn-model-all" class="is-active" title="两个模型与全部路标一起显示">全部显示</button>
+      <label><input id="chk-landmarks" type="checkbox" checked /> 路标点</label>
+      <label><input id="chk-euro-static-only" type="checkbox" /> 欧版仅 Static</label>
+      <button type="button" id="btn-front" class="is-active">正视</button>
+      <button type="button" id="btn-side">侧视</button>
+      <button type="button" id="btn-download-align">下载对齐 JSON</button>
+      <button type="button" id="btn-export-bake" title="导出拧后对齐的烘焙 GLB + 工坊映射表 map.json">导出烘焙包</button>
+      <span class="grow"></span>
+      <a href="../index.html" style="color:var(--accent);font-size:14px;text-decoration:none">← 头模工坊</a>
+    </header>
+    <div id="main-row">
+      <div id="viewport-wrap">
+        <canvas id="view-canvas"></canvas>
+      </div>
+      <aside id="lm-panel">
+        <nav class="lm-tabs" role="tablist" aria-label="侧栏分类">
+          <button type="button" class="lm-tab-btn is-active" data-tab="edit" role="tab" aria-selected="true">编辑</button>
+          <button type="button" class="lm-tab-btn" data-tab="trs" role="tab" aria-selected="false">预变换</button>
+          <button type="button" class="lm-tab-btn" data-tab="hist" role="tab" aria-selected="false">历史</button>
+        </nav>
+        <div class="lm-tab-panels">
+          <section id="tab-edit" class="lm-tab-panel is-active" role="tabpanel">
+            <div class="lm-edit-block">
+              <div class="lm-tools">
+                <button type="button" id="lm-add-gnm">加点·粉</button>
+                <button type="button" id="lm-add-euro">加点·黄</button>
+                <button type="button" id="lm-pair" title="进入后：连续点选图中两个点球，或列表中的「粉」「黄」按钮（需一粉一黄）；再点已配对点可解对">配对/解对</button>
+                <button type="button" id="lm-gen-mirror" title="按头中矢状面，从当前选中点（及同配对的粉/黄）生成 L↔R 镜像点；名称自动 L/R 互换">生成镜像点</button>
+                <button type="button" id="lm-delete">删除选中</button>
+                <button type="button" id="lm-warp" class="primary" title="按已配对的粉黄路标，用薄板样条将欧版网格非刚性拧向 GNM 表面形态（可重复点击；始终从初始网格出发）">拧</button>
+              </div>
+              <label class="lm-rename-row" title="拖动或方向键调 L/R 之一时，同侧对称点按头中矢状面镜像跟随（随头朝向，非世界竖切面）">
+                <input id="lm-pair-link" type="checkbox" checked />
+                左右镜像联动（L↔R，按头中剖面）
+              </label>
+              <label class="lm-rename-row">名称
+                <input id="lm-rename" type="text" placeholder="选中点后改名" />
+              </label>
+              <div class="lm-io">
+                <button type="button" id="lm-export">导出点集</button>
+                <button type="button" id="lm-import">导入点集</button>
+                <input id="lm-import-file" type="file" accept="application/json,.json" hidden />
+                <button type="button" id="lm-save-local">存本地（覆盖）</button>
+                <button type="button" id="lm-load-local">读本地</button>
+              </div>
+            </div>
+            <div class="lm-list-wrap">
+              <ul id="lm-list"></ul>
+            </div>
+          </section>
+
+          <section id="tab-trs" class="lm-tab-panel" role="tabpanel" hidden>
+            <div id="pre-trs-panel" class="scale-uni">
+              <p class="lm-hint">叠在路标对齐之上：平移仅沿 X/Y/Z，旋转绕轴，缩放勾选「整体」和/或分轴。改滑条即时生效；「拧」不会清掉此处。</p>
+              <div class="trs-block">
+                <div class="trs-label">平移 (mm)</div>
+                <label class="trs-row">X <input id="trs-tx" type="number" step="0.1667" value="0" />
+                  <input id="trs-tx-r" type="range" min="-50" max="50" step="0.1667" value="0" /></label>
+                <label class="trs-row">Y <input id="trs-ty" type="number" step="0.1667" value="0" />
+                  <input id="trs-ty-r" type="range" min="-50" max="50" step="0.1667" value="0" /></label>
+                <label class="trs-row">Z <input id="trs-tz" type="number" step="0.1667" value="0" />
+                  <input id="trs-tz-r" type="range" min="-50" max="50" step="0.1667" value="0" /></label>
+              </div>
+              <div class="trs-block">
+                <div class="trs-label">旋转 (° · 绕轴)</div>
+                <label class="trs-row">X <input id="trs-rx" type="number" step="0.1667" value="0" />
+                  <input id="trs-rx-r" type="range" min="-45" max="45" step="0.1667" value="0" /></label>
+                <label class="trs-row">Y <input id="trs-ry" type="number" step="0.1667" value="0" />
+                  <input id="trs-ry-r" type="range" min="-45" max="45" step="0.1667" value="0" /></label>
+                <label class="trs-row">Z <input id="trs-rz" type="number" step="0.1667" value="0" />
+                  <input id="trs-rz-r" type="range" min="-45" max="45" step="0.1667" value="0" /></label>
+              </div>
+              <div class="trs-block">
+                <div class="trs-label">缩放</div>
+                <div class="trs-scale-flags">
+                  <label class="trs-flag"><input id="trs-uniform" type="checkbox" checked /> 整体</label>
+                  <label class="trs-flag"><input id="trs-axis-x" type="checkbox" /> X</label>
+                  <label class="trs-flag"><input id="trs-axis-y" type="checkbox" /> Y</label>
+                  <label class="trs-flag"><input id="trs-axis-z" type="checkbox" /> Z</label>
+                </div>
+                <label class="trs-row trs-su-row" id="trs-su-row">U <input id="trs-su" type="number" step="0.0033" min="0.2" max="2.5" value="1" />
+                  <input id="trs-su-r" type="range" min="0.5" max="1.5" step="0.0033" value="1" /></label>
+                <label class="trs-row trs-axis-row trs-axis-x">X <input id="trs-sx" type="number" step="0.0033" min="0.2" max="2.5" value="1" />
+                  <input id="trs-sx-r" type="range" min="0.5" max="1.5" step="0.0033" value="1" /></label>
+                <label class="trs-row trs-axis-row trs-axis-y">Y <input id="trs-sy" type="number" step="0.0033" min="0.2" max="2.5" value="1" />
+                  <input id="trs-sy-r" type="range" min="0.5" max="1.5" step="0.0033" value="1" /></label>
+                <label class="trs-row trs-axis-row trs-axis-z">Z <input id="trs-sz" type="number" step="0.0033" min="0.2" max="2.5" value="1" />
+                  <input id="trs-sz-r" type="range" min="0.5" max="1.5" step="0.0033" value="1" /></label>
+              </div>
+              <div class="lm-tools">
+                <button type="button" id="trs-reset">重置预变换</button>
+              </div>
+            </div>
+          </section>
+
+          <section id="tab-hist" class="lm-tab-panel" role="tabpanel" hidden>
+            <p class="lm-hist-title">历史版本</p>
+            <p class="lm-hint">权威存储：磁盘 <code>landmarks/history/</code>（需 18080）。列表只显示磁盘版本；删除会确认且一次只删一项。点列表项加载。</p>
+            <label class="lm-hist-label">备注
+              <input id="lm-hist-note" type="text" placeholder="可选，如：侧视调完" maxlength="40" />
+            </label>
+            <div class="lm-hist-row">
+              <button type="button" id="lm-hist-save" class="primary">存为版本</button>
+              <button type="button" id="lm-hist-del">删除选中</button>
+              <button type="button" id="lm-hist-reload">刷新列表</button>
+              <button type="button" id="lm-hist-export-bake" title="当前场景：烘焙欧版 GLB + map.json">导出烘焙包</button>
+            </div>
+            <select id="lm-hist-select" size="8" title="点击列表项加载"></select>
+          </section>
+        </div>
+      </aside>
+    </div>
+    <footer id="status-bar">
+      <span id="status-text">启动中…</span>
+      <span id="build-rev" class="build-rev"></span>
+      <span>中性 GNM + 欧版肌肉 · 路标 Umeyama 对齐 · 拧 = TPS 非刚性变形 · Live Server(5500) 默认禁热刷新</span>
+    </footer>
+  </div>
+
+  <script>window.__ALIGN_DISABLE_MV_OVERLAY__ = true;</script>
+  <script type="module" src="../../../docs/js/model-viewer.min.js"></script>
+  <script type="module" src="./js/app.js?v=20260829-display18"></script>
+  <script>
+    window.addEventListener('error', function (ev) {
+      var pre = document.getElementById('loading-error');
+      var box = document.getElementById('loading');
+      var title = document.getElementById('loading-title');
+      var detail = document.getElementById('loading-detail');
+      if (!pre || !box) return;
+      box.classList.remove('hidden');
+      box.classList.add('is-error');
+      if (title) title.textContent = '加载失败';
+      if (detail) detail.textContent = '脚本或资源错误（见下方）';
+      pre.classList.remove('hidden');
+      pre.textContent = String((ev && ev.message) || ev) + '\n' + (ev && ev.filename ? ev.filename + ':' + ev.lineno : '');
+    });
+    window.addEventListener('unhandledrejection', function (ev) {
+      var pre = document.getElementById('loading-error');
+      var box = document.getElementById('loading');
+      var title = document.getElementById('loading-title');
+      var detail = document.getElementById('loading-detail');
+      if (!pre || !box) return;
+      box.classList.remove('hidden');
+      box.classList.add('is-error');
+      if (title) title.textContent = '加载失败';
+      if (detail) detail.textContent = '未处理的 Promise 错误';
+      pre.classList.remove('hidden');
+      var r = ev && ev.reason;
+      pre.textContent = String((r && r.message) || r || ev);
+    });
+  </script>
+</body>
+</html>

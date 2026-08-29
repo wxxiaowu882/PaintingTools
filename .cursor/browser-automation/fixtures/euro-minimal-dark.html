@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>euro minimal dark</title>
+<canvas id="c" style="width:900px;height:700px"></canvas>
+<script type="importmap">
+{
+  "imports": {
+    "three": "../../../docs/js/three_164/build/three.module.js",
+    "three/addons/": "../../../docs/js/three_164/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(900, 700);
+renderer.setClearColor(0x0e0f14, 1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e0f14);
+const camera = new THREE.PerspectiveCamera(28, 900 / 700, 0.01, 100);
+camera.position.set(0, 0.16, 0.55);
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 0.15, 0);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd0d0d0, 1.35));
+const d = new THREE.DirectionalLight(0xffffff, 1.25);
+d.position.set(2.2, 3.5, 2.8);
+scene.add(d);
+const f = new THREE.DirectionalLight(0xffffff, 0.7);
+f.position.set(-2.5, 1.2, -1.5);
+scene.add(f);
+new GLTFLoader().load(
+  '../../../自用工具文件_不部署/GNM头模工坊/align-overlay/assets/euro_muscle.glb',
+  (g) => {
+    g.scene.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        if (!m) continue;
+        if ('metalness' in m) m.metalness = 0;
+        if ('roughness' in m) m.roughness = Math.max(Number(m.roughness) || 0.5, 0.48);
+        m.needsUpdate = true;
+      }
+    });
+    scene.add(g.scene);
+    window.__ready = true;
+  }
+);
+</script>

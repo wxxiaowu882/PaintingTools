@@ -11,7 +11,16 @@
     "sketchfab:batch": "node scripts/sketchfab-batch-download.js",
     "sketchfab:ui": "node scripts/sketchfab-batch-ui-server.js",
     "smoke:compare-align": "node scripts/compare-review-align-smoke.js",
-    "selftest:compare-web": "node scripts/compare-review-web-selftest.js"
+    "selftest:compare-web": "node scripts/compare-review-web-selftest.js",
+    "smoke:gnm-align-overlay": "node scripts/gnm-align-overlay-smoke.js",
+    "smoke:gnm-bake-pack": "node scripts/gnm-bake-pack-smoke.js",
+    "smoke:gnm-workshop": "node scripts/gnm-workshop-ux-smoke.js",
+    "selftest:gnm-align-overlay": "node scripts/gnm-align-overlay-selftest.js",
+    "open:gnm-align-overlay": "node scripts/open-gnm-align-overlay.js",
+    "gate:gnm-align-chin": "node scripts/gnm-align-chin-visual-gate.js",
+    "gate:gnm-euro-eye": "node scripts/gnm-euro-eye-gate.js",
+    "accept:gnm-align-browser": "node scripts/gnm-align-browser-acceptance.js",
+    "compare:gnm-euro-display": "node scripts/gnm-euro-display-compare.js"
   },
   "keywords": [],
   "author": "",

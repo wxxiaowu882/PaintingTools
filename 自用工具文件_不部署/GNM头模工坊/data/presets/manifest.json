@@ -1,0 +1,183 @@
+{
+  "version": 2,
+  "disclaimer": "身份含 Tembrica Shape（前30维）与工坊实测改名采样；表情为实测配方。均非真人。",
+  "identities": [
+    {
+      "id": "identity-01-mean",
+      "name": "均值中性",
+      "note": "接近基底均值，轻微噪声",
+      "hue": "#8a9",
+      "file": "identity-01-mean.json"
+    },
+    {
+      "id": "identity-t01-tembrica",
+      "name": "Tembrica Shape 1",
+      "note": "Tembrica 内置 Shape（前 30 维）",
+      "hue": "#7cf",
+      "file": "identity-t01-tembrica.json"
+    },
+    {
+      "id": "identity-t02-tembrica",
+      "name": "Tembrica Shape 2",
+      "note": "Tembrica 内置 Shape（前 30 维）",
+      "hue": "#f8a",
+      "file": "identity-t02-tembrica.json"
+    },
+    {
+      "id": "identity-t03-tembrica",
+      "name": "Tembrica Shape 3",
+      "note": "Tembrica 内置 Shape（前 30 维）",
+      "hue": "#9e8",
+      "file": "identity-t03-tembrica.json"
+    },
+    {
+      "id": "identity-t04-tembrica",
+      "name": "Tembrica Shape 4",
+      "note": "Tembrica 内置 Shape（前 30 维）",
+      "hue": "#c9f",
+      "file": "identity-t04-tembrica.json"
+    },
+    {
+      "id": "identity-t05-tembrica",
+      "name": "Tembrica Shape 5",
+      "note": "Tembrica 内置 Shape（前 30 维）",
+      "hue": "#6dd",
+      "file": "identity-t05-tembrica.json"
+    },
+    {
+      "id": "identity-t06-tembrica",
+      "name": "Tembrica Shape 6",
+      "note": "Tembrica 内置 Shape（前 30 维）",
+      "hue": "#fa7",
+      "file": "identity-t06-tembrica.json"
+    },
+    {
+      "id": "identity-02-wide-forehead",
+      "name": "颌向偏强",
+      "note": "实测：颌区变化为主，面宽略减（原名宽额不准）",
+      "hue": "#6af",
+      "file": "identity-02-wide-forehead.json"
+    },
+    {
+      "id": "identity-03-square-jaw",
+      "name": "颏向偏高",
+      "note": "实测：颏/颧变化，面高略增",
+      "hue": "#fa6",
+      "file": "identity-03-square-jaw.json"
+    },
+    {
+      "id": "identity-04-high-zygoma",
+      "name": "宽面短颅",
+      "note": "实测：面宽增、面高减，颌颏主导（原名高颧不准）",
+      "hue": "#f86",
+      "file": "identity-04-high-zygoma.json"
+    },
+    {
+      "id": "identity-05-childlike",
+      "name": "轻柔变体",
+      "note": "实测变化较弱",
+      "hue": "#fc8",
+      "file": "identity-05-childlike.json"
+    },
+    {
+      "id": "identity-06-long-midface",
+      "name": "略展长面",
+      "note": "实测：面略宽略高、额区有变",
+      "hue": "#9cf",
+      "file": "identity-06-long-midface.json"
+    },
+    {
+      "id": "identity-07-narrow-face",
+      "name": "宽颧展面",
+      "note": "实测：面宽明显增大（原名窄面相反）",
+      "hue": "#adf",
+      "file": "identity-07-narrow-face.json"
+    },
+    {
+      "id": "identity-08-strong-brow",
+      "name": "轻颌鼻变",
+      "note": "实测变化弱，非重眉弓主导",
+      "hue": "#ca8",
+      "file": "identity-08-strong-brow.json"
+    },
+    {
+      "id": "identity-09-soft-female",
+      "name": "宽面偏柔",
+      "note": "实测：面宽增、面高减",
+      "hue": "#f9a",
+      "file": "identity-09-soft-female.json"
+    },
+    {
+      "id": "identity-10-angular-male",
+      "name": "颧收棱角",
+      "note": "实测：颧区变化、面略窄",
+      "hue": "#8bd",
+      "file": "identity-10-angular-male.json"
+    },
+    {
+      "id": "identity-11-flat-nose",
+      "name": "额向收窄",
+      "note": "实测：额/颌主导，面略窄（原名低鼻梁不准）",
+      "hue": "#be9",
+      "file": "identity-11-flat-nose.json"
+    },
+    {
+      "id": "identity-12-protruding-chin",
+      "name": "轻颧颏",
+      "note": "实测变化较弱",
+      "hue": "#db8",
+      "file": "identity-12-protruding-chin.json"
+    },
+    {
+      "id": "identity-13-round-cheek",
+      "name": "颧收偏圆",
+      "note": "实测：颧区变化、面略窄短",
+      "hue": "#fba",
+      "file": "identity-13-round-cheek.json"
+    },
+    {
+      "id": "identity-14-compact-skull",
+      "name": "宽颌变体",
+      "note": "实测：颌/颧变化，面略宽",
+      "hue": "#9ab",
+      "file": "identity-14-compact-skull.json"
+    }
+  ],
+  "expressions": [
+    {
+      "id": "expression-00-neutral",
+      "name": "表情·中性",
+      "note": "全零",
+      "hue": "#888",
+      "file": "expression-00-neutral.json"
+    },
+    {
+      "id": "expression-01-slight-smile",
+      "name": "表情·轻笑",
+      "note": "口角上提倾向（实测配方）",
+      "hue": "#fc6",
+      "file": "expression-01-slight-smile.json"
+    },
+    {
+      "id": "expression-02-brows-up",
+      "name": "表情·挑眉",
+      "note": "双眼区上提倾向",
+      "hue": "#6cf",
+      "file": "expression-02-brows-up.json"
+    },
+    {
+      "id": "expression-03-frown",
+      "name": "表情·蹙眉",
+      "note": "眉区紧张倾向",
+      "hue": "#c66",
+      "file": "expression-03-frown.json"
+    },
+    {
+      "id": "expression-04-open-mouth",
+      "name": "表情·张嘴",
+      "note": "下脸主维取反配方，正向可见张口",
+      "hue": "#da6",
+      "file": "expression-04-open-mouth.json"
+    }
+  ]
+}
