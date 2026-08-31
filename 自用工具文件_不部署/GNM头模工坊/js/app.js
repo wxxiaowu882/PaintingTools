@@ -168,6 +168,7 @@ async function main() {
     scene: viewport.scene,
     getDisplayPositions: () => viewport.positions,
     getRawPositions: () => viewport.rawPositions,
+    getGnmModel: () => model,
     getComponentId: () => model?.componentId,
     getVertexCount: () => model?.numVertices || 0,
     onStatus: (msg) => {

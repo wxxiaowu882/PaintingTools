@@ -11,6 +11,16 @@ import {
   restoreEuroRest,
 } from '../align-overlay/js/euro-warp.js';
 import {
+  cacheEuroEyeMeshes,
+  restoreEuroEyeRest,
+  sampleGnmEyeFrames,
+  sampleEuroEyeFrames,
+  buildEyeAlignSnapshot,
+  applyEuroEyeAlign as applyEuroEyeAlignVerts,
+} from '../align-overlay/js/euro-eye-align.js';
+import { computeBottomCenterNormalize } from '../align-overlay/js/procrustes.js';
+import { TARGET_HEIGHT_M } from './viewport.js';
+import {
   prepareEuroScene,
   prepareEuroMaterials,
   shouldSkipEuroWarp,
@@ -141,6 +151,7 @@ export class EuroMuscleMap {
     this.scene = opts.scene;
     this.getDisplayPositions = opts.getDisplayPositions;
     this.getRawPositions = opts.getRawPositions;
+    this.getGnmModel = opts.getGnmModel;
     this.getComponentId = opts.getComponentId;
     this.getVertexCount = opts.getVertexCount;
     this.onStatus = opts.onStatus || (() => {});
@@ -155,6 +166,7 @@ export class EuroMuscleMap {
     this.opacity = 0.75;
     this.map = null;
     this.meshCache = null;
+    this.eyeCache = null;
     this._loaded = false;
     this._raf = 0;
     this._pending = false;
@@ -194,6 +206,7 @@ export class EuroMuscleMap {
 
     this.map = mapJson;
     this.meshCache = cacheEuroMeshes(this.root);
+    this.eyeCache = cacheEuroEyeMeshes(scene);
     this._bindTrackers();
     this._loaded = true;
     this._packLabel = mapJson.note || '烘焙包';
@@ -315,17 +328,57 @@ export class EuroMuscleMap {
     });
   }
 
+  _applyEuroEyeFollow() {
+    const scene = this.root.children[0];
+    if (!scene || !this.eyeCache?.length) return;
+    const model = this.getGnmModel?.();
+    const raw = this.getRawPositions?.();
+    if (!model || !raw?.length) return;
+
+    const norm = computeBottomCenterNormalize(new Float32Array(raw), TARGET_HEIGHT_M);
+    const gnmFrames = sampleGnmEyeFrames(model, raw, norm);
+    if (!gnmFrames.L || !gnmFrames.R) return;
+
+    restoreEuroEyeRest(this.eyeCache);
+    const euroFrames = sampleEuroEyeFrames(scene);
+    const built = buildEyeAlignSnapshot(gnmFrames, euroFrames);
+    if (!built.ok || !built.snapshot) return;
+    applyEuroEyeAlignVerts(this.eyeCache, built.snapshot, scene);
+    prepareEuroScene(scene);
+  }
+
   _applyFrame() {
     if (!this.meshCache?.length) return;
     restoreEuroRest(this.meshCache);
     const targets = this._collectWarpTargets();
-    if (!targets) return;
-    if (targets.neutral) return;
-    const result = applyEuroWarpTps(this.meshCache, targets.src, targets.dst);
-    if (!result?.ok) return;
+    if (targets && !targets.neutral) {
+      applyEuroWarpTps(this.meshCache, targets.src, targets.dst);
+    }
+    this._applyEuroEyeFollow();
     const scene = this.root.children[0];
     if (scene) prepareEuroScene(scene);
     if (this.enabled) setGroupOpacity(this.root, this.opacity);
+  }
+
+  /** 调试：欧版眼球中心与 GNM 巩膜目标的最大偏差（米，归一化空间） */
+  getEyeAlignGap() {
+    const scene = this.root.children[0];
+    if (!scene || !this.eyeCache?.length) return { ok: false, reason: 'no-eye-cache' };
+    const model = this.getGnmModel?.();
+    const raw = this.getRawPositions?.();
+    if (!model || !raw?.length) return { ok: false, reason: 'no-gnm' };
+    const norm = computeBottomCenterNormalize(new Float32Array(raw), TARGET_HEIGHT_M);
+    const gnmFrames = sampleGnmEyeFrames(model, raw, norm);
+    const euroFrames = sampleEuroEyeFrames(scene, { deformed: true });
+    let maxGap = 0;
+    const gaps = {};
+    for (const side of ['L', 'R']) {
+      if (!gnmFrames[side] || !euroFrames[side]) continue;
+      const d = gnmFrames[side].center.distanceTo(euroFrames[side].center);
+      gaps[side] = d;
+      maxGap = Math.max(maxGap, d);
+    }
+    return { ok: maxGap < 0.0025, maxGap, gaps, eyeCached: this.eyeCache.length };
   }
 
   /** 调试 / 冒烟：当前映射位移幅度 */
@@ -417,6 +470,7 @@ export class EuroMuscleMap {
     this.scene.remove(this.root);
     this._loaded = false;
     this.meshCache = null;
+    this.eyeCache = null;
     this.map = null;
   }
 }
