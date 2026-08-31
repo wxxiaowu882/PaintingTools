@@ -9,7 +9,7 @@
   --danger: #d9534f;
   --font: "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, sans-serif;
   --sidebar-w: 460px;
-  --preset-rail-w: 168px;
+  --preset-rail-w: 328px;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
@@ -87,7 +87,24 @@ button, input, select, textarea { font-family: inherit; }
 }
 .preset-rail-panel.is-active { display: flex; }
 .preset-rail-list {
-  display: flex; flex-direction: column; gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.preset-rail-list > .preset-chip-action,
+.preset-rail-list > .preset-section-title,
+.preset-rail-list > .preset-custom-actions,
+.preset-rail-list > .preset-custom-list,
+.preset-rail-list > .muted {
+  grid-column: 1 / -1;
+}
+.preset-custom-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.preset-custom-list > .muted {
+  grid-column: 1 / -1;
 }
 .preset-chip {
   display: inline-flex; flex-direction: column; align-items: center; gap: 4px;
@@ -111,7 +128,9 @@ button, input, select, textarea { font-family: inherit; }
 .preset-swatch.has-thumb { background-color: transparent; }
 .preset-chip-label {
   text-align: center; line-height: 1.25;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  white-space: normal; word-break: break-all;
 }
 .preset-disclaimer {
   font-size: 11px; color: var(--muted); margin: 10px 2px 4px; line-height: 1.4;
