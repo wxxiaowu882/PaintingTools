@@ -12,8 +12,9 @@ import {
   randomizeIdentity,
 } from './presets.js';
 import { ThumbPreviewer } from './thumb-preview.js';
-import { EuroMuscleMap } from './euro-muscle-map.js';
+import { EuroMuscleMap, peekMuscleMapFromGlb } from './euro-muscle-map.js';
 import { EuroPuppet } from './euro-puppet.js';
+import { saveLastBakePack, loadLastBakePack } from './bake-pack-cache.js';
 
 const MODEL_URL = './data/gnm/gnm_head_web.bin';
 const CONTROLS_URL = './data/controls.json';
@@ -279,6 +280,31 @@ async function main() {
     syncViewModeButtons();
   });
 
+  const finishBakePackLoad = () => {
+    viewport.refreshGeometry(true);
+    muscleMap.rebindTrackers();
+    const chk = $('#muscle-enable');
+    if (chk) chk.checked = true;
+    muscleMap.setEnabled(true);
+    muscleMap.scheduleUpdate();
+    if (viewMode === 'gnm') applyViewMode('both');
+    else if (viewMode === 'euro') applyViewMode('euro');
+  };
+
+  const loadBakePackFromBuffer = async (glbBuffer, mapJson, persistMeta = null) => {
+    if (!mapJson) mapJson = peekMuscleMapFromGlb(glbBuffer);
+    if (!mapJson) throw new Error('未找到映射表（请使用含 extras 的烘焙 GLB 或另附 map.json）');
+    await muscleMap.loadPack(glbBuffer, mapJson);
+    if (persistMeta) {
+      try {
+        await saveLastBakePack(glbBuffer, persistMeta);
+      } catch (err) {
+        console.warn('烘焙包缓存失败', err);
+      }
+    }
+    finishBakePackLoad();
+  };
+
   $('#btn-load-bake')?.addEventListener('click', () => $('#bake-pack-files')?.click());
   $('#bake-pack-files')?.addEventListener('change', async (e) => {
     const files = [...(e.target.files || [])];
@@ -291,15 +317,13 @@ async function main() {
     }
     try {
       if (muscleHint) muscleHint.textContent = '加载烘焙包…';
-      await muscleMap.loadPackFromFiles(glbFile, mapFile || null);
-      viewport.refreshGeometry(true);
-      muscleMap.rebindTrackers();
-      const chk = $('#muscle-enable');
-      if (chk) chk.checked = true;
-      muscleMap.setEnabled(true);
-      muscleMap.scheduleUpdate();
-      if (viewMode === 'gnm') applyViewMode('both');
-      else if (viewMode === 'euro') applyViewMode('euro');
+      const glbBuffer = await glbFile.arrayBuffer();
+      let mapJson = null;
+      if (mapFile) mapJson = JSON.parse(await mapFile.text());
+      await loadBakePackFromBuffer(glbBuffer, mapJson, {
+        fileName: glbFile.name,
+        mapJson: mapFile ? mapJson : null,
+      });
     } catch (err) {
       alert(err.message || String(err));
       if (muscleHint) muscleHint.textContent = `加载失败：${err.message || err}`;
@@ -634,6 +658,20 @@ async function main() {
       $('#btn-export').disabled = false;
     }
   });
+
+  try {
+    const saved = await loadLastBakePack();
+    if (saved?.glbBuffer?.byteLength) {
+      if (muscleHint) muscleHint.textContent = '正在恢复上次烘焙包…';
+      await loadBakePackFromBuffer(saved.glbBuffer, saved.mapJson, null);
+      refreshStatus(`已恢复烘焙包：${saved.fileName}`);
+    }
+  } catch (err) {
+    console.warn('自动恢复烘焙包失败', err);
+    if (muscleHint && !muscleMap._loaded) {
+      muscleHint.textContent = '请从「对齐叠显」导出烘焙包（GLB 内已含映射表）后加载';
+    }
+  }
 
   refreshStatus();
 }
