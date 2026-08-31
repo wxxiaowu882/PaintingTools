@@ -84,6 +84,9 @@ export class LandmarkEditor {
     $('#lm-warp')?.addEventListener('click', () => {
       this.host.applyLandmarkWarp?.();
     });
+    $('#lm-eye-align')?.addEventListener('click', () => {
+      this.host.applyEuroEyeAlign?.();
+    });
     $('#lm-export')?.addEventListener('click', () => this.exportJson());
     $('#lm-import')?.addEventListener('click', () => $('#lm-import-file')?.click());
     $('#lm-import-file')?.addEventListener('change', (ev) => this.importFile(ev));
@@ -1556,6 +1559,7 @@ export class LandmarkEditor {
 
   toJSON() {
     const warpSnapshot = this.host.getWarpSnapshotForSave?.() || null;
+    const eyeAlignSnapshot = this.host.getEyeAlignSnapshotForSave?.() || null;
     return {
       version: 2,
       savedAt: new Date().toISOString(),
@@ -1563,6 +1567,7 @@ export class LandmarkEditor {
       // 保存当下欧版内层姿态；只挪路标未点「重算」时，加载应恢复此矩阵而非重算
       alignSnapshot: this.host.getAlignSnapshot?.() || null,
       warpSnapshot,
+      eyeAlignSnapshot,
       points: this.points.map((p) => ({
         uid: p.uid,
         name: p.name,
@@ -1631,6 +1636,7 @@ export class LandmarkEditor {
     const savedPreTrs = hit.preTrs ?? hit.payload?.preTrs ?? null;
     const snap = hit.alignSnapshot ?? hit.payload?.alignSnapshot ?? null;
     const warpSnap = hit.warpSnapshot ?? hit.payload?.warpSnapshot ?? null;
+    const eyeAlignSnap = hit.eyeAlignSnapshot ?? hit.payload?.eyeAlignSnapshot ?? null;
     this.fromJSON(hit.payload, { applyPreTrs: false });
     this.host.applyPreTrs?.(savedPreTrs);
     const note = hit.note ? `「${hit.note}」` : hit.id || '';
@@ -1669,7 +1675,19 @@ export class LandmarkEditor {
       this.host._reprepareEuroAfterWarp?.();
     }
 
-    const msg = `${prefix}${alignHint}${warpHint}`;
+    let eyeHint = '';
+    if (eyeAlignSnap) {
+      const er = this.host.applyEyeAlignSnapshot?.(eyeAlignSnap);
+      if (er?.ok) {
+        eyeHint = ' · 已恢复眼球重合';
+      } else {
+        eyeHint = ' · 眼球快照无效';
+      }
+    } else {
+      this.host._eyeAlignSnapshot = null;
+    }
+
+    const msg = `${prefix}${alignHint}${warpHint}${eyeHint}`;
     this._lastStatus = msg;
     this.host.setStatus?.(msg);
     this.refreshMarkers();
@@ -1702,7 +1720,12 @@ export class LandmarkEditor {
         if (data.warpSnapshot?.src?.length >= 4) {
           this.host.applyWarpSnapshot?.(data.warpSnapshot);
         }
-        this.host.setStatus?.(`已导入 ${this.points.length} 个点（含预变换/拧形则已恢复）`);
+        if (data.eyeAlignSnapshot) {
+          this.host.applyEyeAlignSnapshot?.(data.eyeAlignSnapshot);
+        } else {
+          this.host.applyEyeAlignSnapshot?.(null);
+        }
+        this.host.setStatus?.(`已导入 ${this.points.length} 个点（含预变换/拧形/眼球则已恢复）`);
       } catch (e) {
         this.host.setStatus?.(`导入失败：${e.message || e}`);
       }
@@ -1735,7 +1758,12 @@ export class LandmarkEditor {
       if (data.warpSnapshot?.src?.length >= 4) {
         this.host.applyWarpSnapshot?.(data.warpSnapshot);
       }
-      this.host.setStatus?.(`已从本地载入 ${this.points.length} 个点（含预变换/拧形则已恢复）`);
+      if (data.eyeAlignSnapshot) {
+        this.host.applyEyeAlignSnapshot?.(data.eyeAlignSnapshot);
+      } else {
+        this.host._eyeAlignSnapshot = null;
+      }
+      this.host.setStatus?.(`已从本地载入 ${this.points.length} 个点（含预变换/拧形/眼球则已恢复）`);
     } catch (e) {
       this.host.setStatus?.(`本地载入失败：${e.message || e}`);
     }
@@ -1908,7 +1936,8 @@ export class LandmarkEditor {
       const n = v.pointCount != null ? ` · ${v.pointCount}点` : '';
       const trs = v.preTrsSummary ? ` · ${v.preTrsSummary}` : '';
       const warp = v.warpSummary ? ` · ${v.warpSummary}` : '';
-      opt.textContent = `${t}${note}${n}${trs}${warp}`;
+      const eye = v.eyeSummary ? ` · ${v.eyeSummary}` : '';
+      opt.textContent = `${t}${note}${n}${trs}${warp}${eye}`;
       sel.appendChild(opt);
     }
     if (prev && [...sel.options].some((o) => o.value === prev)) {
@@ -1971,10 +2000,12 @@ export class LandmarkEditor {
       const preTrs = pack.preTrs || this.host.getPreTrs?.() || null;
       const alignSnapshot = pack.alignSnapshot || this.host.getAlignSnapshot?.() || null;
       const warpSnapshot = pack.warpSnapshot || null;
+      const eyeAlignSnapshot = pack.eyeAlignSnapshot || this.host.getEyeAlignSnapshotForSave?.() || null;
       const status = document.querySelector('#status-text')?.textContent || '';
       const id = `v_${Date.now()}`;
       const preTrsSummary = this._preTrsSummary(preTrs);
       const warpSummary = warpSnapshot ? `拧·${warpSnapshot.nPairs}对` : '';
+      const eyeSummary = eyeAlignSnapshot ? '眼球重合' : '';
       const entry = {
         id,
         note,
@@ -1986,6 +2017,8 @@ export class LandmarkEditor {
         alignSnapshot,
         warpSnapshot,
         warpSummary,
+        eyeAlignSnapshot,
+        eyeSummary,
         payload: pack,
       };
 
@@ -2007,6 +2040,7 @@ export class LandmarkEditor {
           pointCount: entry.pointCount,
           preTrsSummary,
           warpSummary,
+          eyeSummary,
           file: `${id}.json`,
         };
         index.versions = (index.versions || []).filter((v) => v.id !== id);
@@ -2029,7 +2063,8 @@ export class LandmarkEditor {
           : 'API 不可用，已下载 JSON（请放入 landmarks/history/）';
       const trsHint = preTrsSummary ? ` · 含预变换 ${preTrsSummary}` : '';
       const warpHint = warpSummary ? ` · ${warpSummary}` : '';
-      this.host.setStatus?.(`${where}「${note || id}」${trsHint}${warpHint}`);
+      const eyeHint = eyeSummary ? ` · ${eyeSummary}` : '';
+      this.host.setStatus?.(`${where}「${note || id}」${trsHint}${warpHint}${eyeHint}`);
     } catch (e) {
       this.host.setStatus?.(`存版本失败：${e.message || e}`);
     } finally {

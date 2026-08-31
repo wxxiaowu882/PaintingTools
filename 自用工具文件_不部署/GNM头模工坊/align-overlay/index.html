@@ -71,6 +71,7 @@
       </label>
       <button type="button" id="btn-model-switch" title="在 GNM 与欧版之间切换（只显示一侧模型与对应路标列表）">切换模型</button>
       <button type="button" id="btn-model-all" class="is-active" title="两个模型与全部路标一起显示">全部显示</button>
+      <button type="button" id="btn-eye-only" title="仅显示 GNM 与欧版眼球，用于检查眼球重合">眼球模式</button>
       <label><input id="chk-landmarks" type="checkbox" checked /> 路标点</label>
       <label><input id="chk-euro-static-only" type="checkbox" /> 欧版仅 Static</label>
       <button type="button" id="btn-front" class="is-active">正视</button>
@@ -100,6 +101,7 @@
                 <button type="button" id="lm-gen-mirror" title="按头中矢状面，从当前选中点（及同配对的粉/黄）生成 L↔R 镜像点；名称自动 L/R 互换">生成镜像点</button>
                 <button type="button" id="lm-delete">删除选中</button>
                 <button type="button" id="lm-warp" class="primary" title="按已配对的粉黄路标，用薄板样条将欧版网格非刚性拧向 GNM 表面形态（可重复点击；始终从初始网格出发）">拧</button>
+                <button type="button" id="lm-eye-align" title="按 GNM 整球（巩膜+虹膜）对欧版眼球做均匀缩放+平移，并生成晶状体中心 L/R 路标">眼球重合</button>
               </div>
               <label class="lm-rename-row" title="拖动或方向键调 L/R 之一时，同侧对称点按头中矢状面镜像跟随（随头朝向，非世界竖切面）">
                 <input id="lm-pair-link" type="checkbox" checked />

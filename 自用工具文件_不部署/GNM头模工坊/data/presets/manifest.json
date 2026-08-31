@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "disclaimer": "身份含 Tembrica Shape（前30维）与工坊实测改名采样；表情为实测配方。均非真人。",
+  "disclaimer": "身份含 Tembrica、东亚男/女/美女/幼态配方；女相 t04+09 混合+FEM_CORE。均非真人。",
   "identities": [
     {
       "id": "identity-01-mean",
@@ -12,44 +12,163 @@
     {
       "id": "identity-t01-tembrica",
       "name": "Tembrica Shape 1",
-      "note": "Tembrica 内置 Shape（前 30 维）",
+      "note": "偏长男相（勿作美女基底）",
       "hue": "#7cf",
       "file": "identity-t01-tembrica.json"
     },
     {
       "id": "identity-t02-tembrica",
       "name": "Tembrica Shape 2",
-      "note": "Tembrica 内置 Shape（前 30 维）",
+      "note": "大眼窄面（萝莉/幼幼）",
       "hue": "#f8a",
       "file": "identity-t02-tembrica.json"
     },
     {
       "id": "identity-t03-tembrica",
       "name": "Tembrica Shape 3",
-      "note": "Tembrica 内置 Shape（前 30 维）",
+      "note": "圆短阔面（幼幼）",
       "hue": "#9e8",
       "file": "identity-t03-tembrica.json"
     },
     {
       "id": "identity-t04-tembrica",
       "name": "Tembrica Shape 4",
-      "note": "Tembrica 内置 Shape（前 30 维）",
+      "note": "温润椭圆女相（美女默认基底）",
       "hue": "#c9f",
       "file": "identity-t04-tembrica.json"
     },
     {
       "id": "identity-t05-tembrica",
       "name": "Tembrica Shape 5",
-      "note": "Tembrica 内置 Shape（前 30 维）",
+      "note": "阔面偏钝",
       "hue": "#6dd",
       "file": "identity-t05-tembrica.json"
     },
     {
       "id": "identity-t06-tembrica",
       "name": "Tembrica Shape 6",
-      "note": "Tembrica 内置 Shape（前 30 维）",
+      "note": "窄长偏老",
       "hue": "#fa7",
       "file": "identity-t06-tembrica.json"
+    },
+    {
+      "id": "identity-as01-male-north",
+      "name": "东亚男·北方面中",
+      "note": "偏高颅、鼻区略前；颧颊适中",
+      "hue": "#5a9",
+      "file": "identity-as01-male-north.json"
+    },
+    {
+      "id": "identity-as02-male-south",
+      "name": "东亚男·南方阔面",
+      "note": "阔颧颊、侧面偏扁",
+      "hue": "#6b8",
+      "file": "identity-as02-male-south.json"
+    },
+    {
+      "id": "identity-as03-male-jaw",
+      "name": "东亚男·宽颧方颌",
+      "note": "颧外扩 + 颏前",
+      "hue": "#7aa",
+      "file": "identity-as03-male-jaw.json"
+    },
+    {
+      "id": "identity-as04-female-soft",
+      "name": "东亚女·温润鹅蛋",
+      "note": "瓜子鹅蛋：柔和椭圆",
+      "hue": "#f8b",
+      "file": "identity-as04-female-soft.json"
+    },
+    {
+      "id": "identity-as05-female-oval",
+      "name": "东亚女·初恋清纯",
+      "note": "初恋脸：阔面留白、低鼻",
+      "hue": "#eab",
+      "file": "identity-as05-female-oval.json"
+    },
+    {
+      "id": "identity-as06-female-youth",
+      "name": "东亚女·元气幼幼",
+      "note": "幼幼脸：圆短阔颊、大眼",
+      "hue": "#f9c",
+      "file": "identity-as06-female-youth.json"
+    },
+    {
+      "id": "identity-as10-female-vline",
+      "name": "美女·瓜子温润",
+      "note": "瓜子脸：颏尖椭圆",
+      "hue": "#f6a",
+      "file": "identity-as10-female-vline.json"
+    },
+    {
+      "id": "identity-as11-female-heart",
+      "name": "美女·初恋留白",
+      "note": "初恋加强：最大面中留白",
+      "hue": "#f8c",
+      "file": "identity-as11-female-heart.json"
+    },
+    {
+      "id": "identity-as12-female-doe-eye",
+      "name": "美女·丹凤古典",
+      "note": "丹凤：面略长、眼适中",
+      "hue": "#e9b",
+      "file": "identity-as12-female-doe-eye.json"
+    },
+    {
+      "id": "identity-as13-female-sweet",
+      "name": "美女·甜美萝莉",
+      "note": "萝莉：大眼短颏",
+      "hue": "#fba",
+      "file": "identity-as13-female-sweet.json"
+    },
+    {
+      "id": "identity-as14-female-classic",
+      "name": "美女·幼幼元气",
+      "note": "幼幼：短宽圆颊",
+      "hue": "#fad",
+      "file": "identity-as14-female-classic.json"
+    },
+    {
+      "id": "identity-as15-female-petite",
+      "name": "美女·漫画大眼",
+      "note": "漫画：眼最大",
+      "hue": "#f9e",
+      "file": "identity-as15-female-petite.json"
+    },
+    {
+      "id": "identity-as16-female-grace",
+      "name": "美女·温婉古典",
+      "note": "温婉：鹅蛋柔颊",
+      "hue": "#f5d",
+      "file": "identity-as16-female-grace.json"
+    },
+    {
+      "id": "identity-as17-female-cool",
+      "name": "美女·清冷疏朗",
+      "note": "清冷：长面疏朗、低鼻",
+      "hue": "#dce",
+      "file": "identity-as17-female-cool.json"
+    },
+    {
+      "id": "identity-as07-child-wide",
+      "name": "幼态·大眼童颜（5–8）",
+      "note": "幼态极限：颅高↑、小牙、大眼；GNM 成人 PCA 上限",
+      "hue": "#fc9",
+      "file": "identity-as07-child-wide.json"
+    },
+    {
+      "id": "identity-as08-child-round",
+      "name": "幼态·圆颅饱满（7–10）",
+      "note": "更强圆颅：颊外扩 + 颏后收；鼻头略挺",
+      "hue": "#fdb",
+      "file": "identity-as08-child-round.json"
+    },
+    {
+      "id": "identity-as09-child-tween",
+      "name": "幼态·少年（11–14）",
+      "note": "眼仍偏大、颌略长",
+      "hue": "#fec",
+      "file": "identity-as09-child-tween.json"
     },
     {
       "id": "identity-02-wide-forehead",
@@ -102,8 +221,8 @@
     },
     {
       "id": "identity-09-soft-female",
-      "name": "宽面偏柔",
-      "note": "实测：面宽增、面高减",
+      "name": "柔女·宽面基底",
+      "note": "采样柔女向量；美女/东亚女预设的混合基底（勿单独当成品）",
       "hue": "#f9a",
       "file": "identity-09-soft-female.json"
     },

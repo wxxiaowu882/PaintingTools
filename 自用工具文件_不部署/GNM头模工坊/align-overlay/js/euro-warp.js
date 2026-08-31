@@ -170,9 +170,10 @@ export function cacheEuroMeshes(rootObj) {
   return meshCache;
 }
 
-/** 恢复为 GLB 初始局部坐标（撤销拧形） */
+/** 恢复为 GLB 初始局部坐标（撤销拧形；跳过虹膜/晶状体） */
 export function restoreEuroRest(meshCache) {
   for (const entry of meshCache) {
+    if (entry.mesh.userData?._skipEuroWarp) continue;
     const local = entry.mesh.userData._warpLocalRest;
     if (!local) continue;
     const attr = entry.mesh.geometry.attributes.position;

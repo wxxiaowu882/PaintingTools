@@ -13,11 +13,23 @@ import {
   applySimilarity,
   applyNormalizePoint,
   applyNormalizePositions,
+  inverseNormalizePoint,
   computeBottomCenterNormalize,
   composeNormalizeAfterSimilarity,
 } from './procrustes.js';
 import { LandmarkEditor } from './landmarks-editor.js?v=20260828-warp6';
 import { cacheEuroMeshes, applyLandmarkWarp as applyEuroWarpTps, restoreEuroRest } from './euro-warp.js';
+import {
+  cacheEuroEyeMeshes,
+  sampleGnmEyeFrames,
+  sampleEuroEyeFrames,
+  buildEyeAlignSnapshot,
+  applyEuroEyeAlign as applyEuroEyeAlignVerts,
+  applyEuroEyeAlignFromSnapshot,
+  restoreEuroEyeRest,
+  cloneEyeAlignSnapshot,
+  measureEyeSurfaceGapMm,
+} from './euro-eye-align.js';
 import { exportBakedEuroPack } from './export-baked-euro.js';
 import { EuroMvOverlay } from './euro-mv-overlay.js?v=20260829-display15';
 import { createGnmHeadGroup } from '../../js/gnm-mesh-factory.js';
@@ -47,6 +59,8 @@ const FARKAS_URL =
   '../../篡改猴/亚洲头部肌肉模型/work_v4/compare_review/landmarks/farkas_core.json';
 const HISTORY_KEY = 'gnm-align-overlay-history-v1';
 const TARGET_HEIGHT_M = 0.3;
+/** 眼球模式取景：单眼外接球半径下限（米） */
+const MIN_EYE_FRAME_R = 0.004;
 /** 与工坊主页共用 Cache，避免叠显页再下 35MB */
 const MODEL_CACHE = 'gnm-workshop-v1';
 /** 相对叠显页：docs/js/three_164/.../draco/gltf/ */
@@ -187,14 +201,15 @@ function stampMaterialBase(m) {
 
 /** 透明度：接近 1 时恢复材质原样（不强制透明），避免多层肌肉深度错乱。
  */
-function setGroupOpacity(root, opacity) {
+function setGroupOpacity(root, opacity, opts = {}) {
   const o = Math.max(0, Math.min(1, opacity));
+  const blendEuroEyes = !!opts.blendEuroEyes;
   root.visible = o > 0.005;
   root.traverse((obj) => {
     if (!obj.isMesh || !obj.material) return;
     // 虹膜/晶状体不参与组透明度，避免半透明后透出红色肌层（红瞳）
     const label = `${obj.name || ''} ${obj.parent?.name || ''}`;
-    if (meshHasEuroEyeName(obj) || isEuroLensMeshName(label)) {
+    if (!blendEuroEyes && (meshHasEuroEyeName(obj) || isEuroLensMeshName(label))) {
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
       for (const m of mats) {
         stampMaterialBase(m);
@@ -316,9 +331,16 @@ class OverlayApp {
     this._euroWarped = false;
     /** 最近一次拧形的 TPS 控点（拧当下、同步黄点之前），存历史用 */
     this._lastWarpSnapshot = null;
+    /** 欧版眼球刚性对齐快照（平移+缩放贴合 GNM） */
+    this._eyeAlignSnapshot = null;
+    this._euroEyeCache = null;
+    this.gnmModel = null;
+    this.gnmPositionsNative = null;
     this.viewMode = 'front';
     /** 'both' | 'gnm' | 'euro' — 模型显示与路标列表过滤 */
     this.modelViewMode = 'both';
+    /** 眼球模式：仅显示两侧眼球（用于验证重合） */
+    this.eyeOnlyMode = false;
     this.norm = null;
     this.lmEditor = new LandmarkEditor({
       scene: this.scene,
@@ -343,9 +365,12 @@ class OverlayApp {
       getListSideFilter: () => this.getListSideFilter(),
       setStatus,
       applyLandmarkWarp: () => this.applyLandmarkWarp(),
+      applyEuroEyeAlign: () => this.applyEuroEyeAlign(),
       restoreEuroMesh: () => this.restoreEuroMesh(),
       getWarpSnapshotForSave: () => this.getWarpSnapshotForSave(),
       applyWarpSnapshot: (snap) => this.applyWarpSnapshot(snap),
+      getEyeAlignSnapshotForSave: () => this.getEyeAlignSnapshotForSave(),
+      applyEyeAlignSnapshot: (snap) => this.applyEyeAlignSnapshot(snap),
       isEuroWarped: () => this._euroWarped,
     });
     // 侧栏按钮（含历史删除）尽早绑定；loadFromPairs 内会再调一次（有防重入）
@@ -367,6 +392,7 @@ class OverlayApp {
   /** 未拧 + 欧版可见：Filament 叠层（实验性，失败时回退 Three.js） */
   _shouldUseEuroMvOverlay() {
     if (window.__ALIGN_DISABLE_MV_OVERLAY__) return false;
+    if (this.eyeOnlyMode) return false;
     if (this._euroWarped) return false;
     if ($('#chk-euro-static-only')?.checked) return false;
     const e = Number($('#op-euro').value) / 100;
@@ -393,16 +419,23 @@ class OverlayApp {
       const g = Number($('#op-gnm').value) / 100;
       const e = Number($('#op-euro').value) / 100;
       const { showGnm, showEuro } = this.getModelShowFlags();
+      const eyeBlend = !!this.eyeOnlyMode;
       $('#op-gnm-val').textContent = `${Math.round(g * 100)}%`;
       $('#op-euro-val').textContent = `${Math.round(e * 100)}%`;
-      setGroupOpacity(this.gnmRoot, g);
-      setGroupOpacity(this.euroRoot, e);
+      setGroupOpacity(this.gnmRoot, g, { blendEuroEyes: true });
+      setGroupOpacity(this.euroRoot, e, { blendEuroEyes: eyeBlend });
       // 模式开关优先于透明度：未显示的一侧整组隐藏（含对应路标点）
-      const gnmOn = showGnm && g > 0.005;
-      const euroOn = showEuro && e > 0.005;
+      // 眼球模式：按「切换模型」显隐，透明度滑条只做叠显比例（不因 0% 整组消失）
+      const gnmOn = showGnm && (eyeBlend || g > 0.005);
+      const euroOn = showEuro && (eyeBlend || e > 0.005);
       this.gnmRoot.visible = gnmOn;
       this.euroPivot.visible = euroOn;
-      this._syncLandmarkSideVisibility(gnmOn, euroOn);
+      this._syncEyeOnlyVisibility();
+      if (this.eyeOnlyMode) {
+        this.markerRoot.visible = false;
+      } else {
+        this._syncLandmarkSideVisibility(gnmOn, euroOn);
+      }
       // GLB 管理器 neutral：仅欧版时只靠 IBL；有 GNM 时才补弱半球光
       if (this.hemi) this.hemi.intensity = gnmOn ? 0.22 : 0;
       this._syncEuroMvOverlay();
@@ -413,15 +446,19 @@ class OverlayApp {
     this._syncOp = syncOp;
 
     $('#btn-model-switch')?.addEventListener('click', () => {
-      const m = this.modelViewMode;
-      // 全部→GNM→欧版→GNM…（从双侧切入时先到粉侧）
+      const m = this.modelViewMode || 'both';
+      // GNM ↔ 欧版（从双侧切入时先到粉侧 / GNM 眼球侧）
       this.setModelViewMode(m === 'gnm' ? 'euro' : 'gnm');
     });
     $('#btn-model-all')?.addEventListener('click', () => {
       this.setModelViewMode('both');
     });
+    $('#btn-eye-only')?.addEventListener('click', () => {
+      this.setEyeOnlyMode(!this.eyeOnlyMode);
+    });
 
     $('#chk-landmarks').addEventListener('change', (ev) => {
+      if (this.eyeOnlyMode) return;
       this.markerRoot.visible = !!ev.target.checked;
       if (ev.target.checked) {
         const { showGnm, showEuro } = this.getModelShowFlags();
@@ -448,6 +485,18 @@ class OverlayApp {
     };
   }
 
+  _modelViewStatusLabel(mode) {
+    const m = mode || this.modelViewMode || 'both';
+    if (this.eyeOnlyMode) {
+      if (m === 'both') return '眼球模式 · 双侧叠显';
+      if (m === 'gnm') return '眼球模式 · 仅 GNM 眼球';
+      return '眼球模式 · 仅欧版眼球';
+    }
+    if (m === 'both') return '全部显示（粉+黄）';
+    if (m === 'gnm') return '仅 GNM（粉点）';
+    return '仅欧版（黄点）';
+  }
+
   /** 路标列表过滤：null=两侧都列；'gnm'|'euro'=只列该侧 */
   getListSideFilter() {
     const m = this.modelViewMode || 'both';
@@ -458,12 +507,78 @@ class OverlayApp {
   setModelViewMode(mode) {
     if (mode !== 'both' && mode !== 'gnm' && mode !== 'euro') mode = 'both';
     this.modelViewMode = mode;
+    if (this.eyeOnlyMode) this._ensureEyeModeOpacityForView(mode);
     this._syncModelViewUi();
     this._syncOp?.();
     this.lmEditor?.refreshList?.();
-    const label =
-      mode === 'both' ? '全部显示（粉+黄）' : mode === 'gnm' ? '仅 GNM（粉点）' : '仅欧版（黄点）';
-    setStatus(`模型视图：${label}`);
+    setStatus(`模型视图：${this._modelViewStatusLabel(mode)}`);
+  }
+
+  /** 眼球模式：切换 GNM/欧版/双侧时保证当前侧可见且可叠显 */
+  _ensureEyeModeOpacityForView(mode) {
+    const gEl = $('#op-gnm');
+    const eEl = $('#op-euro');
+    if (!gEl || !eEl) return;
+    if (mode === 'gnm') {
+      if (Number(gEl.value) < 5) gEl.value = '100';
+    } else if (mode === 'euro') {
+      if (Number(eEl.value) < 5) eEl.value = '100';
+    } else if (mode === 'both') {
+      if (Number(gEl.value) < 5) gEl.value = '58';
+      if (Number(eEl.value) < 5) eEl.value = '100';
+    }
+  }
+
+  /** 眼球模式：仅显示两侧眼球，隐藏肌肉/皮肤与路标 */
+  setEyeOnlyMode(on) {
+    this.eyeOnlyMode = !!on;
+    $('#btn-eye-only')?.classList.toggle('is-active', this.eyeOnlyMode);
+    if (this.eyeOnlyMode) {
+      // 眼球模式：切换按钮只在 GNM/欧版眼球间二选一，默认落到 GNM 侧
+      if ((this.modelViewMode || 'both') === 'both') this.modelViewMode = 'gnm';
+      this._ensureEyeModeOpacityForView(this.modelViewMode);
+      this._syncModelViewUi();
+    }
+    this._syncOp?.();
+    if (this.eyeOnlyMode) {
+      this.frameEyes();
+      setStatus(`模型视图：${this._modelViewStatusLabel()}`);
+    } else {
+      const chk = $('#chk-landmarks');
+      this.markerRoot.visible = !!chk?.checked;
+      this.frameHead();
+      setStatus(`模型视图：${this._modelViewStatusLabel()}`);
+    }
+  }
+
+  _syncEyeOnlyVisibility() {
+    const on = !!this.eyeOnlyMode;
+    const { showGnm, showEuro } = this.getModelShowFlags();
+    const gh = this.gnmHead;
+    if (gh?.bodyMesh) gh.bodyMesh.visible = !on;
+    if (gh?.eyeInnerMesh) gh.eyeInnerMesh.visible = !on || showGnm;
+    // 眼球模式需显示 GNM 巩膜球体（虹膜+巩膜壳），与欧版眼球叠显比对
+    if (gh?.eyeScleraMesh) gh.eyeScleraMesh.visible = showGnm;
+
+    const staticOnly = !on && !!$('#chk-euro-static-only')?.checked;
+    for (const mesh of this.euroMeshes) {
+      if (mesh.userData._overlayHiddenJunk) {
+        mesh.visible = false;
+        continue;
+      }
+      if (!on) {
+        if (staticOnly) {
+          mesh.visible = isEuroStaticName(mesh.name) || isEuroStaticName(mesh.parent?.name);
+        } else {
+          mesh.visible = true;
+        }
+        continue;
+      }
+      const label = `${mesh.name || ''} ${mesh.parent?.name || ''}`;
+      const isEye =
+        meshHasEuroEyeName(mesh) || isEuroLensMeshName(label) || mesh.name === 'EuroPupilHoleDisc';
+      mesh.visible = showEuro && isEye;
+    }
   }
 
   _syncModelViewUi() {
@@ -776,6 +891,11 @@ class OverlayApp {
   }
 
   _applyEuroStaticOnly(only) {
+    if (this.eyeOnlyMode) {
+      this._syncEyeOnlyVisibility();
+      this._syncOp?.();
+      return;
+    }
     for (const mesh of this.euroMeshes) {
       if (mesh.userData._overlayHiddenJunk) {
         mesh.visible = false;
@@ -873,6 +993,70 @@ class OverlayApp {
     if (this._shouldUseEuroMvOverlay() && this.euroMvOverlay?.isReady?.()) {
       this.euroMvOverlay.pushCameraFromThree(this.camera, this.controls.target);
     }
+  }
+
+  /** 眼球模式：相机对准双眼区域（切换 GNM/欧版时取景不变，避免「对齐了但看起来跳位」） */
+  frameEyes() {
+    const box = new THREE.Box3();
+    const gh = this.gnmHead;
+    const snap = this._eyeAlignSnapshot;
+    const pad = 0.004;
+
+    if (this.eyeOnlyMode && snap?.L?.dstCenter && snap?.R?.dstCenter) {
+      // 已眼球重合：按 GNM 目标球心+外径取景，两侧网格视觉中心一致
+      for (const side of ['L', 'R']) {
+        const spec = snap[side];
+        if (!spec?.dstCenter) continue;
+        const r = Math.max(spec.dstRadius || 0.008, MIN_EYE_FRAME_R);
+        const [x, y, z] = spec.dstCenter;
+        box.expandByPoint(new THREE.Vector3(x - r - pad, y - r - pad, z - r - pad));
+        box.expandByPoint(new THREE.Vector3(x + r + pad, y + r + pad, z + r + pad));
+      }
+    } else if (this.eyeOnlyMode) {
+      // 未重合：双侧眼球并集取景，切换时也不跳
+      if (gh?.eyeInnerMesh) box.expandByObject(gh.eyeInnerMesh);
+      if (gh?.eyeScleraMesh) box.expandByObject(gh.eyeScleraMesh);
+      for (const { mesh } of this._euroEyeCache || []) {
+        if (mesh) box.expandByObject(mesh);
+      }
+    } else {
+      if (gh?.eyeInnerMesh?.visible) box.expandByObject(gh.eyeInnerMesh);
+      if (gh?.eyeScleraMesh?.visible) box.expandByObject(gh.eyeScleraMesh);
+      for (const { mesh } of this._euroEyeCache || []) {
+        if (mesh?.visible) box.expandByObject(mesh);
+      }
+    }
+
+    if (box.isEmpty() && this.gnmModel && this.gnmPositionsNative && this.norm) {
+      const tmp = new THREE.Vector3();
+      for (const side of ['L', 'R']) {
+        const spec = snap?.[side];
+        if (spec?.dstCenter) {
+          tmp.set(spec.dstCenter[0], spec.dstCenter[1], spec.dstCenter[2]);
+          box.expandByPoint(tmp);
+        }
+      }
+    }
+    if (box.isEmpty()) {
+      this.frameHead();
+      return;
+    }
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const maxDim = Math.max(size.x, size.y, size.z, 0.004);
+    this.controls.target.copy(center);
+    this.controls.minDistance = maxDim * 0.35;
+    this.controls.maxDistance = maxDim * 8;
+    this.setView(this.viewMode || 'front');
+    if (this.viewMode === 'side') {
+      this.camera.position.set(center.x + maxDim * 2.2, center.y, center.z);
+    } else {
+      this.camera.position.set(center.x, center.y, center.z + maxDim * 2.2);
+    }
+    this.controls.update();
+    this._syncEuroThreeEyeDisplay();
   }
 
   /** 导出烘焙 GLB + map.json（供头模工坊加载） */
@@ -1007,6 +1191,8 @@ class OverlayApp {
     model.resetPose();
     const raw = new Float32Array(model.numVertices * 3);
     model.computeVertices(raw);
+    this.gnmModel = model;
+    this.gnmPositionsNative = new Float32Array(raw);
 
     setLoadingTitle('采样 GNM 路标…');
     setStatus('采样 GNM 路标…');
@@ -1109,6 +1295,7 @@ class OverlayApp {
     const elements = composeNormalizeAfterSimilarity(sim, norm);
     this.euroRoot.clear();
     this.euroRoot.add(euroScene);
+    this._euroEyeCache = cacheEuroEyeMeshes(euroScene);
     this._applyAlignment(sim, { matrix4_columnMajor: elements });
 
     this.alignReport = {
@@ -1253,7 +1440,149 @@ class OverlayApp {
     this._euroWarped = false;
     this._lastWarpSnapshot = null;
     this._reprepareEuroAfterWarp();
+    this._replayEuroEyeAlign();
     this._syncEuroMvOverlay();
+  }
+
+  getEyeAlignSnapshotForSave() {
+    return cloneEyeAlignSnapshot(this._eyeAlignSnapshot);
+  }
+
+  /** 从历史或导入恢复眼球对齐（v5 整球相似变换；旧版快照自动重算） */
+  applyEyeAlignSnapshot(snap) {
+    if (!snap) {
+      this._eyeAlignSnapshot = null;
+      return { ok: false, reason: 'empty' };
+    }
+    const cloned = cloneEyeAlignSnapshot(snap);
+    if (!cloned) return { ok: false, reason: 'empty' };
+    if ((cloned.version || 0) < 6) {
+      return this.applyEuroEyeAlign();
+    }
+    this._eyeAlignSnapshot = cloned;
+    const result = this._replayEuroEyeAlign();
+    if (result.ok) {
+      this._upsertLensCenterLandmarks(cloned);
+    }
+    return result;
+  }
+
+  _replayEuroEyeAlign() {
+    if (!this._eyeAlignSnapshot || !this._euroEyeCache?.length || !this.euroRoot) {
+      return { ok: false, reason: 'no-snapshot' };
+    }
+    const result = applyEuroEyeAlignFromSnapshot(this._euroEyeCache, this._eyeAlignSnapshot, this.euroRoot);
+    if (result.ok) {
+      this._reprepareEuroAfterWarp();
+      this._syncEuroMvOverlay();
+    }
+    return result;
+  }
+
+  _upsertLensCenterLandmarks(snapshot) {
+    if (!snapshot || !this.lmEditor || !this.norm) return;
+    const norm = this.norm;
+    this.euroRoot.updateMatrixWorld(true);
+    const tmp = new THREE.Vector3();
+    for (const side of ['L', 'R']) {
+      const spec = snapshot[side];
+      if (!spec?.dstCenter) continue;
+      const pairKey = `晶状体中心${side}`;
+      const name = pairKey;
+      const gnmPos = inverseNormalizePoint(spec.dstCenter, norm);
+      tmp.set(spec.dstCenter[0], spec.dstCenter[1], spec.dstCenter[2]);
+      this.euroRoot.worldToLocal(tmp);
+      const euroPos = [tmp.x, tmp.y, tmp.z];
+      let gnmPt = this.lmEditor.points.find((p) => p.pairKey === pairKey && p.side === 'gnm');
+      let euroPt = this.lmEditor.points.find((p) => p.pairKey === pairKey && p.side === 'euro');
+      if (!gnmPt) {
+        gnmPt = {
+          uid: `lm_eye_${pairKey}_g_${Date.now().toString(36)}`,
+          name,
+          side: 'gnm',
+          pos: gnmPos,
+          pairKey,
+          weight: 1,
+        };
+        this.lmEditor.points.push(gnmPt);
+      } else {
+        gnmPt.pos = gnmPos;
+        gnmPt.name = name;
+      }
+      if (!euroPt) {
+        euroPt = {
+          uid: `lm_eye_${pairKey}_e_${Date.now().toString(36)}`,
+          name,
+          side: 'euro',
+          pos: euroPos,
+          pairKey,
+          weight: 1,
+        };
+        this.lmEditor.points.push(euroPt);
+      } else {
+        euroPt.pos = euroPos;
+        euroPt.name = name;
+      }
+    }
+    this.lmEditor.refreshMarkers();
+    this.lmEditor.refreshList();
+  }
+
+  /** 按 GNM 中性眼球自动重合欧版虹膜/晶状体，并生成晶状体中心路标 */
+  applyEuroEyeAlign() {
+    if (!this.gnmModel || !this.gnmPositionsNative || !this.norm) {
+      setStatus('GNM 未就绪，无法眼球重合');
+      return { ok: false };
+    }
+    if (!this._euroEyeCache?.length || !this.euroRoot) {
+      setStatus('欧版眼球网格未就绪');
+      return { ok: false };
+    }
+
+    const gnmFrames = sampleGnmEyeFrames(this.gnmModel, this.gnmPositionsNative, this.norm);
+    restoreEuroEyeRest(this._euroEyeCache);
+    const euroFrames = sampleEuroEyeFrames(this.euroRoot);
+    const built = buildEyeAlignSnapshot(gnmFrames, euroFrames);
+    if (!built.ok || !built.snapshot) {
+      setStatus(`眼球重合失败：${built.warnings?.join(' · ') || built.reason || '采样不足'}`);
+      return { ok: false };
+    }
+
+    this._eyeAlignSnapshot = cloneEyeAlignSnapshot(built.snapshot);
+    const applied = applyEuroEyeAlignVerts(this._euroEyeCache, this._eyeAlignSnapshot, this.euroRoot);
+    if (!applied.ok) {
+      setStatus('眼球重合：顶点写入失败');
+      return { ok: false };
+    }
+
+    this._upsertLensCenterLandmarks(this._eyeAlignSnapshot);
+    this._reprepareEuroAfterWarp();
+    this._syncEuroMvOverlay();
+
+    const fmt = (n, d = 1) => Number(n).toFixed(d);
+    const l = built.snapshot.L;
+    const r = built.snapshot.R;
+    const surf = measureEyeSurfaceGapMm(
+      this.gnmModel,
+      this.gnmPositionsNative,
+      this.norm,
+      this.euroRoot
+    );
+    const warn = built.warnings?.length ? ` · ${built.warnings.join(' · ')}` : '';
+    const surfHint =
+      surf.L && surf.R
+        ? ` · 复核 中心L${fmt(surf.L.centerDistMm)}mm R${fmt(surf.R.centerDistMm)}mm` +
+          ` · 半径差L${fmt(surf.L.radiusDiffMm)}mm R${fmt(surf.R.radiusDiffMm)}mm`
+        : '';
+    const scaleHint = ` · 缩放 L${fmt(l.scale, 3)} R${fmt(r.scale, 3)}`;
+    const msg =
+      `眼球重合（巩膜外径缩放+平移）· 左 残差${fmt(l.residualMm)}mm · 右 残差${fmt(r.residualMm)}mm` +
+      scaleHint +
+      surfHint +
+      ` · 已生成晶状体中心L/R${warn}`;
+    setStatus(msg);
+    this.lmEditor._lastStatus = msg;
+    return { ok: true, snapshot: this._eyeAlignSnapshot };
   }
 
   _cloneWarpSnapshot(snap) {
@@ -1328,6 +1657,7 @@ class OverlayApp {
       this.lmEditor.syncEuroLandmarksToWarpTargets(snap.used);
     }
     this._reprepareEuroAfterWarp();
+    this._replayEuroEyeAlign();
     return result;
   }
 
@@ -1373,7 +1703,7 @@ class OverlayApp {
       ? `${msg}（粉黄几乎未分离，拧形很弱；请先挪动粉点再拧）`
       : msg;
     setStatus(this.lmEditor._lastStatus);
-    this._reprepareEuroAfterWarp();
+    this._replayEuroEyeAlign();
   }
 
   async applyBootQuery() {
