@@ -222,35 +222,6 @@ export class ControlsUI {
     panels.appendChild(allPanel);
 
     this.root.appendChild(panels);
-
-    this.root.appendChild(
-      el('div', { className: 'panel-block row-btns sticky-actions' }, [
-        el('button', {
-          type: 'button',
-          className: 'btn',
-          text: '重置骨相',
-          onClick: () => this.handlers.onResetIdentity?.(),
-        }),
-        el('button', {
-          type: 'button',
-          className: 'btn',
-          text: '重置表情',
-          onClick: () => this.handlers.onResetExpression?.(),
-        }),
-        el('button', {
-          type: 'button',
-          className: 'btn',
-          text: '重置姿态',
-          onClick: () => this.handlers.onResetPose?.(),
-        }),
-        el('button', {
-          type: 'button',
-          className: 'btn danger',
-          text: '全部重置',
-          onClick: () => this.handlers.onResetAll?.(),
-        }),
-      ])
-    );
   }
 
   openCommonEditor(kind) {

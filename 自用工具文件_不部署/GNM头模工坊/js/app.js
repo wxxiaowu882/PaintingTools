@@ -156,13 +156,6 @@ async function main() {
   viewport.setVisibility(visibility);
   setProgress(1, '就绪');
 
-  $('#gnm-opacity')?.addEventListener('input', (e) => {
-    const v = Number(e.target.value) / 100;
-    viewport.setOpacity(v);
-    const lab = $('#gnm-opacity-val');
-    if (lab) lab.textContent = `${Math.round(v * 100)}%`;
-  });
-
   const muscleHint = $('#muscle-hint');
   const muscleMap = new EuroMuscleMap({
     scene: viewport.scene,
@@ -199,6 +192,93 @@ async function main() {
     muscleMap.scheduleUpdate();
   };
 
+  let lastEuroOpacityPct = 75;
+  let viewMode = 'both';
+  let customIdentitiesApi = null;
+
+  const setGnmOpacityPct = (pct) => {
+    const v = Math.max(0, Math.min(100, pct));
+    const slider = $('#gnm-opacity');
+    if (slider) slider.value = String(v);
+    viewport.setOpacity(v / 100);
+    const lab = $('#gnm-opacity-val');
+    if (lab) lab.textContent = `${v}%`;
+  };
+
+  const setEuroOpacityPct = (pct) => {
+    const v = Math.max(0, Math.min(100, pct));
+    const slider = $('#muscle-opacity');
+    if (slider) slider.value = String(v);
+    muscleMap.setOpacity(v / 100);
+    const lab = $('#muscle-opacity-val');
+    if (lab) lab.textContent = `${v}%`;
+    if (v > 0) lastEuroOpacityPct = v;
+  };
+
+  const syncViewModeButtons = () => {
+    $('#btn-view-gnm')?.classList.toggle('is-active', viewMode === 'gnm');
+    $('#btn-view-euro')?.classList.toggle('is-active', viewMode === 'euro');
+    $('#btn-view-both')?.classList.toggle('is-active', viewMode === 'both');
+  };
+
+  const applyViewMode = (mode) => {
+    viewMode = mode;
+    syncViewModeButtons();
+    if (mode === 'gnm') {
+      setGnmOpacityPct(100);
+      setEuroOpacityPct(0);
+    } else if (mode === 'euro') {
+      setGnmOpacityPct(0);
+      setEuroOpacityPct(100);
+    } else {
+      setGnmOpacityPct(100);
+      setEuroOpacityPct(lastEuroOpacityPct || 75);
+    }
+  };
+
+  $('#btn-view-gnm')?.addEventListener('click', () => applyViewMode('gnm'));
+  $('#btn-view-euro')?.addEventListener('click', () => {
+    if (!muscleMap._loaded) {
+      alert('请先加载烘焙包');
+      return;
+    }
+    if (!$('#muscle-enable')?.checked) {
+      const chk = $('#muscle-enable');
+      if (chk) chk.checked = true;
+      muscleMap.setEnabled(true);
+      muscleMap.scheduleUpdate();
+    }
+    applyViewMode('euro');
+  });
+  $('#btn-view-both')?.addEventListener('click', () => {
+    if (muscleMap._loaded && !$('#muscle-enable')?.checked) {
+      const chk = $('#muscle-enable');
+      if (chk) chk.checked = true;
+      muscleMap.setEnabled(true);
+      muscleMap.scheduleUpdate();
+    }
+    applyViewMode('both');
+  });
+
+  $('#gnm-opacity')?.addEventListener('input', (e) => {
+    const v = Number(e.target.value);
+    setGnmOpacityPct(v);
+    if (v > 0 && muscleMap.opacity > 0) viewMode = 'both';
+    else if (v > 0) viewMode = 'gnm';
+    else if (muscleMap.opacity > 0) viewMode = 'euro';
+    syncViewModeButtons();
+  });
+
+  $('#muscle-opacity')?.addEventListener('input', (e) => {
+    const v = Number(e.target.value);
+    setEuroOpacityPct(v);
+    const gnmV = Number($('#gnm-opacity')?.value || 0);
+    if (gnmV > 0 && v > 0) viewMode = 'both';
+    else if (v > 0) viewMode = 'euro';
+    else if (gnmV > 0) viewMode = 'gnm';
+    syncViewModeButtons();
+  });
+
   $('#btn-load-bake')?.addEventListener('click', () => $('#bake-pack-files')?.click());
   $('#bake-pack-files')?.addEventListener('change', async (e) => {
     const files = [...(e.target.files || [])];
@@ -214,8 +294,12 @@ async function main() {
       await muscleMap.loadPackFromFiles(glbFile, mapFile || null);
       viewport.refreshGeometry(true);
       muscleMap.rebindTrackers();
-      if ($('#muscle-enable')?.checked) muscleMap.setEnabled(true);
+      const chk = $('#muscle-enable');
+      if (chk) chk.checked = true;
+      muscleMap.setEnabled(true);
       muscleMap.scheduleUpdate();
+      if (viewMode === 'gnm') applyViewMode('both');
+      else if (viewMode === 'euro') applyViewMode('euro');
     } catch (err) {
       alert(err.message || String(err));
       if (muscleHint) muscleHint.textContent = `加载失败：${err.message || err}`;
@@ -225,13 +309,7 @@ async function main() {
   $('#muscle-enable')?.addEventListener('change', (ev) => {
     muscleMap.setEnabled(!!ev.target.checked);
     if (muscleMap.enabled) muscleMap.scheduleUpdate();
-  });
-
-  $('#muscle-opacity')?.addEventListener('input', (ev) => {
-    const v = Number(ev.target.value) / 100;
-    muscleMap.setOpacity(v);
-    const lab = $('#muscle-opacity-val');
-    if (lab) lab.textContent = `${Math.round(v * 100)}%`;
+    else setEuroOpacityPct(0);
   });
 
   $('#btn-export-euro')?.addEventListener('click', async () => {
@@ -368,13 +446,47 @@ async function main() {
   });
   ui.setModel(model);
 
+  const wireReset = (sel, fn) => {
+    $(sel)?.addEventListener('click', () => {
+      fn();
+      customIdentitiesApi?.clearSelection?.();
+    });
+  };
+  wireReset('#btn-reset-identity', () => {
+    model.resetIdentity();
+    markDirty();
+    ui.syncFromModel();
+    bumpMuscle();
+  });
+  wireReset('#btn-reset-expression', () => {
+    model.resetExpression();
+    markDirty();
+    ui.syncFromModel();
+    bumpMuscle();
+  });
+  wireReset('#btn-reset-pose', () => {
+    model.resetPose();
+    markDirty();
+    ui.syncFromModel();
+    bumpMuscle();
+  });
+  wireReset('#btn-reset-all', () => {
+    model.resetIdentity();
+    model.resetExpression();
+    model.resetPose();
+    markDirty();
+    ui.syncFromModel();
+    bumpMuscle();
+  });
+
   try {
     const manifest = await loadPresetManifest();
     const thumbs = new ThumbPreviewer(model, { size: 128 });
-    await mountPresetRail($('#preset-rail-body'), {
+    const railApi = await mountPresetRail($('#preset-rail-body'), {
       manifest,
       railRoot: $('#preset-rail'),
       thumbPreviewer: thumbs,
+      getModel: () => model,
       onStatus: setStatus,
       onIdentity: (data) => {
         applyIdentityPreset(model, data.identity);
@@ -401,6 +513,7 @@ async function main() {
         refreshStatus(`随机身份 #${seed}`);
       },
     });
+    customIdentitiesApi = railApi?.customIdentities || null;
     viewport.refreshGeometry(true);
     viewport.frameHead();
     viewport.resize();
@@ -419,6 +532,17 @@ async function main() {
   $('#field-note').addEventListener('input', (e) => {
     note = e.target.value;
     markDirty();
+  });
+
+  $('#custom-id-import')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      await customIdentitiesApi?.importFile?.(file);
+    } catch (err) {
+      alert(err.message || String(err));
+    }
   });
 
   $('#btn-import').addEventListener('click', () => $('#file-import').click());

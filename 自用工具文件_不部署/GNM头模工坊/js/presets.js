@@ -1,19 +1,28 @@
 /**
  * Load / apply identity & expression presets (data/presets/).
- * Left rail UI: 身份 / 表情 tabs + scrollable thumb list.
+ * Left rail UI: 身份 / 表情 tabs + scrollable thumb list + 用户自定义身份。
  */
+import {
+  loadCustomIdentities,
+  createCustomIdentity,
+  updateCustomIdentity,
+  deleteCustomIdentity,
+  exportCustomIdentitiesFile,
+  importCustomIdentitiesFile,
+} from './custom-identities.js';
 
 const PRESETS_BASE = './data/presets/';
+const PRESETS_CACHE = '20260831-asian11';
 const STORAGE_PRESET_TAB = 'gnmWorkshop.presetRailTab.v1';
 
 export async function loadPresetManifest() {
-  const res = await fetch(PRESETS_BASE + 'manifest.json');
+  const res = await fetch(PRESETS_BASE + `manifest.json?v=${PRESETS_CACHE}`);
   if (!res.ok) throw new Error('无法加载预设清单');
   return res.json();
 }
 
 export async function loadPresetFile(file) {
-  const res = await fetch(PRESETS_BASE + file);
+  const res = await fetch(PRESETS_BASE + `${file}?v=${PRESETS_CACHE}`);
   if (!res.ok) throw new Error(`无法加载预设 ${file}`);
   return res.json();
 }
@@ -96,12 +105,17 @@ export async function mountPresetRail(bodyEl, opts) {
   rndBtn.title = '在合理范围内随机扰动身份维';
   rndBtn.innerHTML =
     '<span class="preset-swatch" style="background:#00d2ff"></span><span class="preset-chip-label">随机身份</span>';
-  rndBtn.addEventListener('click', () => onRandomIdentity?.());
+  rndBtn.addEventListener('click', () => {
+    clearCustomSelection();
+    onRandomIdentity?.();
+  });
   idList.appendChild(rndBtn);
 
   const idChips = [];
+  let clearCustomSelection = () => {};
   for (const item of manifest.identities || []) {
     const chip = makeChip(item, async () => {
+      clearCustomSelection();
       const data = await loadPresetFile(item.file);
       onIdentity?.(data);
     });
@@ -122,6 +136,22 @@ export async function mountPresetRail(bodyEl, opts) {
   const note = document.createElement('p');
   note.className = 'preset-disclaimer';
   note.textContent = manifest.disclaimer || '统计采样，非真人';
+
+  const customApi = mountCustomIdentitySection(idList, {
+    getModel: opts.getModel,
+    thumbPreviewer,
+    onApply: (entry) => {
+      onIdentity?.({ name: entry.name, identity: entry.identity });
+      opts.onCustomSelected?.(entry.id);
+    },
+    onStatus,
+    clearBuiltinSelection: () => {
+      idList
+        .querySelectorAll('.preset-chip:not(.preset-chip-custom).is-selected')
+        .forEach((c) => c.classList.remove('is-selected'));
+    },
+  });
+  clearCustomSelection = () => customApi.clearSelection();
 
   idPanel.appendChild(idList);
   idPanel.appendChild(note.cloneNode(true));
@@ -174,6 +204,187 @@ export async function mountPresetRail(bodyEl, opts) {
     }
     onStatus?.('预设预览就绪');
   }
+
+  return { customIdentities: customApi };
+}
+
+/**
+ * 左侧身份栏：用户自定义身份（localStorage + 文件导入导出）。
+ */
+export function mountCustomIdentitySection(listEl, opts) {
+  const { getModel, thumbPreviewer, onApply, onStatus, clearBuiltinSelection } = opts;
+  let selectedId = null;
+
+  const title = document.createElement('div');
+  title.className = 'preset-section-title';
+  title.textContent = '我的身份';
+  listEl.appendChild(title);
+
+  const customList = document.createElement('div');
+  customList.className = 'preset-rail-list preset-custom-list';
+  listEl.appendChild(customList);
+
+  const actions = document.createElement('div');
+  actions.className = 'preset-custom-actions';
+  listEl.appendChild(actions);
+
+  const btnNew = document.createElement('button');
+  btnNew.type = 'button';
+  btnNew.className = 'btn';
+  btnNew.textContent = '＋ 新建身份';
+  actions.appendChild(btnNew);
+
+  const btnSave = document.createElement('button');
+  btnSave.type = 'button';
+  btnSave.className = 'btn primary';
+  btnSave.textContent = '保存当前身份';
+  btnSave.disabled = true;
+  actions.appendChild(btnSave);
+
+  const btnExport = document.createElement('button');
+  btnExport.type = 'button';
+  btnExport.className = 'btn';
+  btnExport.textContent = '导出自定义身份';
+  actions.appendChild(btnExport);
+
+  const btnImport = document.createElement('button');
+  btnImport.type = 'button';
+  btnImport.className = 'btn';
+  btnImport.textContent = '导入身份文件';
+  actions.appendChild(btnImport);
+
+  const syncSaveBtn = () => {
+    btnSave.disabled = !selectedId;
+  };
+
+  const clearCustomSelection = () => {
+    customList.querySelectorAll('.preset-chip.is-selected').forEach((c) => c.classList.remove('is-selected'));
+    selectedId = null;
+    syncSaveBtn();
+  };
+
+  const selectChip = (chip, id) => {
+    clearCustomSelection();
+    selectedId = id;
+    chip.classList.add('is-selected');
+    syncSaveBtn();
+    clearBuiltinSelection?.();
+  };
+
+  const renderList = async () => {
+    customList.innerHTML = '';
+    const items = loadCustomIdentities();
+    if (!items.length) {
+      const empty = document.createElement('p');
+      empty.className = 'muted';
+      empty.style.margin = '4px 2px 8px';
+      empty.textContent = '暂无，调好后点「新建身份」';
+      customList.appendChild(empty);
+      if (selectedId && !items.find((x) => x.id === selectedId)) {
+        selectedId = null;
+        syncSaveBtn();
+      }
+      return;
+    }
+    for (const item of items) {
+      const chip = makeCustomChip(
+        item,
+        () => {
+          selectChip(chip, item.id);
+          onApply?.(item);
+        },
+        () => {
+          if (selectedId === item.id) {
+            selectedId = null;
+            syncSaveBtn();
+          }
+          renderList();
+        }
+      );
+      if (item.id === selectedId) chip.classList.add('is-selected');
+      customList.appendChild(chip);
+      if (thumbPreviewer) {
+        try {
+          const url = thumbPreviewer.renderPack({ identity: item.identity });
+          setChipThumb(chip, url);
+        } catch (err) {
+          console.warn('custom thumb failed', item.id, err);
+        }
+      }
+    }
+    syncSaveBtn();
+  };
+
+  btnNew.addEventListener('click', () => {
+    const model = getModel?.();
+    if (!model) return;
+    const name = prompt('输入新身份名称：', '我的骨相');
+    if (name == null) return;
+    const trimmed = name.trim();
+    if (!trimmed) {
+      alert('名称不能为空');
+      return;
+    }
+    const entry = createCustomIdentity(trimmed, model.identity);
+    clearBuiltinSelection?.();
+    selectedId = entry.id;
+    renderList().then(() => {
+      const chip = customList.querySelector(`[data-custom-id="${entry.id}"]`);
+      if (chip) chip.classList.add('is-selected');
+      syncSaveBtn();
+    });
+    onStatus?.(`已新建身份「${entry.name}」`);
+  });
+
+  btnSave.addEventListener('click', () => {
+    const model = getModel?.();
+    if (!model || !selectedId) return;
+    const cur = loadCustomIdentities().find((x) => x.id === selectedId);
+    if (!cur) return;
+    const rename = prompt('保存身份（可修改名称）：', cur.name);
+    if (rename == null) return;
+    const trimmed = rename.trim();
+    if (!trimmed) {
+      alert('名称不能为空');
+      return;
+    }
+    updateCustomIdentity(selectedId, { name: trimmed, identity: model.identity });
+    renderList();
+    onStatus?.(`已保存身份「${trimmed}」`);
+  });
+
+  btnExport.addEventListener('click', () => {
+    const items = loadCustomIdentities();
+    if (!items.length) {
+      alert('还没有可导出的自定义身份');
+      return;
+    }
+    exportCustomIdentitiesFile('gnm_custom_identities.json');
+    onStatus?.(`已导出 ${items.length} 个自定义身份`);
+  });
+
+  btnImport.addEventListener('click', () => {
+    document.getElementById('custom-id-import')?.click();
+  });
+
+  const api = {
+    selectedId: () => selectedId,
+    setSelectedId: (id) => {
+      selectedId = id;
+      syncSaveBtn();
+    },
+    clearSelection: clearCustomSelection,
+    refresh: renderList,
+    async importFile(file) {
+      const result = await importCustomIdentitiesFile(file);
+      await renderList();
+      onStatus?.(`导入完成：新增 ${result.added} · 更新 ${result.updated}`);
+      return result;
+    },
+  };
+
+  renderList();
+  return api;
 }
 
 /** @deprecated use mountPresetRail */
@@ -213,6 +424,43 @@ function makeChip(item, onClick) {
       console.error(err);
       alert(err.message || String(err));
     });
+  });
+  return btn;
+}
+
+function makeCustomChip(item, onClick, onDelete) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'preset-chip preset-chip-rail preset-chip-custom';
+  btn.dataset.customId = item.id;
+  btn.title = item.name;
+  const sw = document.createElement('span');
+  sw.className = 'preset-swatch';
+  sw.style.background = '#6a8';
+  const lab = document.createElement('span');
+  lab.className = 'preset-chip-label';
+  lab.textContent = item.name;
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'preset-chip-del';
+  del.textContent = '×';
+  del.title = '删除此身份';
+  del.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!confirm(`确定删除「${item.name}」？`)) return;
+    deleteCustomIdentity(item.id);
+    onDelete?.();
+  });
+  btn.appendChild(sw);
+  btn.appendChild(lab);
+  btn.appendChild(del);
+  btn.addEventListener('click', (e) => {
+    if (e.target === del) return;
+    btn.parentElement
+      ?.querySelectorAll('.preset-chip.is-selected')
+      .forEach((c) => c.classList.remove('is-selected'));
+    btn.classList.add('is-selected');
+    onClick();
   });
   return btn;
 }

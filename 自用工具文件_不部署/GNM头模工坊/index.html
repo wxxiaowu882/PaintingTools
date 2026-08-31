@@ -48,6 +48,11 @@
     </div>
 
     <div id="puppet-bar">
+      <span class="puppet-view-group" role="group" aria-label="显示模式">
+        <button type="button" class="btn view-mode-btn" id="btn-view-gnm" title="仅显示 GNM 头模">仅 GNM</button>
+        <button type="button" class="btn view-mode-btn" id="btn-view-euro" title="仅显示欧版肌肉（需已加载烘焙包）">仅欧版</button>
+        <button type="button" class="btn view-mode-btn is-active" id="btn-view-both" title="GNM 与欧版叠显对照">全部显示</button>
+      </span>
       <label class="puppet-op" title="调节 GNM 头模叠显透明度，便于对照欧版肌肉">
         GNM
         <input id="gnm-opacity" type="range" min="0" max="100" value="100" />
@@ -93,6 +98,12 @@
           <h1>参数</h1>
         </div>
         <div id="controls-root"></div>
+        <div id="sidebar-actions" class="sidebar-actions">
+          <button type="button" class="btn" id="btn-reset-identity">重置骨相</button>
+          <button type="button" class="btn" id="btn-reset-expression">重置表情</button>
+          <button type="button" class="btn" id="btn-reset-pose">重置姿态</button>
+          <button type="button" class="btn danger" id="btn-reset-all">全部重置</button>
+        </div>
       </aside>
     </div>
 
@@ -102,6 +113,7 @@
     </footer>
   </div>
 
-  <script type="module" src="./js/app.js?v=20260831-euroeye1"></script>
+  <input id="custom-id-import" type="file" accept=".json,application/json" hidden />
+  <script type="module" src="./js/app.js?v=20260831-workshop1"></script>
 </body>
 </html>
