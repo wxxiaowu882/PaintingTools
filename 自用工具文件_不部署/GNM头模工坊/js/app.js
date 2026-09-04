@@ -12,9 +12,21 @@ import {
   randomizeIdentity,
 } from './presets.js';
 import { ThumbPreviewer } from './thumb-preview.js';
-import { EuroMuscleMap, peekMuscleMapFromGlb } from './euro-muscle-map.js';
+import {
+  EuroMuscleMap,
+  peekMuscleMapFromGlb,
+  describeMissingBakeMapError,
+} from './euro-muscle-map.js';
 import { EuroPuppet } from './euro-puppet.js';
 import { saveLastBakePack, loadLastBakePack } from './bake-pack-cache.js';
+import {
+  initParamLabels,
+  exportParamLabelsFile,
+  importParamLabelsFile,
+} from './param-labels.js';
+import { initCustomIdentities } from './custom-identities.js';
+import { initParamFavorites } from './param-favorites.js';
+import { initIdentityTaxonomy } from './identity-taxonomy.js';
 
 const MODEL_URL = './data/gnm/gnm_head_web.bin';
 const CONTROLS_URL = './data/controls.json';
@@ -136,6 +148,10 @@ async function main() {
 
   setProgress(0.02, '加载控件配置…');
   controlsConfig = await (await fetch(CONTROLS_URL)).json();
+  await initParamLabels('./data/param-labels.json');
+  await initCustomIdentities();
+  await initParamFavorites();
+  await initIdentityTaxonomy('./data/identity-taxonomy.json');
 
   setProgress(0.05, '加载完整 GNM 基底…');
   try {
@@ -144,6 +160,7 @@ async function main() {
     });
     const { meta, sections } = parseContainer(buffer);
     model = new GNMHeadModel(meta, sections);
+    model._sections = sections;
   } catch (err) {
     setProgress(0, '基底缺失');
     $('#loading-label').textContent =
@@ -174,6 +191,12 @@ async function main() {
   if (typeof window !== 'undefined') {
     window.__gnmMuscleDebug = muscleMap;
     window.__gnmWorkshopDebug = {
+      getModel: () => model,
+      getIdentitySnapshot: () => Array.from(model.identity),
+      getRawPositionsSnapshot: () => {
+        const src = viewport.rawPositions;
+        return src ? Array.from(src) : null;
+      },
       getGnmHeadState: () => {
         const kinds = (viewport.gnmHead?.parts || []).map((p) => p.kind);
         const sclera = viewport.gnmHead?.eyeScleraMesh?.material;
@@ -291,9 +314,17 @@ async function main() {
     else if (viewMode === 'euro') applyViewMode('euro');
   };
 
-  const loadBakePackFromBuffer = async (glbBuffer, mapJson, persistMeta = null) => {
+  const loadBakePackFromBuffer = async (glbBuffer, mapJson, persistMeta = null, opts = {}) => {
     if (!mapJson) mapJson = peekMuscleMapFromGlb(glbBuffer);
-    if (!mapJson) throw new Error('未找到映射表（请使用含 extras 的烘焙 GLB 或另附 map.json）');
+    if (!mapJson) {
+      throw new Error(
+        describeMissingBakeMapError({
+          mapFileSelected: !!opts.mapFileSelected,
+          glbFileName: persistMeta?.fileName || opts.glbFileName,
+          fromCache: !!opts.fromCache,
+        })
+      );
+    }
     await muscleMap.loadPack(glbBuffer, mapJson);
     if (persistMeta) {
       try {
@@ -312,7 +343,7 @@ async function main() {
     const glbFile = files.find((f) => /\.glb$/i.test(f.name));
     const mapFile = files.find((f) => /_map\.json$/i.test(f.name) || /\.json$/i.test(f.name));
     if (!glbFile) {
-      alert('请选择 *_baked.glb（映射表可内嵌在 GLB 或另附 *_map.json）');
+      alert('请选择烘焙 GLB（*_baked.glb）。若 GLB 内无映射表，请在同一次选择中按住 Ctrl 一并选中 *_map.json');
       return;
     }
     try {
@@ -320,10 +351,15 @@ async function main() {
       const glbBuffer = await glbFile.arrayBuffer();
       let mapJson = null;
       if (mapFile) mapJson = JSON.parse(await mapFile.text());
-      await loadBakePackFromBuffer(glbBuffer, mapJson, {
-        fileName: glbFile.name,
-        mapJson: mapFile ? mapJson : null,
-      });
+      await loadBakePackFromBuffer(
+        glbBuffer,
+        mapJson,
+        {
+          fileName: glbFile.name,
+          mapJson: mapFile ? mapJson : null,
+        },
+        { mapFileSelected: !!mapFile, glbFileName: glbFile.name }
+      );
     } catch (err) {
       alert(err.message || String(err));
       if (muscleHint) muscleHint.textContent = `加载失败：${err.message || err}`;
@@ -505,7 +541,7 @@ async function main() {
 
   try {
     const manifest = await loadPresetManifest();
-    const thumbs = new ThumbPreviewer(model, { size: 128 });
+    const thumbs = new ThumbPreviewer(model, { size: 128, sections: model._sections });
     const railApi = await mountPresetRail($('#preset-rail-body'), {
       manifest,
       railRoot: $('#preset-rail'),
@@ -564,6 +600,26 @@ async function main() {
     if (!file) return;
     try {
       await customIdentitiesApi?.importFile?.(file);
+    } catch (err) {
+      alert(err.message || String(err));
+    }
+  });
+
+  $('#btn-export-param-labels')?.addEventListener('click', () => {
+    exportParamLabelsFile();
+    setStatus('已导出参数名称 JSON');
+  });
+  $('#btn-import-param-labels')?.addEventListener('click', () => {
+    $('#param-labels-import')?.click();
+  });
+  $('#param-labels-import')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const { added, total } = await importParamLabelsFile(file);
+      ui?.syncFromModel?.();
+      refreshStatus(`已导入参数名称：${added} 项更新，共 ${total} 项自定义`);
     } catch (err) {
       alert(err.message || String(err));
     }
@@ -663,13 +719,15 @@ async function main() {
     const saved = await loadLastBakePack();
     if (saved?.glbBuffer?.byteLength) {
       if (muscleHint) muscleHint.textContent = '正在恢复上次烘焙包…';
-      await loadBakePackFromBuffer(saved.glbBuffer, saved.mapJson, null);
+      await loadBakePackFromBuffer(saved.glbBuffer, saved.mapJson, { fileName: saved.fileName }, {
+        fromCache: true,
+      });
       refreshStatus(`已恢复烘焙包：${saved.fileName}`);
     }
   } catch (err) {
     console.warn('自动恢复烘焙包失败', err);
     if (muscleHint && !muscleMap._loaded) {
-      muscleHint.textContent = '请从「对齐叠显」导出烘焙包（GLB 内已含映射表）后加载';
+      muscleHint.textContent = '加载烘焙包时请同时选择 GLB 与 *_map.json（Ctrl 多选）';
     }
   }
 

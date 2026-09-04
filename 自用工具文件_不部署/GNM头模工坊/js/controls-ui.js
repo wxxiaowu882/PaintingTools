@@ -1,5 +1,6 @@
 import {
   isModifiedCoeff,
+  pcaSliderRange,
   STORAGE_COMMON_KEY,
   STORAGE_EXPR_KEY,
   STORAGE_DIRTY_ONLY,
@@ -7,6 +8,18 @@ import {
   STORAGE_ACTIVE_TAB,
 } from './extras.js';
 import { createCaptureSlider } from './capture-slider.js';
+import { getParamLabel, setParamLabel, onParamLabelsChange } from './param-labels.js';
+import {
+  getHeadEffectClusters,
+  renameIdentityCluster,
+  onIdentityTaxonomyChange,
+} from './identity-taxonomy.js';
+import {
+  loadFavoriteKeys,
+  isFavorite,
+  toggleFavorite,
+  makeFavoriteKey,
+} from './param-favorites.js';
 
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
@@ -27,6 +40,7 @@ function el(tag, attrs = {}, children = []) {
 const TABS = [
   { id: 'bone', label: '骨相' },
   { id: 'expr', label: '表情' },
+  { id: 'fav', label: '收藏' },
   { id: 'pose', label: '姿态' },
   { id: 'vis', label: '显示' },
   { id: 'all', label: '全部' },
@@ -45,7 +59,140 @@ export class ControlsUI {
     this.activeTab = localStorage.getItem(STORAGE_ACTIVE_TAB) || 'bone';
     this._sliderRefs = new Map();
     this._dragging = false;
+    this._openAdvGroups = new Set();
+    this._unsubParamLabels = onParamLabelsChange(() => this._refreshParamLabels());
+    this._unsubTaxonomy = onIdentityTaxonomyChange(() => {
+      if (this.activeTab === 'all') this._buildAdvanced();
+    });
     this.renderShell();
+  }
+
+  _displayParamLabel(labelStore, defaultLabel) {
+    if (!labelStore) return defaultLabel;
+    return getParamLabel(labelStore.section, labelStore.key) ?? defaultLabel;
+  }
+
+  _makeRenamableLabel(labelStore, defaultLabel) {
+    const labelEl = el('span', {
+      className: 'slider-label is-renamable',
+      text: this._displayParamLabel(labelStore, defaultLabel),
+      title: labelStore ? '双击可重命名' : undefined,
+    });
+    if (!labelStore) return labelEl;
+    labelEl.dataset.labelSection = labelStore.section;
+    labelEl.dataset.labelKey = labelStore.key;
+    labelEl.dataset.labelDefault = defaultLabel;
+    labelEl.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this._beginLabelEdit(labelEl, labelStore, defaultLabel);
+    });
+    return labelEl;
+  }
+
+  _beginLabelEdit(labelEl, labelStore, defaultLabel) {
+    if (labelEl.dataset.editing === '1') return;
+    labelEl.dataset.editing = '1';
+    const current = labelEl.textContent || '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'slider-label-edit';
+    input.value = current;
+    labelEl.textContent = '';
+    labelEl.appendChild(input);
+    input.focus();
+    input.select();
+
+    let cancelled = false;
+    const finish = () => {
+      delete labelEl.dataset.editing;
+      if (!cancelled) {
+        const next = input.value.trim();
+        if (!next || next === defaultLabel) setParamLabel(labelStore.section, labelStore.key, '');
+        else setParamLabel(labelStore.section, labelStore.key, next);
+      }
+      labelEl.textContent = this._displayParamLabel(labelStore, defaultLabel);
+    };
+    input.addEventListener(
+      'blur',
+      () => {
+        finish();
+      },
+      { once: true }
+    );
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelled = true;
+        input.blur();
+      }
+    });
+  }
+
+  _refreshParamLabels() {
+    this.root.querySelectorAll('.slider-label[data-label-section]').forEach((labelEl) => {
+      const section = labelEl.dataset.labelSection;
+      const key = labelEl.dataset.labelKey;
+      const defaultLabel = labelEl.dataset.labelDefault || '';
+      if (!section || key == null) return;
+      labelEl.textContent = getParamLabel(section, key) ?? defaultLabel;
+    });
+  }
+
+  _makeFavoriteBtn(favKey) {
+    const active = isFavorite(favKey);
+    const btn = el('button', {
+      type: 'button',
+      className: 'btn-fav' + (active ? ' is-active' : ''),
+      text: active ? '★' : '☆',
+      title: active ? '取消收藏' : '加入收藏',
+      'data-fav-key': favKey,
+      onClick: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFavorite(favKey);
+        this._refreshFavoriteIcons();
+        this._buildFavorites();
+      },
+    });
+    return btn;
+  }
+
+  _refreshFavoriteIcons() {
+    this.root.querySelectorAll('.btn-fav[data-fav-key]').forEach((btn) => {
+      const key = btn.getAttribute('data-fav-key');
+      if (!key) return;
+      const active = isFavorite(key);
+      btn.classList.toggle('is-active', active);
+      btn.textContent = active ? '★' : '☆';
+      btn.title = active ? '取消收藏' : '加入收藏';
+    });
+  }
+
+  _advGroupKey(kind, group) {
+    return `${kind}:${group.id}`;
+  }
+
+  _syncAdvGroupOpenFromDom() {
+    if (!this.advBox) return;
+    this.advBox.querySelectorAll('details.group-fold').forEach((det) => {
+      const key = det.dataset.groupKey;
+      if (!key) return;
+      if (det.open) this._openAdvGroups.add(key);
+      else this._openAdvGroups.delete(key);
+    });
+  }
+
+  _bindAdvGroupFold(det, key) {
+    det.dataset.groupKey = key;
+    det.open = this.showDirtyOnly || this._openAdvGroups.has(key);
+    det.addEventListener('toggle', () => {
+      if (det.open) this._openAdvGroups.add(key);
+      else this._openAdvGroups.delete(key);
+    });
   }
 
   _loadCommonIds() {
@@ -182,6 +329,23 @@ export class ControlsUI {
     );
     panels.appendChild(exprPanel);
 
+    // 收藏
+    const favPanel = el('div', {
+      className: 'tab-panel' + (this.activeTab === 'fav' ? ' is-active' : ''),
+      'data-tab': 'fav',
+    });
+    favPanel.appendChild(
+      el('div', { className: 'panel-block' }, [
+        el('div', { className: 'panel-title', text: '收藏的参数' }),
+        el('p', {
+          className: 'muted panel-hint',
+          text: '在各 Tab 参数名称旁点击 ☆ 加入；再次点击 ★ 可取消。',
+        }),
+        (this.favBox = el('div', { className: 'slider-list' })),
+      ])
+    );
+    panels.appendChild(favPanel);
+
     // 姿态
     const posePanel = el('div', {
       className: 'tab-panel' + (this.activeTab === 'pose' ? ' is-active' : ''),
@@ -315,6 +479,7 @@ export class ControlsUI {
     this._buildComponents();
     this._buildCommonBone();
     this._buildCommonExpr();
+    this._buildFavorites();
     this._buildPose();
     this._buildAdvanced();
   }
@@ -325,6 +490,7 @@ export class ControlsUI {
     const vis = this.handlers.getVisibility?.() || [];
     this.cfg.components.forEach((c) => {
       const checked = vis[c.index] !== false;
+      const labelStore = { section: 'component', key: c.id };
       this.compBox.appendChild(
         el('label', { className: 'check-item' }, [
           el('input', {
@@ -336,13 +502,29 @@ export class ControlsUI {
               this.handlers.onVisibility?.(next);
             },
           }),
-          document.createTextNode(' ' + c.name),
+          document.createTextNode(' '),
+          this._makeRenamableLabel(labelStore, c.name),
         ])
       );
     });
   }
 
-  _makeSlider({ key, label, hint, value, min, max, step, dirty, onInput, onReset }) {
+  _makeSlider({
+    key,
+    label,
+    labelStore,
+    defaultLabel,
+    hint,
+    value,
+    min,
+    max,
+    step,
+    dirty,
+    onInput,
+    onReset,
+    favKey,
+  }) {
+    const builtIn = defaultLabel ?? label;
     const row = el('div', {
       className: 'slider-row' + (dirty ? ' is-dirty' : ''),
       'data-key': key,
@@ -351,26 +533,29 @@ export class ControlsUI {
       className: 'slider-val',
       text: Number(value).toFixed(2),
     });
-    const head = el('div', { className: 'slider-head' }, [
-      el('span', { className: 'slider-label', text: label }),
+    const headChildren = [this._makeRenamableLabel(labelStore, builtIn)];
+    if (favKey) headChildren.push(this._makeFavoriteBtn(favKey));
+    headChildren.push(
       el('div', { className: 'slider-head-right' }, [
         valEl,
         el('button', {
           type: 'button',
           className: 'btn-reset-one',
           text: '重置',
-          title: '将此项恢复为 0',
+          title: '将此项归零（中性）',
           onClick: (e) => {
             e.preventDefault();
             e.stopPropagation();
-            slider.setValue(0);
-            onReset?.(0);
-            this._paintDirty(row, false);
+            // 先写模型再同步滑条，避免只改外观
+            onInput?.(0);
+            slider.setValue(0, { silent: true });
             valEl.textContent = '0.00';
+            this._paintDirty(row, false);
           },
         }),
-      ]),
-    ]);
+      ])
+    );
+    const head = el('div', { className: 'slider-head' }, headChildren);
     if (hint) head.title = hint;
 
     const slider = createCaptureSlider({
@@ -389,6 +574,7 @@ export class ControlsUI {
       },
       onPointerUp: () => {
         this._dragging = false;
+        if (!this.showDirtyOnly) return;
         clearTimeout(this._rebuildTimer);
         this._rebuildTimer = setTimeout(() => this.rebuildLists(), 120);
       },
@@ -422,14 +608,15 @@ export class ControlsUI {
       this.commonBox.appendChild(
         this._makeSlider({
           key: `common:${def.id}`,
-          label: def.name,
+          favKey: makeFavoriteKey('identity', def.index),
+          labelStore: { section: 'identity', key: String(def.index) },
+          defaultLabel: def.name,
           hint: `${def.hint} · 身份维 ${def.index}（${this.model.meta.identityNames?.[def.index] || ''}）`,
           value: val,
-          min: def.range[0],
-          max: def.range[1],
+          ...pcaSliderRange('identity', def.index),
           dirty,
           onInput: (v) => this.handlers.onIdentityParam?.(def.index, v),
-          onReset: () => this.handlers.onIdentityParam?.(def.index, 0),
+          onReset: () => this.handlers.onIdentityParam?.(def.index, 0)
         })
       );
     }
@@ -487,27 +674,161 @@ export class ControlsUI {
         dirty = def.weights.some((w) => isModifiedCoeff(this.model.expression[w.index] || 0));
       }
       if (this.showDirtyOnly && !dirty) continue;
-      const min = def.range?.[0] ?? -3;
-      const max = def.range?.[1] ?? 3;
+      const rng = def.weights?.length
+        ? { min: def.range?.[0] ?? 0, max: def.range?.[1] ?? 5 }
+        : pcaSliderRange('expression', def.index);
+      const favKey = def.weights?.length
+        ? makeFavoriteKey('exprCommon', def.id)
+        : makeFavoriteKey('expression', def.index);
+      const labelStore = def.weights?.length
+        ? { section: 'commonExpression', key: def.id }
+        : { section: 'expression', key: String(def.index) };
       this.exprBox.appendChild(
         this._makeSlider({
           key: `expr:${def.id}`,
-          label: def.name,
+          favKey,
+          labelStore,
+          defaultLabel: def.name,
           hint: `${def.hint} · 表情维 ${def.index}${
             def.mirrorIndex != null ? ` / 镜像 ${def.mirrorIndex}` : ''
           }${def.weights ? ' · 多维配方' : ''}`,
           value: val,
-          min,
-          max,
+          min: rng.min,
+          max: rng.max,
           dirty,
           onInput: (v) => this._applyExpressionDef(def, v),
-          onReset: () => this._applyExpressionDef(def, 0),
+          onReset: () => this._applyExpressionDef(def, 0)
         })
       );
     }
     if (!this.exprBox.children.length) {
       this.exprBox.appendChild(el('div', { className: 'muted', text: '无匹配项' }));
     }
+  }
+
+  _buildFavorites() {
+    if (!this.favBox) return;
+    this.favBox.innerHTML = '';
+    const keys = loadFavoriteKeys();
+    if (!keys.length) {
+      this.favBox.appendChild(
+        el('div', { className: 'muted', text: '暂无收藏。在各参数名称旁点击 ☆ 加入收藏。' })
+      );
+      return;
+    }
+    let any = false;
+    for (const favKey of keys) {
+      const row = this._makeSliderFromFavKey(favKey);
+      if (!row) continue;
+      any = true;
+      this.favBox.appendChild(row);
+    }
+    if (!any) {
+      this.favBox.appendChild(el('div', { className: 'muted', text: '收藏项无效或已移除' }));
+    }
+  }
+
+  _makeSliderFromFavKey(favKey) {
+    if (favKey.startsWith('identity:')) {
+      const idx = Number(favKey.slice(9));
+      if (!Number.isFinite(idx) || idx < 0 || idx >= this.model.identityDim) return null;
+      const val = this.model.identity[idx] || 0;
+      const builtIn = this._idLabelBuiltin(idx);
+      return this._makeSlider({
+        key: `fav:${favKey}`,
+        favKey,
+        labelStore: { section: 'identity', key: String(idx) },
+        defaultLabel: builtIn,
+        value: val,
+        ...pcaSliderRange('identity', idx),
+        dirty: isModifiedCoeff(val),
+        onInput: (v) => this.handlers.onIdentityParam?.(idx, v),
+        onReset: () => this.handlers.onIdentityParam?.(idx, 0)
+      });
+    }
+    if (favKey.startsWith('expression:')) {
+      const idx = Number(favKey.slice(11));
+      if (!Number.isFinite(idx) || idx < 0 || idx >= this.model.expressionDim) return null;
+      const val = this.model.expression[idx] || 0;
+      const builtIn = this._exLabelBuiltin(idx);
+      return this._makeSlider({
+        key: `fav:${favKey}`,
+        favKey,
+        labelStore: { section: 'expression', key: String(idx) },
+        defaultLabel: builtIn,
+        value: val,
+        ...pcaSliderRange('expression', idx),
+        dirty: isModifiedCoeff(val),
+        onInput: (v) => this.handlers.onExpressionParam?.(idx, v),
+        onReset: () => this.handlers.onExpressionParam?.(idx, 0)
+      });
+    }
+    if (favKey.startsWith('exprCommon:')) {
+      const id = favKey.slice(11);
+      const def = (this.cfg.commonExpressionControls || []).find((c) => c.id === id);
+      if (!def) return null;
+      const val = this._readExpressionUiValue(def);
+      let dirty = isModifiedCoeff(val);
+      if (!def.weights && def.mirrorIndex != null) {
+        dirty = dirty || isModifiedCoeff(this.model.expression[def.mirrorIndex] || 0);
+      }
+      if (def.weights) {
+        dirty = def.weights.some((w) => isModifiedCoeff(this.model.expression[w.index] || 0));
+      }
+      const labelStore = { section: 'commonExpression', key: def.id };
+      return this._makeSlider({
+        key: `fav:${favKey}`,
+        favKey,
+        labelStore,
+        defaultLabel: def.name,
+        hint: def.hint,
+        value: val,
+        ...(def.weights?.length
+          ? { min: def.range?.[0] ?? 0, max: def.range?.[1] ?? 5 }
+          : pcaSliderRange('expression', def.index)),
+        dirty,
+        onInput: (v) => this._applyExpressionDef(def, v),
+        onReset: () => this._applyExpressionDef(def, 0)
+      });
+    }
+    if (favKey.startsWith('pose:')) {
+      const parts = favKey.slice(5).split(':');
+      const jointIndex = Number(parts[0]);
+      const axis = Number(parts[1]);
+      if (!Number.isFinite(jointIndex) || !Number.isFinite(axis)) return null;
+      const j = this.cfg.joints.find((x) => x.index === jointIndex);
+      if (!j) return null;
+      const axisNames = ['X', 'Y', 'Z'];
+      const idx = jointIndex * 3 + axis;
+      const val = this.model.rotations[idx] || 0;
+      const poseLabel = `${j.name} · ${axisNames[axis] || axis}`;
+      return this._makeSlider({
+        key: `fav:${favKey}`,
+        favKey,
+        labelStore: { section: 'pose', key: `${jointIndex}:${axis}` },
+        defaultLabel: poseLabel,
+        hint: '轴角（弧度）。非张嘴。',
+        value: val,
+        min: -1.2,
+        max: 1.2,
+        dirty: isModifiedCoeff(val),
+        onInput: (v) => {
+          const o = jointIndex * 3;
+          const x = axis === 0 ? v : this.model.rotations[o];
+          const y = axis === 1 ? v : this.model.rotations[o + 1];
+          const z = axis === 2 ? v : this.model.rotations[o + 2];
+          this.handlers.onJointRotation?.(jointIndex, x, y, z);
+        },
+        onReset: () => {
+          const o = jointIndex * 3;
+          const x = axis === 0 ? 0 : this.model.rotations[o];
+          const y = axis === 1 ? 0 : this.model.rotations[o + 1];
+          const z = axis === 2 ? 0 : this.model.rotations[o + 2];
+          this.handlers.onJointRotation?.(jointIndex, x, y, z);
+        },
+      });
+    }
+    return null;
   }
 
   _buildPose() {
@@ -523,10 +844,13 @@ export class ControlsUI {
         const val = this.model.rotations[idx] || 0;
         const dirty = isModifiedCoeff(val);
         if (this.showDirtyOnly && !dirty) continue;
+        const poseLabel = `${j.name} · ${a.name}`;
         this.poseBox.appendChild(
           this._makeSlider({
             key: `pose:${idx}`,
-            label: `${j.name} · ${a.name}`,
+            favKey: makeFavoriteKey('pose', j.index, a.axis),
+            labelStore: { section: 'pose', key: `${j.index}:${a.axis}` },
+            defaultLabel: poseLabel,
             hint: '轴角（弧度）。非张嘴。',
             value: val,
             min: -1.2,
@@ -552,15 +876,19 @@ export class ControlsUI {
     }
   }
 
-  _buildAdvanced() {
-    this.advBox.innerHTML = '';
-    // 保持原分组顺序：已修改就地标黄；不置顶、不从下方移除
+  /**
+   * 头颅面骨：按效果簇子折叠；标题可双击改名（写入 identity-taxonomy.json）。
+   * @returns {HTMLElement | null}
+   */
+  _buildHeadTaxonomy(g, parentGroupKey) {
+    const clusters = getHeadEffectClusters();
+    const wrap = el('div', { className: 'taxonomy-wrap' });
 
-    for (const g of this.cfg.identityGroups) {
-      const det = el('details', { className: 'group-fold' });
-      det.appendChild(
-        el('summary', {
-          text: `${g.name} · ${g.count} 维（索引 ${g.start}–${g.start + g.count - 1}）`,
+    if (!clusters.length) {
+      wrap.appendChild(
+        el('p', {
+          className: 'muted taxonomy-hint',
+          text: '未加载效果簇分类，回退为平铺列表。',
         })
       );
       const inner = el('div', { className: 'slider-list compact' });
@@ -571,26 +899,212 @@ export class ControlsUI {
         const dirty = isModifiedCoeff(val);
         if (this.showDirtyOnly && !dirty) continue;
         any = true;
-        inner.appendChild(
-          this._makeSlider({
-            key: `id-all:${idx}`,
-            label: this._idLabel(idx),
-            value: val,
-            min: -3,
-            max: 3,
-            dirty,
-            onInput: (v) => this.handlers.onIdentityParam?.(idx, v),
-            onReset: () => this.handlers.onIdentityParam?.(idx, 0),
-          })
-        );
+        inner.appendChild(this._makeHeadIdentitySlider(idx));
+      }
+      if (!any) return null;
+      wrap.appendChild(inner);
+      return wrap;
+    }
+
+    wrap.appendChild(
+      el('p', {
+        className: 'muted taxonomy-hint',
+        text: '按变动幅度相似度聚类；双击簇标题可改名（写入磁盘 JSON）。',
+      })
+    );
+
+    const covered = new Set();
+    let anyCluster = false;
+    for (const c of clusters) {
+      const clusterKey = `${parentGroupKey}:fx:${c.id}`;
+      const sub = el('details', { className: 'group-fold taxonomy-cluster' });
+      const title = el('summary', {
+        className: 'taxonomy-cluster-summary is-renamable',
+        text: `${c.name} · ${c.indices.length} 维`,
+        title: '双击改名',
+      });
+      title.dataset.clusterId = c.id;
+      title.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._beginClusterRename(title, c);
+      });
+      // 避免双击时折叠来回切换
+      title.addEventListener('click', (e) => {
+        if (title.dataset.editing === '1') e.preventDefault();
+      });
+      sub.appendChild(title);
+
+      const inner = el('div', { className: 'slider-list compact' });
+      let any = false;
+      for (const idx of c.indices) {
+        if (idx < g.start || idx >= g.start + g.count) continue;
+        covered.add(idx);
+        const val = this.model.identity[idx] || 0;
+        const dirty = isModifiedCoeff(val);
+        if (this.showDirtyOnly && !dirty) continue;
+        any = true;
+        inner.appendChild(this._makeHeadIdentitySlider(idx));
       }
       if (!any) continue;
-      det.appendChild(inner);
-      if (this.showDirtyOnly) det.open = true;
+      anyCluster = true;
+      sub.appendChild(inner);
+      this._bindAdvGroupFold(sub, clusterKey);
+      wrap.appendChild(sub);
+    }
+
+    // 未入簇的维（理论上不应有）
+    const orphan = [];
+    for (let i = 0; i < g.count; i++) {
+      const idx = g.start + i;
+      if (!covered.has(idx)) orphan.push(idx);
+    }
+    if (orphan.length) {
+      const sub = el('details', { className: 'group-fold taxonomy-cluster' });
+      const orphanKey = `${parentGroupKey}:fx:orphan`;
+      sub.appendChild(el('summary', { text: `未分类 · ${orphan.length} 维` }));
+      const inner = el('div', { className: 'slider-list compact' });
+      let any = false;
+      for (const idx of orphan) {
+        const val = this.model.identity[idx] || 0;
+        const dirty = isModifiedCoeff(val);
+        if (this.showDirtyOnly && !dirty) continue;
+        any = true;
+        inner.appendChild(this._makeHeadIdentitySlider(idx));
+      }
+      if (any) {
+        anyCluster = true;
+        sub.appendChild(inner);
+        this._bindAdvGroupFold(sub, orphanKey);
+        wrap.appendChild(sub);
+      }
+    }
+
+    return anyCluster ? wrap : null;
+  }
+
+  _makeHeadIdentitySlider(idx) {
+    const builtIn = this._idLabelBuiltin(idx);
+    return this._makeSlider({
+      key: `id-all:${idx}`,
+      favKey: makeFavoriteKey('identity', idx),
+      labelStore: { section: 'identity', key: String(idx) },
+      defaultLabel: builtIn,
+      value: this.model.identity[idx] || 0,
+      ...pcaSliderRange('identity', idx),
+      dirty: isModifiedCoeff(this.model.identity[idx] || 0),
+      onInput: (v) => this.handlers.onIdentityParam?.(idx, v),
+      onReset: () => this.handlers.onIdentityParam?.(idx, 0)
+    });
+  }
+
+  _beginClusterRename(summaryEl, cluster) {
+    if (summaryEl.dataset.editing === '1') return;
+    summaryEl.dataset.editing = '1';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'taxonomy-cluster-edit';
+    input.value = cluster.name || '';
+    input.maxLength = 64;
+    const suffix = ` · ${cluster.indices.length} 维`;
+    summaryEl.textContent = '';
+    summaryEl.appendChild(input);
+    input.focus();
+    input.select();
+
+    let done = false;
+    const finish = async (commit) => {
+      if (done) return;
+      done = true;
+      delete summaryEl.dataset.editing;
+      const next = commit ? String(input.value || '').trim() : cluster.name;
+      if (commit) {
+        if (!next) {
+          summaryEl.textContent = `${cluster.name}${suffix}`;
+          alert('名称不能为空');
+          return;
+        }
+        try {
+          await renameIdentityCluster(cluster.id, next);
+          cluster.name = next;
+          summaryEl.textContent = `${next}${suffix}`;
+          this.handlers.onStatus?.(`已改名效果簇「${next}」`);
+        } catch (err) {
+          summaryEl.textContent = `${cluster.name}${suffix}`;
+          alert(err.message || String(err));
+        }
+        return;
+      }
+      summaryEl.textContent = `${cluster.name}${suffix}`;
+    };
+
+    input.addEventListener('click', (e) => e.stopPropagation());
+    input.addEventListener('mousedown', (e) => e.stopPropagation());
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        finish(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        finish(false);
+      }
+    });
+    input.addEventListener('blur', () => finish(true));
+  }
+
+  _buildAdvanced() {
+    this._syncAdvGroupOpenFromDom();
+    this.advBox.innerHTML = '';
+    // 保持原分组顺序：已修改就地标黄；不置顶、不从下方移除
+
+    for (const g of this.cfg.identityGroups) {
+      const groupKey = this._advGroupKey('id', g);
+      const det = el('details', { className: 'group-fold' });
+      det.appendChild(
+        el('summary', {
+          text: `${g.name} · ${g.count} 维（索引 ${g.start}–${g.start + g.count - 1}）`,
+        })
+      );
+
+      if (g.id === 'head') {
+        const headInner = this._buildHeadTaxonomy(g, groupKey);
+        if (!headInner) continue;
+        det.appendChild(headInner);
+      } else {
+        const inner = el('div', { className: 'slider-list compact' });
+        let any = false;
+        for (let i = 0; i < g.count; i++) {
+          const idx = g.start + i;
+          const val = this.model.identity[idx] || 0;
+          const dirty = isModifiedCoeff(val);
+          if (this.showDirtyOnly && !dirty) continue;
+          any = true;
+          const builtIn = this._idLabelBuiltin(idx);
+          inner.appendChild(
+            this._makeSlider({
+              key: `id-all:${idx}`,
+              favKey: makeFavoriteKey('identity', idx),
+              labelStore: { section: 'identity', key: String(idx) },
+              defaultLabel: builtIn,
+              value: val,
+              ...pcaSliderRange('identity', idx),
+              dirty,
+              onInput: (v) => this.handlers.onIdentityParam?.(idx, v),
+              onReset: () => this.handlers.onIdentityParam?.(idx, 0)
+            })
+          );
+        }
+        if (!any) continue;
+        det.appendChild(inner);
+      }
+
+      this._bindAdvGroupFold(det, groupKey);
       this.advBox.appendChild(det);
     }
 
     for (const g of this.cfg.expressionGroups) {
+      const groupKey = this._advGroupKey('ex', g);
       const det = el('details', { className: 'group-fold' });
       const end = Math.min(g.start + g.count - 1, this.model.expressionDim - 1);
       det.appendChild(
@@ -607,22 +1121,24 @@ export class ControlsUI {
         const dirty = isModifiedCoeff(val);
         if (this.showDirtyOnly && !dirty) continue;
         any = true;
+        const builtIn = this._exLabelBuiltin(idx);
         inner.appendChild(
           this._makeSlider({
             key: `ex-all:${idx}`,
-            label: this._exLabel(idx),
+            favKey: makeFavoriteKey('expression', idx),
+            labelStore: { section: 'expression', key: String(idx) },
+            defaultLabel: builtIn,
             value: val,
-            min: -3,
-            max: 3,
+            ...pcaSliderRange('expression', idx),
             dirty,
             onInput: (v) => this.handlers.onExpressionParam?.(idx, v),
-            onReset: () => this.handlers.onExpressionParam?.(idx, 0),
+            onReset: () => this.handlers.onExpressionParam?.(idx, 0)
           })
         );
       }
       if (!any) continue;
       det.appendChild(inner);
-      if (this.showDirtyOnly) det.open = true;
+      this._bindAdvGroupFold(det, groupKey);
       this.advBox.appendChild(det);
     }
 
@@ -631,14 +1147,14 @@ export class ControlsUI {
     }
   }
 
-  _idLabel(i) {
+  _idLabelBuiltin(i) {
     const raw = this.model.meta.identityNames?.[i] || `identity_${i}`;
     const probe = this.cfg.identityProbeLabels?.[String(i)];
     if (probe) return `身份 ${i} · ${probe}`;
     return `身份 ${i} · ${this._zhIdentity(raw)}`;
   }
 
-  _exLabel(i) {
+  _exLabelBuiltin(i) {
     const raw = this.model.meta.expressionNames?.[i] || `expression_${i}`;
     const probe = this.cfg.expressionProbeLabels?.[String(i)];
     if (probe) return `表情 ${i} · ${probe}`;
@@ -667,7 +1183,7 @@ export class ControlsUI {
   }
 
   markDirtyUI() {
-    if (this._dragging) return;
+    if (this._dragging || !this.showDirtyOnly) return;
     clearTimeout(this._rebuildTimer);
     this._rebuildTimer = setTimeout(() => {
       if (!this._dragging) this.rebuildLists();

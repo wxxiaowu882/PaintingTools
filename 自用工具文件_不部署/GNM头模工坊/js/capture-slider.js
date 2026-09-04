@@ -2,8 +2,8 @@
  * Tembrica-style slider: pointer capture so drag continues off-track / into 3D view.
  */
 export function createCaptureSlider({
-  min = -3,
-  max = 3,
+  min = -5,
+  max = 5,
   step = 0.01,
   value = 0,
   onInput,

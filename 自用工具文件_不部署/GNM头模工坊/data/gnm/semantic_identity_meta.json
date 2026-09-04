@@ -1,0 +1,56 @@
+{
+  "kind": "gnmWorkshopSemanticIdentityWeights",
+  "version": 1,
+  "source": "google/GNM identity_decoder_model.h5",
+  "latentDim": 64,
+  "conditionDim": 6,
+  "identityDim": 253,
+  "layerCount": 5,
+  "layers": [
+    {
+      "kernelShape": [
+        70,
+        64
+      ],
+      "biasShape": [
+        64
+      ]
+    },
+    {
+      "kernelShape": [
+        64,
+        128
+      ],
+      "biasShape": [
+        128
+      ]
+    },
+    {
+      "kernelShape": [
+        128,
+        256
+      ],
+      "biasShape": [
+        256
+      ]
+    },
+    {
+      "kernelShape": [
+        256,
+        512
+      ],
+      "biasShape": [
+        512
+      ]
+    },
+    {
+      "kernelShape": [
+        512,
+        253
+      ],
+      "biasShape": [
+        253
+      ]
+    }
+  ]
+}

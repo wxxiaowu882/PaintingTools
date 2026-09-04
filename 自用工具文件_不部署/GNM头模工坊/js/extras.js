@@ -10,6 +10,29 @@ export const STORAGE_EXPR_KEY = 'gnmWorkshop.commonExpressionIds.v3';
 export const STORAGE_DIRTY_ONLY = 'gnmWorkshop.showDirtyOnly.v1';
 export const STORAGE_EYE_SYNC = 'gnmWorkshop.eyeSync.v1';
 export const STORAGE_ACTIVE_TAB = 'gnmWorkshop.activeTab.v1';
+export const STORAGE_FAVORITES_KEY = 'gnmWorkshop.paramFavorites.v1';
+
+/** 系数为 1 时最大顶点位移 ≥ 1mm 的主维；其余为细微维。 */
+const MAIN_IDENTITY = new Set([
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 173, 174, 175,
+]);
+const MAIN_EXPRESSION = new Set([
+  0, 1, 2, 3, 100, 101, 102, 103, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 350, 351,
+  352, 353, 354, 355, 356, 357,
+]);
+
+export function isMainPcaDim(kind, index) {
+  const i = Number(index);
+  if (kind === 'identity') return MAIN_IDENTITY.has(i);
+  if (kind === 'expression') return MAIN_EXPRESSION.has(i);
+  return false;
+}
+
+/** 主维 ±5，细微维 ±15。 */
+export function pcaSliderRange(kind, index) {
+  const amp = isMainPcaDim(kind, index) ? 5 : 15;
+  return { min: -amp, max: amp };
+}
 
 export function createDefaultVisibility(componentCount) {
   return Array.from({ length: componentCount }, () => true);

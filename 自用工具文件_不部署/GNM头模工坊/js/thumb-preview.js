@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { normalizePositionsBottomCenter, TARGET_HEIGHT_M } from './viewport.js';
+import { GNMHeadModel } from './vendor/GNMModel.js';
 
 const MATERIAL_COLORS = [
   [0.85, 0.63, 0.51],
@@ -13,11 +14,20 @@ const MATERIAL_COLORS = [
 
 /**
  * Offscreen face thumbnails for identity / expression presets (Tembrica-style).
+ *
+ * 使用独立 GNMHeadModel（共享只读 sections），禁止改写主视口模型，
+ * 避免「生成缩略图」与「选身份 / 调参」竞态导致主模型被还原成旧系数。
  */
 export class ThumbPreviewer {
-  constructor(model, { size = 96 } = {}) {
-    this.model = model;
+  constructor(liveModel, { size = 96, sections } = {}) {
     this.size = size;
+    const secs = sections || liveModel._sections;
+    if (!secs) {
+      throw new Error('ThumbPreviewer 需要 GNM sections（勿复用主模型参数状态）');
+    }
+    // 独立参数状态；basis / template 等只读缓冲与主模型共享
+    this.model = new GNMHeadModel(liveModel.meta, secs);
+
     this.canvas = document.createElement('canvas');
     this.canvas.width = size;
     this.canvas.height = size;
@@ -41,20 +51,20 @@ export class ThumbPreviewer {
     key.position.set(0.4, 0.8, 0.6);
     this.scene.add(key);
 
-    this.positions = new Float32Array(model.numVertices * 3);
+    this.positions = new Float32Array(this.model.numVertices * 3);
     this.geometry = new THREE.BufferGeometry();
     this.posAttr = new THREE.BufferAttribute(this.positions, 3);
     this.geometry.setAttribute('position', this.posAttr);
-    const colors = new Float32Array(model.numVertices * 3);
-    const matId = model.materialId;
-    for (let i = 0; i < model.numVertices; i++) {
+    const colors = new Float32Array(this.model.numVertices * 3);
+    const matId = this.model.materialId;
+    for (let i = 0; i < this.model.numVertices; i++) {
       const c = MATERIAL_COLORS[matId[i] % MATERIAL_COLORS.length];
       colors[i * 3] = c[0];
       colors[i * 3 + 1] = c[1];
       colors[i * 3 + 2] = c[2];
     }
     this.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    this.geometry.setIndex(new THREE.BufferAttribute(model.triangles.slice(), 1));
+    this.geometry.setIndex(new THREE.BufferAttribute(this.model.triangles.slice(), 1));
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness: 0.62,
@@ -62,19 +72,6 @@ export class ThumbPreviewer {
     });
     this.mesh = new THREE.Mesh(this.geometry, mat);
     this.scene.add(this.mesh);
-
-    this._savedId = new Float32Array(model.identityDim);
-    this._savedEx = new Float32Array(model.expressionDim);
-  }
-
-  _snapshotParams() {
-    this._savedId.set(this.model.identity);
-    this._savedEx.set(this.model.expression);
-  }
-
-  _restoreParams() {
-    this.model.setIdentityVector(this._savedId);
-    this.model.setExpressionVector(this._savedEx);
   }
 
   _renderOnce() {
@@ -91,17 +88,12 @@ export class ThumbPreviewer {
    * @param {{ identity?: ArrayLike<number>, expression?: ArrayLike<number> }} pack
    */
   renderPack(pack) {
-    this._snapshotParams();
-    try {
-      if (pack.identity) this.model.setIdentityVector(Float32Array.from(pack.identity));
-      else this.model.resetIdentity();
-      if (pack.expression) this.model.setExpressionVector(Float32Array.from(pack.expression));
-      else this.model.resetExpression();
-      this.model.resetPose();
-      return this._renderOnce();
-    } finally {
-      this._restoreParams();
-    }
+    if (pack.identity) this.model.setIdentityVector(Float32Array.from(pack.identity));
+    else this.model.resetIdentity();
+    if (pack.expression) this.model.setExpressionVector(Float32Array.from(pack.expression));
+    else this.model.resetExpression();
+    this.model.resetPose();
+    return this._renderOnce();
   }
 
   dispose() {

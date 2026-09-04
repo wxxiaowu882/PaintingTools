@@ -139,6 +139,31 @@ export function peekMuscleMapFromGlb(arrayBuffer) {
   return null;
 }
 
+/**
+ * 烘焙包缺少映射表时的用户提示（区分：未选 map / 已选但无效 / 自动恢复缓存）。
+ * @param {{ mapFileSelected?: boolean, glbFileName?: string, fromCache?: boolean }} [opts]
+ */
+export function describeMissingBakeMapError(opts = {}) {
+  const { mapFileSelected, glbFileName, fromCache } = opts;
+  if (fromCache) {
+    return (
+      '上次缓存的烘焙包缺少映射表。\n\n' +
+      '请点「加载烘焙包」，在同一次选择中同时选中 GLB 与配套的 *_map.json（按住 Ctrl 多选）。'
+    );
+  }
+  if (mapFileSelected) {
+    return '所选 map.json 无法识别为映射表，请确认文件完整，且与 GLB 来自同一次「对齐叠显」烘焙导出。';
+  }
+  const name = glbFileName ? `「${glbFileName}」` : '该 GLB';
+  return (
+    `${name} 内未包含映射表。\n\n` +
+    '请重新点「加载烘焙包」，在同一次文件选择中同时选中：\n' +
+    '· *_baked.glb\n' +
+    '· 配套的 *_map.json（按住 Ctrl 多选两个文件）\n\n' +
+    '若从「对齐叠显」导出，会同时下载这两个文件；改色后导出的 GLB 需配原烘焙包的 map.json。'
+  );
+}
+
 export class EuroMuscleMap {
   /**
    * @param {object} opts
@@ -226,7 +251,14 @@ export class EuroMuscleMap {
     } else {
       mapJson = peekMuscleMapFromGlb(glbBuffer);
     }
-    if (!mapJson) throw new Error('未找到映射表（请同时选择 *_map.json 或使用含 extras 的烘焙 GLB）');
+    if (!mapJson) {
+      throw new Error(
+        describeMissingBakeMapError({
+          mapFileSelected: !!mapFile,
+          glbFileName: glbFile?.name,
+        })
+      );
+    }
     await this.loadPack(glbBuffer, mapJson);
   }
 

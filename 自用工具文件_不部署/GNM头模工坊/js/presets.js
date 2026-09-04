@@ -10,6 +10,7 @@ import {
   exportCustomIdentitiesFile,
   importCustomIdentitiesFile,
 } from './custom-identities.js';
+import { openIdentitySampleModal } from './identity-sample-modal.js';
 
 const PRESETS_BASE = './data/presets/';
 const PRESETS_CACHE = '20260831-asian11';
@@ -99,20 +100,80 @@ export async function mountPresetRail(bodyEl, opts) {
   const exList = document.createElement('div');
   exList.className = 'preset-rail-list';
 
+  const clearBuiltinSelectionSoft = () => {
+    idList
+      .querySelectorAll('.preset-chip:not(.preset-chip-custom).is-selected')
+      .forEach((c) => c.classList.remove('is-selected'));
+  };
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'preset-toolbar';
+  idList.appendChild(toolbar);
+
+  const semanticBtn = document.createElement('button');
+  semanticBtn.type = 'button';
+  semanticBtn.className = 'btn preset-toolbar-btn';
+  semanticBtn.title = '官方语义采样：性别/族裔预览确认后加入「我的身份」';
+  semanticBtn.textContent = '语义采样';
+
   const rndBtn = document.createElement('button');
   rndBtn.type = 'button';
-  rndBtn.className = 'preset-chip preset-chip-action preset-chip-rail';
-  rndBtn.title = '在合理范围内随机扰动身份维';
-  rndBtn.innerHTML =
-    '<span class="preset-swatch" style="background:#00d2ff"></span><span class="preset-chip-label">随机身份</span>';
+  rndBtn.className = 'btn preset-toolbar-btn';
+  rndBtn.title = '在合理范围内随机扰动身份维（噪声，非官方语义采样）';
+  rndBtn.textContent = '随机身份';
+
+  toolbar.appendChild(semanticBtn);
+  toolbar.appendChild(rndBtn);
+
+  let clearCustomSelection = () => {};
+  const customApi = mountCustomIdentitySection(idList, {
+    getModel: opts.getModel,
+    thumbPreviewer,
+    toolbarEl: toolbar,
+    onApply: (entry) => {
+      onIdentity?.({ name: entry.name, identity: entry.identity });
+      opts.onCustomSelected?.(entry.id);
+    },
+    onStatus,
+    clearBuiltinSelection: clearBuiltinSelectionSoft,
+  });
+  clearCustomSelection = () => customApi.clearSelection();
+
+  semanticBtn.addEventListener('click', async () => {
+    try {
+      await openIdentitySampleModal({
+        model: opts.getModel?.(),
+        onStatus,
+        onListRefresh: async () => {
+          await customApi.refresh();
+        },
+        onSelectCustom: async (id) => {
+          clearBuiltinSelectionSoft();
+          customApi.setSelectedId?.(id);
+          await customApi.refresh();
+        },
+        onConfirmed: (entry) => {
+          onIdentity?.({ name: entry.name, identity: entry.identity });
+          opts.onCustomSelected?.(entry.id);
+        },
+      });
+    } catch (err) {
+      alert(err.message || String(err));
+      onStatus?.(err.message || String(err));
+    }
+  });
   rndBtn.addEventListener('click', () => {
     clearCustomSelection();
     onRandomIdentity?.();
   });
-  idList.appendChild(rndBtn);
+
+  const railDivider = document.createElement('div');
+  railDivider.className = 'preset-rail-divider';
+  railDivider.setAttribute('role', 'separator');
+  railDivider.title = '我的身份 / 自带身份';
+  idList.appendChild(railDivider);
 
   const idChips = [];
-  let clearCustomSelection = () => {};
   for (const item of manifest.identities || []) {
     const chip = makeChip(item, async () => {
       clearCustomSelection();
@@ -136,22 +197,6 @@ export async function mountPresetRail(bodyEl, opts) {
   const note = document.createElement('p');
   note.className = 'preset-disclaimer';
   note.textContent = manifest.disclaimer || '统计采样，非真人';
-
-  const customApi = mountCustomIdentitySection(idList, {
-    getModel: opts.getModel,
-    thumbPreviewer,
-    onApply: (entry) => {
-      onIdentity?.({ name: entry.name, identity: entry.identity });
-      opts.onCustomSelected?.(entry.id);
-    },
-    onStatus,
-    clearBuiltinSelection: () => {
-      idList
-        .querySelectorAll('.preset-chip:not(.preset-chip-custom).is-selected')
-        .forEach((c) => c.classList.remove('is-selected'));
-    },
-  });
-  clearCustomSelection = () => customApi.clearSelection();
 
   idPanel.appendChild(idList);
   idPanel.appendChild(note.cloneNode(true));
@@ -212,8 +257,39 @@ export async function mountPresetRail(bodyEl, opts) {
  * 左侧身份栏：用户自定义身份（localStorage + 文件导入导出）。
  */
 export function mountCustomIdentitySection(listEl, opts) {
-  const { getModel, thumbPreviewer, onApply, onStatus, clearBuiltinSelection } = opts;
+  const { getModel, thumbPreviewer, onApply, onStatus, clearBuiltinSelection, toolbarEl } = opts;
   let selectedId = null;
+
+  const host = toolbarEl || listEl;
+
+  const btnNew = document.createElement('button');
+  btnNew.type = 'button';
+  btnNew.className = 'btn preset-toolbar-btn';
+  btnNew.title = '把当前头模存为新的自定义身份';
+  btnNew.textContent = '新建';
+  host.appendChild(btnNew);
+
+  const btnSave = document.createElement('button');
+  btnSave.type = 'button';
+  btnSave.className = 'btn preset-toolbar-btn';
+  btnSave.title = '覆盖保存当前选中的自定义身份';
+  btnSave.textContent = '保存';
+  btnSave.disabled = true;
+  host.appendChild(btnSave);
+
+  const btnExport = document.createElement('button');
+  btnExport.type = 'button';
+  btnExport.className = 'btn preset-toolbar-btn';
+  btnExport.title = '导出自定义身份 JSON';
+  btnExport.textContent = '导出';
+  host.appendChild(btnExport);
+
+  const btnImport = document.createElement('button');
+  btnImport.type = 'button';
+  btnImport.className = 'btn preset-toolbar-btn';
+  btnImport.title = '导入身份 JSON 文件';
+  btnImport.textContent = '导入';
+  host.appendChild(btnImport);
 
   const title = document.createElement('div');
   title.className = 'preset-section-title';
@@ -223,35 +299,6 @@ export function mountCustomIdentitySection(listEl, opts) {
   const customList = document.createElement('div');
   customList.className = 'preset-rail-list preset-custom-list';
   listEl.appendChild(customList);
-
-  const actions = document.createElement('div');
-  actions.className = 'preset-custom-actions';
-  listEl.appendChild(actions);
-
-  const btnNew = document.createElement('button');
-  btnNew.type = 'button';
-  btnNew.className = 'btn';
-  btnNew.textContent = '＋ 新建身份';
-  actions.appendChild(btnNew);
-
-  const btnSave = document.createElement('button');
-  btnSave.type = 'button';
-  btnSave.className = 'btn primary';
-  btnSave.textContent = '保存当前身份';
-  btnSave.disabled = true;
-  actions.appendChild(btnSave);
-
-  const btnExport = document.createElement('button');
-  btnExport.type = 'button';
-  btnExport.className = 'btn';
-  btnExport.textContent = '导出自定义身份';
-  actions.appendChild(btnExport);
-
-  const btnImport = document.createElement('button');
-  btnImport.type = 'button';
-  btnImport.className = 'btn';
-  btnImport.textContent = '导入身份文件';
-  actions.appendChild(btnImport);
 
   const syncSaveBtn = () => {
     btnSave.disabled = !selectedId;
@@ -278,7 +325,7 @@ export function mountCustomIdentitySection(listEl, opts) {
       const empty = document.createElement('p');
       empty.className = 'muted';
       empty.style.margin = '4px 2px 8px';
-      empty.textContent = '暂无，调好后点「新建身份」';
+      empty.textContent = '暂无，调好后点「新建」';
       customList.appendChild(empty);
       if (selectedId && !items.find((x) => x.id === selectedId)) {
         selectedId = null;
@@ -293,12 +340,15 @@ export function mountCustomIdentitySection(listEl, opts) {
           selectChip(chip, item.id);
           onApply?.(item);
         },
-        () => {
+        async () => {
           if (selectedId === item.id) {
             selectedId = null;
             syncSaveBtn();
           }
-          renderList();
+          await renderList();
+        },
+        (newName) => {
+          onStatus?.(`已改名「${newName}」（已写入磁盘 JSON）`);
         }
       );
       if (item.id === selectedId) chip.classList.add('is-selected');
@@ -336,7 +386,7 @@ export function mountCustomIdentitySection(listEl, opts) {
     onStatus?.(`已新建身份「${entry.name}」`);
   });
 
-  btnSave.addEventListener('click', () => {
+  btnSave.addEventListener('click', async () => {
     const model = getModel?.();
     if (!model || !selectedId) return;
     const cur = loadCustomIdentities().find((x) => x.id === selectedId);
@@ -348,9 +398,13 @@ export function mountCustomIdentitySection(listEl, opts) {
       alert('名称不能为空');
       return;
     }
-    updateCustomIdentity(selectedId, { name: trimmed, identity: model.identity });
-    renderList();
-    onStatus?.(`已保存身份「${trimmed}」`);
+    try {
+      await updateCustomIdentity(selectedId, { name: trimmed, identity: model.identity });
+      await renderList();
+      onStatus?.(`已保存身份「${trimmed}」`);
+    } catch (err) {
+      alert(err.message || String(err));
+    }
   });
 
   btnExport.addEventListener('click', () => {
@@ -428,39 +482,110 @@ function makeChip(item, onClick) {
   return btn;
 }
 
-function makeCustomChip(item, onClick, onDelete) {
+function makeCustomChip(item, onClick, onDelete, onRenamed) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'preset-chip preset-chip-rail preset-chip-custom';
   btn.dataset.customId = item.id;
-  btn.title = item.name;
+  btn.title = `${item.name}（双击改名）`;
   const sw = document.createElement('span');
   sw.className = 'preset-swatch';
   sw.style.background = '#6a8';
   const lab = document.createElement('span');
   lab.className = 'preset-chip-label';
   lab.textContent = item.name;
+  lab.title = '双击改名';
   const del = document.createElement('button');
   del.type = 'button';
   del.className = 'preset-chip-del';
   del.textContent = '×';
   del.title = '删除此身份';
-  del.addEventListener('click', (e) => {
+  del.addEventListener('click', async (e) => {
     e.stopPropagation();
     if (!confirm(`确定删除「${item.name}」？`)) return;
-    deleteCustomIdentity(item.id);
+    await deleteCustomIdentity(item.id);
     onDelete?.();
   });
+
+  const beginRename = () => {
+    if (lab.querySelector('input')) return;
+    const oldName = item.name;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'preset-chip-rename';
+    input.value = oldName;
+    input.maxLength = 64;
+    input.setAttribute('aria-label', '修改身份名称');
+    lab.textContent = '';
+    lab.appendChild(input);
+    input.focus();
+    input.select();
+
+    let finished = false;
+    const finish = async (commit) => {
+      if (finished) return;
+      finished = true;
+      const next = commit ? String(input.value || '').trim() : oldName;
+      if (commit) {
+        if (!next) {
+          lab.textContent = oldName;
+          alert('名称不能为空');
+          return;
+        }
+        if (next === oldName) {
+          lab.textContent = oldName;
+          return;
+        }
+        try {
+          await updateCustomIdentity(item.id, { name: next });
+          item.name = next;
+          lab.textContent = next;
+          lab.title = '双击改名';
+          btn.title = `${next}（双击改名）`;
+          onRenamed?.(next);
+        } catch (err) {
+          lab.textContent = oldName;
+          alert(err.message || String(err));
+        }
+        return;
+      }
+      lab.textContent = oldName;
+    };
+
+    input.addEventListener('click', (e) => e.stopPropagation());
+    input.addEventListener('mousedown', (e) => e.stopPropagation());
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        finish(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        finish(false);
+      }
+    });
+    input.addEventListener('blur', () => {
+      finish(true);
+    });
+  };
+
   btn.appendChild(sw);
   btn.appendChild(lab);
   btn.appendChild(del);
   btn.addEventListener('click', (e) => {
-    if (e.target === del) return;
+    if (e.target === del || e.target.closest?.('.preset-chip-del')) return;
+    if (lab.querySelector('input')) return;
     btn.parentElement
       ?.querySelectorAll('.preset-chip.is-selected')
       .forEach((c) => c.classList.remove('is-selected'));
     btn.classList.add('is-selected');
     onClick();
+  });
+  btn.addEventListener('dblclick', (e) => {
+    if (e.target === del || e.target.closest?.('.preset-chip-del')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    beginRename();
   });
   return btn;
 }

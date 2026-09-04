@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GNM 头模工坊</title>
-  <link rel="stylesheet" href="./css/workshop.css?v=20260831-workshop2" />
+  <link rel="stylesheet" href="./css/workshop.css?v=20260904-workshop28" />
   <script type="importmap">
   {
     "imports": {
@@ -62,7 +62,7 @@
         <input id="muscle-enable" type="checkbox" />
         欧版肌肉映射
       </label>
-      <button type="button" class="btn" id="btn-load-bake">加载烘焙包</button>
+      <button type="button" class="btn" id="btn-load-bake" title="同时选择 *_baked.glb 与 *_map.json（Ctrl 多选）">加载烘焙包</button>
       <input id="bake-pack-files" type="file" accept=".glb,.json,model/gltf-binary,application/json" multiple hidden />
       <label class="puppet-op">欧版
         <input id="muscle-opacity" type="range" min="0" max="100" value="75" />
@@ -79,7 +79,7 @@
         </select>
         <button type="button" class="btn" id="puppet-rebind">重绑路标</button>
       </details>
-      <span id="muscle-hint" class="puppet-hint">请从「对齐叠显」导出烘焙包（GLB 内已含映射表）后加载</span>
+      <span id="muscle-hint" class="puppet-hint">加载烘焙包时请同时选择 GLB 与 *_map.json（Ctrl 多选）</span>
     </div>
 
     <div id="main">
@@ -96,7 +96,12 @@
       <aside id="sidebar">
         <div id="sidebar-head">
           <h1>参数</h1>
+          <div class="param-label-actions">
+            <button type="button" class="btn-mini" id="btn-export-param-labels" title="导出当前自定义参数名称到 JSON 文件">导出名称</button>
+            <button type="button" class="btn-mini" id="btn-import-param-labels" title="从 JSON 文件导入参数名称">导入名称</button>
+          </div>
         </div>
+        <div id="param-labels-disk-status" class="param-labels-disk-status" aria-live="polite"></div>
         <div id="controls-root"></div>
         <div id="sidebar-actions" class="sidebar-actions">
           <button type="button" class="btn" id="btn-reset-identity">重置骨相</button>
@@ -114,6 +119,7 @@
   </div>
 
   <input id="custom-id-import" type="file" accept=".json,application/json" hidden />
-  <script type="module" src="./js/app.js?v=20260831-workshop3"></script>
+  <input id="param-labels-import" type="file" accept=".json,application/json" hidden />
+  <script type="module" src="./js/app.js?v=20260904-workshop28"></script>
 </body>
 </html>

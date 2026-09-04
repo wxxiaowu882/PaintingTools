@@ -1,0 +1,337 @@
+{
+  "kind": "gnmWorkshopIdentityTaxonomy",
+  "version": 1,
+  "updatedAt": "2026-09-04T11:11:13.342660+00:00",
+  "source": {
+    "k": 15,
+    "method": "ward magnitude maps P0",
+    "report": "scripts/_runs/identity-similarity-p0/REPORT.md"
+  },
+  "scope": {
+    "groupId": "head",
+    "start": 0,
+    "count": 170
+  },
+  "clusters": [
+    {
+      "id": "head_fx_01",
+      "name": "效果簇 01 · 整体体量 id0-5",
+      "defaultName": "效果簇 01 · 整体体量 id0-5",
+      "medoid": 2,
+      "indices": [
+        0,
+        1,
+        2,
+        3,
+        5
+      ],
+      "meanMagCos": 0.8417,
+      "regionHint": "眉/额"
+    },
+    {
+      "id": "head_fx_02",
+      "name": "效果簇 02 · id4-45（眉/口）",
+      "defaultName": "效果簇 02 · id4-45（眉/口）",
+      "medoid": 6,
+      "indices": [
+        4,
+        6,
+        7,
+        13,
+        16,
+        17,
+        18,
+        19,
+        21,
+        22,
+        42,
+        45
+      ],
+      "meanMagCos": 0.85196,
+      "regionHint": "眉/口"
+    },
+    {
+      "id": "head_fx_03",
+      "name": "效果簇 03 · id8-12（眉/额）",
+      "defaultName": "效果簇 03 · id8-12（眉/额）",
+      "medoid": 9,
+      "indices": [
+        8,
+        9,
+        12
+      ],
+      "meanMagCos": 0.91928,
+      "regionHint": "眉/额"
+    },
+    {
+      "id": "head_fx_04",
+      "name": "效果簇 04 · id10-44（眉/口）",
+      "defaultName": "效果簇 04 · id10-44（眉/口）",
+      "medoid": 29,
+      "indices": [
+        10,
+        11,
+        14,
+        25,
+        29,
+        33,
+        37,
+        43,
+        44
+      ],
+      "meanMagCos": 0.82593,
+      "regionHint": "眉/口"
+    },
+    {
+      "id": "head_fx_05",
+      "name": "效果簇 05 · id15-65（眉/口）",
+      "defaultName": "效果簇 05 · id15-65（眉/口）",
+      "medoid": 27,
+      "indices": [
+        15,
+        20,
+        24,
+        27,
+        28,
+        38,
+        47,
+        52,
+        65
+      ],
+      "meanMagCos": 0.82621,
+      "regionHint": "眉/口"
+    },
+    {
+      "id": "head_fx_06",
+      "name": "效果簇 06 · id23-34（眉/口）",
+      "defaultName": "效果簇 06 · id23-34（眉/口）",
+      "medoid": 34,
+      "indices": [
+        23,
+        26,
+        31,
+        34
+      ],
+      "meanMagCos": 0.84064,
+      "regionHint": "眉/口"
+    },
+    {
+      "id": "head_fx_07",
+      "name": "效果簇 07 · id30-74（眉/口）",
+      "defaultName": "效果簇 07 · id30-74（眉/口）",
+      "medoid": 61,
+      "indices": [
+        30,
+        35,
+        36,
+        39,
+        40,
+        46,
+        51,
+        55,
+        56,
+        61,
+        64,
+        74
+      ],
+      "meanMagCos": 0.83187,
+      "regionHint": "眉/口"
+    },
+    {
+      "id": "head_fx_08",
+      "name": "效果簇 08 · id32-85（眉/口）",
+      "defaultName": "效果簇 08 · id32-85（眉/口）",
+      "medoid": 50,
+      "indices": [
+        32,
+        49,
+        50,
+        53,
+        54,
+        57,
+        58,
+        62,
+        71,
+        77,
+        78,
+        85
+      ],
+      "meanMagCos": 0.83967,
+      "regionHint": "眉/口"
+    },
+    {
+      "id": "head_fx_09",
+      "name": "效果簇 09 · id41-102（眉/口）",
+      "defaultName": "效果簇 09 · id41-102（眉/口）",
+      "medoid": 41,
+      "indices": [
+        41,
+        48,
+        88,
+        101,
+        102
+      ],
+      "meanMagCos": 0.84082,
+      "regionHint": "眉/口"
+    },
+    {
+      "id": "head_fx_10",
+      "name": "效果簇 10 · id59-169（眉/额）",
+      "defaultName": "效果簇 10 · id59-169（眉/额）",
+      "medoid": 90,
+      "indices": [
+        59,
+        63,
+        69,
+        72,
+        87,
+        90,
+        98,
+        99,
+        106,
+        110,
+        117,
+        129,
+        149,
+        152,
+        154,
+        155,
+        165,
+        167,
+        169
+      ],
+      "meanMagCos": 0.82126,
+      "regionHint": "眉/额"
+    },
+    {
+      "id": "head_fx_11",
+      "name": "效果簇 11 · id60-161（眉/口）",
+      "defaultName": "效果簇 11 · id60-161（眉/口）",
+      "medoid": 105,
+      "indices": [
+        60,
+        67,
+        70,
+        80,
+        93,
+        105,
+        111,
+        113,
+        115,
+        125,
+        127,
+        130,
+        131,
+        132,
+        136,
+        137,
+        139,
+        141,
+        146,
+        148,
+        156,
+        157,
+        158,
+        159,
+        161
+      ],
+      "meanMagCos": 0.82214,
+      "regionHint": "眉/口"
+    },
+    {
+      "id": "head_fx_12",
+      "name": "效果簇 12 · id66-135（眉/口）",
+      "defaultName": "效果簇 12 · id66-135（眉/口）",
+      "medoid": 66,
+      "indices": [
+        66,
+        68,
+        73,
+        75,
+        76,
+        79,
+        91,
+        97,
+        135
+      ],
+      "meanMagCos": 0.83596,
+      "regionHint": "眉/口"
+    },
+    {
+      "id": "head_fx_13",
+      "name": "效果簇 13 · id81-108（眉/口）",
+      "defaultName": "效果簇 13 · id81-108（眉/口）",
+      "medoid": 103,
+      "indices": [
+        81,
+        83,
+        84,
+        86,
+        100,
+        103,
+        107,
+        108
+      ],
+      "meanMagCos": 0.82977,
+      "regionHint": "眉/口"
+    },
+    {
+      "id": "head_fx_14",
+      "name": "效果簇 14 · id82-168（眉/口）",
+      "defaultName": "效果簇 14 · id82-168（眉/口）",
+      "medoid": 114,
+      "indices": [
+        82,
+        89,
+        95,
+        114,
+        116,
+        118,
+        120,
+        134,
+        143,
+        144,
+        150,
+        160,
+        162,
+        164,
+        168
+      ],
+      "meanMagCos": 0.81884,
+      "regionHint": "眉/口"
+    },
+    {
+      "id": "head_fx_15",
+      "name": "效果簇 15 · id92-166（眉/口）",
+      "defaultName": "效果簇 15 · id92-166（眉/口）",
+      "medoid": 94,
+      "indices": [
+        92,
+        94,
+        96,
+        104,
+        109,
+        112,
+        119,
+        121,
+        122,
+        123,
+        124,
+        126,
+        128,
+        133,
+        138,
+        140,
+        142,
+        145,
+        147,
+        151,
+        153,
+        163,
+        166
+      ],
+      "meanMagCos": 0.82721,
+      "regionHint": "眉/口"
+    }
+  ]
+}

@@ -66,3 +66,4 @@ for (const asset of ASSETS) {
   console.log(`完成: ${dest}`);
 }
 console.log('GNM 基底准备完毕。');
+console.log('若需语义身份采样，请再运行: node scripts/prepare-semantic-identity.mjs');

@@ -1,0 +1,518 @@
+{
+  "kind": "gnmIdentitySimilarityP0Report",
+  "version": 2,
+  "createdAt": "2026-09-04T10:27:56.509615+00:00",
+  "meta": {
+    "kind": "gnmIdentityDisplacementFingerprints",
+    "version": 2,
+    "createdAt": "2026-09-04T10:27:53.254Z",
+    "sourceBin": "data/gnm/gnm_head_web.bin",
+    "headStart": 0,
+    "headCount": 170,
+    "amp": 2,
+    "component": "skin",
+    "skinVertexCount": 12466,
+    "signedFeatDim": 37398,
+    "magFeatDim": 12466,
+    "dtype": "float32",
+    "files": {
+      "signedNormalized": "fingerprints_pos.f32",
+      "magNormalized": "fingerprints_mag.f32",
+      "skinXyz": "skin_xyz.f32"
+    },
+    "clusteringNote": "PCA identity bases are nearly orthogonal in signed displacement space; primary clustering uses per-vertex magnitude maps (where the surface moves) + Ward linkage.",
+    "notes": [
+      "Full skin vertices (no coarse region pooling).",
+      "Signed field kept for diagnostics; mag field used for similarity clustering."
+    ]
+  },
+  "method": {
+    "fingerprint": "per-vertex displacement magnitude ||d|| on full skin, L2-normalized, amp=+2.0",
+    "whyNotSigned": "Identity PCA bases are nearly orthogonal in signed displacement; abs-cos max pair ~0.19.",
+    "similarity": "cosine of magnitude maps",
+    "linkage": "Ward (Euclidean on L2-normalized mag rows)",
+    "alsoSaved": "average linkage on 1-cos(mag) for contrast; signed abs-cos diagnostic",
+    "singletonRule": "max mag-cos neighbor < P5 (0.8455)"
+  },
+  "pairMagCos": {
+    "mean": 0.78734,
+    "median": 0.79934,
+    "p10": 0.72977,
+    "p90": 0.83509
+  },
+  "signedAbsCosDiagnostic": {
+    "mean": 0.01398,
+    "median": 0.01047,
+    "max": 0.18624,
+    "note": "Near-orthogonal PCA bases → very low; not used for clustering."
+  },
+  "singletonCandidates": [
+    {
+      "i": 79,
+      "maxMagCos": 0.84223,
+      "nearest": 97
+    },
+    {
+      "i": 106,
+      "maxMagCos": 0.84463,
+      "nearest": 129
+    },
+    {
+      "i": 130,
+      "maxMagCos": 0.84407,
+      "nearest": 107
+    },
+    {
+      "i": 143,
+      "maxMagCos": 0.83678,
+      "nearest": 125
+    },
+    {
+      "i": 144,
+      "maxMagCos": 0.82154,
+      "nearest": 125
+    },
+    {
+      "i": 145,
+      "maxMagCos": 0.84452,
+      "nearest": 151
+    },
+    {
+      "i": 153,
+      "maxMagCos": 0.83624,
+      "nearest": 96
+    },
+    {
+      "i": 162,
+      "maxMagCos": 0.84513,
+      "nearest": 161
+    },
+    {
+      "i": 167,
+      "maxMagCos": 0.84001,
+      "nearest": 6
+    }
+  ],
+  "cutStats": [
+    {
+      "k": 6,
+      "meanCohesion": 0.82544,
+      "singletonCount": 0,
+      "minClusterSize": 8,
+      "maxClusterSize": 82,
+      "sizeEntropyNorm": 0.82715
+    },
+    {
+      "k": 8,
+      "meanCohesion": 0.82738,
+      "singletonCount": 0,
+      "minClusterSize": 8,
+      "maxClusterSize": 59,
+      "sizeEntropyNorm": 0.88566
+    },
+    {
+      "k": 10,
+      "meanCohesion": 0.83886,
+      "singletonCount": 0,
+      "minClusterSize": 3,
+      "maxClusterSize": 59,
+      "sizeEntropyNorm": 0.8622
+    },
+    {
+      "k": 12,
+      "meanCohesion": 0.83808,
+      "singletonCount": 0,
+      "minClusterSize": 3,
+      "maxClusterSize": 34,
+      "sizeEntropyNorm": 0.92203
+    },
+    {
+      "k": 15,
+      "meanCohesion": 0.83822,
+      "singletonCount": 0,
+      "minClusterSize": 3,
+      "maxClusterSize": 25,
+      "sizeEntropyNorm": 0.94181
+    },
+    {
+      "k": 18,
+      "meanCohesion": 0.84256,
+      "singletonCount": 1,
+      "minClusterSize": 1,
+      "maxClusterSize": 25,
+      "sizeEntropyNorm": 0.92351
+    },
+    {
+      "k": 20,
+      "meanCohesion": 0.84154,
+      "singletonCount": 1,
+      "minClusterSize": 1,
+      "maxClusterSize": 23,
+      "sizeEntropyNorm": 0.93435
+    },
+    {
+      "k": 24,
+      "meanCohesion": 0.84145,
+      "singletonCount": 1,
+      "minClusterSize": 1,
+      "maxClusterSize": 17,
+      "sizeEntropyNorm": 0.95665
+    }
+  ],
+  "suggestion": {
+    "preferredKRange": [
+      10,
+      18
+    ],
+    "ranking": [
+      {
+        "k": 15,
+        "meanCohesion": 0.83822,
+        "singletonCount": 0,
+        "minClusterSize": 3,
+        "maxClusterSize": 25,
+        "sizeEntropyNorm": 0.94181,
+        "score": 0.81627
+      },
+      {
+        "k": 12,
+        "meanCohesion": 0.83808,
+        "singletonCount": 0,
+        "minClusterSize": 3,
+        "maxClusterSize": 34,
+        "sizeEntropyNorm": 0.92203,
+        "score": 0.80867
+      },
+      {
+        "k": 18,
+        "meanCohesion": 0.84256,
+        "singletonCount": 1,
+        "minClusterSize": 1,
+        "maxClusterSize": 25,
+        "sizeEntropyNorm": 0.92351,
+        "score": 0.79548
+      },
+      {
+        "k": 10,
+        "meanCohesion": 0.83886,
+        "singletonCount": 0,
+        "minClusterSize": 3,
+        "maxClusterSize": 59,
+        "sizeEntropyNorm": 0.8622,
+        "score": 0.76837
+      }
+    ],
+    "suggestedK": 15,
+    "note": "Heuristic on Ward(mag). Confirm via cluster lists before P1 naming."
+  },
+  "suggestedCut": {
+    "k": 15,
+    "clusters": [
+      {
+        "cluster": 5,
+        "size": 25,
+        "members": [
+          60,
+          67,
+          70,
+          80,
+          93,
+          105,
+          111,
+          113,
+          115,
+          125,
+          127,
+          130,
+          131,
+          132,
+          136,
+          137,
+          139,
+          141,
+          146,
+          148,
+          156,
+          157,
+          158,
+          159,
+          161
+        ],
+        "meanMagCos": 0.82214,
+        "minMagCos": 0.77015,
+        "medoid": 105
+      },
+      {
+        "cluster": 4,
+        "size": 23,
+        "members": [
+          92,
+          94,
+          96,
+          104,
+          109,
+          112,
+          119,
+          121,
+          122,
+          123,
+          124,
+          126,
+          128,
+          133,
+          138,
+          140,
+          142,
+          145,
+          147,
+          151,
+          153,
+          163,
+          166
+        ],
+        "meanMagCos": 0.82721,
+        "minMagCos": 0.76864,
+        "medoid": 94
+      },
+      {
+        "cluster": 7,
+        "size": 19,
+        "members": [
+          59,
+          63,
+          69,
+          72,
+          87,
+          90,
+          98,
+          99,
+          106,
+          110,
+          117,
+          129,
+          149,
+          152,
+          154,
+          155,
+          165,
+          167,
+          169
+        ],
+        "meanMagCos": 0.82126,
+        "minMagCos": 0.77354,
+        "medoid": 90
+      },
+      {
+        "cluster": 6,
+        "size": 15,
+        "members": [
+          82,
+          89,
+          95,
+          114,
+          116,
+          118,
+          120,
+          134,
+          143,
+          144,
+          150,
+          160,
+          162,
+          164,
+          168
+        ],
+        "meanMagCos": 0.81884,
+        "minMagCos": 0.76944,
+        "medoid": 114
+      },
+      {
+        "cluster": 10,
+        "size": 12,
+        "members": [
+          32,
+          49,
+          50,
+          53,
+          54,
+          57,
+          58,
+          62,
+          71,
+          77,
+          78,
+          85
+        ],
+        "meanMagCos": 0.83967,
+        "minMagCos": 0.79635,
+        "medoid": 50
+      },
+      {
+        "cluster": 12,
+        "size": 12,
+        "members": [
+          30,
+          35,
+          36,
+          39,
+          40,
+          46,
+          51,
+          55,
+          56,
+          61,
+          64,
+          74
+        ],
+        "meanMagCos": 0.83187,
+        "minMagCos": 0.7746,
+        "medoid": 61
+      },
+      {
+        "cluster": 13,
+        "size": 12,
+        "members": [
+          4,
+          6,
+          7,
+          13,
+          16,
+          17,
+          18,
+          19,
+          21,
+          22,
+          42,
+          45
+        ],
+        "meanMagCos": 0.85196,
+        "minMagCos": 0.80622,
+        "medoid": 6
+      },
+      {
+        "cluster": 2,
+        "size": 9,
+        "members": [
+          66,
+          68,
+          73,
+          75,
+          76,
+          79,
+          91,
+          97,
+          135
+        ],
+        "meanMagCos": 0.83596,
+        "minMagCos": 0.8101,
+        "medoid": 66
+      },
+      {
+        "cluster": 14,
+        "size": 9,
+        "members": [
+          10,
+          11,
+          14,
+          25,
+          29,
+          33,
+          37,
+          43,
+          44
+        ],
+        "meanMagCos": 0.82593,
+        "minMagCos": 0.75588,
+        "medoid": 29
+      },
+      {
+        "cluster": 15,
+        "size": 9,
+        "members": [
+          15,
+          20,
+          24,
+          27,
+          28,
+          38,
+          47,
+          52,
+          65
+        ],
+        "meanMagCos": 0.82621,
+        "minMagCos": 0.7503,
+        "medoid": 27
+      },
+      {
+        "cluster": 3,
+        "size": 8,
+        "members": [
+          81,
+          83,
+          84,
+          86,
+          100,
+          103,
+          107,
+          108
+        ],
+        "meanMagCos": 0.82977,
+        "minMagCos": 0.78874,
+        "medoid": 103
+      },
+      {
+        "cluster": 1,
+        "size": 5,
+        "members": [
+          41,
+          48,
+          88,
+          101,
+          102
+        ],
+        "meanMagCos": 0.84082,
+        "minMagCos": 0.81352,
+        "medoid": 41
+      },
+      {
+        "cluster": 9,
+        "size": 5,
+        "members": [
+          0,
+          1,
+          2,
+          3,
+          5
+        ],
+        "meanMagCos": 0.8417,
+        "minMagCos": 0.66864,
+        "medoid": 2
+      },
+      {
+        "cluster": 11,
+        "size": 4,
+        "members": [
+          23,
+          26,
+          31,
+          34
+        ],
+        "meanMagCos": 0.84064,
+        "minMagCos": 0.81172,
+        "medoid": 34
+      },
+      {
+        "cluster": 8,
+        "size": 3,
+        "members": [
+          8,
+          9,
+          12
+        ],
+        "meanMagCos": 0.91928,
+        "minMagCos": 0.88889,
+        "medoid": 9
+      }
+    ]
+  }
+}

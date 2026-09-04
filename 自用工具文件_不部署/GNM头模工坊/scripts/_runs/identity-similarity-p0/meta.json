@@ -1,0 +1,24 @@
+{
+  "kind": "gnmIdentityDisplacementFingerprints",
+  "version": 2,
+  "createdAt": "2026-09-04T10:27:53.254Z",
+  "sourceBin": "data/gnm/gnm_head_web.bin",
+  "headStart": 0,
+  "headCount": 170,
+  "amp": 2,
+  "component": "skin",
+  "skinVertexCount": 12466,
+  "signedFeatDim": 37398,
+  "magFeatDim": 12466,
+  "dtype": "float32",
+  "files": {
+    "signedNormalized": "fingerprints_pos.f32",
+    "magNormalized": "fingerprints_mag.f32",
+    "skinXyz": "skin_xyz.f32"
+  },
+  "clusteringNote": "PCA identity bases are nearly orthogonal in signed displacement space; primary clustering uses per-vertex magnitude maps (where the surface moves) + Ward linkage.",
+  "notes": [
+    "Full skin vertices (no coarse region pooling).",
+    "Signed field kept for diagnostics; mag field used for similarity clustering."
+  ]
+}

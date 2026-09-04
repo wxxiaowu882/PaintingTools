@@ -9,6 +9,7 @@
 - 完整身份（253）/ 表情（383）/ 姿态参数；右侧 Tab：骨相 / 表情 / 姿态 / 显示 / 全部
 - 常用骨相默认约 20 项（可配置）；张嘴等在「表情」Tab（下脸 PCA 配方，正向=张嘴）
 - 身份/表情预设在**左侧竖栏**（身份 / 表情 双 Tab + 滚动），带真实头像缩略图
+- **语义身份采样**：左侧「语义采样…」打开预览弹层（性别/族裔/混合/种子），确认后写入「我的身份」置顶
 - 主视口用 ResizeObserver 同步画布缓冲与显示比例，避免头模被拉伸变形
 - Tembrica 式滑条（指针捕获）：拖出侧栏 / 进入 3D 区不断档；单项重置；拖动中不重建列表
 - 导入带 `asset.extras.paintingtools.gnmHead` 的 GLB → 还原参数继续调；已修改项**就地标黄**（不置顶、不从列表移除）
@@ -23,9 +24,12 @@
 ```bash
 cd 自用工具文件_不部署/GNM头模工坊
 node scripts/prepare-gnm-assets.mjs
+node scripts/prepare-semantic-identity.mjs
 ```
 
 将下载约 34MB 的 `data/gnm/gnm_head_web.bin`（GNMW 全维 int8 基底，Apache-2.0）。该文件已 gitignore。
+
+语义采样另需 `semantic_identity_weights.bin` + `semantic_identity_meta.json`（官方 IdentitySampler decoder；需本机 Python3 + `numpy` `h5py`）。左侧「语义采样…」可预览后确认写入「我的身份」。
 
 ## 打开方式
 
