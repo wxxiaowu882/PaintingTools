@@ -71,6 +71,20 @@ const IDENTITY_TAXONOMY_BACKUP_DIR = path.join(
   'data',
   'identity-taxonomy-backups'
 );
+const GLB_DIR_HISTORY_PATH = path.join(
+  repoRoot,
+  '自用工具文件_不部署',
+  'GBL管理器',
+  'data',
+  'dir-history.json'
+);
+const GLB_DIR_HISTORY_BACKUP_DIR = path.join(
+  repoRoot,
+  '自用工具文件_不部署',
+  'GBL管理器',
+  'data',
+  'dir-history-backups'
+);
 
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -382,6 +396,34 @@ async function handleIdentityTaxonomyApi(req, res) {
   });
 }
 
+async function handleGlbDirHistoryApi(req, res) {
+  await handleJsonFileApi(req, res, {
+    filePath: GLB_DIR_HISTORY_PATH,
+    backupDir: GLB_DIR_HISTORY_BACKUP_DIR,
+    backupPrefix: 'dir-history',
+    buildPayload: (body) => {
+      const folders = Array.isArray(body.folders)
+        ? body.folders
+            .filter((f) => f && typeof f.path === 'string' && f.path.trim())
+            .map((f) => ({
+              id: String(f.id || `dir_${Date.now()}`),
+              path: String(f.path).trim().replace(/\//g, '\\'),
+              name: String(f.name || path.basename(String(f.path).trim()) || f.path).trim(),
+              lastUsed: Number(f.lastUsed) || Date.now(),
+            }))
+            .slice(0, 40)
+        : [];
+      return {
+        kind: 'glbManagerDirHistory',
+        version: Number(body.version) || 1,
+        updatedAt: new Date().toISOString(),
+        lastId: body.lastId ? String(body.lastId) : folders[0]?.id || null,
+        folders,
+      };
+    },
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const urlPath = (req.url || '/').split('?')[0];
@@ -403,6 +445,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (urlPath === '/__api/gnm-identity-taxonomy') {
       await handleIdentityTaxonomyApi(req, res);
+      return;
+    }
+    if (urlPath === '/__api/glb-dir-history') {
+      await handleGlbDirHistoryApi(req, res);
       return;
     }
 
@@ -436,4 +482,5 @@ server.listen(port, () => {
   console.log(`Custom identities API: POST/GET http://localhost:${port}/__api/gnm-custom-identities`);
   console.log(`Param favorites API: POST/GET http://localhost:${port}/__api/gnm-param-favorites`);
   console.log(`Identity taxonomy API: POST/GET http://localhost:${port}/__api/gnm-identity-taxonomy`);
+  console.log(`GLB dir history API: POST/GET http://localhost:${port}/__api/glb-dir-history`);
 });

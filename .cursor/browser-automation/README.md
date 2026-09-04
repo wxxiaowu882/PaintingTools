@@ -19,6 +19,7 @@
 3. 在 `Solid_Portrait_Create.html` 里，标注工具用原生 `#tool-mode-select` 切换，不要误判成自定义下拉。
 4. 经典引出线的正确动作是 `Alt+Shift+拖拽`，不是单击。
 5. 每个关键节点都截图到 `runs/`，任务结束后只保留有价值的最终证据，其余即时清理。
+6. GLB 管理器历史文件夹下拉：禁止按同名合并；每个历史项单独存句柄；切换必须强制重扫。自测：`npm run selftest:glb-dir-switch`（需先 `serve:repo`）。
 
 ## 新对话怎么直接用
 

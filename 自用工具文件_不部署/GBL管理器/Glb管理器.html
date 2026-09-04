@@ -17,6 +17,38 @@ button.danger:hover { background: #d9534f; color: #fff; }
 #btn-restore-dir { background: rgba(212, 175, 55, 0.15); border-color: var(--accent-gold); color: var(--accent-gold); }
 #btn-restore-dir:hover { background: var(--accent-gold); color: #000; }
 #btn-toggle-logs.has-error { background: #d9534f; color: #fff; border-color: #ff0000; animation: pulse 2s infinite; }
+.dir-history-row { display: flex; flex-direction: row; gap: 6px; align-items: stretch; }
+#dir-history-list { display: none !important; }
+#dir-history-select {
+  flex: 1; min-width: 0; width: auto; display: block !important;
+  background: #111; border: 1px solid #444; color: #00ffcc; border-radius: 4px;
+  padding: 6px 8px; font-size: 12px; outline: none; cursor: pointer;
+}
+#dir-history-select:focus { border-color: var(--theme-color); }
+#dir-history-select option { background: #1a1b22; color: #eaeaea; }
+#btn-remove-dir-history {
+  display: inline-block !important;
+  flex-shrink: 0;
+  width: auto;
+  min-width: 64px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  background: #c0392b !important;
+  border: 1px solid #ff6b5a !important;
+  color: #ffffff !important;
+  border-radius: 4px;
+}
+#btn-remove-dir-history:hover:not(:disabled) {
+  background: #e74c3c !important;
+  color: #fff !important;
+}
+#btn-remove-dir-history:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+}
+.dir-hist-item, .dir-hist-pick, .dir-hist-del { display: none !important; }
 #search-input { width: 100%; background: #111; border: 1px solid #444; color: #fff; border-radius: 4px; padding: 6px 10px; font-size: 11px; outline: none; transition: 0.2s; }
 #status-text { font-size: 10px; color: var(--text-sub); margin-top: 0px; word-break: break-all; }
 #tool-panel { padding: 6px 10px; border-bottom: 1px solid #333; background: #14151a; display: none; flex-direction: column; max-height: 40vh; overflow-y: auto; gap: 4px; }
@@ -42,8 +74,10 @@ button.danger:hover { background: #d9534f; color: #fff; }
 .delete-btn { background: #4a2020; color: #fff; border-color: #6a3030; } .delete-btn:hover { background: #d9534f; }
 #main-view { flex: 1; position: relative; background: #050508; display: flex; flex-direction: column; overflow: hidden; }
 #main-viewer { width: 100%; height: 100%; outline: none; }
+#matcap-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; z-index: 2; outline: none; touch-action: none; }
 #empty-state { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #444; font-size: 18px; letter-spacing: 2px; pointer-events: none; }
-#current-model-title { position: absolute; top: 20px; left: 30px; color: var(--theme-color); font-size: 18px; font-weight: 300; pointer-events: none; text-shadow: 0 2px 10px rgba(0,0,0,0.8); z-index: 5; }
+#current-model-title { position: absolute; top: 20px; left: 30px; color: var(--theme-color); font-size: 18px; font-weight: 300; pointer-events: none; text-shadow: 0 2px 10px rgba(0,0,0,0.8); z-index: 5; max-width: calc(100% - 220px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#model-height-disp { position: absolute; top: 48px; left: 30px; color: #00ffcc; font-size: 14px; font-family: monospace; font-weight: 500; pointer-events: none; text-shadow: 0 2px 10px rgba(0,0,0,0.8); z-index: 5; letter-spacing: 0.5px; display: none; }
 
 /* 视图浮动控制面板 */
 #view-controls { position: absolute; top: 20px; right: 30px; z-index: 10; display: none; flex-direction: column; gap: 8px; background: rgba(15, 16, 21, 0.85); border: 1px solid #333; border-radius: 6px; padding: 10px; backdrop-filter: blur(4px); box-shadow: 0 4px 15px rgba(0,0,0,0.5); min-width: 160px; }
@@ -71,7 +105,7 @@ button.danger:hover { background: #d9534f; color: #fff; }
 "imports": { "three": "./three.module.js", "three/addons/loaders/GLTFLoader.js": "./GLTFLoader.js", "three/addons/loaders/GLTFExporter.js": "./GLTFExporter.js",
 "three/addons/loaders/DRACOLoader.js": "./DRACOLoader.js", "/build/three.module.js": "./three.module.js", "../../../build/three.module.js": "./three.module.js" } } </script> </head> <body>
 <div id="global-loading"><div class="loading-spinner"></div><div id="loading-msg">处理中...</div></div>
-<div id="sidebar"> <div class="sidebar-header"> <div class="title-bar"> <h2>模型标准化仓库</h2> <div class="btn-group"> <button id="btn-select-dir" class="primary" title="点击选择本地文件夹">新文件夹</button> <button id="btn-restore-dir" style="display:none;">📂 恢复</button> <button id="btn-refresh" title="刷新列表">↻</button> <button id="btn-rebuild-thumbs" title="强制重建所有缩略图">🔄</button> <button id="btn-toggle-logs" title="查看日志">📋</button> </div> </div> <input type="text" id="search-input" placeholder="🔍 搜索模型名称..." list="search-suggestions"><datalist id="search-suggestions"></datalist> <div id="status-text">请选择本地 GLB 文件夹</div> </div>
+<div id="sidebar"> <div class="sidebar-header"> <div class="title-bar"> <h2>模型标准化仓库</h2> <div class="btn-group"> <button id="btn-select-dir" class="primary" title="点击选择本地文件夹">新文件夹</button> <button id="btn-restore-dir" style="display:none;">📂 恢复</button> <button id="btn-refresh" title="刷新列表">↻</button> <button id="btn-rebuild-thumbs" title="强制重建所有缩略图">🔄</button> <button id="btn-toggle-logs" title="查看日志">📋</button> </div> </div> <div class="dir-history-row"><select id="dir-history-select" title="已加载过的文件夹"><option value="">— 历史文件夹 —</option></select><button type="button" id="btn-remove-dir-history" title="删除当前选中的历史路径（不删磁盘文件）" disabled>删除</button><div id="dir-history-list" hidden></div></div> <input type="text" id="search-input" placeholder="🔍 搜索模型名称..." list="search-suggestions"><datalist id="search-suggestions"></datalist> <div id="status-text">请选择本地 GLB 文件夹</div> </div>
 <div id="tool-panel">
 <div id="panel-toggle" style="font-size:11px; color:var(--theme-color); text-align:center; cursor:pointer; padding-bottom:3px; border-bottom:1px solid #333; font-weight:bold; letter-spacing: 1px; transition: 0.2s;">▶ 展开调节面板</div>
 <div id="tool-panel-inner" style="display:none; flex-direction:column; gap:4px;">
@@ -123,7 +157,7 @@ button.danger:hover { background: #d9534f; color: #fff; }
 <button id="btn-export-save" class="primary" style="width:100%; padding:6px; font-weight:bold; font-size:12px; margin-top:2px;">⚡ 执行加工并另存为</button> </div> 
 </div> </div> <div id="model-grid"></div> </div>
 <div id="sidebar-resizer" title="拖动调整面板宽度"></div>
-<div id="main-view"> <div id="empty-state">请从左侧列表选择模型</div> <div id="current-model-title"></div> 
+<div id="main-view"> <div id="empty-state">请从左侧列表选择模型</div> <div id="current-model-title"></div> <div id="model-height-disp"></div> 
 <div id="view-controls">
     <button id="btn-send-to-editor" style="display:none; background:rgba(46,204,113,0.15); border:1px solid #2ecc71; color:#2ecc71; border-radius:4px; padding:8px 12px; cursor:pointer; font-size:13px; font-weight:bold; transition:0.2s; margin-bottom:4px;" onmouseover="this.style.background='#2ecc71'; this.style.color='#000';" onmouseout="this.style.background='rgba(46,204,113,0.15)'; this.style.color='#2ecc71';">🎯 将此模型发送到编辑器</button>
     <button id="btn-toggle-light">🌤️ 当前: 自然漫反射 (柔和)</button>
@@ -132,6 +166,9 @@ button.danger:hover { background: #d9534f; color: #fff; }
         <input type="range" id="slide-exposure" min="0.5" max="3" step="0.1" value="1.3" style="flex:1; accent-color: #d4af37; height:4px;">
         <span id="val-exposure" style="font-size:10px; color:#d4af37; width:20px; text-align:right;">1.3</span>
     </div>
+    <label id="prefer-pbr-wrap" style="display:flex; align-items:center; gap:6px; font-size:11px; color:#ccc; cursor:pointer; padding:4px 2px; user-select:none;" title="有 sfMatcap 标记时默认走 Matcap 直出；勾选后强制走 model-viewer PBR（灯光/曝光按钮生效）">
+        <input type="checkbox" id="check-prefer-pbr" style="accent-color:#00ffcc;"> 强制 PBR 预览
+    </label>
     <button id="btn-toggle-grid">🌐 隐藏坐标网格</button>
     <button id="btn-view-mode">🖱️ 当前: 旋转</button>
     <button id="btn-split-export" disabled>拆出并另存为 (已选 0)</button>
@@ -139,6 +176,7 @@ button.danger:hover { background: #d9534f; color: #fff; }
 <div id="progress-container"><div id="progress-bar"></div></div>
 <canvas id="split-overlay-canvas"></canvas>
 <div id="split-marquee"></div>
+<canvas id="matcap-canvas"></canvas>
 <model-viewer id="main-viewer" camera-controls tone-mapping="aces" shadow-intensity="1" style="display:none;"></model-viewer> </div>
 <div id="log-panel"> <div id="log-header"> <span style="color:var(--theme-color)">运行终端 (全局排错模式)</span> <div class="btn-group"><button id="btn-clear-logs">清空</button><button id="btn-copy-logs">复制全部</button><button id="btn-close-logs">关闭</button></div> </div> <div id="log-content"></div> </div>
 <div id="custom-prompt-overlay"><div id="custom-prompt-box"><div id="custom-prompt-title">重命名模型</div><select id="custom-prompt-select" style="background:#000; border:1px solid #444; color:#00ffcc; padding:6px; border-radius:4px; outline:none; font-size:12px; cursor:pointer;"><option value="">-- 选择预设名称 (可选) --</option></select><div class="input-wrapper"><input type="text" id="custom-prompt-input" autocomplete="off" spellcheck="false"><span class="input-suffix">.glb</span></div><div id="custom-prompt-btns"><button id="btn-prompt-cancel">取消</button><button id="btn-prompt-ok" class="primary">确定</button></div></div></div>
@@ -163,7 +201,475 @@ customElements.whenDefined('model-viewer').then(() => logDebug('🟢 model-viewe
 setTimeout(() => { if (!customElements.get('model-viewer')) logDebug('❌ model-viewer 脚本未加载，右侧预览会黑屏。请确认 Live Server 下 ../../../docs/js/model-viewer.min.js 可访问'); }, 2500); const runHeavyTask = async (msg, taskFn) => {
 const loader = document.getElementById('global-loading'); document.getElementById('loading-msg').innerText = msg; loader.style.display = 'flex';
 await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); try { await taskFn(); } catch(e) { logDebug(`❌ 任务崩溃 [${msg}]`, e); } finally { loader.style.display = 'none'; } };
-let currentDirHandle = null; let modelFiles = []; let activeModel = null; let db; let isGeneratingThumb = false; let thumbQueue = []; const dbName = "GLBStandardDB"; const initDB = () => new Promise(res => {
+let currentDirHandle = null; let currentDirHistoryId = null; let dirHistory = []; let modelFiles = []; let activeModel = null; let db; let isGeneratingThumb = false; let thumbQueue = []; const dbName = "GLBStandardDB";
+const dirHistorySelect = document.getElementById('dir-history-select');
+const btnRemoveDirHistory = document.getElementById('btn-remove-dir-history');
+/** 会话内句柄缓存（可丢）；权威路径列表在 data/dir-history.json */
+const dirHandleById = new Map();
+const DIR_HISTORY_JSON_URL = './data/dir-history.json';
+const DIR_HISTORY_LS_KEY = 'glbManager.dirHistory.v1';
+const DIR_HISTORY_API_URLS = [
+    '/__api/glb-dir-history',
+    'http://127.0.0.1:18080/__api/glb-dir-history',
+];
+const normalizeDirPath = (p) => String(p || '').trim().replace(/\//g, '\\').replace(/[\\\/]+$/, '');
+const basenameFromPath = (p) => {
+    const n = normalizeDirPath(p);
+    const parts = n.split('\\').filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : n;
+};
+const displayDirLabel = (entry) => entry.path || entry.name || entry.id;
+const idbGet = (key) => new Promise(res => {
+    if (!db) return res(null);
+    try {
+        const req = db.transaction('settings', 'readonly').objectStore('settings').get(key);
+        req.onsuccess = e => res(e.target.result);
+        req.onerror = () => res(null);
+    } catch (_) { res(null); }
+});
+const idbPut = (key, val) => new Promise(res => {
+    if (!db) return res(false);
+    try {
+        const req = db.transaction('settings', 'readwrite').objectStore('settings').put(val, key);
+        req.onsuccess = () => res(true);
+        req.onerror = (ev) => {
+            try { ev.preventDefault(); } catch (_) {}
+            res(false);
+        };
+    } catch (_) { res(false); }
+});
+const idbPutHandle = async (key, handle) => {
+    try { return await idbPut(key, handle); } catch (_) { return false; }
+};
+const foldersFromPayload = (data) => {
+    if (!data || !Array.isArray(data.folders)) return null;
+    return data.folders
+        .filter((f) => f && (f.path || f.name))
+        .map((f) => {
+            const name = String(f.name || basenameFromPath(f.path) || '').trim();
+            const pathStr = normalizeDirPath(f.path || name);
+            return {
+                id: String(f.id || `dir_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`),
+                path: pathStr,
+                name: name || pathStr,
+                lastUsed: Number(f.lastUsed) || 0,
+            };
+        })
+        .filter((f) => f.path || f.name);
+};
+const buildDirHistoryPayload = () => ({
+    kind: 'glbManagerDirHistory',
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    lastId: currentDirHistoryId || null,
+    folders: dirHistory.map(({ id, path: p, name, lastUsed }) => ({
+        id, path: p, name, lastUsed: lastUsed || Date.now(),
+    })),
+});
+const mirrorDirHistoryLocal = () => {
+    try { localStorage.setItem(DIR_HISTORY_LS_KEY, JSON.stringify(buildDirHistoryPayload())); } catch (_) {}
+};
+const writeDirHistoryFileHandle = async (fileHandle, payload) => {
+    const perm = await fileHandle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+        const req = await fileHandle.requestPermission({ mode: 'readwrite' });
+        if (req !== 'granted') throw new Error('未授权写入 dir-history.json');
+    }
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(payload, null, 2));
+    await writable.close();
+};
+/** 静默保存：本机镜像必写；API / 已授权文件能写就写，绝不弹窗 */
+const persistDirHistory = async () => {
+    const payload = buildDirHistoryPayload();
+    mirrorDirHistoryLocal();
+    await idbPut('dirHistoryMeta', payload);
+    for (const url of DIR_HISTORY_API_URLS) {
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json().catch(() => ({}));
+            if (data && data.ok === false) throw new Error(data.error || 'write failed');
+            logDebug(`💾 历史文件夹已写入 JSON（${dirHistory.length} 项）`);
+            return true;
+        } catch (_) {}
+    }
+    try {
+        const fileHandle = await idbGet('dirHistoryFile');
+        if (fileHandle) {
+            await writeDirHistoryFileHandle(fileHandle, payload);
+            logDebug(`💾 历史文件夹已写入 data/dir-history.json（${dirHistory.length} 项）`);
+            return true;
+        }
+    } catch (_) {}
+    return true; // 本机镜像已保存即可
+};
+const loadDirHistoryFromDisk = async () => {
+    const tryUrls = [DIR_HISTORY_JSON_URL, ...DIR_HISTORY_API_URLS];
+    let sawEmptyJson = false;
+    for (const url of tryUrls) {
+        try {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) continue;
+            const data = await res.json();
+            const folders = foldersFromPayload(data);
+            if (!folders) continue;
+            if (!folders.length) { sawEmptyJson = true; continue; }
+            dirHistory = folders;
+            dedupeDirHistoryByName();
+            if (data.lastId) currentDirHistoryId = String(data.lastId);
+            if (currentDirHistoryId && !dirHistory.some((d) => d.id === currentDirHistoryId)) {
+                currentDirHistoryId = dirHistory[0]?.id || null;
+            }
+            mirrorDirHistoryLocal();
+            logDebug(`📂 已从 JSON 加载 ${dirHistory.length} 条历史文件夹`);
+            return true;
+        } catch (_) {}
+    }
+    const tryLocal = (raw, label) => {
+        if (!raw) return false;
+        try {
+            const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            const folders = foldersFromPayload(data);
+            if (!folders || !folders.length) return false;
+            dirHistory = folders;
+            dedupeDirHistoryByName();
+            if (data.lastId) currentDirHistoryId = String(data.lastId);
+            if (currentDirHistoryId && !dirHistory.some((d) => d.id === currentDirHistoryId)) {
+                currentDirHistoryId = dirHistory[0]?.id || null;
+            }
+            logDebug(`📂 已从${label}恢复 ${dirHistory.length} 条历史文件夹`);
+            persistDirHistory();
+            return true;
+        } catch (_) { return false; }
+    };
+    try {
+        if (tryLocal(localStorage.getItem(DIR_HISTORY_LS_KEY), sawEmptyJson ? '本机镜像' : '本机镜像')) return true;
+    } catch (_) {}
+    const idbMeta = await idbGet('dirHistoryMeta');
+    if (tryLocal(idbMeta, '本地库')) return true;
+    logDebug('ℹ️ 未读到历史文件夹，将从空列表开始');
+    return false;
+};
+let dirSwitchSeq = 0;
+/** 同名文件夹只保留一条（取最近使用），避免下拉出现 model·xxxx 重复项 */
+const dedupeDirHistoryByName = () => {
+    const byKey = new Map();
+    const order = [...dirHistory].sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
+    for (const entry of order) {
+        const key = String(entry.name || basenameFromPath(entry.path) || '').trim().toLowerCase();
+        if (!key) continue;
+        if (!byKey.has(key)) {
+            byKey.set(key, entry);
+            continue;
+        }
+        const keep = byKey.get(key);
+        // 把手柄迁到保留项
+        const orphanHandle = entry.handle || dirHandleById.get(entry.id);
+        if (orphanHandle && !(keep.handle || dirHandleById.get(keep.id))) {
+            keep.handle = orphanHandle;
+            dirHandleById.set(keep.id, orphanHandle);
+        }
+        dirHandleById.delete(entry.id);
+        if (currentDirHistoryId === entry.id) currentDirHistoryId = keep.id;
+    }
+    dirHistory = [...byKey.values()].sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
+};
+const renderDirHistorySelect = (forceId = null) => {
+    dedupeDirHistoryByName();
+    const preferred = forceId || currentDirHistoryId || dirHistorySelect.value;
+    dirHistorySelect.innerHTML = '<option value="">— 历史文件夹 —</option>';
+    [...dirHistory].sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0)).forEach(entry => {
+        const op = document.createElement('option');
+        op.value = entry.id;
+        op.textContent = displayDirLabel(entry);
+        op.title = displayDirLabel(entry);
+        dirHistorySelect.appendChild(op);
+    });
+    if (preferred && dirHistory.some(d => d.id === preferred)) dirHistorySelect.value = preferred;
+    else if (currentDirHistoryId && dirHistory.some(d => d.id === currentDirHistoryId)) dirHistorySelect.value = currentDirHistoryId;
+    else dirHistorySelect.value = '';
+    btnRemoveDirHistory.disabled = !dirHistorySelect.value;
+};
+const addDirToHistory = async (handle) => {
+    if (!handle) return null;
+    const name = handle.name || '未命名';
+    for (const entry of dirHistory) {
+        const cached = entry.handle || dirHandleById.get(entry.id);
+        if (cached && typeof cached.isSameEntry === 'function') {
+            try {
+                if (await cached.isSameEntry(handle)) {
+                    entry.handle = handle;
+                    entry.name = name;
+                    entry.path = name;
+                    entry.lastUsed = Date.now();
+                    currentDirHistoryId = entry.id;
+                    dirHandleById.set(entry.id, handle);
+                    await idbPutHandle(`dirHandle:${entry.id}`, handle);
+                    dedupeDirHistoryByName();
+                    await persistDirHistory();
+                    renderDirHistorySelect(entry.id);
+                    return entry.id;
+                }
+            } catch (_) {}
+        }
+    }
+    // 同名即同一路径项：更新句柄，不新建
+    const sameName = dirHistory.find((d) => String(d.name || '').toLowerCase() === name.toLowerCase()
+        || String(basenameFromPath(d.path) || '').toLowerCase() === name.toLowerCase());
+    if (sameName) {
+        sameName.handle = handle;
+        sameName.name = name;
+        sameName.path = name;
+        sameName.lastUsed = Date.now();
+        currentDirHistoryId = sameName.id;
+        dirHandleById.set(sameName.id, handle);
+        await idbPutHandle(`dirHandle:${sameName.id}`, handle);
+        dedupeDirHistoryByName();
+        await persistDirHistory();
+        renderDirHistorySelect(sameName.id);
+        return sameName.id;
+    }
+    const id = `dir_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    dirHistory.unshift({ id, path: name, name, lastUsed: Date.now(), handle });
+    if (dirHistory.length > 40) dirHistory.length = 40;
+    currentDirHistoryId = id;
+    dirHandleById.set(id, handle);
+    await idbPutHandle(`dirHandle:${id}`, handle);
+    dedupeDirHistoryByName();
+    await persistDirHistory();
+    renderDirHistorySelect(currentDirHistoryId);
+    return currentDirHistoryId;
+};
+const connectDirectory = async (handle, historyId = null, options = {}) => {
+    if (!handle) return false;
+    const { resetPreview = true, switchToken = null } = options;
+    if (switchToken != null && switchToken !== dirSwitchSeq) {
+        logDebug(`ℹ️ 忽略过期的目录切换 (#${switchToken})`);
+        return false;
+    }
+    const searchInp = document.getElementById('search-input');
+    if (searchInp) searchInp.value = '';
+    if (resetPreview) {
+        activeModel = null;
+        processingScene = null;
+        if (typeof resetSplitSelectState === 'function') resetSplitSelectState();
+        document.getElementById('current-model-title').innerText = '';
+        if (typeof updateModelHeightDisp === 'function') updateModelHeightDisp();
+        mainViewer.style.display = 'none';
+        if (mainViewer.src && mainViewer.src.startsWith('blob:')) URL.revokeObjectURL(mainViewer.src.split('#')[0]);
+        mainViewer.src = '';
+        toolPanel.style.display = 'none';
+        const vc = document.getElementById('view-controls');
+        if (vc) vc.style.display = 'none';
+        document.getElementById('empty-state').style.display = 'block';
+    }
+    currentDirHandle = handle;
+    if (historyId) {
+        currentDirHistoryId = historyId;
+        const entry = dirHistory.find(d => d.id === historyId);
+        if (entry) {
+            entry.handle = handle;
+            entry.name = handle.name || entry.name;
+            entry.lastUsed = Date.now();
+            dirHandleById.set(historyId, handle);
+            await idbPutHandle(`dirHandle:${historyId}`, handle);
+            await persistDirHistory();
+        }
+    } else {
+        await addDirToHistory(handle);
+    }
+    if (switchToken != null && switchToken !== dirSwitchSeq) {
+        logDebug(`ℹ️ 扫描前发现更新的切换请求，中止本次扫描 (#${switchToken})`);
+        return false;
+    }
+    await idbPutHandle('lastDir', currentDirHandle);
+    const label = (dirHistory.find(d => d.id === currentDirHistoryId)?.name) || handle.name;
+    document.getElementById('btn-restore-dir').style.display = 'none';
+    document.getElementById('btn-select-dir').title = `当前已连接本地目录: [ ${label} ]`;
+    renderDirHistorySelect(currentDirHistoryId);
+    await scanDirectory();
+    if (switchToken != null && switchToken !== dirSwitchSeq) return false;
+    const st = document.getElementById('status-text');
+    if (st) st.innerText = `共 ${modelFiles.length} 个模型 · ${label}`;
+    return true;
+};
+const ensureHistoryHandle = async (entry) => {
+    let handle = entry.handle || dirHandleById.get(entry.id) || await idbGet(`dirHandle:${entry.id}`) || null;
+    if (handle) {
+        entry.handle = handle;
+        dirHandleById.set(entry.id, handle);
+        try {
+            const perm = await handle.queryPermission({ mode: 'readwrite' });
+            if (perm === 'granted') return handle;
+            const req = await handle.requestPermission({ mode: 'readwrite' });
+            if (req === 'granted') return handle;
+        } catch (_) {}
+    }
+    if (!window.showDirectoryPicker) return null;
+    // 每个历史项用独立 picker id，避免总是回到上一次选的同一个目录
+    try {
+        handle = await window.showDirectoryPicker({
+            id: `glb_hist_${entry.id}`,
+            mode: 'readwrite',
+        });
+    } catch (e) {
+        if (e.name !== 'AbortError') logDebug('❌ 重新选择文件夹失败', e);
+        return null;
+    }
+    entry.handle = handle;
+    entry.name = handle.name || entry.name;
+    dirHandleById.set(entry.id, handle);
+    await idbPutHandle(`dirHandle:${entry.id}`, handle);
+    return handle;
+};
+const loadDirFromHistory = async (id) => {
+    if (!id) return false;
+    const entry = dirHistory.find(d => d.id === id);
+    if (!entry) { logDebug('⚠️ 历史文件夹记录无效'); return false; }
+    const switchToken = ++dirSwitchSeq;
+    try {
+        const handle = await ensureHistoryHandle(entry);
+        if (switchToken !== dirSwitchSeq) return false;
+        if (!handle) {
+            logDebug('ℹ️ 未获得该文件夹访问权限');
+            document.getElementById('btn-restore-dir').style.display = 'inline-block';
+            currentDirHistoryId = id;
+            renderDirHistorySelect(id);
+            return false;
+        }
+        // 下拉切换必须强制重扫，不能因为 id 相同就跳过
+        const ok = await connectDirectory(handle, id, { resetPreview: true, switchToken });
+        if (ok) logDebug(`✅ 已切换至历史文件夹: ${displayDirLabel(entry)}（${modelFiles.length} 个模型）`);
+        return ok;
+    } catch (e) { logDebug('❌ 加载历史文件夹失败', e); return false; }
+};
+dirHistorySelect.onchange = () => {
+    btnRemoveDirHistory.disabled = !dirHistorySelect.value;
+    if (dirHistorySelect.value) loadDirFromHistory(dirHistorySelect.value);
+};
+const removeDirHistoryById = async (id) => {
+    if (!id) return false;
+    const entry = dirHistory.find(d => d.id === id);
+    const label = entry ? displayDirLabel(entry) : id;
+    const wasCurrent = currentDirHistoryId === id;
+    dirHistory = dirHistory.filter(d => d.id !== id);
+    dirHandleById.delete(id);
+    if (wasCurrent) {
+        currentDirHistoryId = null;
+        currentDirHandle = null;
+        modelFiles = [];
+        const g = document.getElementById('model-grid');
+        if (g) g.innerHTML = '';
+        try {
+            if (db) db.transaction('settings', 'readwrite').objectStore('settings').delete('lastDir');
+        } catch (_) {}
+        const st = document.getElementById('status-text');
+        if (st) st.innerText = '请选择本地 GLB 文件夹';
+        document.getElementById('empty-state').style.display = 'block';
+        document.getElementById('current-model-title').innerText = '';
+        if (typeof updateModelHeightDisp === 'function') updateModelHeightDisp();
+        mainViewer.style.display = 'none';
+        toolPanel.style.display = 'none';
+        const vc = document.getElementById('view-controls');
+        if (vc) vc.style.display = 'none';
+    }
+    await persistDirHistory();
+    renderDirHistorySelect(currentDirHistoryId || '');
+    logDebug(`🗑️ 已删除历史路径: ${label}`);
+    return true;
+};
+btnRemoveDirHistory.onclick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = dirHistorySelect.value;
+    if (!id) {
+        logDebug('ℹ️ 请先选中要删除的历史路径');
+        return;
+    }
+    await removeDirHistoryById(id);
+};
+
+/** 自动化测试：注入虚拟目录句柄，验证下拉切换会换模型列表 */
+window.__GLB_DIR_HISTORY_TEST__ = {
+    getState: () => ({
+        currentId: currentDirHistoryId,
+        selectValue: dirHistorySelect.value,
+        status: (document.getElementById('status-text') || {}).innerText || '',
+        history: dirHistory.map((d) => ({
+            id: d.id,
+            name: d.name,
+            path: d.path,
+            hasHandle: !!(d.handle || dirHandleById.get(d.id)),
+        })),
+        models: modelFiles.map((m) => m.fullPath || m.name),
+        modelCount: modelFiles.length,
+    }),
+    makeMockDir: (folderName, fileNames) => {
+        const files = (fileNames || []).map((n) => {
+            const name = n.endsWith('.glb') ? n : `${n}.glb`;
+            const blob = new Blob([new Uint8Array([0x67, 0x6c, 0x54, 0x46])], { type: 'model/gltf-binary' });
+            const file = new File([blob], name, { type: 'model/gltf-binary', lastModified: Date.now() });
+            const fileHandle = {
+                kind: 'file',
+                name,
+                getFile: async () => file,
+            };
+            return { name, fileHandle, file };
+        });
+        const handle = {
+            kind: 'directory',
+            name: folderName,
+            isSameEntry: async (other) => other === handle,
+            queryPermission: async () => 'granted',
+            requestPermission: async () => 'granted',
+            values: async function* () {
+                for (const f of files) yield f.fileHandle;
+            },
+            getFileHandle: async (n) => {
+                const hit = files.find((f) => f.name === n);
+                if (!hit) throw new Error('not found');
+                return hit.fileHandle;
+            },
+        };
+        return handle;
+    },
+    connectMock: async (folderName, fileNames) => {
+        const handle = window.__GLB_DIR_HISTORY_TEST__.makeMockDir(folderName, fileNames);
+        await connectDirectory(handle);
+        return window.__GLB_DIR_HISTORY_TEST__.getState();
+    },
+    selectById: async (id) => {
+        dirHistorySelect.value = id;
+        await loadDirFromHistory(id);
+        return window.__GLB_DIR_HISTORY_TEST__.getState();
+    },
+    removeById: async (id) => {
+        if (!id) return window.__GLB_DIR_HISTORY_TEST__.getState();
+        await removeDirHistoryById(id);
+        return window.__GLB_DIR_HISTORY_TEST__.getState();
+    },
+    resetHistory: async () => {
+        dirHistory = [];
+        dirHandleById.clear();
+        currentDirHistoryId = null;
+        currentDirHandle = null;
+        modelFiles = [];
+        const g = document.getElementById('model-grid');
+        if (g) g.innerHTML = '';
+        const st = document.getElementById('status-text');
+        if (st) st.innerText = '请选择本地 GLB 文件夹';
+        await persistDirHistory();
+        renderDirHistorySelect();
+        return window.__GLB_DIR_HISTORY_TEST__.getState();
+    },
+};
+
+const initDB = () => new Promise(res => {
 const req = indexedDB.open(dbName, 2);
 req.onupgradeneeded = e => { db = e.target.result; if(!db.objectStoreNames.contains('thumbs')) db.createObjectStore('thumbs', {keyPath: 'name'}); if(!db.objectStoreNames.contains('settings')) db.createObjectStore('settings'); };
 req.onsuccess = e => { db = e.target.result; res(); }; req.onerror = () => { logDebug("❌ IndexedDB 初始化失败"); res(); }; });
@@ -214,14 +720,20 @@ const slideExposure = document.getElementById('slide-exposure');
 const valExposure = document.getElementById('val-exposure');
 const exposureControl = document.getElementById('exposure-control');
 const btnToggleGrid = document.getElementById('btn-toggle-grid');
+const matcapCanvas = document.getElementById('matcap-canvas');
+let matcapPreview = null;
 
 let isStudioLight = localStorage.getItem('light_mode') === 'studio';
 let savedExp = localStorage.getItem('studio_exposure') || '1.3';
 let isGridVisible = localStorage.getItem('show_grid') !== 'false';
 
 slideExposure.value = savedExp; valExposure.innerText = savedExp;
-slideExposure.oninput = () => { valExposure.innerText = slideExposure.value; if(isStudioLight) mainViewer.setAttribute('exposure', slideExposure.value); };
-slideExposure.onchange = () => { localStorage.setItem('studio_exposure', slideExposure.value); };
+slideExposure.oninput = () => {
+    valExposure.innerText = slideExposure.value;
+    if (isStudioLight) mainViewer.setAttribute('exposure', slideExposure.value);
+    applyMatcapLightRig();
+};
+slideExposure.onchange = () => { localStorage.setItem('studio_exposure', slideExposure.value); applyMatcapLightRig(); };
 
 let studioEnvMap = null;
 const createStudioEnv = () => {
@@ -233,6 +745,27 @@ const createStudioEnv = () => {
     drawLight(512, 128, 150, 'rgba(220,220,220,1)', 'rgba(220,220,220,0)');   
     drawLight(512, 128, 150, 'rgba(220,220,220,1)', 'rgba(220,220,220,0)'); 
     return cvs.toDataURL('image/png');
+};
+/** Matcap 直出预览的灯：与「摄影棚/自然」按钮同步，避免按钮只改文案不改画面 */
+const applyMatcapLightRig = () => {
+    if (!matcapPreview || !matcapPreview.lights) return;
+    const L = matcapPreview.lights;
+    const exp = isStudioLight ? Math.max(0.5, parseFloat(slideExposure.value) || 1.3) : 1;
+    if (isStudioLight) {
+        L.hemi.intensity = 0.55 * exp;
+        L.key.intensity = 1.85 * exp;
+        L.fill.intensity = 0.35 * exp;
+        L.eye.intensity = 1.8 * exp;
+        L.key.position.set(2.8, 4.0, 3.2);
+        L.fill.position.set(-2.4, 0.6, 1.6);
+    } else {
+        L.hemi.intensity = 1.15;
+        L.key.intensity = 0.9;
+        L.fill.intensity = 0.5;
+        L.eye.intensity = 1.25;
+        L.key.position.set(2.2, 3.2, 4.0);
+        L.fill.position.set(-2.0, 1.2, 2.5);
+    }
 };
 const updateLightMode = () => {
     // 天坑：KHR_materials_transmission（角膜/玻璃壳）在无 environment-image 时会被 model-viewer 画成实心白壳。
@@ -254,9 +787,23 @@ const updateLightMode = () => {
         exposureControl.style.display = 'none';
     }
     localStorage.setItem('light_mode', isStudioLight ? 'studio' : 'natural');
+    applyMatcapLightRig();
 };
 toggleLightBtn.onclick = () => { isStudioLight = !isStudioLight; updateLightMode(); };
-updateLightMode(); 
+updateLightMode();
+
+const checkPreferPbr = document.getElementById('check-prefer-pbr');
+if (checkPreferPbr) {
+    checkPreferPbr.checked = localStorage.getItem('prefer_pbr_preview') === '1';
+    checkPreferPbr.onchange = async () => {
+        localStorage.setItem('prefer_pbr_preview', checkPreferPbr.checked ? '1' : '0');
+        if (activeModel) {
+            const card = document.querySelector('.model-card.active');
+            if (card) await previewModel(activeModel, card);
+        }
+    };
+}
+const shouldUseMatcapPreview = () => !(checkPreferPbr && checkPreferPbr.checked);
 
 const updateGridUI = () => {
     btnToggleGrid.innerText = isGridVisible ? "🌐 隐藏坐标网格" : "🌐 显示坐标网格";
@@ -317,7 +864,7 @@ const ensureSplitRenderer = () => {
     splitLights.name = 'SplitSelectLights';
     const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
     const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(1, 1, 1).normalize();
-    const fill = new THREE.DirectionalLight(0xffffff, 0.6); fill.position.set(-1, 0, 1).normalize();
+    const fill = new THREE.DirectionalLight(0xfff2ea, 0.75); fill.position.set(-1, 0, 1).normalize();
     splitLights.add(hemi, key, fill);
     splitSceneRoot.add(splitLights);
     splitRaycaster = new THREE.Raycaster();
@@ -877,6 +1424,19 @@ const center = new THREE.Vector3(); box.getCenter(center); mainViewer.setAttribu
 mainViewer.setAttribute('camera-target', `0m ${center.y}m 0m`); if (keepAngle && typeof mainViewer.getCameraOrbit === 'function') { const o = mainViewer.getCameraOrbit();
 mainViewer.setAttribute('camera-orbit', `${o.theta}rad ${o.phi}rad 1.7m`); } else { mainViewer.setAttribute('camera-orbit', `45deg 75deg 1.7m`); } };
 
+/** 右侧视图左上角：显示当前手术台模型的 Y 轴高度（cm），与「尺寸标准化」一致 */
+const updateModelHeightDisp = () => {
+    const el = document.getElementById('model-height-disp');
+    if (!el) return;
+    if (!processingScene || !processingScene.scene) { el.style.display = 'none'; el.innerText = ''; return; }
+    processingScene.scene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(processingScene.scene);
+    const hCm = (box.max.y - box.min.y) * 100;
+    if (!(hCm > 0) || !isFinite(hCm)) { el.style.display = 'none'; el.innerText = ''; return; }
+    el.innerText = `高度: ${hCm.toFixed(1)} cm`;
+    el.style.display = 'block';
+};
+
 let globalDracoLoader = null;
 const getDracoLoader = () => { 
     if (!globalDracoLoader) { 
@@ -889,7 +1449,7 @@ const getDracoLoader = () => {
 };
 const loadToThree = async (file, ctxName="未知") => { return new Promise(async (resolve, reject) => { logDebug(`⏳ [排查-GLTF] 开始读取文件流: ${ctxName}`);
 let isDone = false; const loadObj = { name: ctxName, reject: (err) => { if(!isDone){ isDone=true; reject(err); } } }; window.activeGltfLoads.add(loadObj);
-const timeoutId = setTimeout(() => { if(!isDone) { window.activeGltfLoads.delete(loadObj); logDebug(`🚨 [防挂死机制] 解析超时(30s)强制释放: ${ctxName}`); if(globalDracoLoader){ globalDracoLoader.dispose(); globalDracoLoader = null; } loadObj.reject(new Error("解析器无响应超时")); } }, 30000);
+const timeoutId = setTimeout(() => { if(!isDone) { window.activeGltfLoads.delete(loadObj); logDebug(`🚨 [防挂死机制] 解析超时(180s)强制释放: ${ctxName}`); if(globalDracoLoader){ globalDracoLoader.dispose(); globalDracoLoader = null; } loadObj.reject(new Error("解析器无响应超时")); } }, 180000);
 try { const loader = new GLTFLoader(); 
 loader.setDRACOLoader(getDracoLoader()); const arrayBuffer = await file.arrayBuffer(); logDebug(`⏳ [排查-GLTF] ArrayBuffer就绪，移交底层解析: ${ctxName}`); 
 loader.parse(arrayBuffer, '', (gltf) => { if(isDone) return; isDone=true; clearTimeout(timeoutId); window.activeGltfLoads.delete(loadObj); logDebug(`✅ [排查-GLTF] 解析成功: ${ctxName}`); resolve(gltf); }, (err) => { if(isDone) return; isDone=true; clearTimeout(timeoutId); window.activeGltfLoads.delete(loadObj); const errStr = (err && err.isTrusted) ? 'Web Worker加载拦截 (通常由于缺失 draco_wasm_wrapper.js 或 CDN 被墙)' : String(err); logDebug(`❌ [排查-GLTF] 解析失败 [${ctxName}]:`, errStr); reject(err); }); } catch (e) { if(isDone) return; isDone=true; clearTimeout(timeoutId); window.activeGltfLoads.delete(loadObj); logDebug(`❌ [排查-GLTF] 致命异常 [${ctxName}]:`, e); reject(e); } }); };
@@ -923,9 +1483,13 @@ focusCameraOnModel(true); await updateViewerFromThree(false); });
 
 const applyMaterialsAndPreview = async () => { if(!processingScene) return; const rOffset = parseFloat(document.getElementById('slide-rough').value);
 const mOffset = parseFloat(document.getElementById('slide-metal').value); const nScale = parseFloat(document.getElementById('slide-normal').value); processingScene.scene.traverse(node => {
-if(node.isMesh && node.material) { const mats = Array.isArray(node.material) ? node.material : [node.material]; mats.forEach(m => { if((m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) && m.userData.origRoughness !== undefined) {
+if(node.isMesh && node.material) { const mats = Array.isArray(node.material) ? node.material : [node.material]; mats.forEach(m => {
+if((m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) && m.userData.origRoughness !== undefined) {
 m.roughness = Math.max(0, Math.min(1, m.userData.origRoughness + rOffset)); m.metalness = Math.max(0, Math.min(1, m.userData.origMetalness + mOffset));
-if(m.normalScale && m.userData.origNormalScale) m.normalScale.copy(m.userData.origNormalScale).multiplyScalar(nScale); } }); } }); logDebug("🎨 材质已预览更新"); await updateViewerFromThree(true); };
+if(m.normalScale && m.userData.origNormalScale) m.normalScale.copy(m.userData.origNormalScale).multiplyScalar(nScale);
+} else if (m.isMeshMatcapMaterial && m.normalScale && m.userData.origNormalScale) {
+m.normalScale.copy(m.userData.origNormalScale).multiplyScalar(nScale);
+} }); } }); logDebug("🎨 材质已预览更新"); await updateViewerFromThree(true); };
 ['rough', 'metal', 'normal'].forEach(id => { const el = document.getElementById(`slide-${id}`); const valDisp = document.getElementById(`val-${id}`);
 el.oninput = () => { valDisp.innerText = el.value; }; el.onchange = () => runHeavyTask("正在重新编译材质...", async () => { await applyMaterialsAndPreview(); }); }); const toggleLights = async (update = true) => {
 if(!processingScene || !processingScene.userData.origLights) return; const remove = document.getElementById('check-remove-lights').checked; processingScene.userData.origLights.forEach(item => {
@@ -1004,8 +1568,309 @@ try {
     return glbBuffer;
 }
 };
+
+// --- Matcap 直出预览（Sketchfab 类材质：model-viewer 不支持 MeshMatcap，手术台内用 Three 直出）---
+// matcapCanvas / matcapPreview 已在顶部声明；此处不再重复 let
+const findSfMatcapTexture = (root) => {
+    let found = null;
+    root.traverse(node => {
+        if (!node.isMesh || !node.material) return;
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mats.forEach(m => {
+            const extras = m.extras || m.userData || {};
+            if (extras.sfEyeball) return; // 眼球 Matcap 不参与皮肤查找
+            if (extras.sfMatcap && m.emissiveMap) found = m.emissiveMap;
+            [m.map, m.emissiveMap, m.aoMap].forEach(t => {
+                if (!t) return;
+                const n = String(t.name || '').toLowerCase();
+                if (/skin_|matcap/.test(n) && !/gray|metal|wet|glass/.test(n)) found = t;
+            });
+        });
+    });
+    return found;
+};
+const findSfEyeballMatcapTexture = (root) => {
+    let found = null;
+    root.traverse(node => {
+        if (!node.isMesh || !node.material) return;
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mats.forEach(m => {
+            const extras = m.extras || m.userData || {};
+            if (!extras.sfEyeball) return;
+            if (extras.sfEyeballMatcap && m.emissiveMap) {
+                const n = String(m.emissiveMap.name || '').toLowerCase();
+                if (!/skin_|gray/.test(n)) found = m.emissiveMap;
+            }
+            [m.emissiveMap, m.map].forEach(t => {
+                if (!t) return;
+                const n = String(t.name || '').toLowerCase();
+                if (/skin_|gray/.test(n)) return;
+                if (/^(metal|wet|glass)/.test(n) || /(^|[_-])(metal|wet|glass)(\.|$)/.test(n)) found = t;
+            });
+        });
+    });
+    return found;
+};
+const tagSfSparsePatchMeshes = (root) => {
+    // 通用：补洞片默认隐藏（主网格 FrontSide 已补洞；可见时易 z-fight 成胸口黑斑）
+    if (!root) return 0;
+    let n = 0;
+    root.traverse(node => {
+        if (!node.isMesh || !node.material) return;
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        if (mats.some(m => (m.extras || m.userData || {}).sfSparsePatch)) {
+            node.visible = false;
+            n++;
+        }
+    });
+    return n;
+};
+const upgradeSfMatcapMaterials = (gltf) => {
+    if (!gltf || !gltf.scene) return false;
+    const matcapTex = findSfMatcapTexture(gltf.scene);
+    const eyeMatcapTex = findSfEyeballMatcapTexture(gltf.scene);
+    // 仅当存在皮肤 Matcap 贴图才进直出预览。PBR_Preview 已去掉 sfMatcap，只剩 sfEyeball 时
+    // 若仍进 Matcap 画布，摄影棚/曝光无效，且皮肤会落成错误着色。
+    if (!matcapTex) return false;
+    const nPatch = tagSfSparsePatchMeshes(gltf.scene);
+    if (nPatch) logDebug(`👁 补洞叠层×${nPatch}：默认隐藏（防胸口 z-fight 黑斑）`);
+    if (matcapTex) {
+        if ('colorSpace' in matcapTex) matcapTex.colorSpace = THREE.SRGBColorSpace;
+        else if ('encoding' in matcapTex) matcapTex.encoding = THREE.sRGBEncoding;
+        matcapTex.needsUpdate = true;
+    }
+    if (eyeMatcapTex) {
+        if ('colorSpace' in eyeMatcapTex) eyeMatcapTex.colorSpace = THREE.SRGBColorSpace;
+        else if ('encoding' in eyeMatcapTex) eyeMatcapTex.encoding = THREE.sRGBEncoding;
+        eyeMatcapTex.needsUpdate = true;
+    }
+    let nMatcap = 0, nEye = 0, nEyeMesh = 0;
+    gltf.scene.traverse(node => {
+        if (!node.isMesh || !node.material) return;
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        const next = mats.map(m => {
+            const extras = m.extras || m.userData || {};
+            if (extras.sfEyeball) {
+                let eye;
+                if (m.map) {
+                    if ('colorSpace' in m.map) m.map.colorSpace = THREE.SRGBColorSpace;
+                    else if ('encoding' in m.map) m.map.encoding = THREE.sRGBEncoding;
+                    m.map.needsUpdate = true;
+                    m.map.flipY = true;
+                    if ('wrapS' in m.map) { m.map.wrapS = THREE.ClampToEdgeWrapping; m.map.wrapT = THREE.ClampToEdgeWrapping; }
+                    m.map.needsUpdate = true;
+                    // Basic 直出虹膜贴图，避免 Lambert+灯把巩膜打成白环
+                    eye = new THREE.MeshBasicMaterial({
+                        map: m.map,
+                        color: new THREE.Color(1, 1, 1),
+                        // 双眼合并网格常有一侧绕序反，单面会整眼黑_void
+                        side: THREE.DoubleSide,
+                        transparent: false,
+                        depthWrite: true,
+                        polygonOffset: true,
+                        polygonOffsetFactor: -4,
+                        polygonOffsetUnits: -4
+                    });
+                } else {
+                    eye = new THREE.MeshPhongMaterial({
+                        color: new THREE.Color(0.2, 0.18, 0.17),
+                        specular: new THREE.Color(0.95, 0.95, 1),
+                        shininess: 220,
+                        side: THREE.FrontSide,
+                        transparent: false,
+                        depthWrite: true
+                    });
+                }
+                eye.name = m.name;
+                eye.userData.sfEyeball = true;
+                nEye++;
+                return eye;
+            }
+            const isMatcapMat = !!extras.sfMatcap || (matcapTex && m.emissiveMap && m.emissiveMap === matcapTex);
+            if (extras.sfSparsePatch && m.map) {
+                if ('colorSpace' in m.map) m.map.colorSpace = THREE.SRGBColorSpace;
+                else if ('encoding' in m.map) m.map.encoding = THREE.sRGBEncoding;
+                m.map.needsUpdate = true;
+                const bm = new THREE.MeshBasicMaterial({
+                    map: m.map,
+                    color: new THREE.Color(1, 1, 1),
+                    side: THREE.FrontSide,
+                    polygonOffset: true,
+                    polygonOffsetFactor: 2,
+                    polygonOffsetUnits: 2
+                });
+                bm.name = m.name;
+                bm.userData.sfSparsePatch = true;
+                nMatcap++;
+                return bm;
+            }
+            if (!isMatcapMat || !matcapTex) return m;
+            if (m.map) {
+                if ('colorSpace' in m.map) m.map.colorSpace = THREE.SRGBColorSpace;
+                else if ('encoding' in m.map) m.map.encoding = THREE.sRGBEncoding;
+                m.map.needsUpdate = true;
+            }
+            const mm = new THREE.MeshMatcapMaterial({
+                matcap: matcapTex,
+                map: m.map || null,
+                // 略提亮乘色，让底色 mottling 更能透出来（减轻纯黏土感）
+                color: new THREE.Color(1.03, 1.05, 1.06),
+                side: (m.side === THREE.BackSide) ? THREE.BackSide
+                    : ((m.side === THREE.DoubleSide || extras.doubleSided || m.doubleSided) ? THREE.DoubleSide : THREE.FrontSide),
+                transparent: false,
+                opacity: 1,
+                depthWrite: true
+            });
+            if (extras.sfSparsePatch) {
+                mm.userData.sfSparsePatch = true;
+            }
+            if (m.normalMap) {
+                mm.normalMap = m.normalMap;
+                mm.normalScale = m.normalScale ? m.normalScale.clone() : new THREE.Vector2(0.55, 0.55);
+                // 过强法线在柔光下像树杈深纹；Matcap 预览再压一档
+                if (mm.normalScale) mm.normalScale.multiplyScalar(0.45);
+            }
+            mm.name = m.name;
+            mm.userData.sfMatcap = true;
+            mm.userData.origNormalScale = mm.normalScale ? mm.normalScale.clone() : new THREE.Vector2(1, 1);
+            nMatcap++;
+            return mm;
+        });
+        node.material = Array.isArray(node.material) ? next : next[0];
+        const nm = Array.isArray(node.material) ? node.material : [node.material];
+        if (nm.some(m => m && m.userData && m.userData.sfEyeball)) {
+          nEyeMesh++;
+          // 通用：仅隐藏极小索引重复片（如 2 tri），不用顶点数判（左右眼常同 vc）
+          const ic = (node.geometry && node.geometry.index)
+            ? node.geometry.index.count
+            : ((node.geometry && node.geometry.attributes && node.geometry.attributes.position)
+              ? node.geometry.attributes.position.count / 3 : 0);
+          if (ic > 0 && ic < 64) node.visible = false;
+          node.renderOrder = 5;
+        }
+    });
+    if (nMatcap || nEye) logDebug(`✅ 预览升级: MeshMatcap×${nMatcap} + 湿润眼球×${nEye}（仅材质规则，不改几何）`);
+    return (nMatcap + nEye) > 0;
+};
+const stopMatcapPreview = () => {
+    if (!matcapPreview) return;
+    cancelAnimationFrame(matcapPreview.raf);
+    matcapCanvas.onpointerdown = null;
+    matcapCanvas.onpointermove = null;
+    matcapCanvas.onpointerup = null;
+    matcapCanvas.onwheel = null;
+    window.removeEventListener('resize', matcapPreview.onResize);
+    if (matcapPreview.renderer) matcapPreview.renderer.dispose();
+    matcapPreview = null;
+    matcapCanvas.style.display = 'none';
+};
+const startMatcapPreview = (preserveCamera = false) => {
+    if (!processingScene) return;
+    const prevOrbit = matcapPreview ? { theta: matcapPreview.theta, phi: matcapPreview.phi, dist: matcapPreview.dist } : null;
+    stopMatcapPreview();
+    mainViewer.style.display = 'none';
+    matcapCanvas.style.display = 'block';
+    const renderer = new THREE.WebGLRenderer({ canvas: matcapCanvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.sortObjects = true;
+    if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+    else if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.NoToneMapping;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x3a3a3a);
+    scene.add(processingScene.scene);
+    if (isGridVisible) scene.add(createHelpers().clone());
+    // Matcap 皮肤不需灯；sfEyeball 的 Phong 没灯会整球黑死（管理器黑洞根因）
+    const _mcHemi = new THREE.HemisphereLight(0xffffff, 0x555555, 1.15);
+    scene.add(_mcHemi);
+    const _mcKey = new THREE.DirectionalLight(0xffffff, 0.9);
+    _mcKey.position.set(2.2, 3.2, 4.0);
+    scene.add(_mcKey);
+    const _mcFill = new THREE.DirectionalLight(0xfff2ea, 0.5);
+    _mcFill.position.set(-2.0, 1.2, 2.5);
+    scene.add(_mcFill);
+    const _mcEye = new THREE.PointLight(0xffffff, 1.25, 40);
+    scene.add(_mcEye);
+    const camera = new THREE.PerspectiveCamera(28, 1, 0.01, 100);
+    const box = new THREE.Box3().setFromObject(processingScene.scene);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const radius = Math.max(size.x, size.y, size.z) * 0.55;
+    let theta = 0.35, phi = 1.35, dist = Math.max(radius * 5.0, 0.45);
+    if (preserveCamera && prevOrbit) {
+        theta = prevOrbit.theta; phi = prevOrbit.phi; dist = prevOrbit.dist;
+    }
+    const target = center.clone();
+    _mcEye.position.set(center.x + size.x * 0.06, center.y + size.y * 0.06, center.z - size.z * 0.75);
+    const syncCam = () => {
+        camera.position.set(
+            target.x + dist * Math.sin(phi) * Math.sin(theta),
+            target.y + dist * Math.cos(phi),
+            target.z + dist * Math.sin(phi) * Math.cos(theta)
+        );
+        camera.lookAt(target);
+    };
+    const onResize = () => {
+        const w = matcapCanvas.clientWidth || matcapCanvas.parentElement.clientWidth || 800;
+        const h = matcapCanvas.clientHeight || matcapCanvas.parentElement.clientHeight || 600;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / Math.max(1, h);
+        camera.updateProjectionMatrix();
+    };
+    onResize();
+    syncCam();
+    let dragging = false, lastX = 0, lastY = 0;
+    matcapCanvas.onpointerdown = (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; matcapCanvas.setPointerCapture(e.pointerId); };
+    matcapCanvas.onpointermove = (e) => {
+        if (!dragging) return;
+        theta -= (e.clientX - lastX) * 0.005;
+        phi = Math.max(0.15, Math.min(Math.PI - 0.15, phi + (e.clientY - lastY) * 0.005));
+        lastX = e.clientX; lastY = e.clientY;
+        if (matcapPreview) { matcapPreview.theta = theta; matcapPreview.phi = phi; }
+        syncCam();
+    };
+    matcapCanvas.onpointerup = (e) => { dragging = false; try { matcapCanvas.releasePointerCapture(e.pointerId); } catch (_) {} };
+    matcapCanvas.onwheel = (e) => { e.preventDefault(); dist = Math.max(radius * 1.2, Math.min(radius * 12, dist * (e.deltaY > 0 ? 1.08 : 0.92))); if (matcapPreview) matcapPreview.dist = dist; syncCam(); };
+    window.addEventListener('resize', onResize);
+    const applyOrbit = () => {
+        theta = matcapPreview.theta; phi = matcapPreview.phi; dist = matcapPreview.dist;
+        syncCam();
+    };
+    matcapPreview = {
+        renderer, scene, camera, raf: 0, onResize, theta, phi, dist,
+        lights: { hemi: _mcHemi, key: _mcKey, fill: _mcFill, eye: _mcEye },
+        setOrbit: (th, ph, d) => {
+            if (th != null) matcapPreview.theta = th;
+            if (ph != null) matcapPreview.phi = ph;
+            if (d != null) matcapPreview.dist = d;
+            applyOrbit();
+        }
+    };
+    applyMatcapLightRig();
+    const tick = () => {
+        // 允许外部改 matcapPreview.theta/phi/dist
+        theta = matcapPreview.theta; phi = matcapPreview.phi; dist = matcapPreview.dist;
+        syncCam();
+        renderer.render(scene, camera);
+        matcapPreview.raf = requestAnimationFrame(tick);
+    };
+    tick();
+    logDebug('🟢 Matcap 直出预览已启动（拖拽旋转 / 滚轮缩放）');
+};
+
 const updateViewerFromThree = (preserveCamera = true) => {
-return new Promise((resolve) => { if(!processingScene) return resolve(); try { if (preserveCamera && typeof mainViewer.getCameraOrbit === 'function') { const o = mainViewer.getCameraOrbit();
+return new Promise((resolve) => { if(!processingScene) return resolve();
+try {
+updateModelHeightDisp();
+if (processingScene.userData && processingScene.userData.sfMatcapPreview) {
+    startMatcapPreview(preserveCamera);
+    if (isBoxSelectMode && processingScene) { attachSplitSceneContent(); }
+    resolve();
+    return;
+}
+stopMatcapPreview();
+mainViewer.style.display = 'block';
+if (preserveCamera && typeof mainViewer.getCameraOrbit === 'function') { const o = mainViewer.getCameraOrbit();
 const t = mainViewer.getCameraTarget(); mainViewer.setAttribute('camera-orbit', `${o.theta}rad ${o.phi}rad ${o.radius}m`); mainViewer.setAttribute('camera-target', `${t.x}m ${t.y}m ${t.z}m`); }
 const exporter = new GLTFExporter(); const options = { binary: true }; 
 const texLimit = parseInt(document.getElementById('sel-tex-size').value); if(texLimit > 0) options.maxTextureSize = texLimit;
@@ -1163,7 +2028,7 @@ if (existingIdx > -1) {
     card.__modelData = newModel;
     card.onclick = (e) => { if(!e.target.closest('button')) previewModel(newModel, card); };
     card.querySelector('.rename-btn').onclick = async (e) => { e.stopPropagation(); const nn = await customPrompt("请输入新的模型名称:", newName); if (!nn || nn === newName) return; try { let finalNn = nn; if (modelFiles.some(f => f.name === finalNn)) { const d = new Date(); const ts = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0') + String(d.getSeconds()).padStart(2,'0'); finalNn = finalNn.replace(/\.glb$/i, `_${ts}.glb`); logDebug(`⚠️ 同名文件已存在，自动追加后缀 -> ${finalNn}`); } logDebug(`正在通过读写方式重命名: ${newFullPath} -> ${finalNn}`); const oldHandle = await targetParent.getFileHandle(newName); const oldFile = await oldHandle.getFile(); const buffer = await oldFile.arrayBuffer(); const newHandle = await targetParent.getFileHandle(finalNn, { create: true }); const writable = await newHandle.createWritable(); await writable.write(buffer); await writable.close(); await targetParent.removeEntry(newName); if(db) { const thumb = await getThumb(newFullPath); if(thumb) { const nfp = newFullPath.replace(newName, finalNn); await saveThumb(nfp, thumb.lastModified, thumb.dataUrl); db.transaction('thumbs','readwrite').objectStore('thumbs').delete(newFullPath); } } if(activeModel && activeModel.fullPath === newFullPath) activeModel = null; await scanDirectory(); logDebug(`✅ 重命名成功`); } catch (err) { logDebug("❌ 重命名失败", err); alert("重命名失败: " + err.message); } };
-    card.querySelector('.delete-btn').onclick = async (e) => { e.stopPropagation(); if (!confirm(`确定要永久删除模型文件【${newFullPath}】吗？`)) return; try { logDebug(`正在删除: ${newFullPath}`); await targetParent.removeEntry(newName); if(db) db.transaction('thumbs', 'readwrite').objectStore('thumbs').delete(newFullPath); if(activeModel && activeModel.fullPath === newFullPath) { activeModel = null; processingScene = null; resetSplitSelectState(); document.getElementById('current-model-title').innerText = ''; mainViewer.style.display = 'none'; toolPanel.style.display = 'none'; viewControls.style.display = 'none'; document.getElementById('empty-state').style.display = 'block'; } card.remove(); modelFiles = modelFiles.filter(f => f.fullPath !== newFullPath); statusText.innerText = `共 ${modelFiles.length} 个模型`; updateSearchSuggestions(); logDebug(`✅ 删除成功`); } catch (err) { logDebug("❌ 删除失败", err); alert("删除失败: " + err.message); } };
+    card.querySelector('.delete-btn').onclick = async (e) => { e.stopPropagation(); if (!confirm(`确定要永久删除模型文件【${newFullPath}】吗？`)) return; try { logDebug(`正在删除: ${newFullPath}`); await targetParent.removeEntry(newName); if(db) db.transaction('thumbs', 'readwrite').objectStore('thumbs').delete(newFullPath); if(activeModel && activeModel.fullPath === newFullPath) { activeModel = null; processingScene = null; resetSplitSelectState(); document.getElementById('current-model-title').innerText = ''; updateModelHeightDisp(); mainViewer.style.display = 'none'; toolPanel.style.display = 'none'; viewControls.style.display = 'none'; document.getElementById('empty-state').style.display = 'block'; } card.remove(); modelFiles = modelFiles.filter(f => f.fullPath !== newFullPath); statusText.innerText = `共 ${modelFiles.length} 个模型`; updateSearchSuggestions(); logDebug(`✅ 删除成功`); } catch (err) { logDebug("❌ 删除失败", err); alert("删除失败: " + err.message); } };
     if(grid.children[newIdx]) grid.insertBefore(card, grid.children[newIdx]); else grid.appendChild(card);
     if(window.thumbObserver) window.thumbObserver.observe(card);
     newModel.thumbQueued = true;
@@ -1179,7 +2044,7 @@ async function walk(dirHandle, path = '') { for await (const entry of dirHandle.
 if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.glb')) { const file = await entry.getFile(); const fullPath = path ? `${path}/${entry.name}` : entry.name;
 modelFiles.push({ handle: entry, parent: dirHandle, file, name: entry.name, fullPath });
 } else if (entry.kind === 'directory') { await walk(entry, path ? `${path}/${entry.name}` : entry.name); } } }
-await walk(currentDirHandle); modelFiles.sort((a,b)=>a.fullPath.localeCompare(b.fullPath)); statusText.innerText = `共 ${modelFiles.length} 个模型`; renderGrid(); grid.scrollTop = prevScroll; const searchInp = document.getElementById('search-input'); if(searchInp && searchInp.value) searchInp.dispatchEvent(new Event('input')); } catch(e) { logDebug("❌ 扫描失败", e); } }
+await walk(currentDirHandle); modelFiles.sort((a,b)=>a.fullPath.localeCompare(b.fullPath)); statusText.innerText = `共 ${modelFiles.length} 个模型${currentDirHandle ? ' · ' + currentDirHandle.name : ''}`; renderGrid(); grid.scrollTop = prevScroll; const searchInp = document.getElementById('search-input'); if (searchInp && searchInp.value.trim()) searchInp.dispatchEvent(new Event('input')); } catch(e) { logDebug("❌ 扫描失败", e); } }
 
 const updateSearchSuggestions = () => { const counts = {}; modelFiles.forEach(m => { m.name.replace(/\.glb$/i,'').split('_').forEach(t => { const tk = t.trim(); if(tk && !/^\d+$/.test(tk) && tk.toLowerCase() !== 'std') counts[tk] = (counts[tk]||0)+1; }); }); const dl = document.getElementById('search-suggestions'); dl.innerHTML = ''; const presets = [...new Set(quickNames)]; const dynamicTags = Object.keys(counts).filter(k => !presets.includes(k)).sort((a,b)=>counts[b]-counts[a]).slice(0,15); [...presets, ...dynamicTags].forEach(w => { const op = document.createElement('option'); op.value = w; dl.appendChild(op); }); };
 
@@ -1194,7 +2059,7 @@ card.querySelector('.rename-btn').onclick = async (e) => { e.stopPropagation(); 
 card.querySelector('.delete-btn').onclick = async (e) => { e.stopPropagation(); if (!confirm(`确定要永久删除模型文件【${m.fullPath}】吗？\n此操作直接从磁盘删除文件，无法通过回收站恢复！`)) return; try { logDebug(`正在删除: ${m.fullPath}`);
 await m.parent.removeEntry(m.name); if(db) db.transaction('thumbs', 'readwrite').objectStore('thumbs').delete(m.fullPath);
 if(activeModel && activeModel.fullPath === m.fullPath) { activeModel = null; processingScene = null; resetSplitSelectState(); document.getElementById('current-model-title').innerText = '';
-mainViewer.style.display = 'none'; toolPanel.style.display = 'none'; viewControls.style.display = 'none'; document.getElementById('empty-state').style.display = 'block'; }
+updateModelHeightDisp(); mainViewer.style.display = 'none'; toolPanel.style.display = 'none'; viewControls.style.display = 'none'; document.getElementById('empty-state').style.display = 'block'; }
 card.remove(); modelFiles = modelFiles.filter(f => f.fullPath !== m.fullPath); statusText.innerText = `共 ${modelFiles.length} 个模型`; updateSearchSuggestions(); logDebug(`✅ 删除成功`); } catch (err) { logDebug("❌ 删除失败 (权限不足或占用)", err); alert("删除失败: " + err.message); } }; grid.appendChild(card);
 window.thumbObserver.observe(card); }); }
 
@@ -1216,7 +2081,7 @@ try {
 const gltf = await loadToThree(task.file, task.name); const scene = new THREE.Scene();
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0); hemiLight.position.set(0, 1, 0); scene.add(hemiLight);
 const keyLight = new THREE.DirectionalLight(0xffffff, 1.2); keyLight.position.set(1, 1, 1).normalize(); scene.add(keyLight);
-const fillLight = new THREE.DirectionalLight(0xffffff, 0.6); fillLight.position.set(-1, 0, 1).normalize(); scene.add(fillLight);
+const fillLight = new THREE.DirectionalLight(0xfff2ea, 0.75); fillLight.position.set(-1, 0, 1).normalize(); scene.add(fillLight);
 const backLight = new THREE.DirectionalLight(0xffffff, 0.8); backLight.position.set(0, 1, -1).normalize(); scene.add(backLight);
 
 const model = gltf.scene; scene.add(model);
@@ -1254,7 +2119,16 @@ mainViewer.style.display = 'block'; viewControls.style.display = 'flex'; documen
 resetSplitSelectState();
 await runHeavyTask(`正在调入解析引擎: ${model.fullPath}`, async () => { window.isThreeProcessing = true; if(mainViewer.src && mainViewer.src.startsWith('blob:')) URL.revokeObjectURL(mainViewer.src.split('#')[0]);
 mainViewer.src = ''; mainViewer.removeAttribute('scale'); try { const freshFile = await model.handle.getFile(); model.file = freshFile; logDebug(`📂 正在将 ${model.fullPath} 载入 Three.js 手术台...`); processingScene = await loadToThree(freshFile, model.fullPath);
-processingScene.userData = { origLights: [] }; processingScene.scene.traverse(node => { if(node.isLight) processingScene.userData.origLights.push({ parent: node.parent, light: node }); if(node.isMesh && node.material) {
+processingScene.userData = { origLights: [] };
+if (shouldUseMatcapPreview()) {
+    processingScene.userData.sfMatcapPreview = upgradeSfMatcapMaterials(processingScene);
+} else {
+    processingScene.userData.sfMatcapPreview = false;
+    if (findSfMatcapTexture(processingScene.scene)) {
+        logDebug('ℹ️ 已勾选「强制 PBR 预览」：跳过 Matcap 直出，走 model-viewer（摄影棚/曝光生效）');
+    }
+}
+processingScene.scene.traverse(node => { if(node.isLight) processingScene.userData.origLights.push({ parent: node.parent, light: node }); if(node.isMesh && node.material) {
 const mats = Array.isArray(node.material) ? node.material : [node.material]; mats.forEach(m => { if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) { if (m.userData.origRoughness === undefined) {
 m.userData.origRoughness = (m.roughness !== undefined && !isNaN(m.roughness)) ? m.roughness : 0.5; m.userData.origMetalness = (m.metalness !== undefined && !isNaN(m.metalness)) ? m.metalness : 0.0;
 if(m.normalScale) m.userData.origNormalScale = m.normalScale.clone(); } } }); } });
@@ -1263,16 +2137,148 @@ document.getElementById('orig-size-disp').innerText = `(物理原始尺寸: ${(s
 ['rough', 'metal'].forEach(id => { document.getElementById(`slide-${id}`).value = 0; document.getElementById(`val-${id}`).innerText = "0"; });
 document.getElementById('slide-normal').value = 1; document.getElementById('val-normal').innerText = "1"; await toggleLights(false); logDebug("🟢 手术台解析就绪，锁定物理中心并推送最终视图...");
 focusCameraOnModel(); await updateViewerFromThree(false); } catch(e) { logDebug("❌ 手术台载入彻底失败", e); } finally { window.isThreeProcessing = false; } }); }
-initDB().then(async () => { const reqDir = db.transaction('settings','readonly').objectStore('settings').get('lastDir'); reqDir.onsuccess = async (e) => {
-if(e.target.result) { currentDirHandle = e.target.result; document.getElementById('btn-select-dir').title = `当前已连接本地目录: [ ${currentDirHandle.name} ]`;
-if(await currentDirHandle.queryPermission({mode:'readwrite'}) === 'granted') await scanDirectory();
-else document.getElementById('btn-restore-dir').style.display='inline-block'; } }; }); document.getElementById('btn-select-dir').onclick = async () => {
+
+// --- Agent/自测：不经本地目录也能载入 ArrayBuffer（对照截图用）---
+window.__AGENT_LOAD_GLB_BUFFER__ = async (arrayBuffer, name = 'agent.glb') => {
+  const file = new File([arrayBuffer], name, { type: 'model/gltf-binary' });
+  document.getElementById('empty-state').style.display = 'none';
+  mainViewer.style.display = 'block';
+  viewControls.style.display = 'flex';
+  document.getElementById('current-model-title').innerText = name;
+  toolPanel.style.display = 'flex';
+  resetSplitSelectState();
+  await runHeavyTask(`Agent载入: ${name}`, async () => {
+    window.isThreeProcessing = true;
+    if (mainViewer.src && mainViewer.src.startsWith('blob:')) URL.revokeObjectURL(mainViewer.src.split('#')[0]);
+    mainViewer.src = '';
+    mainViewer.removeAttribute('scale');
+    try {
+      processingScene = await loadToThree(file, name);
+      processingScene.userData = { origLights: [] };
+      if (shouldUseMatcapPreview()) {
+        processingScene.userData.sfMatcapPreview = upgradeSfMatcapMaterials(processingScene);
+      } else {
+        processingScene.userData.sfMatcapPreview = false;
+      }
+      processingScene.scene.traverse(node => {
+        if (node.isLight) processingScene.userData.origLights.push({ parent: node.parent, light: node });
+        if (node.isMesh && node.material) {
+          const mats = Array.isArray(node.material) ? node.material : [node.material];
+          mats.forEach(m => {
+            if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+              if (m.userData.origRoughness === undefined) {
+                m.userData.origRoughness = (m.roughness !== undefined && !isNaN(m.roughness)) ? m.roughness : 0.5;
+                m.userData.origMetalness = (m.metalness !== undefined && !isNaN(m.metalness)) ? m.metalness : 0.0;
+                if (m.normalScale) m.userData.origNormalScale = m.normalScale.clone();
+              }
+            }
+          });
+        }
+      });
+      processingScene.scene.updateMatrixWorld(true);
+      await toggleLights(false);
+      focusCameraOnModel();
+      await updateViewerFromThree(false);
+    } finally {
+      window.isThreeProcessing = false;
+    }
+  });
+  window.__AGENT_PROCESSING_SCENE__ = processingScene;
+  window.__AGENT_MATCAP_PREVIEW__ = typeof matcapPreview !== 'undefined' ? matcapPreview : null;
+  return {
+    ok: !!processingScene,
+    matcap: !!(processingScene && processingScene.userData && processingScene.userData.sfMatcapPreview),
+  };
+};
+window.__AGENT_PROBE_MATERIALS__ = () => {
+  const root = window.__AGENT_PROCESSING_SCENE__;
+  if (!root || !root.scene) return { err: 'no scene' };
+  const eyes = [];
+  root.scene.traverse(node => {
+    if (!node.isMesh || !node.material) return;
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    mats.forEach(m => {
+      const ex = m.userData || {};
+      if (!(ex.sfEyeball || (m.extras && m.extras.sfEyeball))) return;
+      eyes.push({
+        name: node.name,
+        type: m.type,
+        hasMap: !!m.map,
+        mapName: m.map && m.map.name,
+        mapImg: !!(m.map && m.map.image),
+        mapW: m.map && m.map.image && m.map.image.width,
+        color: m.color && m.color.toArray(),
+        shininess: m.shininess,
+        specular: m.specular && m.specular.toArray(),
+        uv: !!(node.geometry && node.geometry.attributes && node.geometry.attributes.uv)
+      });
+    });
+  });
+  return { eyes, nEye: eyes.length };
+};
+
+window.__AGENT_SET_MATCAP_VIEW__ = (th, ph, d) => {
+  if (!matcapPreview || !matcapPreview.setOrbit) return false;
+  matcapPreview.setOrbit(th, ph, d);
+  return true;
+};
+
+initDB().then(async () => {
+    await loadDirHistoryFromDisk();
+    // 恢复每个历史项各自的目录句柄，避免切换时全落到 lastDir 那一个
+    for (const entry of dirHistory) {
+        const h = await idbGet(`dirHandle:${entry.id}`);
+        if (h) {
+            entry.handle = h;
+            dirHandleById.set(entry.id, h);
+        }
+    }
+    renderDirHistorySelect();
+    const lastHandle = await idbGet('lastDir');
+    if (!lastHandle) return;
+    let matchedId = null;
+    for (const entry of dirHistory) {
+        const h = entry.handle || dirHandleById.get(entry.id);
+        if (h && typeof h.isSameEntry === 'function') {
+            try {
+                if (await h.isSameEntry(lastHandle)) { matchedId = entry.id; break; }
+            } catch (_) {}
+        }
+    }
+    if (!matchedId && currentDirHistoryId && dirHistory.some(d => d.id === currentDirHistoryId)) {
+        matchedId = currentDirHistoryId;
+    }
+    if (!matchedId) {
+        for (const entry of dirHistory) {
+            if (entry.name === lastHandle.name || basenameFromPath(entry.path) === lastHandle.name) {
+                matchedId = entry.id;
+                break;
+            }
+        }
+    }
+    if (matchedId) {
+        const entry = dirHistory.find(d => d.id === matchedId);
+        if (entry) {
+            entry.handle = lastHandle;
+            dirHandleById.set(matchedId, lastHandle);
+            await idbPutHandle(`dirHandle:${matchedId}`, lastHandle);
+        }
+    }
+    currentDirHandle = lastHandle;
+    currentDirHistoryId = matchedId;
+    const label = (matchedId && dirHistory.find(d => d.id === matchedId)?.name) || lastHandle.name;
+    document.getElementById('btn-select-dir').title = `当前已连接本地目录: [ ${label} ]`;
+    renderDirHistorySelect(matchedId);
+    if (await lastHandle.queryPermission({ mode: 'readwrite' }) === 'granted') await scanDirectory();
+    else document.getElementById('btn-restore-dir').style.display = 'inline-block';
+}); document.getElementById('btn-select-dir').onclick = async () => {
 if (!window.showDirectoryPicker) { alert("当前浏览器不支持或处于非安全环境。"); return; }
-logDebug("📂 尝试打开文件夹选择器..."); try { currentDirHandle = await window.showDirectoryPicker({id: 'glb_manager_repo', mode:'readwrite'});
-if(db) db.transaction('settings','readwrite').objectStore('settings').put(currentDirHandle, 'lastDir');
-document.getElementById('btn-restore-dir').style.display='none'; document.getElementById('btn-select-dir').title = `当前已连接本地目录: [ ${currentDirHandle.name} ]`;
-await scanDirectory(); logDebug("✅ 文件夹已连接"); } catch (err) { if (err.name === 'AbortError') logDebug("ℹ️ 操作已取消"); else logDebug("❌ 选择文件夹失败", err); } };
-document.getElementById('btn-restore-dir').onclick = async () => { try { if(await currentDirHandle.requestPermission({mode:'readwrite'}) === 'granted') {
+logDebug("📂 尝试打开文件夹选择器..."); try {
+const handle = await window.showDirectoryPicker({id: 'glb_manager_repo', mode:'readwrite'});
+await connectDirectory(handle);
+logDebug("✅ 文件夹已连接"); } catch (err) { if (err.name === 'AbortError') logDebug("ℹ️ 操作已取消"); else logDebug("❌ 选择文件夹失败", err); } };
+document.getElementById('btn-restore-dir').onclick = async () => { try { if(!currentDirHandle) return;
+if(await currentDirHandle.requestPermission({mode:'readwrite'}) === 'granted') {
 document.getElementById('btn-restore-dir').style.display='none'; await scanDirectory(); } } catch(e) { logDebug("❌ 恢复权限失败", e); } };
 const searchInp = document.getElementById('search-input');
 searchInp.addEventListener('input', (e) => { const term = e.target.value.toLowerCase(); document.querySelectorAll('.model-card').forEach(card => { const name = card.querySelector('.model-name').innerText.toLowerCase(); card.style.display = name.includes(term) ? 'flex' : 'none'; }); });
