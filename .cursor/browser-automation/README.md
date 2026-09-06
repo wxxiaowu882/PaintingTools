@@ -19,7 +19,15 @@
 3. 在 `Solid_Portrait_Create.html` 里，标注工具用原生 `#tool-mode-select` 切换，不要误判成自定义下拉。
 4. 经典引出线的正确动作是 `Alt+Shift+拖拽`，不是单击。
 5. 每个关键节点都截图到 `runs/`，任务结束后只保留有价值的最终证据，其余即时清理。
-6. GLB 管理器历史文件夹下拉：禁止按同名合并；每个历史项单独存句柄；切换必须强制重扫。自测：`npm run selftest:glb-dir-switch`（需先 `serve:repo`）。
+6. GLB 管理器历史文件夹：下拉切换、同名合并、删除；卡片「复制到」仅可复制到其它历史文件夹，同名冲突自动加时间戳。自测：`npm run selftest:glb-dir-switch`（需先 `serve:repo`）。
+7. GLB 管理器「打开所在文件夹」：右侧预览区按钮，通过 `/__api/reveal-in-explorer` 调起资源管理器并选中当前 GLB。**禁止粘贴路径弹窗**；「新文件夹」走 `/__api/pick-folder` 一次选目录即记住完整路径。自测：`npm run selftest:glb-reveal`（隔离模式，不污染真实历史）。
+8. 肌肉标注换模（欧版 → 黄种人女 V8）：另存 `docs/json/结构_头骨骨点肌肉/03 肌肉详解_黄种人女V8.json`。先探测同索引是否真对应；若顶点已重排则改「旧世界坐标 → 新肌肉网格最近顶点」。Draco 用 `@gltf-transform/cli@4 copy` 解压。Playwright 对隐藏 `#file-input` 用 `state: 'attached'` 再 `setInputFiles`。自测：`npm run selftest:remap-muscle-v8`（需先 `serve:repo`）。
+9. 换模后若「点在脸上但聚焦却转到后脑勺」：多半是 **法线反了**（双面网格拉到内侧）。用 `npm run fix:muscle-v8-visual` 在浏览器里按原档案法线对准观看侧、对热点重拾射线写回 `pos/norm`；再用 `node scripts/visual-qa-muscle-v8.js` 点击列表聚焦抽检。
+10. 口周点位解剖纠偏：`node scripts/precise-repick-muscle-v8.js`（口轮匝肌锚点 + 手调偏移 + 近邻射线）；单点微调可用 `fix-dao-front.js` / `fix-dao-visual.js`。确认图务必用**正面**+斜视各一张，避免斜视投影误判高低。
+11. **AI 视觉定点（优先）**：先 `vision-audit-all-points.js` 出 23 张聚焦图目视；再按看图结论用 `vision-retouch-critical.js` / 浏览器点选写回。点选后法线必须「朝向当时相机」（列表聚焦用 `atan2(nx,nz)` / `acos(ny)`），否则会从下巴底/后脑看。口周高度以正面图为准；偏好命中更大 `+z`，避免点到底面。产物：`03 肌肉详解_黄种人女V8.json`（不覆盖原 `03 肌肉详解.json`）。
+12. **肌肉色块硬对齐（推荐最终）**：欧版与 V8 的 Deform **UV 岛共享**但配色不同、顶点索引不共享。正确做法：`uv-muscle-remap-v8-nongap.py`——原版点→最近 Deform 顶点取 UV→V8 同 UV 候选（左右各一）按原版左右选侧→避开灰缝/头皮色吸附到肌腹；再用 `fixed-view-muscle-qa.js` / `dual-muscle-qa.js` 固定视角验收（勿只靠列表法线聚焦）。须先 `@gltf-transform/cli@4 copy` 解压 GLB。
+
+13. **肌肉快照手机取景对齐**：生产端参考框用**光学裁切**（不缩视口，框外模型仍可见）。`model-viewer` 竖屏会自动拉大 FOV，消费端 `applySnapshot` 用 FOV 锁把 `getFieldOfView` 拉回生产真实视角。验收：`PORT=18080 node scripts/mobile-frame-match-verify.js`。
 
 ## 新对话怎么直接用
 

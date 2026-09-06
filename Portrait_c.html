@@ -134,7 +134,7 @@
     <div class="gallery-grid" id="gallery-grid">
       </div>
   </div>
-  <model-viewer id="workbench-viewer" camera-controls disable-tap tone-mapping="aces" interaction-prompt="none" interpolation-decay="200"></model-viewer>
+  <model-viewer id="workbench-viewer" camera-controls disable-tap tone-mapping="aces" interaction-prompt="none" interpolation-decay="200" min-field-of-view="5deg" max-field-of-view="60deg"></model-viewer>
   <svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true"> <defs> <filter id="filter-posterize"> <feComponentTransfer id="posterize-transfer">
   <feFuncR type="discrete" tableValues="0 1"/> <feFuncG type="discrete" tableValues="0 1"/>
   <feFuncB type="discrete" tableValues="0 1"/> </feComponentTransfer> </filter> </defs> </svg> <svg id="ink-overlay"></svg>
@@ -165,7 +165,7 @@
       courseConfig = [
           { name: '头骨详解', url: './docs/json/结构_头骨骨点肌肉/01 头骨详解.json' },
           { name: '骨点详解', url: './docs/json/结构_头骨骨点肌肉/02 骨点详解.json' }, // 请自行修改为真实的 json 路径
-          { name: '肌肉详解', url: './docs/json/结构_头骨骨点肌肉/03 肌肉详解.json' }
+          { name: '肌肉详解', url: './docs/json/结构_头骨骨点肌肉/03 肌肉详解_黄种人女V8.json' }
           
       ];
   } else if (libType === 'facial') {
@@ -251,6 +251,7 @@
   hitHotspot = true; break; } }
   if (isDoubleTap && !hitHotspot && !e.target.closest('#control-panel, #top-bar, #tour-controls, .custom-select-container')) { if(window.tourState.isActive) window.stopTour(); if (currentData) { currentData.pointsData.forEach(p => p.hidden = false);
   activePointId = null; window.currentSnapshotShowTextPoints = []; window._hasAppliedSnapshot = false; document.querySelectorAll('.list-item').forEach(n => n.classList.remove('active'));
+  _authoredSnapshotFovDeg = null; clearTimeout(_fovLockTimer);
   /* 双击空白：恢复课设朝向 + 当前安全区适配（不用 auto auto auto） */
   if (typeof fitCameraToSafeRect === 'function' && _courseCamera) { applyViewerLayout(); fitCameraToSafeRect(); }
   else { const v = document.querySelector('#workbench-viewer'); v.setAttribute('camera-target', 'auto auto auto'); v.setAttribute('camera-orbit', 'auto auto auto'); }
@@ -286,20 +287,25 @@
     const tourActive = viewer.classList.contains('tour-active');
     const drawerOpen = viewer.classList.contains('drawer-open');
     const panelVisible = panel && panel.style.display !== 'none' && getComputedStyle(panel).display !== 'none';
+    const snapStage = !!window._hasAppliedSnapshot
+      || (window.tourState && window.tourState.isActive && window.tourState.mode === 'snap');
     const vp = getViewportSize();
     let left = 0, top = 0, width = vp.w, height = vp.h;
-    if (tourActive) {
+    const MOBILE_TOP = 60, MOBILE_BOTTOM = 55, MOBILE_CHROME = MOBILE_TOP + MOBILE_BOTTOM;
+    if (tourActive && snapStage && isMobile) {
+      left = 0; top = 0; width = vp.w;
+      height = Math.max(220, vp.h - MOBILE_CHROME);
+    } else if (tourActive) {
       left = 0; top = 0; width = vp.w;
       height = Math.max(220, vp.h - (isMobile ? 160 : 180));
     } else if (isMobile) {
-      /* 真安全区：扣顶栏 + 底部把手/抽屉，几何中心才在「看得见」的那块 */
-      const topBar = 60, handleH = 55;
-      left = 0; top = topBar; width = vp.w;
+      /* 卡片弹出：播放器高度=卡片之上；收起：顶栏+底栏把手 */
+      left = 0; top = MOBILE_TOP; width = vp.w;
       if (drawerOpen && panelVisible) {
         const panelH = Math.max(panel.offsetHeight || 0, Math.round(vp.h * 0.35));
-        height = Math.max(220, vp.h - topBar - panelH);
+        height = Math.max(220, vp.h - MOBILE_TOP - panelH);
       } else {
-        height = Math.max(220, vp.h - topBar - handleH);
+        height = Math.max(220, vp.h - MOBILE_CHROME);
       }
     } else {
       const gap = 16, panelLeft = 30, panelW = 340, topBar = 80, bottomPad = 30, rightPad = 30;
@@ -477,6 +483,73 @@
     viewer.setAttribute('camera-target', targetStr);
     viewer.setAttribute('camera-orbit', orbitStr);
   }
+  /**
+   * model-viewer 在窄画幅会按 idealAspect 自动放大垂直 FOV。
+   * 生产端光学参考框按「宽屏上的真实 FOV」构图；手机端要把 getFieldOfView 拉回该值。
+   * 【硬规则】快照切换期间禁止 jumpCameraToGoal（含 MV 内部 resize 触发的 jump），否则镜头动画被掐。
+   */
+  let _authoredSnapshotFovDeg = null;
+  let _fovLockTimer = null;
+  let _blockSnapJumpUntil = 0;
+  let _snapJumpPatched = false;
+  function installSnapshotJumpGuard() {
+    if (_snapJumpPatched || !viewer || typeof viewer.jumpCameraToGoal !== 'function') return;
+    _snapJumpPatched = true;
+    const orig = viewer.jumpCameraToGoal.bind(viewer);
+    viewer.jumpCameraToGoal = function() {
+      if (window._hasAppliedSnapshot && Date.now() < _blockSnapJumpUntil) return;
+      return orig.apply(this, arguments);
+    };
+  }
+  installSnapshotJumpGuard();
+  function parseFovDegStr(s) {
+    if (s == null) return NaN;
+    if (typeof s === 'number') return s;
+    const m = String(s).trim().match(/^([-\d.]+)\s*(deg|rad)?$/i);
+    if (!m) return NaN;
+    const v = parseFloat(m[1]);
+    if (!Number.isFinite(v)) return NaN;
+    return (m[2] && m[2].toLowerCase() === 'rad') ? (v * 180 / Math.PI) : v;
+  }
+  function goalFovForWanted(wantDeg) {
+    const want = Number(wantDeg);
+    if (!Number.isFinite(want) || want <= 0) return want;
+    const aspect = viewer.clientWidth / Math.max(1, viewer.clientHeight);
+    let ideal = aspect;
+    try { if (typeof viewer.getIdealAspect === 'function') ideal = viewer.getIdealAspect() || aspect; } catch (_e) {}
+    if (!(ideal > aspect + 1e-4)) return want; /* 宽屏不放大 */
+    const halfWant = want * Math.PI / 360;
+    const halfGoal = Math.atan(Math.tan(halfWant) * aspect / ideal);
+    const goal = halfGoal * 360 / Math.PI;
+    return Math.max(5.05, Math.min(60, goal));
+  }
+  /** 只改 field-of-view 属性，绝不 jump；保留 orbit/target 缓动 */
+  function applySnapshotFovLock(wantDeg, opts) {
+    const want = parseFovDegStr(wantDeg);
+    if (!Number.isFinite(want) || want <= 0) return;
+    _authoredSnapshotFovDeg = want;
+    const goal = goalFovForWanted(want);
+    const nextStr = goal + 'deg';
+    const curStr = viewer.getAttribute('field-of-view') || '';
+    if (curStr !== nextStr) {
+      viewer.setAttribute('min-field-of-view', '5deg');
+      viewer.setAttribute('max-field-of-view', '60deg');
+      viewer.setAttribute('field-of-view', nextStr);
+    }
+    /* 布局变化后 MV 可能改写 FOV：动画窗口过后再单次轻校正，仍不 jump */
+    if (opts && opts.deferCorrect) {
+      clearTimeout(_fovLockTimer);
+      _fovLockTimer = setTimeout(() => {
+        if (!_authoredSnapshotFovDeg || !window._hasAppliedSnapshot) return;
+        let got = want;
+        try { got = viewer.getFieldOfView(); } catch (_e2) {}
+        if (Math.abs(got - want) <= 0.35) return;
+        const cur = parseFovDegStr(viewer.getAttribute('field-of-view')) || goal;
+        const next = Math.max(5.05, Math.min(60, cur * (want / Math.max(0.1, got))));
+        viewer.setAttribute('field-of-view', next + 'deg');
+      }, 650);
+    }
+  }
   function formatMetersVec(v) {
     if (!v || ![v.x, v.y, v.z].every(Number.isFinite)) return null;
     return `${v.x}m ${v.y}m ${v.z}m`;
@@ -514,11 +587,17 @@
   }
   function reframeViewport(delayMs, opts) {
     const delay = delayMs == null ? 50 : delayMs;
-    const skipFit = (opts && opts.skipFit) || (window.tourState && window.tourState.isActive);
+    /* 导览中 / 生产快照机位：禁止 fit 拉近，否则与标注工具构图对不上 */
+    const skipFit = (opts && opts.skipFit)
+      || (window.tourState && window.tourState.isActive)
+      || !!window._hasAppliedSnapshot;
     clearTimeout(_reframeTimer);
     _reframeTimer = setTimeout(() => {
       applyViewerLayout();
-      if (Date.now() < _annoPinUntil && _lastAnnoFly) {
+      if (window._hasAppliedSnapshot || (window.tourState && window.tourState.isActive && window.tourState.mode === 'snap')) {
+        /* 已锁定快照机位：只改布局 + FOV 锁，绝不 jump */
+        if (_authoredSnapshotFovDeg != null) applySnapshotFovLock(_authoredSnapshotFovDeg, { deferCorrect: true });
+      } else if (Date.now() < _annoPinUntil && _lastAnnoFly) {
         /* 点选后短时间内勿被 resize 打回课设机位；只按当前安全区重算远近 */
         const r = computeSafeRadiusForTarget(_lastAnnoFly.posStr, 'anno');
         const parts = _lastAnnoFly.orbitStr.trim().split(/\s+/);
@@ -537,7 +616,7 @@
   }
   const percentEl = document.getElementById('loading-percent'); viewer.addEventListener('progress', (e) => { if (percentEl && e.detail.totalProgress) {
   percentEl.innerText = Math.round(e.detail.totalProgress * 100) + '%'; } }); let currentData = null; let defaultColor = '#d4af37', defaultOpacity = '0.15';
-  let envSettings = { amb: 0.15, aT: 6500, aX: 0, aY: 90, spt: 0.8, sT: 4500, sX: -45, sY: 45, envRotOffset: 0, shadow: 0.8 }; let globalModelOpacity = '1';
+  let envSettings = { amb: 0.15, aT: 6500, aX: 0, aY: 90, spt: 0.8, sT: 4500, sX: -45, sY: 45, envRotOffset: 0, shadow: 0.8, surfaceGloss: 1 }; let globalModelOpacity = '1';
   let defaultPosterize = '0', defaultGrayscale = false; const updateViewFilters = () => { const val = parseInt(defaultPosterize); const isGray = defaultGrayscale;
   const viewerEl = document.getElementById('workbench-viewer'); const transferEl = document.getElementById('posterize-transfer'); let filterStr = ''; if (val > 0) { const level = 22 - val;
   let tableVals = []; for (let i = 0; i < level; i++) { tableVals.push((i / (level - 1)).toFixed(4)); }
@@ -586,11 +665,78 @@
       const c = mat.pbrMetallicRoughness.baseColorFactor;
       const rgba = [c[0], c[1], c[2], c[3] !== undefined ? c[3] : 1];
       const mode = readAlphaMode(mat);
+      let roughness = 1, metalness = 0;
+      try {
+        const p = mat.pbrMetallicRoughness;
+        roughness = (typeof p.getRoughnessFactor === 'function') ? p.getRoughnessFactor() : (p.roughnessFactor !== undefined ? p.roughnessFactor : 1);
+        metalness = (typeof p.getMetallicFactor === 'function') ? p.getMetallicFactor() : (p.metallicFactor !== undefined ? p.metallicFactor : 0);
+      } catch (_e) {}
+      let mrTex = null;
+      try {
+        const info = mat.pbrMetallicRoughness.metallicRoughnessTexture;
+        if (info && info.texture) mrTex = info.texture;
+      } catch (_e2) {}
       const three = getThreeMats(mat).map(tm => ({
-        opacity: tm.opacity, transparent: tm.transparent, depthWrite: tm.depthWrite
+        opacity: tm.opacity, transparent: tm.transparent, depthWrite: tm.depthWrite,
+        roughness: tm.roughness, metalness: tm.metalness,
+        roughnessMap: tm.roughnessMap || null,
+        metalnessMap: tm.metalnessMap || null,
+        envMapIntensity: (typeof tm.envMapIntensity === 'number') ? tm.envMapIntensity : 1,
+        clearcoat: (typeof tm.clearcoat === 'number') ? tm.clearcoat : 0,
+        clearcoatRoughness: (typeof tm.clearcoatRoughness === 'number') ? tm.clearcoatRoughness : 0
       }));
-      return { rgba, mode, three };
+      return { rgba, mode, roughness, metalness, mrTex, three };
     });
+  }
+  function applySurfaceGloss(gIn) {
+    if (!viewer.model || !viewer.model.materials) return;
+    if (!_matOrig || _matOrig.length !== viewer.model.materials.length) captureMatOrig();
+    if (!_matOrig) return;
+    const g = Math.max(0, Math.min(1, parseFloat(gIn)));
+    if (!isFinite(g)) return;
+    const dull = 1 - g;
+    viewer.model.materials.forEach((mat, i) => {
+      const orig = _matOrig[i]; if (!orig) return;
+      const or = (orig.roughness !== undefined && orig.roughness !== null) ? orig.roughness : 1;
+      const om = (orig.metalness !== undefined && orig.metalness !== null) ? orig.metalness : 0;
+      try {
+        const info = mat.pbrMetallicRoughness.metallicRoughnessTexture;
+        if (info && typeof info.setTexture === 'function') {
+          if (dull > 0.001) info.setTexture(null);
+          else if (orig.mrTex) info.setTexture(orig.mrTex);
+        }
+      } catch (_eTex) {}
+      const nr = dull > 0.001 ? (or * g + 1 * dull) : or;
+      const nm = om * g;
+      try {
+        const p = mat.pbrMetallicRoughness;
+        if (typeof p.setRoughnessFactor === 'function') p.setRoughnessFactor(nr); else p.roughnessFactor = nr;
+        if (typeof p.setMetallicFactor === 'function') p.setMetallicFactor(nm); else p.metallicFactor = nm;
+      } catch (_e) {}
+      getThreeMats(mat).forEach((tm, ti) => {
+        const o = orig.three && orig.three[ti];
+        const baseR = (o && o.roughness !== undefined) ? o.roughness : or;
+        const baseM = (o && o.metalness !== undefined) ? o.metalness : om;
+        const baseEnv = (o && typeof o.envMapIntensity === 'number') ? o.envMapIntensity : 1;
+        const baseCC = (o && typeof o.clearcoat === 'number') ? o.clearcoat : 0;
+        const baseCCR = (o && typeof o.clearcoatRoughness === 'number') ? o.clearcoatRoughness : 0;
+        if (dull > 0.001) {
+          tm.roughnessMap = null;
+          tm.metalnessMap = null;
+          if (typeof tm.roughness === 'number') tm.roughness = baseR * g + 1 * dull;
+        } else {
+          if (o && ('roughnessMap' in o)) tm.roughnessMap = o.roughnessMap;
+          if (o && ('metalnessMap' in o)) tm.metalnessMap = o.metalnessMap;
+          if (typeof tm.roughness === 'number') tm.roughness = baseR;
+        }
+        if (typeof tm.metalness === 'number') tm.metalness = baseM * g;
+        if (typeof tm.envMapIntensity === 'number') tm.envMapIntensity = baseEnv * Math.max(0.05, g * g);
+        if (typeof tm.clearcoat === 'number') tm.clearcoat = baseCC * g;
+        if (typeof tm.clearcoatRoughness === 'number') tm.clearcoatRoughness = baseCCR + (1 - baseCCR) * dull;
+        tm.needsUpdate = true;
+      });
+    });
+    try { updateLighting(); } catch (_eL) {}
   }
   function restoreAllFromOrig() {
     if (!viewer.model || !viewer.model.materials || !_matOrig) { _opacityDirty = false; return; }
@@ -599,16 +745,32 @@
       const orig = _matOrig[i]; if (!orig) return;
       mat.pbrMetallicRoughness.setBaseColorFactor(orig.rgba.slice());
       try { mat.setAlphaMode(orig.mode || 'OPAQUE'); } catch (_e) {}
+      try {
+        const p = mat.pbrMetallicRoughness;
+        const or = (orig.roughness !== undefined) ? orig.roughness : 1;
+        const om = (orig.metalness !== undefined) ? orig.metalness : 0;
+        if (typeof p.setRoughnessFactor === 'function') p.setRoughnessFactor(or); else p.roughnessFactor = or;
+        if (typeof p.setMetallicFactor === 'function') p.setMetallicFactor(om); else p.metallicFactor = om;
+      } catch (_e2) {}
       getThreeMats(mat).forEach((tm, ti) => {
         const o = orig.three && orig.three[ti];
         if (!o) {
           if ((orig.mode || 'OPAQUE') === 'OPAQUE') { tm.transparent = false; tm.opacity = 1; tm.depthWrite = true; }
           tm.needsUpdate = true; return;
         }
-        tm.opacity = o.opacity; tm.transparent = o.transparent; tm.depthWrite = o.depthWrite; tm.needsUpdate = true;
+        tm.opacity = o.opacity; tm.transparent = o.transparent; tm.depthWrite = o.depthWrite;
+        if (o.roughness !== undefined) tm.roughness = o.roughness;
+        if (o.metalness !== undefined) tm.metalness = o.metalness;
+        if ('roughnessMap' in o) tm.roughnessMap = o.roughnessMap;
+        if ('metalnessMap' in o) tm.metalnessMap = o.metalnessMap;
+        if (typeof o.envMapIntensity === 'number') tm.envMapIntensity = o.envMapIntensity;
+        if (typeof o.clearcoat === 'number') tm.clearcoat = o.clearcoat;
+        if (typeof o.clearcoatRoughness === 'number') tm.clearcoatRoughness = o.clearcoatRoughness;
+        tm.needsUpdate = true;
       });
     });
     _opacityDirty = false;
+    applySurfaceGloss(envSettings.surfaceGloss !== undefined ? envSettings.surfaceGloss : 1);
   }
   function applyXrayThreeOpacity(val) {
     if (!viewer.model || !viewer.model.materials || !_matOrig) return;
@@ -650,6 +812,7 @@
   };
   viewer.addEventListener('load', () => {
     _matOrig = null; _opacityDirty = false; captureMatOrig();
+    applySurfaceGloss(envSettings.surfaceGloss !== undefined ? envSettings.surfaceGloss : 1);
     if (parseFloat(globalModelOpacity) < 0.999) applyModelOpacity(globalModelOpacity);
   });
   const k2rgb = (k) => { let t=k/100,r,g,b; if(t<=66){r=255; g=Math.max(0,Math.min(255,99.47*Math.log(t)-161.1)); b=t<=19?0:Math.max(0,Math.min(255,138.5*Math.log(t-10)-305));}else{r=Math.max(0,Math.min(255,329.7*Math.pow(t-60,-0.133)));g=Math.max(0,Math.min(255,288.1*Math.pow(t-60,-0.075)));b=255;} return [r,g,b]; };
@@ -661,16 +824,19 @@
   reframeViewport(420); } };
   let _lightCanvas, _lightCtx; function updateLighting() {
   if(!_lightCanvas){ _lightCanvas = document.createElement('canvas'); _lightCanvas.width = 1024; _lightCanvas.height = 512; _lightCtx = _lightCanvas.getContext('2d'); }
-  const ctx = _lightCtx; ctx.fillStyle = '#0a0a10'; ctx.fillRect(0, 0, 1024, 512); const peak = Math.max(1, envSettings.amb, envSettings.spt); const drawLight = (intensity, px, py, radius, r, g, b, isSpot = false) => {
+  const ctx = _lightCtx; ctx.fillStyle = '#0a0a10'; ctx.fillRect(0, 0, 1024, 512); const iAmb = parseFloat(envSettings.amb) || 0; const iSpot = parseFloat(envSettings.spt) || 0;
+  const gloss = Math.max(0, Math.min(1, parseFloat(envSettings.surfaceGloss))); const soft = 1 - (isFinite(gloss) ? gloss : 1);
+  const iSpotDraw = iSpot * (1 - soft * 0.55); const iAmbDraw = iAmb + iSpot * soft * 0.35; const iFill = iAmbDraw * 0.5 + iSpot * soft * 0.25;
+  const spotRadius = 120 + soft * 200; const ambRadius = 280 + soft * 80;
+  const peak = Math.max(iAmbDraw, iSpotDraw, iFill, 1e-6); const drawLight = (intensity, px, py, radius, r, g, b, isSpot = false) => {
   const i = parseFloat(intensity) / peak; if(i <= 0) return; if (Math.abs(parseFloat(py)) === 90) px = 0; const x = ((parseFloat(px) + 180) / 360) * 1024; const y = ((-parseFloat(py) + 90) / 180) * 512;
   const cr = Math.min(255, Math.floor(r * i)), cg = Math.min(255, Math.floor(g * i)), cb = Math.min(255, Math.floor(b * i));
   const pitchRad = parseFloat(py) * Math.PI / 180; const stretchX = Math.max(1, 1 / Math.max(0.01, Math.cos(pitchRad))); ctx.save(); for(let offset of [-1024, 0, 1024]) { ctx.save(); ctx.translate(x + offset, y); ctx.scale(stretchX, 1);
   const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, radius); grd.addColorStop(0, `rgba(${cr},${cg},${cb},1)`); if(isSpot) grd.addColorStop(0.15, `rgba(${cr},${cg},${cb},1)`); grd.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
-  ctx.fillStyle = grd; ctx.fillRect(-radius, -radius, radius * 2, radius * 2); ctx.restore(); } ctx.restore(); }; const [ar, ag, ab] = k2rgb(envSettings.aT); drawLight(envSettings.amb, envSettings.aX, envSettings.aY, 280, ar, ag, ab);
-  // 柔和辅光：减轻眼球等反射材质在纯暗底上“空掉”（与生产端一致）
-  drawLight(Math.max(0.35, parseFloat(envSettings.amb) * 0.5), 0, 40, 220, 180, 190, 210);
-  const [sr, sg, sb] = k2rgb(envSettings.sT); drawLight(envSettings.spt, envSettings.sX, envSettings.sY, 120, sr, sg, sb, true);
-  viewer.setAttribute('environment-image', _lightCanvas.toDataURL('image/png')); viewer.setAttribute('exposure', peak.toString());
+  ctx.fillStyle = grd; ctx.fillRect(-radius, -radius, radius * 2, radius * 2); ctx.restore(); } ctx.restore(); }; const [ar, ag, ab] = k2rgb(envSettings.aT); drawLight(iAmbDraw, envSettings.aX, envSettings.aY, ambRadius, ar, ag, ab);
+  if (iFill > 0) drawLight(iFill, 0, 40, 220 + soft * 60, 180, 190, 210);
+  const [sr, sg, sb] = k2rgb(envSettings.sT); drawLight(iSpotDraw, envSettings.sX, envSettings.sY, spotRadius, sr, sg, sb, true);
+  viewer.setAttribute('environment-image', _lightCanvas.toDataURL('image/png')); viewer.setAttribute('exposure', String(peak));
   viewer.setAttribute('environment-rotation', `0rad ${envSettings.envRotOffset}rad 0rad`); viewer.setAttribute('shadow-intensity', envSettings.shadow); }
   let activePointId = null; let svgRafId = null; let _isSvgUpdating = false;
   // 【初始名称可见】：进页/离开快照时按 showTextOnLoad 挂 show-text；缺省字段视为可见（1A）
@@ -707,12 +873,22 @@
   flyToAnnotationPose(p.pos, Math.atan2(nx, nz)*180/Math.PI, Math.acos(Math.max(-1, Math.min(1, ny)))*180/Math.PI); } }
   updateSVG(); }; window.applySnapshot = function(s) { activePointId = null; window._hasAppliedSnapshot = true; window.currentSnapshotShowTextPoints = s.showTextPoints || [];
   clearShowTextClasses(); // 快照接管名称显隐，不再沿用进页初始设置（2A）
-  if(s.camera) { viewer.setAttribute('camera-target', s.camera.target); viewer.setAttribute('camera-orbit', s.camera.orbit); viewer.setAttribute('field-of-view', s.camera.fov); }      if(s.settings) {
+  _annoPinUntil = 0; _lastAnnoFly = null;
+  installSnapshotJumpGuard();
+  _blockSnapJumpUntil = Date.now() + 900; /* 挡住 MV resize/内部 jump，保住镜头缓动 */
+  if (typeof applyViewerLayout === 'function') applyViewerLayout();
+  if(s.camera) {
+    viewer.setAttribute('camera-target', s.camera.target);
+    viewer.setAttribute('camera-orbit', s.camera.orbit);
+    /* 只设 FOV，绝不 jumpCameraToGoal，保留 interpolation-decay 动画 */
+    applySnapshotFovLock(s.camera.fov, { deferCorrect: true });
+  }      if(s.settings) {
   if(s.settings.ambient!==undefined) envSettings.amb = s.settings.ambient; if(s.settings.ambientTemp!==undefined) envSettings.aT = s.settings.ambientTemp; if(s.settings.ambientX!==undefined) envSettings.aX = s.settings.ambientX;
   if(s.settings.ambientY!==undefined) envSettings.aY = s.settings.ambientY; if(s.settings.spot!==undefined) envSettings.spt = s.settings.spot; else if(s.settings.exposure!==undefined) envSettings.spt = s.settings.exposure;
   if(s.settings.spotTemp!==undefined) envSettings.sT = s.settings.spotTemp; if(s.settings.spotX!==undefined) envSettings.sX = s.settings.spotX; else if(s.settings.lightX!==undefined) envSettings.sX = s.settings.lightX;
   else if(s.settings.lightRot!==undefined) envSettings.sX = s.settings.lightRot; if(s.settings.spotY!==undefined) envSettings.sY = s.settings.spotY; else if(s.settings.lightY!==undefined) envSettings.sY = s.settings.lightY;
   if(s.settings.shadowIntensity!==undefined) envSettings.shadow = s.settings.shadowIntensity; if(s.settings.modelOpacity!==undefined) { globalModelOpacity = s.settings.modelOpacity; applyModelOpacity(globalModelOpacity); }
+  if(s.settings.surfaceGloss!==undefined) { envSettings.surfaceGloss = s.settings.surfaceGloss; applySurfaceGloss(envSettings.surfaceGloss); }
   envSettings.envRotOffset = s.settings.envRotOffset !== undefined ? s.settings.envRotOffset : 0; if(s.settings.posterize!==undefined) defaultPosterize = s.settings.posterize;
   if(s.settings.grayscale!==undefined) defaultGrayscale = s.settings.grayscale; updateViewFilters(); updateLighting(); }
   if(s.visiblePoints) { currentData.pointsData.forEach(p => p.hidden = !s.visiblePoints.includes(p.id)); updateSVG(); } else { updateSVG(); } }; window.tourState = { isActive: false, mode: 'pts', currentIndex: 0,
@@ -731,7 +907,11 @@
   iconPause.style.display = 'block'; iconPlay.style.display = 'none'; btnPause.classList.add('playing'); reframeViewport(80, { skipFit: true }); playCurrentNode(); }; window.stopTour = function() {
   window.tourState.isActive = false; window.tourState.playId++; clearTimeout(window.tourState.timeoutId); topBarEl.classList.remove('tour-mode-hidden'); controlPanelEl.classList.remove('tour-mode-hidden');
   viewer.classList.remove('tour-active'); svgOverlay.classList.remove('tour-active'); panelEl.style.opacity = '0'; panelEl.style.pointerEvents = 'none';
-  tourControlsEl.style.opacity = '0'; tourControlsEl.style.pointerEvents = 'none'; viewer.querySelectorAll('.active').forEach(el => {
+  tourControlsEl.style.opacity = '0'; tourControlsEl.style.pointerEvents = 'none';
+  window._hasAppliedSnapshot = false; /* 结束导览后允许恢复课设安全区适配 */
+  _authoredSnapshotFovDeg = null;
+  clearTimeout(_fovLockTimer);
+  viewer.querySelectorAll('.active').forEach(el => {
   if(el.classList.contains('preview-hotspot') || el.classList.contains('ink-mid')) el.classList.remove('active'); }); reframeViewport(80); }; async function playCurrentNode() {
   if (!window.tourState.isActive) return; window.tourState.playId++; const currentPlayId = window.tourState.playId; clearTimeout(window.tourState.timeoutId); const node = window.tourState.list[window.tourState.currentIndex];
   const minPlayTime = 8000; const startTime = Date.now(); if (window.tourState.mode === 'pts') { window.triggerAnnotation(node.id, false); } else { window.applySnapshot(node); }
@@ -755,20 +935,26 @@
   envSettings.amb = data.settings.ambient ?? envSettings.amb; envSettings.aT = data.settings.ambientTemp ?? envSettings.aT; envSettings.aX = data.settings.ambientX ?? envSettings.aX; envSettings.aY = data.settings.ambientY ?? envSettings.aY;
   envSettings.spt = data.settings.spot ?? data.settings.exposure ?? envSettings.spt; envSettings.sT = data.settings.spotTemp ?? envSettings.sT;
   envSettings.sX = data.settings.spotX ?? data.settings.lightX ?? data.settings.lightRot ?? envSettings.sX; envSettings.sY = data.settings.spotY ?? data.settings.lightY ?? envSettings.sY;
-  envSettings.envRotOffset = data.settings.envRotOffset ?? envSettings.envRotOffset; envSettings.shadow = data.settings.shadowIntensity ?? envSettings.shadow;
+  envSettings.envRotOffset = data.settings.envRotOffset ?? envSettings.envRotOffset;   envSettings.shadow = data.settings.shadowIntensity ?? envSettings.shadow;
+  envSettings.surfaceGloss = data.settings.surfaceGloss !== undefined ? data.settings.surfaceGloss : 1;
   if(data.settings.modelOpacity !== undefined) { globalModelOpacity = data.settings.modelOpacity; applyModelOpacity(globalModelOpacity); }
   if(data.settings.posterize !== undefined) defaultPosterize = data.settings.posterize; if(data.settings.grayscale !== undefined) defaultGrayscale = data.settings.grayscale; }
-  updateViewFilters(); updateLighting(); if(data.camera) { if(data.camera.target) viewer.setAttribute('camera-target', data.camera.target);
+  updateViewFilters(); updateLighting(); applySurfaceGloss(envSettings.surfaceGloss); if(data.camera) { if(data.camera.target) viewer.setAttribute('camera-target', data.camera.target);
   if(data.camera.orbit) viewer.setAttribute('camera-orbit', data.camera.orbit); if(data.camera.fov) viewer.setAttribute('field-of-view', data.camera.fov); }
   rememberCourseCamera(data.camera || null);
   viewer.querySelectorAll('.preview-hotspot, .ink-anchor').forEach(el => el.remove()); data.pointsData.forEach(p => { p.hidden = false; window.AnnotationPluginManager.dispatchMountDOM(p, viewer); });
-  window._hasAppliedSnapshot = false; applyInitialShowText(); renderLists(); const hideLoading = () => {
+  window._hasAppliedSnapshot = false; _authoredSnapshotFovDeg = null; clearTimeout(_fovLockTimer); applyInitialShowText(); renderLists(); const hideLoading = () => {
   setTimeout(() => { loading.style.opacity = '0'; loading.style.pointerEvents = 'none';
   document.getElementById('control-panel').style.display = 'flex'; 
   const tb = document.getElementById('top-bar'); tb.style.display = 'block'; tb.offsetHeight; tb.style.opacity = '1'; /* 模型加载完后才物理呈现菜单栏 */
   /* 进页占满：面板可见后多趟重算（手机上 getDimensions 常晚于首帧） */
   const runFill = () => {
     applyViewerLayout();
+    /* 延迟补算可能晚于用户点开快照/导览，勿覆盖生产机位 */
+    if (window._hasAppliedSnapshot || (window.tourState && window.tourState.isActive)) {
+      if (typeof updateSVG === 'function') updateSVG();
+      return;
+    }
     if (!_courseCamera) rememberCourseCamera(data.camera || null);
     fitCameraToSafeRect();
     if (typeof updateSVG === 'function') updateSVG();
