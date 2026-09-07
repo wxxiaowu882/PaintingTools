@@ -1,0 +1,2031 @@
+<!DOCTYPE html> <html lang="zh-CN"> <head> <meta charset="UTF-8"> <title>3D 空间坐标拾取工作台 - Pro</title> <style>
+    body { margin: 0; overflow: hidden; background: #0a0b10; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    /* 与消费端 Portrait_c 一致：画布与 SVG 叠在同一视口坐标系，避免标注与模型错位 */
+    model-viewer, #ink-overlay { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; outline: none; background: transparent; display: block; }
+    model-viewer { z-index: 0; }
+    #ink-overlay { z-index: 1; pointer-events: none; }
+    /* 高端暗黑风控制台 */
+    #console-panel { position: absolute; top: 10px; right: 20px; width: 420px; background: rgba(15, 15, 15, 0.85); backdrop-filter: blur(10px); border: 1px solid #333; border-radius: 8px; padding: 15px; color: #ddd; z-index: 10; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); max-height: 95vh; overflow-y: auto; }
+    #console-resizer { position: absolute; left: -5px; top: 0; width: 10px; height: 100%; cursor: ew-resize; z-index: 100; }
+    #snapshot-resizer { position: absolute; right: -5px; top: 0; width: 10px; height: 100%; cursor: ew-resize; z-index: 100; }
+    /* 【UI重构】：左侧面板改为固定高度，内部上下分栏，隐藏全局滚动条 */
+    #snapshot-panel { position: absolute; top: 10px; left: 20px; width: 320px; background: rgba(15, 15, 15, 0.85); backdrop-filter: blur(10px); border: 1px solid #333; border-radius: 8px; padding: 15px; color: #ddd; z-index: 10; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.8); height: calc(100vh - 20px); overflow: hidden; }
+    #workspace-section { display: flex; flex-direction: column; overflow: hidden; }
+    #snapshot-section { display: flex; flex-direction: column; overflow: hidden; }
+    #panel-splitter { width: 100%; height: 10px; background: rgba(255,255,255,0.05); margin: 8px 0; cursor: ns-resize; border-radius: 4px; display: flex; justify-content: center; align-items: center; flex-shrink: 0; transition: background 0.2s; }
+    #panel-splitter:hover, #panel-splitter.dragging { background: rgba(212, 175, 55, 0.4); }
+    #panel-splitter::after { content: ''; width: 30px; height: 2px; background: rgba(255,255,255,0.3); border-radius: 1px; }
+    /* 调整内部滚动条样式 */
+    #workspace-file-list::-webkit-scrollbar, #snap-list::-webkit-scrollbar { width: 4px; }
+    #workspace-file-list::-webkit-scrollbar-thumb, #snap-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+    .panel-title { color: #fff; font-size: 14px; border-bottom: 1px solid #333; padding-bottom: 8px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+    .instruction { font-size: 11px; color: #00d2ff; background: rgba(0, 210, 255, 0.1); padding: 6px; border-radius: 4px; border-left: 3px solid #00d2ff; line-height: 1.5; margin-bottom: 5px; }
+    /* 分组控件样式重构 - 彻底展开 */ .ctrl-group { background: rgba(0,0,0,0.4); border: 1px solid #222; border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+    .ctrl-title { font-size: 12px; font-weight: bold; border-bottom: 1px dashed #444; padding-bottom: 4px; margin-bottom: 2px; } .ctrl-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #aaa; }
+    .ctrl-row input[type="range"] { flex: 1; margin-left: 15px; cursor: pointer; } .ctrl-row span { width: 140px; white-space: nowrap; }
+    #points-list { flex: 1; min-height: 120px; overflow-y: auto; background: rgba(0,0,0,0.5); border: 1px solid #222; border-radius: 4px; padding: 5px; scroll-behavior: smooth; }
+    .point-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; margin-bottom: 4px; background: #222; border-radius: 4px; font-size: 12px; font-family: monospace; transition: 0.2s; gap: 6px; }
+    .point-item:hover { background: #333; } .point-item.active { background: rgba(0, 210, 255, 0.15); box-shadow: inset 3px 0 0 #00d2ff; } .point-item.dragging { opacity: 0.45; } .point-item.drag-over { box-shadow: inset 0 2px 0 #00d2ff; } .drag-handle { cursor: grab; color: #888; flex-shrink: 0; } .drag-handle:active { cursor: grabbing; } .point-name { color: #00d2ff; cursor: pointer; text-decoration: underline; white-space: nowrap; }
+    .point-text-input { flex: 1; background: #111; border: 1px solid #444; color: #0f0; border-radius: 3px; padding: 2px 4px; font-size: 11px; outline: none; }
+    .action-small-btn { background: #444; color: #fff; border: none; border-radius: 3px; cursor: pointer; padding: 2px 6px; font-weight: bold; font-size: 11px; } .action-small-btn:hover { background: #666; }
+    .del-btn { background: #522; color: #f55; } .del-btn:hover { background: #f55; color: #fff; }
+    #snap-list { flex: 1; overflow-y: auto; background: rgba(0,0,0,0.3); border: 1px dashed #444; border-radius: 4px; padding: 5px; display: flex; flex-direction: column; gap: 5px; }
+    .snap-item { display: flex; align-items: center; background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 4px; gap: 8px; font-size: 11px; cursor: grab; }
+    .snap-item.selected { outline: 2px solid #0aa; box-shadow: 0 0 10px rgba(0,170,170,0.25); background: #142828; border-color: #066; }
+    .snap-item.snap-dragging { opacity: 0.45; cursor: grabbing; }
+    .snap-item.snap-drag-over { box-shadow: inset 0 2px 0 #0df; border-color: #0aa; }
+    .snap-item .snap-name-input, .snap-item .action-small-btn, .snap-item .snap-thumb { cursor: auto; }
+    .snap-item .snap-thumb { cursor: pointer; }
+    .snap-item .action-small-btn { cursor: pointer; }
+    .snap-thumb { width: 40px; height: 30px; background: #000; border-radius: 2px; object-fit: cover; cursor: pointer; border: 1px solid #555; } .snap-thumb:hover { border-color: #0df; }
+    .snap-name { flex: 1; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    textarea { background: #050505; color: #0f0; border: 1px solid #333; border-radius: 4px; padding: 8px; font-size: 10px; resize: vertical; height: 60px; outline: none; font-family: monospace; white-space: pre; }
+    .btn-group { display: flex; gap: 6px; }
+    button.action-btn { flex: 1; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 6px 4px; cursor: pointer; transition: 0.2s; font-size: 11px; font-weight: 500; }
+    button.action-btn:hover { background: #444; } .status-text { font-size: 11px; color: #888; text-align: right; height: 14px; }
+    #anno-flash-toast { position: fixed; left: 50%; top: 18%; transform: translate(-50%, -12px); z-index: 10050; pointer-events: none;
+      padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; letter-spacing: 0.5px;
+      background: rgba(20, 28, 24, 0.92); border: 1px solid rgba(80, 200, 140, 0.55); color: #b8f0c8;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.45); opacity: 0; transition: opacity 0.18s ease, transform 0.18s ease; }
+    #anno-flash-toast.show { opacity: 1; transform: translate(-50%, 0); }
+    #anno-flash-toast.err { border-color: rgba(220, 100, 100, 0.65); color: #ffc0c0; background: rgba(40, 18, 18, 0.92); }
+
+    #ink-overlay * { pointer-events: none !important; } /* 核心：让所有SVG画线不阻挡旋转 */ .ink-anchor { position: absolute; width: 4px; height: 4px; background: rgba(0,0,0,0.01); transform: translate(-50%, -50%); pointer-events: none; }
+    [data-visibility-attribute]:not([visible]), [visible="false"] { pointer-events: none !important; } .ink-mid, .preview-hotspot { pointer-events: none !important; } /* 核心：让所有点位不阻挡旋转 */
+    .ink-mid .HotspotAnnotation { display: none; background: transparent; color: #fff; padding: 0; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); white-space: nowrap; border: none; font-family: sans-serif; font-size: 11px; pointer-events: none; z-index: 100; font-weight: 600; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.8); }
+    .ink-mid.show-text .HotspotAnnotation { display: block; }
+    .preview-hotspot { background: rgba(46, 46, 46, 0.8); border: 1.5px solid #f2f2f2; border-radius: 50%; width: 14px; height: 14px; box-shadow: none; cursor: pointer; transition: 0.2s; pointer-events: auto !important; position: relative; box-sizing: border-box; }
+    .preview-hotspot::after { content: ''; position: absolute; top: -10px; left: -10px; right: -10px; bottom: -10px; border-radius: 50%; }
+    .preview-hotspot .HotspotAnnotation { display: none; background: transparent; color: #fff; padding: 0; position: absolute; left: 20px; top: 50%; transform: translateY(-50%); white-space: nowrap; border: none; font-family: sans-serif; font-size: 11px; pointer-events: none; z-index: 100; font-weight: 600; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.8); }
+    .preview-hotspot.show-text .HotspotAnnotation { display: block; } .preview-hotspot.show-text, .ink-mid.show-text { z-index: 99999 !important; } .HotspotAnnotation { z-index: 99999 !important; }
+    .strict-hide { visibility: hidden !important; pointer-events: none !important; transform: scale(0) !important; transition: none !important; }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+    .console-tabs { display:flex; gap:6px; margin:0 0 8px 0; }
+    .console-tab-btn { flex:1; background:#1a1a1a; color:#888; border:1px solid #333; border-radius:4px; padding:6px 8px; cursor:pointer; font-size:12px; font-weight:600; }
+    .console-tab-btn:hover { color:#ccc; border-color:#555; }
+    .console-tab-btn.active { background:rgba(0,210,255,0.12); color:#0df; border-color:#0aa; }
+    #tab-anno, #tab-scene { display:flex; flex-direction:column; gap:8px; min-height:0; }
+    #tab-scene { display:none; }
+    .preview-hotspot.show-text .HotspotAnnotation, .ink-mid.show-text .HotspotAnnotation { pointer-events: auto !important; cursor: text; }
+    .HotspotAnnotation[contenteditable="true"] { outline:1px solid #0df; background:rgba(0,0,0,0.55); padding:1px 4px; border-radius:3px; cursor:text; min-width:2em; }
+    #debug-log-panel { display: none !important; }
+    /* 手机端屏幕取景参考框：淡灰描边，不挡操作 */
+    #anno-mobile-frame-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+    #anno-mobile-frame-overlay[hidden] { display: none !important; }
+    #anno-mobile-frame-wrap { position: fixed; box-sizing: border-box; border: 1.5px solid rgba(190, 195, 205, 0.7); border-radius: 0; /* 半透明遮罩：框外模型仍可见 */ box-shadow: 0 0 0 9999px rgba(5,6,10,0.28); pointer-events: none; }
+    #anno-mobile-frame-label { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; color: rgba(180,185,195,0.8); letter-spacing: 0.5px; white-space: nowrap; font-family: sans-serif; }
+    .log-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #555; padding-bottom: 5px; } 
+    /* 【阶段 2 优化】: Glb管理器 模态弹窗样式 */
+    #glb-manager-modal { display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); z-index:99999; justify-content:center; align-items:center; opacity:0; transition:opacity 0.3s; }
+    #glb-manager-modal.show { display:flex; opacity:1; }
+    .glb-modal-content { width: 90vw; height: 90vh; max-width: 1400px; background: #0f1015; border: 1px solid #333; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.8); position: relative; }
+    .glb-modal-close { position: absolute; top: 15px; right: 20px; background: rgba(0,0,0,0.5); border: 1px solid #444; color: #fff; font-size: 24px; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; z-index: 10; display: flex; justify-content: center; align-items: center; transition: 0.2s; }
+    .glb-modal-close:hover { background: #f55; transform: rotate(90deg); }
+    </style> <script>
+/* Must run early: block Live Server / Live Preview auto-reload while overwriting JSON archives */
+(function () {
+  window.__annoBlockReloadUntil = 0;
+  function blocked() { return Date.now() < (window.__annoBlockReloadUntil || 0); }
+  window.armAnnoReloadBlock = function (ms) {
+    window.__annoBlockReloadUntil = Date.now() + (ms == null ? 12000 : ms);
+  };
+  try {
+    const _reload = window.location.reload.bind(window.location);
+    window.location.reload = function () {
+      if (blocked()) { console.warn('[anno] blocked location.reload'); return; }
+      return _reload();
+    };
+  } catch (_e) {}
+  try {
+    const OrigWS = window.WebSocket;
+    if (OrigWS && !OrigWS.__annoPatched) {
+      function wrapWS(ws) {
+        const _add = ws.addEventListener.bind(ws);
+        ws.addEventListener = function (type, fn, opts) {
+          if (type !== 'message' || typeof fn !== 'function') return _add(type, fn, opts);
+          return _add(type, function (ev) {
+            const data = ev && ev.data != null ? String(ev.data) : '';
+            if (blocked() && /reload|refresh|update/i.test(data)) {
+              console.warn('[anno] blocked ws reload', data.slice(0, 80));
+              return;
+            }
+            return fn.apply(this, arguments);
+          }, opts);
+        };
+        try {
+          let _onmsg = null;
+          Object.defineProperty(ws, 'onmessage', {
+            configurable: true,
+            get() { return _onmsg; },
+            set(fn) {
+              _onmsg = typeof fn === 'function' ? function (ev) {
+                const data = ev && ev.data != null ? String(ev.data) : '';
+                if (blocked() && /reload|refresh|update/i.test(data)) {
+                  console.warn('[anno] blocked ws onmessage reload', data.slice(0, 80));
+                  return;
+                }
+                return fn.apply(this, arguments);
+              } : fn;
+            }
+          });
+        } catch (_e2) {}
+        return ws;
+      }
+      function PatchedWS(url, protocols) {
+        const ws = protocols !== undefined ? new OrigWS(url, protocols) : new OrigWS(url);
+        return wrapWS(ws);
+      }
+      PatchedWS.prototype = OrigWS.prototype;
+      PatchedWS.CONNECTING = OrigWS.CONNECTING;
+      PatchedWS.OPEN = OrigWS.OPEN;
+      PatchedWS.CLOSING = OrigWS.CLOSING;
+      PatchedWS.CLOSED = OrigWS.CLOSED;
+      PatchedWS.__annoPatched = true;
+      window.WebSocket = PatchedWS;
+    }
+  } catch (_e3) {}
+})();
+</script>
+<script type="module" src="../docs/js/model-viewer.min.js"></script>
+    </head> <body>
+    <model-viewer id="workbench-viewer" camera-controls disable-tap tone-mapping="aces" interaction-prompt="none" interpolation-decay="200" min-field-of-view="5deg" max-field-of-view="60deg"></model-viewer>
+    <svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true"> <defs> <filter id="filter-posterize"> <feComponentTransfer id="posterize-transfer">
+    <feFuncR type="discrete" tableValues="0 1"/> <feFuncG type="discrete" tableValues="0 1"/>
+    <feFuncB type="discrete" tableValues="0 1"/> </feComponentTransfer> </filter> </defs> </svg> <svg id="ink-overlay"></svg>
+    <div id="anno-flash-toast" aria-live="polite"></div>
+<div id="anno-mobile-frame-overlay" aria-hidden="false">
+      <div id="anno-mobile-frame-wrap">
+        <div id="anno-mobile-frame-label">手机快照取景参考</div>
+      </div>
+    </div>
+    <!-- 课程封面截取框（参考 SolidCreate）：默认隐藏 -->
+    <div id="anno-crop-box" style="display:none; position:fixed; border:2px dashed #2ecc71; width:384px; height:216px; top:calc(50% - 108px); left:calc(50% - 192px); z-index:8; pointer-events:none; outline:9999px solid rgba(0,0,0,0.55); box-sizing:border-box;">
+      <div id="anno-crop-drag" style="position:absolute; top:0; left:0; width:100%; height:24px; background:rgba(46,204,113,0.85); pointer-events:auto; cursor:move; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold; user-select:none;">拖拽移动 · 封面 16:9</div>
+      <div id="anno-crop-resize" style="position:absolute; right:-7px; bottom:-7px; width:14px; height:14px; background:#fff; border:2px solid #2ecc71; border-radius:50%; pointer-events:auto; cursor:nwse-resize; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>
+    </div>
+    <div id="snapshot-panel">
+        <div id="snapshot-resizer" title="拖拽调整面板宽度"></div>
+        <div id="workspace-section">
+            <div style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; flex-shrink: 0;">
+                <button class="action-btn" id="btn-mount-workspace" style="width:100%; background: #c82; font-weight: bold; padding: 6px;">📁 挂载新工作目录</button>
+                <div style="display: flex; gap: 5px;">
+                    <button class="action-btn" onclick="loadQuickDir('head_anatomy')" oncontextmenu="event.preventDefault(); loadQuickDir('head_anatomy', true)" style="flex:1; background: #2c3e50; font-size: 10px; padding: 4px;" title="左键：加载该库 / 右键：重选目录">⚡ 结构_头骨骨点肌肉</button>
+                    <button class="action-btn" onclick="loadQuickDir('head_facial')" oncontextmenu="event.preventDefault(); loadQuickDir('head_facial', true)" style="flex:1; background: #2c3e50; font-size: 10px; padding: 4px;" title="左键：加载该库 / 右键：重选目录">⚡ 结构_五官</button>
+                </div>
+            </div>
+            <div id="workspace-file-list" style="flex:1; overflow-y: auto; background: rgba(0,0,0,0.4); border: 1px solid #444; border-radius: 4px; padding: 4px; font-size: 12px;">
+                <div style="color: #666; text-align: center; padding: 15px 0;">尚未挂载目录</div>
+            </div>
+        </div>
+
+        <div id="panel-splitter" title="上下拖动调整占比"></div>
+
+        <div id="snapshot-section" style="flex: 1;">
+            <div class="panel-title" style="flex-shrink: 0;"><span>组合快照 (视角+光照+显隐)</span><span style="font-size:10px;color:#777;font-weight:normal;">拖行排序 · ↑↓微调</span></div>
+            <div id="anno-cover-bar" style="display:flex; align-items:center; gap:8px; flex-shrink:0; margin-bottom:6px; padding:6px; background:rgba(0,0,0,0.35); border:1px solid #333; border-radius:4px;">
+                <img id="anno-cover-preview" alt="封面" title="课程封面预览（16:9）" src="" style="width:80px; height:45px; object-fit:cover; border-radius:3px; border:1px solid #555; background:#111; flex-shrink:0;">
+                <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:4px;">
+                    <div style="font-size:10px; color:#aaa;">课程封面 <span id="anno-cover-status" style="color:#666;">（未截取，导出时回退首张快照）</span></div>
+                    <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                        <button type="button" class="action-btn" id="anno-crop-toggle-btn" style="flex:1; min-width:72px; padding:3px 4px; font-size:10px; background:rgba(142,68,173,0.35); border-color:#8e44ad;" title="显示/隐藏绿框，拖动构图后截取">✂️ 截取框</button>
+                        <button type="button" class="action-btn" id="anno-cover-capture-btn" style="flex:1; min-width:72px; padding:3px 4px; font-size:10px; background:#044; border-color:#088; color:#0ff;" title="按当前绿框截取为课程封面（写入 mainThumbnail）">📷 截取封面</button>
+                        <button type="button" class="action-btn" id="anno-cover-clear-btn" style="flex:none; width:40px; padding:3px 4px; font-size:10px; background:#322; border-color:#533; color:#f88;" title="清除独立封面">清</button>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 6px; flex-shrink: 0; margin-bottom: 5px;">
+                <input type="text" id="snap-name" placeholder="输入快照描述..." style="flex:1; background:#111; border:1px solid #444; color:#fff; border-radius:3px; padding:4px 6px; font-size:11px;">
+                <button class="action-btn" id="add-snap-btn" style="flex:none; width:60px; padding:4px; border-color:#088; background:#044; color:#0ff;">+ 捕获</button>
+                <button class="action-btn" id="overwrite-snap-btn" type="button" disabled style="flex:none; width:52px; padding:4px; border-color:#864; background:#332200; color:#fc6;" title="覆盖当前选中快照的视图数据，保留名称与详细知识">复写</button>
+            </div> 
+            <div id="snap-list" style="flex: 1; overflow-y: auto; padding-right: 4px;"><div style="padding: 10px; text-align: center; color: #555; font-size: 11px;">暂无保存的快照</div></div>
+        </div>
+    </div> <div id="console-panel"> <div id="console-resizer" title="拖拽调整面板宽度"></div> <div class="panel-title"><span>坐标拾取系统 Pro</span> <span id="point-count" style="font-size:11px;color:#888;">0 个点位</span></div>
+    <div class="console-tabs" role="tablist"><button type="button" class="console-tab-btn active" data-tab="anno" id="tab-btn-anno">标注</button><button type="button" class="console-tab-btn" data-tab="scene" id="tab-btn-scene">场景</button></div>
+    <div id="tab-anno">
+    <div class="ctrl-group">
+    <div class="ctrl-title" style="color: #bbb;">标注工具模式</div> <div style="display:flex; align-items:center; gap:15px; font-size:12px; color:#ddd; padding:4px 0;"> <select id="tool-mode-select" style="background:#111; color:#0df; border:1px solid #444; padding:3px 6px; font-size:11px; outline:none; cursor:pointer; border-radius:3px;">
+    <option value="point">📍 表面点位 [Alt+左击]</option> <option value="normal-arrow">↗️ 法线箭头 [Alt+左击]</option> <option value="line">📏 连续虚线 [Alt+Shift+划动]</option> <option value="leader">🏷️ 经典引出线 [Alt+Shift+划动]</option> <option value="contour">🌐 体块环绕线 [Alt+Shift+划动截取]</option> <option value="polygon">📐 2D 多边形面片 [Alt+左击顶点, Enter闭合]</option> <option value="polygon3d">💎 3D 光影面片 [Alt+鼠标左键 放开闭合/Alt+Shift 移动鼠标 放开闭合]</option> <option value="prober">💡 受光逻辑探针 [Alt+左击]</option> </select> <div id="arrow-len-container" style="display:none; align-items:center; gap:6px;">
+    <span style="color:#aaa;">长度:</span>
+    <input type="range" id="arrow-length" min="0.02" max="0.3" step="0.01" value="0.06" style="width:50px;">
+    <span id="arrow-len-disp" style="color:#888; font-family:monospace; width:30px;">0.06m</span> </div> </div> </div>
+    <div class="ctrl-group">
+    <div class="ctrl-title" style="color: #bbb;">标注显示</div>
+    <div class="ctrl-row"><span>未激活标注透明度：</span><input type="range" id="global-opacity-slider" min="0" max="1" step="0.1"><span class="val-disp" style="width: 32px; text-align: right; color: #888; font-family: monospace;"></span></div>
+    <div class="ctrl-row" style="justify-content: flex-start;"> <span>新建标注默认颜色：</span> <input type="color" id="global-color-picker" style="width:30px;height:24px;padding:0;border:none;background:none;cursor:pointer;margin-left:15px;"> </div>
+    </div>
+    <div id="points-list"><div style="padding: 10px; text-align: center; color: #555; font-size: 11px;">暂无标注点，请在模型上拾取</div></div>
+    <div class="btn-group">
+    <button class="action-btn" id="export-btn" style="background:#242; border-color:#363;">纯数据导出</button>
+    </div>
+    <div class="status-text" id="status-msg">系统已就绪</div>
+    </div>
+    <div id="tab-scene" style="display:none;">
+    <div class="ctrl-group" style="margin-bottom: 5px;">
+    <div class="ctrl-title" style="color: #bbb;">全局视角与光影预设</div> <div class="ctrl-row"><span>快速视角定位：</span>
+    <select id="preset-cam" style="flex:1; margin-left:15px; background:#111; color:#fff; border:1px solid #444; padding:2px 4px; font-size:11px; outline:none; cursor:pointer;"> <option value="">-- 选择视角 --</option> <option value="0deg 90deg auto">正前 (Front)</option>
+    <option value="-45deg 90deg auto">左前 (Front-Left)</option> <option value="-90deg 90deg auto">正左 (Left)</option> <option value="-135deg 90deg auto">左后 (Back-Left)</option>
+    <option value="180deg 90deg auto">正后 (Back)</option> <option value="135deg 90deg auto">右后 (Back-Right)</option> <option value="90deg 90deg auto">正右 (Right)</option>
+    <option value="45deg 90deg auto">右前 (Front-Right)</option> <option value="0deg 0deg auto">正上 (Top)</option> <option value="0deg 180deg auto">正下 (Bottom)</option> </select> </div>
+    <div class="ctrl-row" title="【透视】控制近大远小的强弱（相机视野 FOV）。
+
+向左：更扁、更像长焦，透视弱。
+向右：更冲、更像广角，透视强。
+
+调节时会沿视线微调相机远近，尽量让主体在画面里大小差不多（不是单纯裁切画面）。
+写入导出 JSON 的 camera.fov；快照也会记录。旧数据无此字段时沿用当前/自动视角。"><span>透视强弱：</span>
+    <input type="range" id="anno-persp-slider" min="5" max="60" step="1" value="34" style="flex:1; margin-left:15px; cursor:pointer;" aria-label="透视强弱">
+    <span id="anno-persp-val" style="width: 32px; text-align: right; color: #888; font-family: monospace; flex-shrink:0;">34</span>
+    </div>
+    <div class="ctrl-row" title="叠加 390×844 手机比例淡灰框（半透明，框外模型仍可见），便于兼顾手机端构图。"><span>手机取景框：</span>
+    <label style="display:flex;align-items:center;gap:6px;margin-left:15px;cursor:pointer;color:#bbb;font-size:11px;">
+      <input type="checkbox" id="anno-mobile-frame-toggle" style="accent-color:#88a; cursor:pointer;">显示淡灰参考框
+    </label>
+    </div>
+    <div class="ctrl-row"><span>经典光影预设：</span> <select id="preset-light" style="flex:1; margin-left:15px; background:#111; color:#fff; border:1px solid #444; padding:2px 4px; font-size:11px; outline:none; cursor:pointer;"> <option value="">-- 选择光影 --</option>
+    <option value='{"amb":0.2,"aT":6500,"aX":45,"aY":0,"spt":2.5,"sT":5000,"sX":135,"sY":45}'>伦勃朗光 (主光左前+辅光右前)</option> <option value='{"amb":0.5,"aT":10000,"aX":45,"aY":0,"spt":3,"sT":2000,"sX":135,"sY":0}'>赛博冷暖光 (主暖左前+辅冷右前)</option> <option value='{"amb":1,"aT":6500,"aX":90,"aY":90,"spt":0,"sT":6500,"sX":90,"sY":90}'>顶部底光 (环境全亮+无死角)</option>
+    <option value='{"amb":0.15,"aT":6500,"aX":90,"aY":90,"spt":0.8,"sT":4500,"sX":45,"sY":45}'>恢复默认设定 (主光右前)</option> </select> </div> </div> <div class="ctrl-group"> <div class="ctrl-title" style="color: #0df;">天光控制 (环境漫反射基底)</div>
+    <div style="display: flex; align-items: center; gap: 15px; padding: 4px 0;"> <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+    <div class="ctrl-row"><span style="width: 30px;">强度</span><input type="range" id="global-ambient" min="0" max="4" step="0.05" style="margin-left: 5px;"><span class="val-disp" style="width: 32px; text-align: right; color: #888; font-family: monospace;"></span></div>
+    <div class="ctrl-row"><span style="width: 30px;">竖向</span><input type="range" id="global-ambient-y" min="-90" max="90" step="1" style="margin-left: 5px;"><span class="val-disp" style="width: 32px; text-align: right; color: #888; font-family: monospace;"></span></div>
+    <div class="ctrl-row"><span style="width: 30px;">色温</span><input type="range" id="global-ambient-temp" min="2000" max="10000" step="100" style="margin-left: 5px;"><span class="val-disp" style="width: 32px; text-align: right; color: #888; font-family: monospace;"></span></div>
+    </div> <div style="width: 100px; display: flex; flex-direction: column; align-items: center;"> <div style="position: relative; width: 70px; height: 70px; margin-top: 4px;">
+    <span class="dial-lbl" data-vdeg="0" style="position:absolute; bottom:-16px; left:50%; transform:translateX(-50%); font-size:11px; color:#fff; text-shadow:0 0 5px #0df; cursor:pointer; padding:2px; z-index:2;" title="点击直达: 正前">前</span>
+    <span class="dial-lbl" data-vdeg="180" style="position:absolute; top:-16px; left:50%; transform:translateX(-50%); font-size:11px; color:#555; cursor:pointer; padding:2px; z-index:2;" title="点击直达: 正后">后</span>
+    <span class="dial-lbl" data-vdeg="90" style="position:absolute; left:-18px; top:50%; transform:translateY(-50%); font-size:11px; color:#aaa; cursor:pointer; padding:2px; z-index:2;" title="点击直达: 正左">左</span>
+    <span class="dial-lbl" data-vdeg="-90" style="position:absolute; right:-18px; top:50%; transform:translateY(-50%); font-size:11px; color:#aaa; cursor:pointer; padding:2px; z-index:2;" title="点击直达: 正右">右</span>
+    <div id="ambient-dial" style="width:100%; height:100%; border-radius:50%; background:#0a0b10; border:2px solid #333; position:absolute; top:0; left:0; cursor:crosshair; box-shadow:inset 0 0 15px #000, 0 0 5px rgba(0,210,255,0.2); box-sizing: border-box;"> <div class="dial-pointer" style="position:absolute; width:2px; height:33px; background:#0df; left:calc(50% - 1px); top:50%; transform-origin:top center; transform:rotate(0deg); box-shadow:0 0 6px #0df;"></div> <div style="position:absolute; width:14px; height:14px; border-radius:50%; background:#1a1a1a; border:2px solid #0df; top:calc(50% - 7px); left:calc(50% - 7px); pointer-events:none;"></div> </div> </div>
+    <div style="margin-top: 18px; text-align: center;">
+    <input type="range" id="global-ambient-x" min="-180" max="180" step="1" style="display:none;">
+    <span id="ambient-val-display" style="color:#0df; font-family:monospace; font-size:12px; font-weight:bold;">0°</span> </div> </div> </div> </div> <div class="ctrl-group">
+    <div class="ctrl-title" style="color: #fd0;">聚光灯控制 (主光源寻形)</div> <div style="display: flex; align-items: center; gap: 15px; padding: 4px 0;"> <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+    <div class="ctrl-row"><span style="width: 30px;">强度</span><input type="range" id="global-spot" min="0" max="10" step="0.05" style="margin-left: 5px;"><span class="val-disp" style="width: 32px; text-align: right; color: #888; font-family: monospace;"></span></div>
+    <div class="ctrl-row"><span style="width: 30px;">竖向</span><input type="range" id="global-spot-y" min="-90" max="90" step="1" style="margin-left: 5px;"><span class="val-disp" style="width: 32px; text-align: right; color: #888; font-family: monospace;"></span></div>
+    <div class="ctrl-row"><span style="width: 30px;">色温</span><input type="range" id="global-spot-temp" min="2000" max="10000" step="100" style="margin-left: 5px;"><span class="val-disp" style="width: 32px; text-align: right; color: #888; font-family: monospace;"></span></div>
+    </div> <div style="width: 100px; display: flex; flex-direction: column; align-items: center;"> <div style="position: relative; width: 70px; height: 70px; margin-top: 4px;">
+    <span class="dial-lbl" data-vdeg="0" style="position:absolute; bottom:-16px; left:50%; transform:translateX(-50%); font-size:11px; color:#fff; text-shadow:0 0 5px #fd0; cursor:pointer; padding:2px; z-index:2;" title="点击直达: 正前">前</span>
+    <span class="dial-lbl" data-vdeg="180" style="position:absolute; top:-16px; left:50%; transform:translateX(-50%); font-size:11px; color:#555; cursor:pointer; padding:2px; z-index:2;" title="点击直达: 正后">后</span>
+    <span class="dial-lbl" data-vdeg="90" style="position:absolute; left:-18px; top:50%; transform:translateY(-50%); font-size:11px; color:#aaa; cursor:pointer; padding:2px; z-index:2;" title="点击直达: 正左">左</span>
+    <span class="dial-lbl" data-vdeg="-90" style="position:absolute; right:-18px; top:50%; transform:translateY(-50%); font-size:11px; color:#aaa; cursor:pointer; padding:2px; z-index:2;" title="点击直达: 正右">右</span>
+    <div id="spot-dial" style="width:100%; height:100%; border-radius:50%; background:#0a0b10; border:2px solid #333; position:absolute; top:0; left:0; cursor:crosshair; box-shadow:inset 0 0 15px #000, 0 0 5px rgba(255,221,0,0.2); box-sizing: border-box;"> <div class="dial-pointer" style="position:absolute; width:2px; height:33px; background:#fd0; left:calc(50% - 1px); top:50%; transform-origin:top center; transform:rotate(0deg); box-shadow:0 0 6px #fd0;"></div> <div style="position:absolute; width:14px; height:14px; border-radius:50%; background:#1a1a1a; border:2px solid #fd0; top:calc(50% - 7px); left:calc(50% - 7px); pointer-events:none;"></div> </div> </div>
+    <div style="margin-top: 18px; text-align: center;">
+    <input type="range" id="global-spot-x" min="-180" max="180" step="1" style="display:none;">
+    <span id="spot-val-display" style="color:#fd0; font-family:monospace; font-size:12px; font-weight:bold;">0°</span> </div> </div> </div> </div> <script> // 监听工具模式切换
+    const toolModeSelect = document.getElementById('tool-mode-select'); if (toolModeSelect) { toolModeSelect.addEventListener('change', e => {
+    const container = document.getElementById('arrow-len-container'); if (container) container.style.display = (e.target.value === 'normal-arrow') ? 'flex' : 'none'; });
+    }
+    const arrowLength = document.getElementById('arrow-length'); if (arrowLength) { arrowLength.addEventListener('input', e => { const disp = document.getElementById('arrow-len-disp');
+    if (disp) disp.innerText = parseFloat(e.target.value).toFixed(2) + 'm'; }); }
+    setTimeout(() => { const bindDial = (dialId, inputId, displayId) => { const dial = document.getElementById(dialId); if (!dial) return; const ptr = dial.querySelector('.dial-pointer');
+    const inp = document.getElementById(inputId); const disp = document.getElementById(displayId); if(!ptr || !inp || !disp) return; let isDragging = false; const update = (vDeg) => { let visDeg = Math.round(vDeg);
+    if(visDeg <= -180) visDeg += 360; if(visDeg > 180) visDeg -= 360; ptr.style.transform = `rotate(${visDeg}deg)`; disp.innerText = visDeg + '°'; // 核心修复：底层数据补偿 +90 度错位
+    let valDeg = visDeg + 90; if(valDeg > 180) valDeg -= 360; inp.value = valDeg; inp.dispatchEvent(new Event('input')); }; const onMove = (e) => { if(!isDragging) return; const r = dial.getBoundingClientRect();
+    let vDeg = Math.atan2(-(e.clientX - (r.left + r.width/2)), e.clientY - (r.top + r.height/2)) * 180 / Math.PI; update(vDeg); }; dial.addEventListener('mousedown', (e) => { isDragging = true; onMove(e); });
+    window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', () => isDragging = false);
+    dial.parentElement.querySelectorAll('.dial-lbl').forEach(lbl => { lbl.addEventListener('click', () => { update(parseFloat(lbl.getAttribute('data-vdeg'))); }); });
+    setInterval(() => { if(isDragging) return; let valDeg = parseFloat(inp.value) || 0; let visDeg = valDeg - 90; if(visDeg <= -180) visDeg += 360; if(visDeg > 180) visDeg -= 360; ptr.style.transform = `rotate(${visDeg}deg)`;
+    disp.innerText = visDeg + '°'; }, 100); }; bindDial('ambient-dial', 'global-ambient-x', 'ambient-val-display');
+    bindDial('spot-dial', 'global-spot-x', 'spot-val-display'); }, 300); </script>
+    <div class="ctrl-group">
+    <div class="ctrl-title" style="color: #bbb;">全局基础设置</div>
+    <div class="ctrl-row"><span>画面色阶概括 (0为关)：</span><input type="range" id="global-posterize" min="0" max="20" step="1" value="0"><span class="val-disp" style="width: 32px; text-align: right; color: #888; font-family: monospace;"></span><label style="display:flex; align-items:center; gap:4px; margin-left:10px; cursor:pointer; color:#bbb;"><input type="checkbox" id="global-grayscale">灰度</label></div>
+    <div class="ctrl-row"><span>模型X光透视度：</span><input type="range" id="global-model-opacity" min="0" max="1" step="0.02"><span class="val-disp" style="width: 32px; text-align: right; color: #888; font-family: monospace;"></span></div>
+    <div class="ctrl-row" title="写入当前档案 settings.surfaceGloss；1=保留原材质光泽，0=哑光去油腻。头骨可保持偏高，肌肉可调低。"><span>表面光泽（油腻感）：</span><input type="range" id="global-surface-gloss" min="0" max="1" step="0.05"><span class="val-disp" style="width: 32px; text-align: right; color: #888; font-family: monospace;"></span></div>
+    </div>
+    <div class="btn-group">
+    <button class="action-btn" id="reset-cam-btn" style="background:#553; border-color:#664;">复位视角</button>
+    <button class="action-btn" id="btn-open-glb" style="background:#055; border-color:#088; color:#0ff;">📦 载入素模</button>
+    </div>
+    </div>
+    <input type="file" id="file-input" style="display:none;" accept=".json,.txt,.html">
+ </div> 
+
+    <div id="glb-manager-modal">
+        <div class="glb-modal-content">
+            <button class="glb-modal-close" onclick="window.closeGlbManager()">&times;</button>
+            <iframe id="glb-iframe" style="width:100%; height:100%; border:none; background:transparent;"></iframe>
+        </div>
+    </div>
+
+    <div id="desc-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
+    <div style="background:#1a1b22; border:1px solid #444; border-radius:8px; padding:15px; width:520px; max-width:92vw; display:flex; flex-direction:column; gap:10px;"> <div style="color:#0df; font-size:14px; font-weight:bold;">标注详细知识录入 <span id="desc-modal-id" style="color:#888;font-size:11px;"></span></div> <textarea id="desc-textarea" style="height:280px; width:100%; box-sizing:border-box; background:#050505; color:#ddd; border:1px solid #333; padding:8px; font-size:12px; resize:none; outline:none; white-space:pre-wrap; overflow-wrap:anywhere; overflow-x:hidden; font-family:sans-serif;" placeholder="输入更详细的知识点，支持换行..."></textarea>
+    <div style="display:flex; justify-content:flex-end; gap:10px;"> <button class="action-btn" onclick="document.getElementById('desc-modal').style.display='none'" style="background:#333;">取消</button>
+    <button class="action-btn" id="desc-save-btn" style="background:#055; border-color:#088; color:#0ff;">保存</button> </div> </div> </div> <div id="info-display" style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(10,11,16,0.95); border:1px solid #00d2ff; border-radius:6px; padding:15px; color:#fff; z-index:1000; min-width:300px; max-width:600px; box-shadow:0 4px 20px rgba(0,210,255,0.2);">
+    <div id="info-display-title" style="font-weight:bold; color:#00d2ff; margin-bottom:8px; border-bottom:1px solid #333; padding-bottom:5px;"></div> <div id="info-display-content" style="font-size:12px; line-height:1.6; white-space:pre-wrap;"></div>
+    <button onclick="this.parentElement.style.display='none'" style="position:absolute; top:10px; right:10px; background:none; border:none; color:#888; cursor:pointer;">✖</button> </div> <div id="debug-log-panel" style="pointer-events: auto;">
+    <div class="log-header"> <span id="toggle-log-btn" style="font-size: 12px; font-weight: bold; color: #f55; cursor: pointer; user-select: none;" title="点击收缩/展开">Bug排查日志 <span id="log-toggle-icon">▼</span></span> <button id="copy-log-btn" style="background: #444; color: #fff; border: none; padding: 2px 6px; cursor: pointer; border-radius: 3px; font-size: 11px;">复制日志</button> </div> <textarea id="debug-log-text" style="width: 100%; height: 100px; background: #000; color: #0f0; border: none; font-size: 10px; resize: none; outline: none; padding-top: 5px;" readonly></textarea>
+    </div> <script> // 初始化 Bug 排查系统
+    const logText = document.getElementById('debug-log-text'); window.logDebug = function(msg) { const time = new Date().toISOString().split('T')[1].slice(0, -1);
+    logText.value += `[${time}] ${msg}\n`; logText.scrollTop = logText.scrollHeight; }; window.onerror = function(msg, url, lineNo, columnNo, error) { window.logDebug(`[ERROR] ${msg} (Line: ${lineNo})`);
+    return false; }; document.getElementById('copy-log-btn').addEventListener('click', () => { navigator.clipboard.writeText(logText.value).then(() => alert('日志已成功复制！')); });
+    // 【新增】：日志面板收缩与缓存逻辑
+    const toggleLogBtn = document.getElementById('toggle-log-btn'); const logIcon = document.getElementById('log-toggle-icon'); const logPanel = document.getElementById('debug-log-panel');
+    const applyLogState = (collapsed) => { if (collapsed) { logText.style.display = 'none'; logIcon.innerText = '▲'; logPanel.style.width = 'auto'; } else { logText.style.display = 'block'; logIcon.innerText = '▼'; logPanel.style.width = '340px'; } };
+    applyLogState(localStorage.getItem('hw_log_collapsed') === 'true');
+    toggleLogBtn.addEventListener('click', () => { const newState = logText.style.display !== 'none'; localStorage.setItem('hw_log_collapsed', newState); applyLogState(newState); });
+    window.logDebug("日志系统已启动，正在监控应用异常..."); // ==========================================
+    // 插件管理器基座 (PluginManager)
+    // ==========================================
+    window.AnnotationPluginManager = { plugins: {}, register: function(plugin) { if(plugin && plugin.id) this.plugins[plugin.id] = plugin; }, getPlugin: function(id) { return this.plugins[id]; },
+    getAllPlugins: function() { return Object.values(this.plugins); }, dispatchRenderSVG: function(item, htmlStr, ctx) { const plugin = this.getPlugin(item.type);
+    if (plugin && plugin.renderSVG) { try { return plugin.renderSVG(item, htmlStr, ctx); } catch (e) { window.logDebug && window.logDebug(`[Plugin Error] ${item.type} 渲染异常: ${e.message}`); } }
+    return htmlStr; }, dispatchMountDOM: function(p, viewer) { const plugin = this.getPlugin(p.type);
+    if (plugin && plugin.mountDOM) { try { plugin.mountDOM(p, viewer); } catch (e) { window.logDebug && window.logDebug(`[Plugin Error] ${p.type} 挂载异常: ${e.message}`); } } }, dispatchUnmountDOM: function(p, viewer) { const plugin = this.getPlugin(p.type);
+    if (plugin && plugin.unmountDOM) { try { plugin.unmountDOM(p, viewer); } catch (e) { window.logDebug && window.logDebug(`[Plugin Error] ${p.type} 卸载异常: ${e.message}`); } } }, dispatchGetOcclusionReads: function(p, viewer, checkOccluded, isBackFace) {
+    const plugin = this.getPlugin(p.type); if (plugin && plugin.getOcclusionReads) { return plugin.getOcclusionReads(p, viewer, checkOccluded, isBackFace); }
+    return null; } }; // ==========================================
+    const viewer = document.querySelector('#workbench-viewer');
+    const statusMsg = document.querySelector('#status-msg');
+    let _annoFlashTimer = null;
+    function flashToast(msg, isErr) {
+        let el = document.getElementById('anno-flash-toast');
+        if (!el) {
+            el = document.createElement('div'); el.id = 'anno-flash-toast'; el.setAttribute('aria-live', 'polite');
+            document.body.appendChild(el);
+        }
+        el.textContent = msg || '';
+        el.classList.toggle('err', !!isErr);
+        el.classList.add('show');
+        clearTimeout(_annoFlashTimer);
+        _annoFlashTimer = setTimeout(() => { el.classList.remove('show'); }, 1400);
+        if (statusMsg) { statusMsg.innerText = msg || ''; statusMsg.style.color = isErr ? '#f88' : '#888'; }
+    }
+    /* reload/WS guard lives in <head>; ensure helper exists if head script delayed */
+    if (typeof window.armAnnoReloadBlock !== 'function') {
+        window.armAnnoReloadBlock = function (ms) {
+            window.__annoBlockReloadUntil = Date.now() + (ms == null ? 12000 : ms);
+        };
+    }
+
+    const pointsList = document.querySelector('#points-list'); const pointCountLabel = document.querySelector('#point-count'); const snapList = document.querySelector('#snap-list');
+    let pointIndex = 1; let pointsData = []; let snapshotsData = []; let snapIndex = 1; let selectedSnapId = null; let mainThumbnailData = ""; let currentLineDots = []; let currentPolygonDots = []; let isDrawing = false; let lastDrawX = 0, lastDrawY = 0;
+    let selectedPointId = null; let pointMoveSession = null; let _pointMoveSuppressClick = false;
+    let _baseCamRadius = null;
+    const ANNO_DEFAULT_FOV = 34; const ANNO_FOV_MIN = 5; const ANNO_FOV_MAX = 60;
+    let isUserDragging = false; let isDraggingOnModel = false; let lastCameraTheta = 0; let envRotOffset = 0; let defaultColor = localStorage.getItem('picker_default_color') || '#00d2ff';
+    let defaultOpacity = localStorage.getItem('picker_default_opacity') || '0.2'; let defaultShadow = localStorage.getItem('picker_shadow') || '0.8';
+    let globalModelOpacity = localStorage.getItem('picker_model_opacity') || '1';
+    // 表面光泽：1=原材质（头骨可保持油亮），0=哑光；写入档案 settings.surfaceGloss，按场景分别保存
+    let defaultSurfaceGloss = localStorage.getItem('picker_surface_gloss') || '1';
+    let defaultAmbient = localStorage.getItem('picker_ambient') || '0.15'; let defaultAmbientTemp = localStorage.getItem('picker_ambient_temp') || '6500';
+    let defaultAmbientX = localStorage.getItem('picker_ambient_x') || '0'; let defaultAmbientY = localStorage.getItem('picker_ambient_y') || '90';
+    let defaultSpot = localStorage.getItem('picker_spot') || '0.8'; let defaultSpotTemp = localStorage.getItem('picker_spot_temp') || '4500';
+    let defaultSpotX = localStorage.getItem('picker_spot_x') || '-45'; let defaultSpotY = localStorage.getItem('picker_spot_y') || '45';
+    const k2rgb = (k) => { let t=k/100,r,g,b; if(t<=66){r=255; g=Math.max(0,Math.min(255,99.47*Math.log(t)-161.1)); b=t<=19?0:Math.max(0,Math.min(255,138.5*Math.log(t-10)-305));}else{r=Math.max(0,Math.min(255,329.7*Math.pow(t-60,-0.133)));g=Math.max(0,Math.min(255,288.1*Math.pow(t-60,-0.075)));b=255;} return [r,g,b]; };
+    let _lightCanvas, _lightCtx; function updateLighting() {
+    if(!_lightCanvas){ _lightCanvas = document.createElement('canvas'); _lightCanvas.width = 1024; _lightCanvas.height = 512; _lightCtx = _lightCanvas.getContext('2d'); }
+    const canvas = _lightCanvas; const ctx = _lightCtx; ctx.fillStyle = '#0a0a10'; ctx.fillRect(0, 0, 1024, 512); const iAmb = parseFloat(defaultAmbient) || 0; const iSpot = parseFloat(defaultSpot) || 0;
+    // 表面光泽↓ → 环境高光软化（对齐 GLB 管理器摄影棚：大半径、低对比），避免只改材质仍被硬聚光打出油斑
+    const gloss = Math.max(0, Math.min(1, parseFloat(defaultSurfaceGloss))); const soft = 1 - (isFinite(gloss) ? gloss : 1);
+    const iSpotDraw = iSpot * (1 - soft * 0.55); const iAmbDraw = iAmb + iSpot * soft * 0.35; const iFill = iAmbDraw * 0.5 + iSpot * soft * 0.25;
+    const spotRadius = 120 + soft * 200; const ambRadius = 280 + soft * 80;
+    const peak = Math.max(iAmbDraw, iSpotDraw, iFill, 1e-6); const drawLight = (intensity, px, py, radius, r, g, b, isSpot = false) => { const i = parseFloat(intensity) / peak; if(i <= 0) return; if (Math.abs(parseFloat(py)) === 90) px = 0;
+    const x = ((parseFloat(px) + 180) / 360) * 1024; const y = ((-parseFloat(py) + 90) / 180) * 512; const cr = Math.min(255, Math.floor(r * i)); const cg = Math.min(255, Math.floor(g * i)); const cb = Math.min(255, Math.floor(b * i));
+    // 核心修复：抗极点拉伸畸变
+    const pitchRad = parseFloat(py) * Math.PI / 180; const stretchX = Math.max(1, 1 / Math.max(0.01, Math.cos(pitchRad))); ctx.save(); for(let offset of [-1024, 0, 1024]) { ctx.save(); ctx.translate(x + offset, y); ctx.scale(stretchX, 1);
+    const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, radius); grd.addColorStop(0, `rgba(${cr},${cg},${cb},1)`); if(isSpot) grd.addColorStop(0.15, `rgba(${cr},${cg},${cb},1)`); grd.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+    ctx.fillStyle = grd; ctx.fillRect(-radius, -radius, radius * 2, radius * 2); ctx.restore(); }
+    ctx.restore(); }; const [ar, ag, ab] = k2rgb(defaultAmbientTemp); drawLight(iAmbDraw, defaultAmbientX, defaultAmbientY, ambRadius, ar, ag, ab);
+    if (iFill > 0) drawLight(iFill, 0, 40, 220 + soft * 60, 180, 190, 210);
+    const [sr, sg, sb] = k2rgb(defaultSpotTemp); drawLight(iSpotDraw, defaultSpotX, defaultSpotY, spotRadius, sr, sg, sb, true); viewer.setAttribute('environment-image', canvas.toDataURL('image/png'));
+    viewer.setAttribute('exposure', String(peak)); updateSVG(); }
+    window.scrollToListItem = function(id) { selectedPointId = id; document.querySelectorAll('.point-item').forEach(n => n.classList.remove('active')); const el = document.getElementById('list-item-' + id);
+    if (el) { el.classList.add('active'); el.scrollIntoView({behavior: 'smooth', block: 'nearest'}); } };
+    function annoClampFov(v) {
+        const n = (typeof v === 'string') ? parseFloat(v) : Number(v);
+        if (!isFinite(n)) return ANNO_DEFAULT_FOV;
+        return Math.max(ANNO_FOV_MIN, Math.min(ANNO_FOV_MAX, n));
+    }
+    function annoReadFovDeg() {
+        try {
+            if (viewer.getFieldOfView) return annoClampFov(viewer.getFieldOfView());
+        } catch (_e) {}
+        const attr = viewer.getAttribute('field-of-view');
+        if (attr && attr !== 'auto') return annoClampFov(attr);
+        return ANNO_DEFAULT_FOV;
+    }
+    function annoSyncPerspectiveSlider() {
+        const s = document.getElementById('anno-persp-slider');
+        const lab = document.getElementById('anno-persp-val');
+        const fov = Math.round(annoReadFovDeg());
+        if (s && document.activeElement !== s) s.value = String(fov);
+        if (lab) lab.textContent = String(fov);
+    }
+    /** 调透视：改 FOV，并按 tan 比缩放 orbit 半径，尽量保住主体画面大小（对齐 Create） */
+    function annoSetPerspectiveFov(newFovDeg) {
+        const clamped = annoClampFov(newFovDeg);
+        const oldFov = annoReadFovDeg();
+        if (Math.abs(clamped - oldFov) < 1e-4) { annoSyncPerspectiveSlider(); return; }
+        try {
+            const orbit = viewer.getCameraOrbit ? viewer.getCameraOrbit() : null;
+            if (orbit && isFinite(orbit.radius) && orbit.radius > 1e-4) {
+                const oldHalf = (oldFov * Math.PI / 180) * 0.5;
+                const newHalf = (clamped * Math.PI / 180) * 0.5;
+                const scale = Math.tan(oldHalf) / Math.tan(newHalf);
+                const newRadius = orbit.radius * scale;
+                viewer.cameraOrbit = `${orbit.theta}rad ${orbit.phi}rad ${newRadius}m`;
+            }
+        } catch (_eOrb) {}
+        try {
+            viewer.fieldOfView = clamped + 'deg';
+        } catch (_eFov) {
+            viewer.setAttribute('field-of-view', clamped + 'deg');
+        }
+        try { if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal(); } catch (_eJump) {}
+        _baseCamRadius = null;
+        annoSyncPerspectiveSlider();
+        updateSVG();
+        if (statusMsg) statusMsg.innerText = '透视 ' + Math.round(clamped) + '°';
+    }
+    function installAnnoPerspectiveUI() {
+        const s = document.getElementById('anno-persp-slider');
+        if (!s || s._annoPerspBound) return;
+        s._annoPerspBound = true;
+        const onInput = function() { annoSetPerspectiveFov(this.value); };
+        s.addEventListener('input', onInput);
+        s.addEventListener('change', onInput);
+        annoSyncPerspectiveSlider();
+    }
+    function hitTestSurfacePointHotspot(clientX, clientY) {
+        // 不用 elementsFromPoint：pointerdown 时 canvas 常盖住 slotted hotspot，导致永远 miss
+        let best = null;
+        let bestDist = Infinity;
+        const pad = 12;
+        for (let i = 0; i < pointsData.length; i++) {
+            const p = pointsData[i];
+            if (!p || p.type !== 'point' || p.hidden) continue;
+            const el = viewer.querySelector(`[slot="${p.slot}"]`);
+            if (!el) continue;
+            if (el.style.display === 'none' || el.style.visibility === 'hidden') continue;
+            if (el.getAttribute('visible') === 'false') continue;
+            const r = el.getBoundingClientRect();
+            if (r.width <= 0 || r.height <= 0) continue;
+            if (clientX < r.left - pad || clientX > r.right + pad || clientY < r.top - pad || clientY > r.bottom + pad) continue;
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+            const d = Math.hypot(clientX - cx, clientY - cy);
+            if (d < bestDist) { bestDist = d; best = { p, el }; }
+        }
+        return best;
+    }
+    function selectSurfacePoint(id) {
+        selectedPointId = id;
+        document.querySelectorAll('.point-item').forEach(n => n.classList.remove('active'));
+        const li = document.getElementById('list-item-' + id);
+        if (li) { li.classList.add('active'); li.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+        viewer.querySelectorAll('.show-text').forEach(el => el.classList.remove('show-text'));
+        const p = pointsData.find(x => x.id === id);
+        if (p && !p.hidden) {
+            const slotQuery = (p.type === 'line' || p.type === 'spline' || p.type === 'contour') && p.dots
+                ? p.dots[p.midIndex || Math.floor(p.dots.length / 2)].slot
+                : p.slot;
+            if (slotQuery) {
+                const el = viewer.querySelector(`[slot="${slotQuery}"]`);
+                if (el) el.classList.add('show-text');
+            }
+        }
+        updateSVG();
+    }
+    function clearSurfacePointSelection() {
+        selectedPointId = null;
+        document.querySelectorAll('.point-item').forEach(n => n.classList.remove('active'));
+        viewer.querySelectorAll('.show-text').forEach(el => el.classList.remove('show-text'));
+        updateSVG();
+    }
+    function endPointMoveSession() {
+        if (!pointMoveSession) return;
+        const sess = pointMoveSession;
+        pointMoveSession = null;
+        try {
+            if (sess.pointerId != null && viewer.hasPointerCapture && viewer.hasPointerCapture(sess.pointerId)) {
+                viewer.releasePointerCapture(sess.pointerId);
+            }
+        } catch (_eRel) {}
+        try { if (!viewer.hasAttribute('camera-controls')) viewer.setAttribute('camera-controls', ''); } catch (_eCam) {}
+        if (sess.moved) {
+            _pointMoveSuppressClick = true;
+            const p = pointsData.find(x => x.id === sess.id);
+            if (p) {
+                const nameEl = document.querySelector('.point-name[data-id="' + sess.id + '"]');
+                if (nameEl) { nameEl.setAttribute('data-pos', p.pos); nameEl.setAttribute('data-norm', p.norm); }
+            }
+            generateCode();
+            statusMsg.innerText = '已更新点位 ' + sess.id + ' 吸附位置';
+        }
+    }
+    function beginPointMoveSession(p, clientX, clientY, pointerId) {
+        selectSurfacePoint(p.id);
+        pointMoveSession = { id: p.id, moved: false, startX: clientX, startY: clientY, lastPos: p.pos, lastNorm: p.norm, pointerId: pointerId };
+        try { viewer.removeAttribute('camera-controls'); } catch (_eCam2) {}
+        try { if (pointerId != null) viewer.setPointerCapture(pointerId); } catch (_eCap) {}
+        isUserDragging = false; isDraggingOnModel = false;
+        statusMsg.innerText = '拖移点位 ' + p.id + '（吸附表面）';
+    }
+    window.selectProberAnnotation = function(id) {
+    document.querySelectorAll('.point-item').forEach(n => n.classList.remove('active'));
+    const li = document.getElementById('list-item-' + id);
+    if (li) { li.classList.add('active'); li.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    const midEl = viewer.querySelector('.ink-mid[data-id="' + id + '"]');
+    if (midEl) midEl.classList.add('show-text');
+    updateSVG(); };
+    const hexToRgba = (hex, alpha) => { const h = hex || '#00d2ff'; const r = parseInt(h.slice(1, 3), 16) || 0, g = parseInt(h.slice(3, 5), 16) || 210, b = parseInt(h.slice(5, 7), 16) || 255; return `rgba(${r},${g},${b},${alpha})`; };
+    // 核心重构：彻底抛弃受透明材质干扰的默认探针，加入严格的 3D 空间法线背面剔除算法 (Backface Culling)
+    const checkOccluded = (elem) => { if (!elem) return true; return elem.style.display === 'none' || !elem.hasAttribute('visible') || elem.getAttribute('visible') === 'false'; };
+    let svgRafId = null; let _orbitSvgRafId = null; let _isSvgUpdating = false;
+    function performUpdateSVG(activePts = null) {
+    _isSvgUpdating = true;
+    const svg = document.querySelector('#ink-overlay'); if (!svg) { _isSvgUpdating = false; return; }
+    svg.setAttribute('viewBox', `0 0 ${svg.clientWidth} ${svg.clientHeight}`); let html = ''; // 实时计算摄像机视线向量 (用于完美背面剔除)
+    let camVec = {x:0, y:0, z:1}; if (viewer.getCameraOrbit) { const o = viewer.getCameraOrbit(); camVec.x = Math.sin(o.phi) * Math.sin(o.theta); camVec.y = Math.cos(o.phi); camVec.z = Math.sin(o.phi) * Math.cos(o.theta); }
+    const isBackFace = (normStr) => { if (!normStr) return false; const [nx, ny, nz] = normStr.replace(/m/g, '').split(' ').map(Number); return (nx * camVec.x + ny * camVec.y + nz * camVec.z) < -0.05; };
+    // --- 读写分离管线 (终极完全解耦) ---
+    const reads = []; pointsData.forEach(p => { if (p.hidden) return; const readData = window.AnnotationPluginManager.dispatchGetOcclusionReads(p, viewer, checkOccluded, isBackFace); if (readData) reads.push(readData); });
+    // 同步显隐
+    pointsData.forEach(p => { const slotEl = viewer.querySelector(`[slot="${(p.type==='line'||p.type==='spline'||p.type==='contour')&&p.dots?p.dots[p.midIndex||Math.floor(p.dots.length/2)].slot:p.slot}"]`); if (slotEl) slotEl.style.display = p.hidden ? 'none' : '';
+    if ((p.type==='line'||p.type==='spline'||p.type==='polygon'||p.type==='polygon3d'||p.type==='contour')&&p.dots) p.dots.forEach(d => { const del = viewer.querySelector(`[slot="${d.slot}"]`); if(del) del.style.display = p.hidden ? 'none' : ''; });
+    if (p.type==='normal-arrow') { [p.slotEnd, p.slotP1, p.slotP2, p.slotP3].forEach(s => { if(s){ const del = viewer.querySelector(`[slot="${s}"]`); if(del) del.style.display = p.hidden ? 'none' : ''; } }); } });
+    const getRenderAlpha = (isOccluded, baseOp) => { if (!isOccluded) return baseOp; // 没挡住，依然用原来的透明度
+    const mo = parseFloat(globalModelOpacity); if (mo >= 1.0) return 0; // 不透明模型，彻底隐藏
+    return (1 - mo) * 0.9; // 终极 X-Ray：打碎 baseOp 限制！模型越透，背面的幽灵线越清晰！
+    }; // 实时提取控制台的全部光影参数，打包喂给插件
+    const lightData = { amb: parseFloat(defaultAmbient), spt: parseFloat(defaultSpot), sX: parseFloat(defaultSpotX), sY: parseFloat(defaultSpotY), envRot: envRotOffset };
+    reads.forEach(item => { const p = item.p; const color = p.color || defaultColor; const ctx = { defaultOpacity, hexToRgba, color, getRenderAlpha, lightData }; html = window.AnnotationPluginManager.dispatchRenderSVG(item, html, ctx); });
+    if (typeof activePts === 'string' && activePts) { html += `<path d="${activePts}" pathLength="100" fill="none" stroke="${defaultColor}" stroke-width="3" stroke-dasharray="2,3" opacity="0.4" style="transition: opacity 0.2s; filter: drop-shadow(0 0 4px ${defaultColor}); pointer-events: none;" />`; }
+    const activeMode = document.getElementById('tool-mode-select').value; if (window.AnnotationPluginManager.getPlugin(activeMode)?.renderPreviewSVG) {
+    html = window.AnnotationPluginManager.getPlugin(activeMode).renderPreviewSVG(html, { hexToRgba, getRenderAlpha }); }
+    svg.innerHTML = html; _isSvgUpdating = false; }
+    function updateSVG(activePts = null) { if (svgRafId && activePts === null) cancelAnimationFrame(svgRafId); svgRafId = requestAnimationFrame(() => { svgRafId = null; performUpdateSVG(activePts); }); }
+    function scheduleOrbitSvgLoop() { if (_orbitSvgRafId != null) return; const tick = () => { _orbitSvgRafId = null; if (!isUserDragging) return; performUpdateSVG(null); _orbitSvgRafId = requestAnimationFrame(tick); }; _orbitSvgRafId = requestAnimationFrame(tick); }
+    function updateSVGActiveLine() { const mode = document.getElementById('tool-mode-select').value; let dStr = ''; const dotReads = []; currentLineDots.forEach(d => { const el = viewer.querySelector(`[slot="${d.slot}"]`); if(!el) return; dotReads.push({ r: el.getBoundingClientRect(), isOccluded: checkOccluded(el) }); }); if (mode === 'spline') { const buildSmoothPath = (pts) => { if(pts.length===0) return ''; if(pts.length===1) return `M ${pts[0].x} ${pts[0].y} `; if(pts.length===2) return `M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y} `; let d=`M ${pts[0].x} ${pts[0].y} `; for(let i=1; i<pts.length-1; i++){ const xc=(pts[i].x+pts[i+1].x)/2; const yc=(pts[i].y+pts[i+1].y)/2; d+=`Q ${pts[i].x} ${pts[i].y}, ${xc} ${yc} `; } d+=`L ${pts[pts.length-1].x} ${pts[pts.length-1].y} `; return d; }; let currentSeg = []; dotReads.forEach(dr => { if (!dr.isOccluded) currentSeg.push({x: dr.r.left + dr.r.width/2, y: dr.r.top + dr.r.height/2}); else if (currentSeg.length > 0) { dStr += buildSmoothPath(currentSeg); currentSeg = []; } }); if (currentSeg.length > 0) dStr += buildSmoothPath(currentSeg); } else { let isFirst = true; dotReads.forEach(dr => { if (dr.isOccluded) isFirst = true; else { dStr += `${isFirst ? 'M' : 'L'}${dr.r.left + dr.r.width/2} ${dr.r.top + dr.r.height/2} `; isFirst = false; } }); } updateSVG(dStr); }
+    /** 程序写入滑条时同步旁边 .val-disp（导入/应用快照勿只改 .value） */
+    function setRangeVal(selector, value) {
+        const el = document.querySelector(selector); if (!el || value === undefined || value === null) return;
+        el.value = value;
+        const disp = el.nextElementSibling;
+        if (disp && disp.classList.contains('val-disp')) disp.innerText = String(value);
+    }
+    const initSlider = (selector, defaultVal, updateFn) => { const el = document.querySelector(selector); if(el) { const disp = el.nextElementSibling; const triggerUpdate = (v) => { if(disp && disp.classList.contains('val-disp')) disp.innerText = v; updateFn(v); }; el.value = defaultVal; triggerUpdate(defaultVal); el.addEventListener('input', (e) => triggerUpdate(e.target.value)); } return el; };
+    initSlider('#global-color-picker', defaultColor, v => { defaultColor=v; localStorage.setItem('picker_default_color', v); updateSVG(); });
+    installAnnoPerspectiveUI();
+    // 手机取景框：仅叠加 390×844 比例淡灰框（半透明遮罩），不裁切 3D 视口，框外模型仍可见。
+    (function initAnnoMobileFrame() {
+        const STORAGE_KEY = 'picker_mobile_frame';
+        /* 与 Portrait_c 手机快照画幅同宽高比；只画光学参考框，不缩视口，框外模型仍可见 */
+        const BASE_W = 440, BASE_H = 956, MOBILE_CHROME = 60 + 55;
+        const ov = document.getElementById('anno-mobile-frame-overlay');
+        const wrap = document.getElementById('anno-mobile-frame-wrap');
+        const cb = document.getElementById('anno-mobile-frame-toggle');
+        const label = document.getElementById('anno-mobile-frame-label');
+        const mv = document.getElementById('workbench-viewer');
+        const ink = document.getElementById('ink-overlay');
+        if (!ov || !wrap || !cb) return;
+        if (label) label.textContent = '手机快照取景参考';
+
+        // 清掉信箱残留
+        if (mv && ink) {
+            [mv, ink].forEach((el) => {
+                el.style.top = ''; el.style.left = ''; el.style.width = '';
+                el.style.height = ''; el.style.right = ''; el.style.bottom = '';
+                el.style.position = '';
+            });
+        }
+        document.body.classList.remove('anno-mobile-frame-on');
+
+        /** 光学裁切框：画布仍全屏，框内=手机快照区；框外半透明可见 */
+        function layout() {
+            if (!mv) return;
+            const vr = mv.getBoundingClientRect();
+            if (vr.width < 32 || vr.height < 32) return;
+            const Am = BASE_W / Math.max(1, BASE_H - MOBILE_CHROME);
+            let h = vr.height;
+            let w = h * Am;
+            if (w > vr.width) { w = vr.width; h = w / Am; }
+            const left = vr.left + (vr.width - w) / 2;
+            const top = vr.top + (vr.height - h) / 2;
+            wrap.style.left = Math.round(left) + 'px';
+            wrap.style.top = Math.round(top) + 'px';
+            wrap.style.width = Math.round(w) + 'px';
+            wrap.style.height = Math.round(h) + 'px';
+        }
+
+        function setEnabled(on) {
+            ov.hidden = !on;
+            cb.checked = !!on;
+            try { localStorage.setItem(STORAGE_KEY, on ? '1' : '0'); } catch (_e) {}
+            if (on) layout();
+        }
+
+        let enabled = true;
+        try {
+            const v = localStorage.getItem(STORAGE_KEY);
+            enabled = (v === null) ? true : (v === '1');
+        } catch (_e) {}
+        setEnabled(enabled);
+        cb.addEventListener('change', () => setEnabled(cb.checked));
+        window.addEventListener('resize', () => { if (!ov.hidden) layout(); });
+        if (window.ResizeObserver && mv) {
+            const ro = new ResizeObserver(() => { if (!ov.hidden) layout(); });
+            ro.observe(mv);
+        }
+    })();
+    viewer.addEventListener('load', () => { setTimeout(() => annoSyncPerspectiveSlider(), 100); });
+    document.querySelector('#preset-cam').addEventListener('change', (e) => { if(!e.target.value) return; _baseCamRadius = null;
+    viewer.setAttribute('camera-target', 'auto auto auto'); viewer.setAttribute('camera-orbit', e.target.value); e.target.value = '';
+    statusMsg.innerText = "已应用视角预设"; updateSVG(); setTimeout(() => annoSyncPerspectiveSlider(), 400); }); document.querySelector('#preset-light').addEventListener('change', (e) => { if(!e.target.value) return;
+    const c = JSON.parse(e.target.value); const setVal = (id, val) => { const el = document.querySelector(id); if(el){ el.value = val; el.dispatchEvent(new Event('input')); } };
+    setVal('#global-ambient', c.amb); setVal('#global-ambient-temp', c.aT); setVal('#global-ambient-x', c.aX); setVal('#global-ambient-y', c.aY);
+    setVal('#global-spot', c.spt); setVal('#global-spot-temp', c.sT); setVal('#global-spot-x', c.sX); setVal('#global-spot-y', c.sY); e.target.value = '';
+    statusMsg.innerText = "已应用光影预设"; });
+    // 【材质透明度】USE_SAFE_MODEL_OPACITY=false 可一键回退旧逻辑
+    // X 光用 three.opacity 淡化并保持 depthWrite=true，避免 setAlphaMode(BLEND) 导致眼皮/肌肉层次穿插；滑回 1 全体还原
+    const USE_SAFE_MODEL_OPACITY = true;
+    let _matOrig = null;
+    let _opacityDirty = false;
+    let _opacityApplyRaf = null;
+    let _opacityAssertRaf = null;
+    function getThreeMats(mat) {
+        const out = [];
+        try {
+            for (const sym of Object.getOwnPropertySymbols(mat)) {
+                const val = mat[sym];
+                if (!val || typeof val !== 'object') continue;
+                if (typeof val.forEach === 'function') {
+                    val.forEach(tm => { if (tm && (tm.isMaterial || typeof tm.opacity === 'number')) out.push(tm); });
+                } else if (Array.isArray(val)) {
+                    val.forEach(tm => { if (tm && (tm.isMaterial || typeof tm.opacity === 'number')) out.push(tm); });
+                }
+            }
+        } catch (_e) {}
+        return out;
+    }
+    function readAlphaMode(mat) {
+        try {
+            if (typeof mat.getAlphaMode === 'function') {
+                const m = mat.getAlphaMode();
+                if (typeof m === 'string' && m) return m;
+            }
+        } catch (_e) {}
+        try {
+            const c = mat.pbrMetallicRoughness.baseColorFactor;
+            if (c && c[3] !== undefined && c[3] < 0.999) return 'BLEND';
+        } catch (_e2) {}
+        return 'OPAQUE';
+    }
+    function readRoughness(mat) {
+        try {
+            const p = mat.pbrMetallicRoughness;
+            if (typeof p.getRoughnessFactor === 'function') return p.getRoughnessFactor();
+            if (p.roughnessFactor !== undefined) return p.roughnessFactor;
+        } catch (_e) {}
+        return 1;
+    }
+    function readMetalness(mat) {
+        try {
+            const p = mat.pbrMetallicRoughness;
+            if (typeof p.getMetallicFactor === 'function') return p.getMetallicFactor();
+            if (p.metallicFactor !== undefined) return p.metallicFactor;
+        } catch (_e) {}
+        return 0;
+    }
+    function captureMatOrig() {
+        _matOrig = null;
+        if (!viewer.model || !viewer.model.materials) return;
+        _matOrig = viewer.model.materials.map(mat => {
+            const c = mat.pbrMetallicRoughness.baseColorFactor;
+            const rgba = [c[0], c[1], c[2], c[3] !== undefined ? c[3] : 1];
+            const mode = readAlphaMode(mat);
+            const roughness = readRoughness(mat);
+            const metalness = readMetalness(mat);
+            let mrTex = null;
+            try {
+                const info = mat.pbrMetallicRoughness.metallicRoughnessTexture;
+                if (info && info.texture) mrTex = info.texture;
+            } catch (_e) {}
+            const three = getThreeMats(mat).map(tm => ({
+                opacity: tm.opacity,
+                transparent: tm.transparent,
+                depthWrite: tm.depthWrite,
+                roughness: tm.roughness,
+                metalness: tm.metalness,
+                roughnessMap: tm.roughnessMap || null,
+                metalnessMap: tm.metalnessMap || null,
+                envMapIntensity: (typeof tm.envMapIntensity === 'number') ? tm.envMapIntensity : 1,
+                clearcoat: (typeof tm.clearcoat === 'number') ? tm.clearcoat : 0,
+                clearcoatRoughness: (typeof tm.clearcoatRoughness === 'number') ? tm.clearcoatRoughness : 0
+            }));
+            return { rgba, mode, roughness, metalness, mrTex, three };
+        });
+    }
+    function applySurfaceGloss(gIn) {
+        if (!viewer.model || !viewer.model.materials) return;
+        if (!_matOrig || _matOrig.length !== viewer.model.materials.length) captureMatOrig();
+        if (!_matOrig) return;
+        const g = Math.max(0, Math.min(1, parseFloat(gIn)));
+        if (!isFinite(g)) return;
+        const dull = 1 - g; // 0=原光泽，1=全哑光（对齐 GLB 管理器摄影棚柔和质感）
+        viewer.model.materials.forEach((mat, i) => {
+            const orig = _matOrig[i]; if (!orig) return;
+            const or = (orig.roughness !== undefined && orig.roughness !== null) ? orig.roughness : 1;
+            const om = (orig.metalness !== undefined && orig.metalness !== null) ? orig.metalness : 0;
+            // 关键：先清/还原 metallicRoughnessTexture，否则贴图 G/B 通道会把 roughnessFactor 乘死，滑条无效
+            try {
+                const info = mat.pbrMetallicRoughness.metallicRoughnessTexture;
+                if (info && typeof info.setTexture === 'function') {
+                    if (dull > 0.001) info.setTexture(null);
+                    else if (orig.mrTex) info.setTexture(orig.mrTex);
+                }
+            } catch (_eTex) {}
+            // 去油：粗糙度强推到接近 1；回油：回到原 factor
+            const nr = dull > 0.001 ? (or * g + 1 * dull) : or;
+            const nm = om * g;
+            try {
+                const p = mat.pbrMetallicRoughness;
+                if (typeof p.setRoughnessFactor === 'function') p.setRoughnessFactor(nr); else p.roughnessFactor = nr;
+                if (typeof p.setMetallicFactor === 'function') p.setMetallicFactor(nm); else p.metallicFactor = nm;
+            } catch (_e) {}
+            getThreeMats(mat).forEach((tm, ti) => {
+                const o = orig.three && orig.three[ti];
+                const baseR = (o && o.roughness !== undefined) ? o.roughness : or;
+                const baseM = (o && o.metalness !== undefined) ? o.metalness : om;
+                const baseEnv = (o && typeof o.envMapIntensity === 'number') ? o.envMapIntensity : 1;
+                const baseCC = (o && typeof o.clearcoat === 'number') ? o.clearcoat : 0;
+                const baseCCR = (o && typeof o.clearcoatRoughness === 'number') ? o.clearcoatRoughness : 0;
+                if (dull > 0.001) {
+                    tm.roughnessMap = null;
+                    tm.metalnessMap = null;
+                    if (typeof tm.roughness === 'number') tm.roughness = baseR * g + 1 * dull;
+                } else {
+                    if (o && ('roughnessMap' in o)) tm.roughnessMap = o.roughnessMap;
+                    if (o && ('metalnessMap' in o)) tm.metalnessMap = o.metalnessMap;
+                    if (typeof tm.roughness === 'number') tm.roughness = baseR;
+                }
+                if (typeof tm.metalness === 'number') tm.metalness = baseM * g;
+                // IBL 反射强度随光泽下降（管理器柔和观感的关键）
+                if (typeof tm.envMapIntensity === 'number') tm.envMapIntensity = baseEnv * Math.max(0.05, g * g);
+                if (typeof tm.clearcoat === 'number') tm.clearcoat = baseCC * g;
+                if (typeof tm.clearcoatRoughness === 'number') tm.clearcoatRoughness = baseCCR + (1 - baseCCR) * dull;
+                tm.needsUpdate = true;
+            });
+        });
+        // 光泽也驱动环境高光软硬，与材质同步
+        try { updateLighting(); } catch (_eL) {}
+    }
+    function restoreAllFromOrig() {
+        if (!viewer.model || !viewer.model.materials || !_matOrig) {
+            _opacityDirty = false;
+            return;
+        }
+        if (_opacityAssertRaf) { cancelAnimationFrame(_opacityAssertRaf); _opacityAssertRaf = null; }
+        viewer.model.materials.forEach((mat, i) => {
+            const orig = _matOrig[i];
+            if (!orig) return;
+            mat.pbrMetallicRoughness.setBaseColorFactor(orig.rgba.slice());
+            try { mat.setAlphaMode(orig.mode || 'OPAQUE'); } catch (_e) {}
+            try {
+                const p = mat.pbrMetallicRoughness;
+                const or = (orig.roughness !== undefined) ? orig.roughness : 1;
+                const om = (orig.metalness !== undefined) ? orig.metalness : 0;
+                if (typeof p.setRoughnessFactor === 'function') p.setRoughnessFactor(or); else p.roughnessFactor = or;
+                if (typeof p.setMetallicFactor === 'function') p.setMetallicFactor(om); else p.metallicFactor = om;
+            } catch (_e2) {}
+            getThreeMats(mat).forEach((tm, ti) => {
+                const o = orig.three && orig.three[ti];
+                if (!o) {
+                    if ((orig.mode || 'OPAQUE') === 'OPAQUE') {
+                        tm.transparent = false; tm.opacity = 1; tm.depthWrite = true;
+                    }
+                    tm.needsUpdate = true;
+                    return;
+                }
+                tm.opacity = o.opacity;
+                tm.transparent = o.transparent;
+                tm.depthWrite = o.depthWrite;
+                if (o.roughness !== undefined) tm.roughness = o.roughness;
+                if (o.metalness !== undefined) tm.metalness = o.metalness;
+                if ('roughnessMap' in o) tm.roughnessMap = o.roughnessMap;
+                if ('metalnessMap' in o) tm.metalnessMap = o.metalnessMap;
+                if (typeof o.envMapIntensity === 'number') tm.envMapIntensity = o.envMapIntensity;
+                if (typeof o.clearcoat === 'number') tm.clearcoat = o.clearcoat;
+                if (typeof o.clearcoatRoughness === 'number') tm.clearcoatRoughness = o.clearcoatRoughness;
+                tm.needsUpdate = true;
+            });
+        });
+        _opacityDirty = false;
+        applySurfaceGloss(defaultSurfaceGloss);
+    }
+    function applyXrayThreeOpacity(val) {
+        if (!viewer.model || !viewer.model.materials || !_matOrig) return;
+        viewer.model.materials.forEach((mat, i) => {
+            const orig = _matOrig[i]; if (!orig) return;
+            // 保持原始 alphaMode，不走 BLEND（避免 depthWrite=false 造成穿模）
+            mat.pbrMetallicRoughness.setBaseColorFactor(orig.rgba.slice());
+            try { mat.setAlphaMode(orig.mode || 'OPAQUE'); } catch (_e) {}
+            getThreeMats(mat).forEach((tm, ti) => {
+                const o = (orig.three && orig.three[ti]) || { opacity: 1 };
+                const baseOp = (o.opacity !== undefined && o.opacity !== null) ? o.opacity : 1;
+                tm.transparent = true;
+                tm.opacity = baseOp * val;
+                tm.depthWrite = true;
+                tm.needsUpdate = true;
+            });
+        });
+    }
+    const applyModelOpacity = (alpha) => {
+        const val = parseFloat(alpha);
+        if (!viewer.model || !viewer.model.materials) return;
+        if (!USE_SAFE_MODEL_OPACITY) {
+            viewer.model.materials.forEach(mat => {
+                const c = mat.pbrMetallicRoughness.baseColorFactor;
+                mat.pbrMetallicRoughness.setBaseColorFactor([c[0], c[1], c[2], val]);
+                mat.setAlphaMode(val < 1.0 ? 'BLEND' : 'OPAQUE');
+            });
+            return;
+        }
+        if (val >= 0.999) {
+            if (_opacityDirty) restoreAllFromOrig();
+            return;
+        }
+        if (_opacityDirty) restoreAllFromOrig();
+        if (!_matOrig || _matOrig.length !== viewer.model.materials.length) captureMatOrig();
+        if (!_matOrig) return;
+        applyXrayThreeOpacity(val);
+        _opacityDirty = true;
+        // model-viewer 可能在同帧后又同步一次材质，下一帧再钉死 opacity/depthWrite
+        if (_opacityAssertRaf) cancelAnimationFrame(_opacityAssertRaf);
+        _opacityAssertRaf = requestAnimationFrame(() => {
+            _opacityAssertRaf = null;
+            if (!_opacityDirty) return;
+            if (parseFloat(globalModelOpacity) >= 0.999) return;
+            applyXrayThreeOpacity(parseFloat(globalModelOpacity));
+        });
+    };
+    viewer.addEventListener('load', () => {
+        _matOrig = null; _opacityDirty = false; captureMatOrig();
+        applySurfaceGloss(defaultSurfaceGloss);
+        if (parseFloat(globalModelOpacity) < 0.999) applyModelOpacity(globalModelOpacity);
+    }); // 色阶概括与灰度功能核心逻辑 (SVG Filter + CSS Filter 驱动)
+let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defaultGrayscale = localStorage.getItem('picker_grayscale') === 'true';
+    const updateViewFilters = () => { const val = parseInt(defaultPosterize); const isGray = defaultGrayscale;
+    const viewerEl = document.getElementById('workbench-viewer'); const transferEl = document.getElementById('posterize-transfer'); let filterStr = ''; if (val > 0) {
+    // 核心反向映射：滑块值 1~20 映射为色阶数 21~2 (越往右，概括越强，色阶越少)
+    const level = 22 - val; let tableVals = []; for (let i = 0; i < level; i++) { tableVals.push((i / (level - 1)).toFixed(4)); }
+    const tableStr = tableVals.join(' ');
+    if (transferEl) { transferEl.querySelector('feFuncR').setAttribute('tableValues', tableStr); transferEl.querySelector('feFuncG').setAttribute('tableValues', tableStr); transferEl.querySelector('feFuncB').setAttribute('tableValues', tableStr); }
+    filterStr += 'url(#filter-posterize) '; }
+    if (isGray) { filterStr += 'grayscale(1) '; }
+    viewerEl.style.filter = filterStr.trim() || 'none'; };
+    initSlider('#global-posterize', defaultPosterize, v => { defaultPosterize = v; localStorage.setItem('picker_posterize', v); updateViewFilters(); });
+    const grayCheck = document.getElementById('global-grayscale');
+    if(grayCheck) { grayCheck.checked = defaultGrayscale; grayCheck.addEventListener('change', (e) => { defaultGrayscale = e.target.checked; localStorage.setItem('picker_grayscale', defaultGrayscale); updateViewFilters(); }); updateViewFilters(); }
+    initSlider('#global-model-opacity', globalModelOpacity, v => {
+        globalModelOpacity = v; localStorage.setItem('picker_model_opacity', v);
+        if (_opacityApplyRaf) cancelAnimationFrame(_opacityApplyRaf);
+        _opacityApplyRaf = requestAnimationFrame(() => {
+            _opacityApplyRaf = null;
+            applyModelOpacity(v); updateSVG(); generateCode();
+        });
+    });
+    initSlider('#global-surface-gloss', defaultSurfaceGloss, v => {
+        defaultSurfaceGloss = v; localStorage.setItem('picker_surface_gloss', v);
+        applySurfaceGloss(v); generateCode();
+        if (statusMsg) statusMsg.innerText = `表面光泽 ${v}（写入档案 settings.surfaceGloss）`;
+    });
+    initSlider('#global-opacity-slider', defaultOpacity, v => { defaultOpacity=v; localStorage.setItem('picker_default_opacity', v); updateSVG(); }); // 右侧控制台面板宽度拖拽记忆系统
+    const consolePanel = document.getElementById('console-panel'); const resizer = document.getElementById('console-resizer'); let isResizingPanel = false, panelStartX = 0, panelStartWidth = 0;
+    const savedPanelWidth = localStorage.getItem('picker_console_width'); if(savedPanelWidth) consolePanel.style.width = savedPanelWidth + 'px';
+    resizer.addEventListener('mousedown', (e) => { isResizingPanel = true; panelStartX = e.clientX; panelStartWidth = consolePanel.offsetWidth; document.body.style.cursor = 'ew-resize'; e.preventDefault(); });
+    window.addEventListener('mousemove', (e) => { if(!isResizingPanel) return; const newW = panelStartWidth - (e.clientX - panelStartX); if(newW > 320 && newW < 800) { consolePanel.style.width = newW + 'px'; localStorage.setItem('picker_console_width', newW); } });
+    window.addEventListener('mouseup', () => { isResizingPanel = false; document.body.style.cursor = 'default'; });
+
+    // 左侧快照面板宽度拖拽记忆系统
+    const snapshotPanelEl = document.getElementById('snapshot-panel'); const snapResizer = document.getElementById('snapshot-resizer'); let isResizingSnap = false, snapStartX = 0, snapStartWidth = 0;
+    const savedSnapWidth = localStorage.getItem('hw_snapshot_width'); if(savedSnapWidth) snapshotPanelEl.style.width = savedSnapWidth + 'px';
+    snapResizer.addEventListener('mousedown', (e) => { isResizingSnap = true; snapStartX = e.clientX; snapStartWidth = snapshotPanelEl.offsetWidth; document.body.style.cursor = 'ew-resize'; e.preventDefault(); });
+    window.addEventListener('mousemove', (e) => { if(!isResizingSnap) return; const newW = snapStartWidth + (e.clientX - snapStartX); if(newW > 320 && newW < 800) { snapshotPanelEl.style.width = newW + 'px'; localStorage.setItem('hw_snapshot_width', newW); } });
+    window.addEventListener('mouseup', () => { isResizingSnap = false; if(!isResizingPanel) document.body.style.cursor = 'default'; });
+    initSlider('#global-ambient', defaultAmbient, v => { defaultAmbient=v; localStorage.setItem('picker_ambient', v); updateLighting(); });
+    initSlider('#global-ambient-temp', defaultAmbientTemp, v => { defaultAmbientTemp=v; localStorage.setItem('picker_ambient_temp', v); updateLighting(); });
+    initSlider('#global-ambient-x', defaultAmbientX, v => { defaultAmbientX=v; localStorage.setItem('picker_ambient_x', v); updateLighting(); });
+    initSlider('#global-ambient-y', defaultAmbientY, v => { defaultAmbientY=v; localStorage.setItem('picker_ambient_y', v); updateLighting(); });
+    initSlider('#global-spot', defaultSpot, v => { defaultSpot=v; localStorage.setItem('picker_spot', v); updateLighting(); });
+    initSlider('#global-spot-temp', defaultSpotTemp, v => { defaultSpotTemp=v; localStorage.setItem('picker_spot_temp', v); updateLighting(); });
+    initSlider('#global-spot-x', defaultSpotX, v => { defaultSpotX=v; localStorage.setItem('picker_spot_x', v); updateLighting(); });
+    initSlider('#global-spot-y', defaultSpotY, v => { defaultSpotY=v; localStorage.setItem('picker_spot_y', v); updateLighting(); });
+    viewer.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || e.shiftKey) return;
+        const hitPt = hitTestSurfacePointHotspot(e.clientX, e.clientY);
+        if (hitPt) {
+            beginPointMoveSession(hitPt.p, e.clientX, e.clientY, e.pointerId);
+            try { e.preventDefault(); e.stopImmediatePropagation(); } catch (_eStop) {}
+            return;
+        }
+    }, { capture: true });
+    viewer.addEventListener('pointerdown', (e) => { if (pointMoveSession || e.altKey || e.button !== 0) return; isUserDragging = true; const hit = viewer.positionAndNormalFromPoint(e.clientX, e.clientY);
+    if (hit != null) { isDraggingOnModel = true; } else { isDraggingOnModel = false; }
+    if(viewer.getCameraOrbit) lastCameraTheta = viewer.getCameraOrbit().theta; scheduleOrbitSvgLoop(); }, { capture: true });
+    function applyPointMoveFromEvent(e) {
+        if (!pointMoveSession) return false;
+        const sess = pointMoveSession;
+        const dist = Math.hypot(e.clientX - sess.startX, e.clientY - sess.startY);
+        if (dist > 5) {
+            const hit = viewer.positionAndNormalFromPoint(e.clientX, e.clientY);
+            if (hit != null) {
+                const posStr = `${hit.position.x.toFixed(4)}m ${hit.position.y.toFixed(4)}m ${hit.position.z.toFixed(4)}m`;
+                const normStr = `${hit.normal.x.toFixed(4)}m ${hit.normal.y.toFixed(4)}m ${hit.normal.z.toFixed(4)}m`;
+                const p = pointsData.find(x => x.id === sess.id);
+                const plugin = window.AnnotationPluginManager.getPlugin('point');
+                if (p && plugin && plugin.updateSurfacePose) {
+                    plugin.updateSurfacePose(p, posStr, normStr, viewer);
+                    sess.lastPos = posStr; sess.lastNorm = normStr; sess.moved = true;
+                    updateSVG();
+                }
+            }
+        }
+        return true;
+    }
+    viewer.addEventListener('pointermove', (e) => {
+        if (applyPointMoveFromEvent(e)) {
+            try { e.preventDefault(); e.stopPropagation(); } catch (_eMv) {}
+            return;
+        }
+        if (e.buttons !== 1 || e.altKey) return; if (!isUserDragging) { isUserDragging = true; const hit = viewer.positionAndNormalFromPoint(e.clientX, e.clientY); isDraggingOnModel = hit != null; if (viewer.getCameraOrbit) lastCameraTheta = viewer.getCameraOrbit().theta; } scheduleOrbitSvgLoop();
+    }, { capture: true });
+    window.addEventListener('pointermove', (e) => {
+        if (!pointMoveSession) return;
+        applyPointMoveFromEvent(e);
+    }, { capture: true });
+    window.addEventListener('pointerup', () => { endPointMoveSession(); if (_orbitSvgRafId != null) { cancelAnimationFrame(_orbitSvgRafId); _orbitSvgRafId = null; } isUserDragging = false; isDraggingOnModel = false; updateSVG(); }, { capture: true });
+    window.addEventListener('pointercancel', () => { endPointMoveSession(); }, { capture: true });
+    viewer.addEventListener('camera-change', () => { requestAnimationFrame(() => { requestAnimationFrame(() => { updateSVG(); }); }); if (isUserDragging && !pointMoveSession && viewer.getCameraOrbit) { const currentTheta = viewer.getCameraOrbit().theta; const delta = currentTheta - lastCameraTheta;
+    lastCameraTheta = currentTheta; if (!isDraggingOnModel) { envRotOffset += delta; viewer.setAttribute('environment-rotation', `0rad ${envRotOffset}rad 0rad`); } } });
+    window.addEventListener('resize', () => updateSVG());
+    new MutationObserver(() => { if(!_isSvgUpdating) updateSVG(); }).observe(viewer, { attributes: true, subtree: true, childList: true, attributeFilter: ['visible', 'style'] });
+    if (window.ResizeObserver) new ResizeObserver(() => updateSVG()).observe(viewer); function generateCode() {
+    const oStr = viewer.getCameraOrbit ? viewer.getCameraOrbit().toString() : (viewer.getAttribute('camera-orbit')||'auto auto auto');
+    const tStr = viewer.getCameraTarget ? viewer.getCameraTarget().toString() : (viewer.getAttribute('camera-target')||'auto auto auto');
+    const fStr = (function(){ const a=viewer.getAttribute('field-of-view'); if(a&&a!=='auto') return a; if(viewer.fieldOfView&&viewer.fieldOfView!=='auto') return viewer.fieldOfView; return viewer.getFieldOfView ? viewer.getFieldOfView()+'deg' : 'auto'; })();
+    const cameraObj = { orbit: oStr, target: tStr, fov: fStr };
+    let mainThumb = (typeof mainThumbnailData === 'string' && mainThumbnailData) ? mainThumbnailData : "";
+    if (!mainThumb) {
+        const coverSnap = snapshotsData.find(s => s.isCover);
+        mainThumb = coverSnap ? (coverSnap.thumb || "") : (snapshotsData.length > 0 ? (snapshotsData[0].thumb || "") : "");
+    }
+    const realModelSrc = viewer.getAttribute('data-raw-src') || viewer.getAttribute('src') || "";
+    const exportData = { version: "1.6.5", timestamp: Date.now(), mainThumbnail: mainThumb, modelSrc: realModelSrc, settings: { defaultColor, defaultOpacity, modelOpacity: globalModelOpacity, surfaceGloss: defaultSurfaceGloss, ambient: defaultAmbient, ambientTemp: defaultAmbientTemp, ambientX: defaultAmbientX, ambientY: defaultAmbientY, spot: defaultSpot, spotTemp: defaultSpotTemp, spotX: defaultSpotX, spotY: defaultSpotY, shadowIntensity: defaultShadow, envRotOffset: envRotOffset, posterize: defaultPosterize, grayscale: defaultGrayscale }, camera: cameraObj, pointsData: pointsData.map(p => Object.assign({}, p, { customData: {} })), snapshots: snapshotsData };
+    return JSON.stringify(exportData, null, 2); }
+    
+    function bindPointsListDrag() {
+        let dragId = null;
+        pointsList.querySelectorAll('.point-item').forEach((item) => {
+            const handle = item.querySelector('.drag-handle');
+            if (handle) {
+                handle.addEventListener('pointerdown', () => { item.draggable = true; });
+            }
+            item.addEventListener('dragstart', (e) => {
+                dragId = parseInt(item.getAttribute('data-id'), 10);
+                item.classList.add('dragging');
+                try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(dragId)); } catch (_e) {}
+            });
+            item.addEventListener('dragend', () => {
+                item.draggable = false;
+                item.classList.remove('dragging');
+                pointsList.querySelectorAll('.point-item.drag-over').forEach((el) => el.classList.remove('drag-over'));
+                dragId = null;
+            });
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                try { e.dataTransfer.dropEffect = 'move'; } catch (_e2) {}
+                const over = e.currentTarget;
+                pointsList.querySelectorAll('.point-item.drag-over').forEach((el) => { if (el !== over) el.classList.remove('drag-over'); });
+                const oid = parseInt(over.getAttribute('data-id'), 10);
+                if (!isNaN(oid) && oid !== dragId) over.classList.add('drag-over');
+            });
+            item.addEventListener('dragleave', (e) => {
+                if (e.currentTarget.contains(e.relatedTarget)) return;
+                e.currentTarget.classList.remove('drag-over');
+            });
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.classList.remove('drag-over');
+                const toId = parseInt(e.currentTarget.getAttribute('data-id'), 10);
+                let fromId = dragId;
+                if (fromId == null || isNaN(fromId)) {
+                    try { fromId = parseInt(e.dataTransfer.getData('text/plain'), 10); } catch (_e3) { fromId = NaN; }
+                }
+                if (isNaN(fromId) || isNaN(toId) || fromId === toId) return;
+                const fromIdx = pointsData.findIndex((x) => x.id === fromId);
+                const toIdx = pointsData.findIndex((x) => x.id === toId);
+                if (fromIdx < 0 || toIdx < 0) return;
+                const [moved] = pointsData.splice(fromIdx, 1);
+                pointsData.splice(toIdx, 0, moved);
+                renderState(); updateSVG(); generateCode();
+            });
+        });
+    }
+
+    function renderState() { pointsList.innerHTML = '';
+    if (pointsData.length === 0) { pointsList.innerHTML = '<div style="padding: 10px; text-align: center; color: #555; font-size: 11px;">暂无标注点</div>'; generateCode(); pointCountLabel.innerText = '0 个点位'; return; }
+    pointsData.forEach((p) => {
+    const item = document.createElement('div'); item.className = 'point-item'; item.id = `list-item-${p.id}`; item.setAttribute('data-id', String(p.id)); item.style.opacity = p.hidden ? '0.4' : '1';
+    item.innerHTML = `<button type="button" class="action-small-btn drag-handle" title="拖动调整顺序" aria-label="拖动调整顺序">⠿</button><button class="action-small-btn vis-btn" data-id="${p.id}" title="局部显隐">${p.hidden?'闭':'👁'}</button><button class="action-small-btn list-vis-btn" data-id="${p.id}" title="是否在画册的重要结构中显示" style="color:${p.hideInList?'#888':'#0df'};">${p.hideInList?'隐':'列'}</button><button class="action-small-btn text-init-btn" data-id="${p.id}" title="消费端刚进页时是否显示名称（默认可见；应用快照后以快照为准）" style="color:${p.showTextOnLoad===false?'#888':'#0f0'};">${p.showTextOnLoad===false?'匿':'名'}</button><span class="point-name" data-id="${p.id}" data-pos="${p.pos}" data-norm="${p.norm}" title="点击聚焦">🎯 ${p.type==='polygon'?'2D面':p.type==='polygon3d'?'3D面':p.type==='normal-arrow'?'法线':p.type==='leader'?'引线':p.type==='line'?'线段':p.type==='prober'?'受光探针':'点位'} ${p.id}</span><input type="text" class="point-text-input" data-id="${p.id}" value="${p.text}"><button class="action-small-btn desc-btn" data-id="${p.id}" title="详细知识编辑" style="background:#246;">${p.desc?'📄+':'📄'}</button><input type="color" class="point-color-input" data-id="${p.id}" value="${p.color || defaultColor}" style="width:20px;height:16px;padding:0;border:none;background:none;cursor:pointer;"><button class="action-small-btn del-btn" data-id="${p.id}">✖</button>`; pointsList.appendChild(item); }); generateCode(); pointCountLabel.innerText = `${pointsData.length} 个标注项`;
+    bindPointsListDrag();
+    document.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', function() { requestDeletePoint(parseInt(this.getAttribute('data-id'))); }));
+    document.querySelectorAll('.vis-btn').forEach(btn => btn.addEventListener('click', function() { const p = pointsData.find(d => d.id === parseInt(this.getAttribute('data-id'))); if(p) { p.hidden = !p.hidden; renderState(); updateSVG(); } }));
+    document.querySelectorAll('.list-vis-btn').forEach(btn => btn.addEventListener('click', function() { const p = pointsData.find(d => d.id === parseInt(this.getAttribute('data-id'))); if(p) { p.hideInList = !p.hideInList; renderState(); generateCode(); } }));
+    document.querySelectorAll('.text-init-btn').forEach(btn => btn.addEventListener('click', function() { const p = pointsData.find(d => d.id === parseInt(this.getAttribute('data-id'))); if(p) { p.showTextOnLoad = (p.showTextOnLoad === false); renderState(); generateCode(); } }));
+    document.querySelectorAll('.desc-btn').forEach(btn => btn.addEventListener('click', function() { const p = pointsData.find(d => d.id === parseInt(this.getAttribute('data-id'))); if(p) { document.getElementById('desc-modal-id').innerText = `(${p.text})`; document.getElementById('desc-textarea').value = p.desc || ''; document.getElementById('desc-modal').style.display = 'flex'; document.getElementById('desc-save-btn').onclick = () => { p.desc = document.getElementById('desc-textarea').value; document.getElementById('desc-modal').style.display = 'none'; renderState(); }; } }));
+    document.querySelectorAll('.point-color-input').forEach(input => { input.addEventListener('input', function() { const p = pointsData.find(d => d.id === parseInt(this.getAttribute('data-id'))); if(p) { p.color = this.value; updateSVG(); const slotQuery = (p.type==='line'||p.type==='spline'||p.type==='contour')&&p.dots?p.dots[p.midIndex||Math.floor(p.dots.length/2)].slot:p.slot; const annoEl = viewer.querySelector(`[slot="${slotQuery}"] .HotspotAnnotation`); if(annoEl) annoEl.style.borderColor = this.value; } }); input.addEventListener('change', () => generateCode()); });
+    document.querySelectorAll('.point-text-input').forEach(input => { input.addEventListener('input', function() { const p = pointsData.find(d => d.id === parseInt(this.getAttribute('data-id'))); if(p) { p.text = this.value; const slotQuery = (p.type==='line'||p.type==='spline'||p.type==='contour')&&p.dots ? p.dots[p.midIndex||Math.floor(p.dots.length/2)].slot : p.slot; const el = viewer.querySelector(`[slot="${slotQuery}"] .HotspotAnnotation`); if(el) el.innerText = this.value; generateCode(); } }); });
+    document.querySelectorAll('.point-name').forEach(btn => { btn.addEventListener('click', function() { const id = parseInt(this.getAttribute('data-id'));
+    selectSurfacePoint(id);
+    const p = pointsData.find(x => x.id === id); if(p) {
+    if(p.desc) { document.getElementById('info-display-title').innerText = p.text; document.getElementById('info-display-content').innerText = p.desc; document.getElementById('info-display').style.display = 'block'; } else { document.getElementById('info-display').style.display = 'none'; }
+    }
+    const pos = this.getAttribute('data-pos'); const normStr = this.getAttribute('data-norm'); const [nx, ny, nz] = normStr.replace(/m/g, '').split(' ').map(Number);
+    _baseCamRadius = null; viewer.setAttribute('camera-target', pos);     viewer.setAttribute('camera-orbit', `${Math.atan2(nx, nz)*180/Math.PI}deg ${Math.acos(ny)*180/Math.PI}deg auto`); statusMsg.innerText = `已追踪视口`; updateSVG(); });
+    }); }
+    function updateCoverPreview() {
+        const img = document.getElementById('anno-cover-preview');
+        const st = document.getElementById('anno-cover-status');
+        const src = (typeof mainThumbnailData === 'string' && mainThumbnailData) ? mainThumbnailData : '';
+        if (img) {
+            if (src) { img.src = src; img.style.opacity = '1'; }
+            else {
+                img.removeAttribute('src');
+                img.style.opacity = '0.35';
+            }
+        }
+        if (st) {
+            if (src) st.innerHTML = '<span style="color:#2ecc71;">已设置独立封面</span>';
+            else {
+                const coverSnap = snapshotsData.find(s => s.isCover);
+                if (coverSnap) st.innerHTML = '<span style="color:#fd0;">回退：快照★「' + (coverSnap.name || '') + '」</span>';
+                else if (snapshotsData.length > 0) st.innerHTML = '<span style="color:#888;">未截取 · 导出回退首张快照</span>';
+                else st.innerHTML = '<span style="color:#666;">未截取封面</span>';
+            }
+        }
+    }
+    const ANNO_COVER_AR = 16 / 9;
+    function annoGetCropCaptureRect(cropBoxEl, vw, vh) {
+        const fbW = 384, fbH = Math.round(fbW / ANNO_COVER_AR);
+        if (!cropBoxEl || cropBoxEl.style.display === 'none') {
+            return { left: Math.max(0, Math.floor((vw - fbW) / 2)), top: Math.max(0, Math.floor((vh - fbH) / 2)), width: fbW, height: fbH };
+        }
+        const outer = cropBoxEl.getBoundingClientRect();
+        const cs = window.getComputedStyle(cropBoxEl);
+        const bl = parseFloat(cs.borderLeftWidth) || 0, bt = parseFloat(cs.borderTopWidth) || 0;
+        let w = Math.max(1, cropBoxEl.clientWidth), h = Math.max(1, cropBoxEl.clientHeight);
+        let left = outer.left + bl, top = outer.top + bt;
+        /* 强制按 16:9 取内缘居中区域，避免旧方框缓存导致比例跑偏 */
+        const targetH = w / ANNO_COVER_AR;
+        if (Math.abs(h - targetH) > 1) {
+            if (h > targetH) { top += (h - targetH) * 0.5; h = targetH; }
+            else { const targetW = h * ANNO_COVER_AR; left += (w - targetW) * 0.5; w = targetW; }
+        }
+        left = Math.max(0, Math.floor(left));
+        top = Math.max(0, Math.floor(top));
+        w = Math.max(1, Math.min(Math.floor(w), Math.max(1, vw - left)));
+        h = Math.max(1, Math.min(Math.floor(h), Math.max(1, vh - top)));
+        return { left: left, top: top, width: w, height: h };
+    }
+    function annoBlitCoverRect(dstCtx, src, sx, sy, sw, sh, outW, outH) {
+        if (!dstCtx || !src || sw < 1 || sh < 1 || outW < 1 || outH < 1) return;
+        const srcW = src.width || sw, srcH = src.height || sh;
+        let sx0 = Math.max(0, sx), sy0 = Math.max(0, sy);
+        let sw0 = Math.max(1, Math.min(sw, srcW - sx0)), sh0 = Math.max(1, Math.min(sh, srcH - sy0));
+        dstCtx.drawImage(src, sx0, sy0, sw0, sh0, 0, 0, outW, outH);
+    }
+    async function captureCoverFromCrop() {
+        const OUT_W = 640, OUT_H = Math.round(OUT_W / ANNO_COVER_AR);
+        const cropBox = document.getElementById('anno-crop-box');
+        const prevVis = cropBox ? cropBox.style.visibility : '';
+        if (cropBox) cropBox.style.visibility = 'hidden';
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        try {
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const cap = annoGetCropCaptureRect(cropBox, vw, vh);
+            const vR = viewer.getBoundingClientRect();
+            const modelData = viewer.toDataURL('image/png', 0.85);
+            const svgEl = document.querySelector('#ink-overlay');
+            const svgData = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(svgEl))));
+            const full = document.createElement('canvas');
+            full.width = Math.max(1, Math.floor(vR.width));
+            full.height = Math.max(1, Math.floor(vR.height));
+            const fCtx = full.getContext('2d');
+            const imgM = new Image(); const imgS = new Image();
+            await Promise.all([
+                new Promise(r => { imgM.onload = r; imgM.onerror = r; imgM.src = modelData; }),
+                new Promise(r => { imgS.onload = r; imgS.onerror = r; imgS.src = svgData; })
+            ]);
+            fCtx.drawImage(imgM, 0, 0, full.width, full.height);
+            try { fCtx.drawImage(imgS, 0, 0, full.width, full.height); } catch (_eSvg) {}
+            let srcCvs = full;
+            const level = parseInt(defaultPosterize);
+            if (level > 1 || defaultGrayscale) {
+                let fStr = '';
+                if (level > 1) fStr += 'url(#filter-posterize) ';
+                if (defaultGrayscale) fStr += 'grayscale(1) ';
+                const fCvs = document.createElement('canvas');
+                fCvs.width = full.width; fCvs.height = full.height;
+                const fx = fCvs.getContext('2d');
+                fx.filter = fStr.trim();
+                fx.drawImage(full, 0, 0);
+                srcCvs = fCvs;
+            }
+            const sx = Math.max(0, (cap.left - vR.left) * (srcCvs.width / Math.max(1, vR.width)));
+            const sy = Math.max(0, (cap.top - vR.top) * (srcCvs.height / Math.max(1, vR.height)));
+            const sw = Math.max(1, Math.min(cap.width * (srcCvs.width / Math.max(1, vR.width)), srcCvs.width - sx));
+            const sh = Math.max(1, Math.min(cap.height * (srcCvs.height / Math.max(1, vR.height)), srcCvs.height - sy));
+            const out = document.createElement('canvas'); out.width = OUT_W; out.height = OUT_H;
+            const oCtx = out.getContext('2d');
+            oCtx.imageSmoothingEnabled = true; oCtx.imageSmoothingQuality = 'high';
+            annoBlitCoverRect(oCtx, srcCvs, sx, sy, sw, sh, OUT_W, OUT_H);
+            return out.toDataURL('image/jpeg', 0.85);
+        } finally {
+            if (cropBox) cropBox.style.visibility = prevVis;
+        }
+    }
+
+    function updateOverwriteSnapBtn() { const b = document.querySelector('#overwrite-snap-btn'); if (!b) return; b.disabled = selectedSnapId == null || !snapshotsData.some(s => s.id === selectedSnapId); }
+    function captureSnapshotFields() {
+    const oStr = viewer.getCameraOrbit ? viewer.getCameraOrbit().toString() : (viewer.getAttribute('camera-orbit') || 'auto auto auto');
+    const tStr = viewer.getCameraTarget ? viewer.getCameraTarget().toString() : (viewer.getAttribute('camera-target') || 'auto auto auto');
+    const fStr = (function(){ const a=viewer.getAttribute('field-of-view'); if(a&&a!=='auto') return a; if(viewer.fieldOfView&&viewer.fieldOfView!=='auto') return viewer.fieldOfView; return viewer.getFieldOfView ? viewer.getFieldOfView()+'deg' : 'auto'; })(); const cam = { orbit: oStr, target: tStr, fov: fStr };
+    const set = { modelOpacity: globalModelOpacity, surfaceGloss: defaultSurfaceGloss, ambient: defaultAmbient, ambientTemp: defaultAmbientTemp, ambientX: defaultAmbientX, ambientY: defaultAmbientY, spot: defaultSpot, spotTemp: defaultSpotTemp, spotX: defaultSpotX, spotY: defaultSpotY, shadowIntensity: defaultShadow, envRotOffset: envRotOffset, posterize: defaultPosterize, grayscale: defaultGrayscale };
+    const vis = pointsData.filter(p => !p.hidden).map(p => p.id);
+    const showTextIds = []; pointsData.forEach(p => { const slotQuery = (p.type === 'line' || p.type === 'spline' || p.type === 'contour') && p.dots ? p.dots[p.midIndex || Math.floor(p.dots.length / 2)].slot : p.slot; const el = viewer.querySelector(`[slot="${slotQuery}"]`); if (el && el.classList.contains('show-text')) showTextIds.push(p.id); });
+    return { cam, set, vis, showTextIds }; }
+    async function captureSnapshotThumb() {
+    let thumb = ''; try {
+        const modelData = viewer.toDataURL("image/png", 0.6);
+        const svgEl = document.querySelector('#ink-overlay');
+        const svgData = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(svgEl))));
+        const cvs = document.createElement('canvas'); cvs.width = viewer.clientWidth; cvs.height = viewer.clientHeight; const ctx = cvs.getContext('2d');
+        const imgM = new Image(); const imgS = new Image();
+        await Promise.all([new Promise(r => { imgM.onload = r; imgM.src = modelData; }), new Promise(r => { imgS.onload = r; imgS.src = svgData; })]);
+        ctx.drawImage(imgM, 0, 0, cvs.width, cvs.height); ctx.drawImage(imgS, 0, 0, cvs.width, cvs.height);
+        const level = parseInt(defaultPosterize); if (level > 1 || defaultGrayscale) {
+            let fStr = ''; if (level > 1) fStr += 'url(#filter-posterize) '; if (defaultGrayscale) fStr += 'grayscale(1) ';
+            const fCvs = document.createElement('canvas'); fCvs.width = cvs.width; fCvs.height = cvs.height; const fCtx = fCvs.getContext('2d');
+            fCtx.filter = fStr.trim(); fCtx.drawImage(cvs, 0, 0); thumb = fCvs.toDataURL("image/jpeg", 0.35);
+        } else { thumb = cvs.toDataURL("image/jpeg", 0.35); }
+    } catch (e) { thumb = viewer.toDataURL("image/jpeg", 0.1); }
+    return thumb; }
+    function applySnapshotFromData(s) {
+    if (!s) return; _baseCamRadius = null; if (s.camera) { viewer.setAttribute('camera-target', s.camera.target);
+    viewer.setAttribute('camera-orbit', s.camera.orbit); viewer.setAttribute('field-of-view', s.camera.fov); }
+    if (s.settings) { if (s.settings.ambient !== undefined) { setRangeVal('#global-ambient', defaultAmbient = s.settings.ambient); }
+    if (s.settings.ambientTemp !== undefined) { setRangeVal('#global-ambient-temp', defaultAmbientTemp = s.settings.ambientTemp); }
+    if (s.settings.ambientX !== undefined) { setRangeVal('#global-ambient-x', defaultAmbientX = s.settings.ambientX); }
+    if (s.settings.ambientY !== undefined) { setRangeVal('#global-ambient-y', defaultAmbientY = s.settings.ambientY); }
+    if (s.settings.spot !== undefined) { setRangeVal('#global-spot', defaultSpot = s.settings.spot); }
+    if (s.settings.spotTemp !== undefined) { setRangeVal('#global-spot-temp', defaultSpotTemp = s.settings.spotTemp); }
+    if (s.settings.spotX !== undefined) { setRangeVal('#global-spot-x', defaultSpotX = s.settings.spotX); }
+    if (s.settings.spotY !== undefined) { setRangeVal('#global-spot-y', defaultSpotY = s.settings.spotY); }
+    if (s.settings.shadowIntensity !== undefined) { defaultShadow = s.settings.shadowIntensity; viewer.setAttribute('shadow-intensity', defaultShadow); }
+    if (s.settings.modelOpacity !== undefined) { setRangeVal('#global-model-opacity', globalModelOpacity = s.settings.modelOpacity); applyModelOpacity(globalModelOpacity); }
+    if (s.settings.surfaceGloss !== undefined) {
+      defaultSurfaceGloss = s.settings.surfaceGloss;
+      setRangeVal('#global-surface-gloss', defaultSurfaceGloss);
+      applySurfaceGloss(defaultSurfaceGloss);
+    }
+    envRotOffset = s.settings.envRotOffset !== undefined ? s.settings.envRotOffset : 0; viewer.setAttribute('environment-rotation', `0rad ${envRotOffset}rad 0rad`);
+    if (s.settings.posterize !== undefined) { setRangeVal('#global-posterize', defaultPosterize = s.settings.posterize); }
+    if (s.settings.grayscale !== undefined) { const gc = document.querySelector('#global-grayscale'); if (gc) gc.checked = defaultGrayscale = s.settings.grayscale; }
+    if (typeof updateViewFilters === 'function') updateViewFilters(); updateLighting(); }
+    if (s.visiblePoints) { pointsData.forEach(p => p.hidden = !s.visiblePoints.includes(p.id)); }
+    if (s.showTextPoints !== undefined) { pointsData.forEach(p => { const slotQuery = (p.type === 'line' || p.type === 'spline' || p.type === 'contour') && p.dots ? p.dots[p.midIndex || Math.floor(p.dots.length / 2)].slot : p.slot; const el = viewer.querySelector(`[slot="${slotQuery}"]`); if (el) { if (s.showTextPoints.includes(p.id)) el.classList.add('show-text'); else el.classList.remove('show-text'); } }); } else { viewer.querySelectorAll('.show-text').forEach(el => el.classList.remove('show-text')); }
+    renderState(); updateSVG(); setTimeout(() => annoSyncPerspectiveSlider(), 200); }
+    window.__annoBatch = {
+        selectSurfacePoint,
+        captureSnapshotFields,
+        captureSnapshotThumb,
+        applySnapshotFromData,
+        generateCode,
+        getPoints: () => pointsData,
+        getSnapshots: () => snapshotsData,
+        getSnapIndex: () => snapIndex,
+        setSnapIndex: (n) => { snapIndex = n; },
+        pushSnapshot: (s) => { snapshotsData.push(s); },
+        renderSnapshots,
+        renderState,
+        updateSVG,
+        focusPointCamera: (p) => {
+            if (!p) return;
+            _baseCamRadius = null;
+            const [nx, ny, nz] = String(p.norm || '0 1 0').replace(/m/g, '').split(/\s+/).map(Number);
+            viewer.setAttribute('camera-target', p.pos);
+            viewer.setAttribute('camera-orbit', `${Math.atan2(nx, nz) * 180 / Math.PI}deg ${Math.acos(Math.min(1, Math.max(-1, ny))) * 180 / Math.PI}deg auto`);
+            try { if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal(); } catch (_e) {}
+        },
+        applyLightSettings: (set) => {
+            if (!set) return;
+            if (set.ambient !== undefined) setRangeVal('#global-ambient', defaultAmbient = set.ambient);
+            if (set.ambientTemp !== undefined) setRangeVal('#global-ambient-temp', defaultAmbientTemp = set.ambientTemp);
+            if (set.ambientX !== undefined) setRangeVal('#global-ambient-x', defaultAmbientX = set.ambientX);
+            if (set.ambientY !== undefined) setRangeVal('#global-ambient-y', defaultAmbientY = set.ambientY);
+            if (set.spot !== undefined) setRangeVal('#global-spot', defaultSpot = set.spot);
+            if (set.spotTemp !== undefined) setRangeVal('#global-spot-temp', defaultSpotTemp = set.spotTemp);
+            if (set.spotX !== undefined) setRangeVal('#global-spot-x', defaultSpotX = set.spotX);
+            if (set.spotY !== undefined) setRangeVal('#global-spot-y', defaultSpotY = set.spotY);
+            if (set.shadowIntensity !== undefined) { defaultShadow = set.shadowIntensity; viewer.setAttribute('shadow-intensity', defaultShadow); }
+            if (set.modelOpacity !== undefined) { setRangeVal('#global-model-opacity', globalModelOpacity = set.modelOpacity); applyModelOpacity(globalModelOpacity); }
+            if (set.surfaceGloss !== undefined) { defaultSurfaceGloss = set.surfaceGloss; setRangeVal('#global-surface-gloss', defaultSurfaceGloss); applySurfaceGloss(defaultSurfaceGloss); }
+            if (set.envRotOffset !== undefined) { envRotOffset = set.envRotOffset; viewer.setAttribute('environment-rotation', `0rad ${envRotOffset}rad 0rad`); }
+            if (set.posterize !== undefined) setRangeVal('#global-posterize', defaultPosterize = set.posterize);
+            if (set.grayscale !== undefined) { const gc = document.querySelector('#global-grayscale'); if (gc) gc.checked = defaultGrayscale = set.grayscale; }
+            if (typeof updateViewFilters === 'function') updateViewFilters();
+            updateLighting();
+        }
+    };
+    function moveSnapshotById(fromId, toId) {
+        if (fromId == null || toId == null || fromId === toId) return false;
+        const fromIdx = snapshotsData.findIndex(x => x.id === fromId);
+        const toIdx = snapshotsData.findIndex(x => x.id === toId);
+        if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return false;
+        const [row] = snapshotsData.splice(fromIdx, 1);
+        snapshotsData.splice(toIdx, 0, row);
+        return true;
+    }
+    function renderSnapshots() { snapList.innerHTML = ''; if (snapshotsData.length === 0) { selectedSnapId = null; snapList.innerHTML = '<div style="padding: 10px; text-align: center; color: #555; font-size: 11px;">暂无保存的快照</div>'; updateOverwriteSnapBtn(); return; }
+    if (selectedSnapId != null && !snapshotsData.some(s => s.id === selectedSnapId)) selectedSnapId = null;
+    snapshotsData.forEach(s => { const item = document.createElement('div'); item.className = 'snap-item' + (s.id === selectedSnapId ? ' selected' : '');
+    item.dataset.id = String(s.id); item.draggable = true; item.title = '拖动可调整顺序';
+    const coverStyle = s.isCover ? 'color:#fd0; border-color:#fd0; box-shadow:0 0 5px rgba(255,221,0,0.5);' : 'color:#555; border-color:#444;';
+    item.innerHTML = `<button class="action-small-btn snap-up-btn" data-id="${s.id}" title="上移">↑</button><button class="action-small-btn snap-down-btn" data-id="${s.id}" title="下移">↓</button><img src="${s.thumb||''}" class="snap-thumb" data-id="${s.id}" title="点击应用快照" draggable="false" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiM0NDQiLz48L3N2Zz4='"><input type="text" class="snap-name-input" data-id="${s.id}" value="${s.name}" style="flex:1; background:#111; border:1px solid #444; color:#ddd; border-radius:3px; padding:2px 4px; font-size:11px; outline:none;" title="修改名称" draggable="false"><button class="action-small-btn set-cover-btn" data-id="${s.id}" style="background:transparent; ${coverStyle}" title="设为课程封面">★</button><button class="action-small-btn snap-desc-btn" data-id="${s.id}" title="详细知识编辑" style="background:#246;">${s.desc?'📄+':'📄'}</button><button class="action-small-btn del-snap-btn" data-id="${s.id}" style="background:#522;color:#f55;">✖</button>`; snapList.appendChild(item); });
+    /* 拖拽排序：避开输入框/按钮上的原生交互 */
+    snapList.querySelectorAll('.snap-item').forEach(item => {
+        item.addEventListener('mousedown', (e) => {
+            const hit = e.target && e.target.closest
+                ? e.target.closest('input, textarea, button, a, .snap-name-input, .action-small-btn, .snap-thumb')
+                : null;
+            item.draggable = !hit;
+        });
+        item.addEventListener('mouseup', () => { item.draggable = true; });
+        item.addEventListener('mouseleave', () => { item.draggable = true; });
+        item.addEventListener('dragstart', (e) => {
+            if (!item.draggable) { e.preventDefault(); return; }
+            const id = item.dataset.id;
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', id); } catch (_e) {}
+            item.classList.add('snap-dragging');
+            window.__snapDragId = id;
+        });
+        item.addEventListener('dragend', () => {
+            item.classList.remove('snap-dragging');
+            snapList.querySelectorAll('.snap-drag-over').forEach(el => el.classList.remove('snap-drag-over'));
+            window.__snapDragId = null;
+        });
+        item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            snapList.querySelectorAll('.snap-drag-over').forEach(el => { if (el !== item) el.classList.remove('snap-drag-over'); });
+            item.classList.add('snap-drag-over');
+        });
+        item.addEventListener('dragleave', () => { item.classList.remove('snap-drag-over'); });
+        item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            item.classList.remove('snap-drag-over');
+            let fromId = window.__snapDragId;
+            try { fromId = e.dataTransfer.getData('text/plain') || fromId; } catch (_e2) {}
+            const toId = item.dataset.id;
+            const from = parseInt(fromId, 10);
+            const to = parseInt(toId, 10);
+            if (!Number.isFinite(from) || !Number.isFinite(to)) return;
+            if (moveSnapshotById(from, to)) {
+                renderSnapshots();
+                generateCode();
+                if (typeof statusMsg !== 'undefined' && statusMsg) statusMsg.innerText = '快照顺序已调整';
+            }
+        });
+    });
+    document.querySelectorAll('.set-cover-btn').forEach(btn => btn.addEventListener('click', function() { const id = parseInt(this.getAttribute('data-id')); const hit = snapshotsData.find(s => s.id === id); snapshotsData.forEach(s => s.isCover = (s.id === id)); if (hit && hit.thumb) { mainThumbnailData = hit.thumb; } renderSnapshots(); generateCode(); flashToast('已用该快照作封面'); }));
+    document.querySelectorAll('.snap-up-btn').forEach(btn => btn.addEventListener('click', function() { const id = parseInt(this.getAttribute('data-id')); const idx = snapshotsData.findIndex(x => x.id === id); if (idx > 0) { const temp = snapshotsData[idx]; snapshotsData[idx] = snapshotsData[idx - 1]; snapshotsData[idx - 1] = temp; renderSnapshots(); generateCode(); } }));
+    document.querySelectorAll('.snap-down-btn').forEach(btn => btn.addEventListener('click', function() { const id = parseInt(this.getAttribute('data-id')); const idx = snapshotsData.findIndex(x => x.id === id); if (idx < snapshotsData.length - 1) { const temp = snapshotsData[idx]; snapshotsData[idx] = snapshotsData[idx + 1]; snapshotsData[idx + 1] = temp; renderSnapshots(); generateCode(); } }));
+    document.querySelectorAll('.del-snap-btn').forEach(b => b.addEventListener('click', function(){ const rid = parseInt(this.getAttribute('data-id')); snapshotsData = snapshotsData.filter(x => x.id !== rid); if (selectedSnapId === rid) selectedSnapId = null; renderSnapshots(); generateCode(); }));
+    document.querySelectorAll('.snap-desc-btn').forEach(btn => btn.addEventListener('click', function() { const s = snapshotsData.find(d => d.id === parseInt(this.getAttribute('data-id'))); if(s) { document.getElementById('desc-modal-id').innerText = `(快照: ${s.name})`; document.getElementById('desc-textarea').value = s.desc || ''; document.getElementById('desc-modal').style.display = 'flex'; document.getElementById('desc-save-btn').onclick = () => { s.desc = document.getElementById('desc-textarea').value; document.getElementById('desc-modal').style.display = 'none'; renderSnapshots(); generateCode(); }; } }));
+    document.querySelectorAll('.snap-name-input').forEach(inp => inp.addEventListener('input', function() { const s = snapshotsData.find(d => d.id === parseInt(this.getAttribute('data-id'))); if(s) { s.name = this.value; generateCode(); } }));
+    document.querySelectorAll('.snap-thumb').forEach(el => el.addEventListener('click', function() {
+    const s = snapshotsData.find(x => x.id === parseInt(this.getAttribute('data-id'))); if (!s) return;
+    selectedSnapId = s.id; applySnapshotFromData(s); statusMsg.innerText = `快照 "${s.name}" 已应用`; renderSnapshots(); }));
+    updateOverwriteSnapBtn(); updateCoverPreview(); }
+    document.querySelector('#add-snap-btn').addEventListener('click', async () => {
+    const nameEl = document.querySelector('#snap-name'); const name = nameEl.value || `快照 ${snapIndex}`;
+    const { cam, set, vis, showTextIds } = captureSnapshotFields(); const thumb = await captureSnapshotThumb();
+    snapshotsData.push({ id: snapIndex++, name: name, thumb: thumb, camera: cam, settings: set, visiblePoints: vis, showTextPoints: showTextIds });
+    nameEl.value = ''; renderSnapshots(); generateCode(); statusMsg.innerText = "快照已成功捕获"; });
+    document.querySelector('#overwrite-snap-btn').addEventListener('click', async () => {
+    if (selectedSnapId == null) return; const s = snapshotsData.find(x => x.id === selectedSnapId); if (!s) return;
+    try {
+    const { cam, set, vis, showTextIds } = captureSnapshotFields(); const thumb = await captureSnapshotThumb();
+    s.camera = cam; s.settings = set; s.visiblePoints = vis; s.showTextPoints = showTextIds; s.thumb = thumb;
+    // 当前已是目标视角：勿再 applySnapshotFromData（回写 orbit/fov 会触发插值，表现为突然缩小）
+    generateCode(); renderSnapshots();
+    flashToast(`已复写「${s.name}」`);
+    } catch (err) { flashToast('复写失败', true); }
+    });
+    let _annoLabelEditing = false;
+    function requestDeletePoint(id) {
+        if (id == null || isNaN(id)) return;
+        if (!confirm('确定删除该标注？')) return;
+        deletePoint(id);
+    }
+    function deletePoint(id) { const p = pointsData.find(x => x.id === id);
+    if (p) { window.AnnotationPluginManager.dispatchUnmountDOM(p, viewer); }
+    if (selectedPointId === id) selectedPointId = null;
+    if (pointMoveSession && pointMoveSession.id === id) { pointMoveSession = null; try { if (!viewer.hasAttribute('camera-controls')) viewer.setAttribute('camera-controls', ''); } catch (_eDel) {} }
+    pointsData = pointsData.filter(x => x.id !== id); renderState(); updateSVG(); statusMsg.innerText = `已删除: 标注项 ${id}`; }
+    const finishPolygon = () => { const mode = document.getElementById('tool-mode-select').value; if(mode.includes('polygon')) window.AnnotationPluginManager.getPlugin(mode)?.finish(); };
+    viewer.addEventListener('pointerdown', (e) => { if (pointMoveSession) return; if (_annoLabelEditing) return; if (e.altKey && !e.shiftKey && e.button === 0) {
+    if (hitTestSurfacePointHotspot(e.clientX, e.clientY)) return;
+    const hitExact = viewer.positionAndNormalFromPoint(e.clientX, e.clientY); if (hitExact != null) {
+    const mode = document.getElementById('tool-mode-select').value; const posStr = `${hitExact.position.x.toFixed(4)}m ${hitExact.position.y.toFixed(4)}m ${hitExact.position.z.toFixed(4)}m`; const normStr = `${hitExact.normal.x.toFixed(4)}m ${hitExact.normal.y.toFixed(4)}m ${hitExact.normal.z.toFixed(4)}m`; const slotName = `hotspot-${pointIndex}`;
+    const plugin = window.AnnotationPluginManager.getPlugin(mode); if (plugin && plugin.onPointerDown) { plugin.onPointerDown(slotName, posStr, normStr, hitExact, e, viewer);
+    if (mode.includes('polygon')) return; // 拦截所有多边形类型的自动完成
+    renderState(); updateSVG(); statusMsg.innerText = `精准捕获: ${slotName}`; pointIndex++; } } } }); // ====== 新增：全局探照灯点击逻辑 (完美解决标注阻挡旋转问题) ======
+    let _clickStartX = 0, _clickStartY = 0, _isClickDragging = false; document.addEventListener('pointerdown', e => { _clickStartX = e.clientX; _clickStartY = e.clientY; _isClickDragging = false; }, { passive: true });
+    document.addEventListener('pointermove', e => { if (Math.hypot(e.clientX - _clickStartX, e.clientY - _clickStartY) > 5) _isClickDragging = true; }, { passive: true });
+    document.addEventListener('pointerup', e => {
+    if (_pointMoveSuppressClick) { _pointMoveSuppressClick = false; return; }
+    if (_isClickDragging || e.button !== 0 || e.altKey || e.shiftKey) return; // 鼠标抬起瞬间，临时唤醒可点击属性
+    const hotspots = document.querySelectorAll('.preview-hotspot, .ink-mid, .svg-hit-path, .svg-prober-norm-hit, #ink-overlay polygon, #ink-overlay path, #ink-overlay circle, #ink-overlay line'); hotspots.forEach(el => el.style.setProperty('pointer-events', 'auto', 'important'));
+    const elements = document.elementsFromPoint(e.clientX, e.clientY); // 穿透探测
+    hotspots.forEach(el => el.style.setProperty('pointer-events', 'none', 'important')); // 立即重新隐藏
+    for (const el of elements) { if (el.classList && el.classList.contains('svg-prober-norm-hit')) { const sid = el.getAttribute('data-id'); const pid = sid != null ? parseInt(sid, 10) : NaN;
+    if (!isNaN(pid) && typeof window.selectProberAnnotation === 'function') { window.selectProberAnnotation(pid); break; } }
+    if (el.classList && el.classList.contains('svg-hit-path')) { const sid = el.getAttribute('data-id'); const pid = sid != null ? parseInt(sid, 10) : NaN;
+    if (!isNaN(pid)) { const probe = pointsData.find(x => x.id === pid); if (probe && probe.type === 'prober') { const midEl = viewer.querySelector('.ink-mid[data-id="' + pid + '"]'); if (midEl) { midEl.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); break; } } } }
+    if (el.classList.contains('preview-hotspot') || el.classList.contains('ink-mid')) { el.click(); break; }
+    if (el.hasAttribute('onclick')) { el.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, view: window})); break; } } }); // ====== 解耦优化：通用的连续绘制路由 ======
+    viewer.addEventListener('pointermove', (e) => { if (pointMoveSession) return; if (e.altKey && e.shiftKey && (e.buttons === 0 || e.buttons === 1)) { const mode = document.getElementById('tool-mode-select').value;
+    const plugin = window.AnnotationPluginManager.getPlugin(mode); if(plugin && plugin.onPointerMove) plugin.onPointerMove(e, viewer); // 盲传给插件
+    } else if (isDrawing) finishDrawing(); }); const finishDrawing = () => { const mode = document.getElementById('tool-mode-select').value; // 只对支持连续绘制的工具发送结束指令，保护点击类面片
+    if(['line', 'spline', 'leader', 'polygon3d', 'contour'].includes(mode)) {
+    window.AnnotationPluginManager.getPlugin(mode)?.finish(); } };
+    window.addEventListener('keyup', (e) => {
+        if (e.key === 'Escape') {
+            if (pointMoveSession) endPointMoveSession();
+            clearSurfacePointSelection();
+            return;
+        }
+        if (e.key === 'Alt' || e.key === 'Shift') finishDrawing(); if (e.key === 'Enter') finishPolygon();
+    });
+    window.addEventListener('blur', finishDrawing); document.querySelector('#reset-cam-btn').addEventListener('click', () => { _baseCamRadius = null;
+    viewer.setAttribute('camera-target', 'auto auto auto'); viewer.setAttribute('camera-orbit', 'auto auto auto'); viewer.setAttribute('field-of-view', 'auto');
+    envRotOffset = 0; viewer.setAttribute('environment-rotation', `0rad ${envRotOffset}rad 0rad`); statusMsg.innerText = "模型视角与光向已重置"; updateLighting(); setTimeout(() => { annoSyncPerspectiveSlider(); generateCode(); }, 800); });
+    document.querySelector('#export-btn').addEventListener('click', (e) => { e.preventDefault(); const codeStr = generateCode(); if (!codeStr) return; const blob = new Blob([codeStr], {type: 'application/json;charset=utf-8'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = '3d-annotations.json'; a.style.display = 'none'; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(() => URL.revokeObjectURL(url), 100); statusMsg.innerText = "文件已成功导出"; });
+    
+    // --- 右侧 Tab：标注 / 场景 ---
+    (function initConsoleTabs() {
+        const btnAnno = document.getElementById('tab-btn-anno');
+        const btnScene = document.getElementById('tab-btn-scene');
+        const tabAnno = document.getElementById('tab-anno');
+        const tabScene = document.getElementById('tab-scene');
+        if (!btnAnno || !btnScene || !tabAnno || !tabScene) return;
+        function showTab(name) {
+            const isAnno = name === 'anno';
+            tabAnno.style.display = isAnno ? 'flex' : 'none';
+            tabScene.style.display = isAnno ? 'none' : 'flex';
+            btnAnno.classList.toggle('active', isAnno);
+            btnScene.classList.toggle('active', !isAnno);
+        }
+        btnAnno.addEventListener('click', () => showTab('anno'));
+        btnScene.addEventListener('click', () => showTab('scene'));
+        showTab('anno');
+    })();
+
+    // --- 画面双击改名（所有 HotspotAnnotation）---
+    function commitAnnoLabelEdit(annEl, id, original) {
+        if (!annEl) return;
+        const raw = (annEl.innerText || '').replace(/\s+/g, ' ').trim();
+        const next = raw || original;
+        annEl.innerText = next;
+        annEl.contentEditable = 'false';
+        annEl.removeAttribute('contenteditable');
+        annEl.removeAttribute('tabindex');
+        _annoLabelEditing = false;
+        try { if (!viewer.hasAttribute('camera-controls')) viewer.setAttribute('camera-controls', ''); } catch (_e) {}
+        const p = pointsData.find(x => x.id === id);
+        if (p) p.text = next;
+        const input = document.querySelector('.point-text-input[data-id="' + id + '"]');
+        if (input) input.value = next;
+        try { generateCode(); } catch (_e2) {}
+    }
+    function cancelAnnoLabelEdit(annEl, original) {
+        if (!annEl) return;
+        annEl.innerText = original;
+        annEl.contentEditable = 'false';
+        annEl.removeAttribute('contenteditable');
+        annEl.removeAttribute('tabindex');
+        _annoLabelEditing = false;
+        try { if (!viewer.hasAttribute('camera-controls')) viewer.setAttribute('camera-controls', ''); } catch (_e) {}
+    }
+    viewer.addEventListener('dblclick', (e) => {
+        const ann = e.target && e.target.closest ? e.target.closest('.HotspotAnnotation') : null;
+        if (!ann || !viewer.contains(ann)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const host = ann.closest('[data-id]');
+        if (!host) return;
+        const id = parseInt(host.getAttribute('data-id'), 10);
+        if (isNaN(id)) return;
+        if (!host.classList.contains('show-text')) host.classList.add('show-text');
+        const original = (ann.innerText || '').trim();
+        _annoLabelEditing = true;
+        try { viewer.removeAttribute('camera-controls'); } catch (_e) {}
+        ann.setAttribute('tabindex', '-1');
+        ann.contentEditable = 'true';
+        let editClosed = false;
+        const finishEdit = (commit) => {
+            if (editClosed) return;
+            editClosed = true;
+            ann.removeEventListener('keydown', onKey);
+            ann.removeEventListener('blur', onBlur);
+            if (commit) commitAnnoLabelEdit(ann, id, original);
+            else cancelAnnoLabelEdit(ann, original);
+        };
+        const onKey = (ev) => {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                ev.stopPropagation();
+                finishEdit(true);
+            } else if (ev.key === 'Escape') {
+                ev.preventDefault();
+                ev.stopPropagation();
+                finishEdit(false);
+            }
+        };
+        const onBlur = () => { finishEdit(true); };
+        ann.addEventListener('keydown', onKey);
+        ann.addEventListener('blur', onBlur);
+        try { ann.focus({ preventScroll: true }); } catch (_eF) { try { ann.focus(); } catch (_eF2) {} }
+        try {
+            const range = document.createRange();
+            range.selectNodeContents(ann);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } catch (_eSel) {}
+    }, true);
+
+    // --- Delete / Backspace 删除选中标注 ---
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+        const t = e.target;
+        if (!t) return;
+        const tag = (t.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        if (t.isContentEditable) return;
+        if (selectedPointId == null) return;
+        e.preventDefault();
+        requestDeletePoint(selectedPointId);
+    });
+
+    const fileInput = document.querySelector('#file-input');
+    fileInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (evt) => { let parsed = null; try {
+    parsed = JSON.parse(evt.target.result); } catch(err) { const regex = new RegExp("<!-- CONFIG_DATA_BEGIN\\n([\\s\\S]*?)\\nCONFIG_DATA_END -->"); const m = evt.target.result.match(regex); if (m && m[1]) { try { parsed = { pointsData: JSON.parse(m[1]) }; } catch(e){} } }
+    if (parsed && parsed.pointsData) { try { _baseCamRadius = null;
+    viewer.querySelectorAll('.preview-hotspot, .ink-anchor').forEach(el => el.remove()); pointsData = parsed.pointsData; pointIndex = pointsData.length > 0 ? Math.max(...pointsData.map(p => p.id)) + 1 : 1;
+    snapshotsData = parsed.snapshots || []; snapIndex = snapshotsData.length > 0 ? Math.max(...snapshotsData.map(s => s.id)) + 1 : 1; selectedSnapId = null; mainThumbnailData = (parsed.mainThumbnail && typeof parsed.mainThumbnail === 'string') ? parsed.mainThumbnail : ""; updateCoverPreview(); if(parsed.settings) {
+    setRangeVal('#global-color-picker', defaultColor=parsed.settings.defaultColor||defaultColor);
+    setRangeVal('#global-opacity-slider', defaultOpacity=parsed.settings.defaultOpacity||defaultOpacity);
+    if(parsed.settings.ambient!==undefined) setRangeVal('#global-ambient', defaultAmbient=parsed.settings.ambient);
+    if(parsed.settings.ambientTemp!==undefined) setRangeVal('#global-ambient-temp', defaultAmbientTemp=parsed.settings.ambientTemp);
+    if(parsed.settings.ambientX!==undefined) setRangeVal('#global-ambient-x', defaultAmbientX=parsed.settings.ambientX);
+    if(parsed.settings.ambientY!==undefined) setRangeVal('#global-ambient-y', defaultAmbientY=parsed.settings.ambientY);
+    if(parsed.settings.spot!==undefined) setRangeVal('#global-spot', defaultSpot=parsed.settings.spot);
+    if(parsed.settings.spotTemp!==undefined) setRangeVal('#global-spot-temp', defaultSpotTemp=parsed.settings.spotTemp);
+    if(parsed.settings.spotX!==undefined) setRangeVal('#global-spot-x', defaultSpotX=parsed.settings.spotX);
+    if(parsed.settings.spotY!==undefined) setRangeVal('#global-spot-y', defaultSpotY=parsed.settings.spotY);
+    if(parsed.settings.shadowIntensity!==undefined) { defaultShadow = parsed.settings.shadowIntensity; viewer.setAttribute('shadow-intensity', defaultShadow); }
+    if(parsed.settings.modelOpacity!==undefined) { setRangeVal('#global-model-opacity', globalModelOpacity = parsed.settings.modelOpacity); applyModelOpacity(globalModelOpacity); }
+    if(parsed.settings.surfaceGloss!==undefined) {
+        defaultSurfaceGloss = parsed.settings.surfaceGloss;
+        setRangeVal('#global-surface-gloss', defaultSurfaceGloss);
+        localStorage.setItem('picker_surface_gloss', defaultSurfaceGloss);
+        applySurfaceGloss(defaultSurfaceGloss);
+    }
+    envRotOffset = parsed.settings.envRotOffset !== undefined ? parsed.settings.envRotOffset : 0; viewer.setAttribute('environment-rotation', `0rad ${envRotOffset}rad 0rad`);
+    if(parsed.settings.posterize!==undefined) { setRangeVal('#global-posterize', defaultPosterize = parsed.settings.posterize); }
+    if(parsed.settings.grayscale!==undefined) { const gc = document.querySelector('#global-grayscale'); if(gc) gc.checked = defaultGrayscale = parsed.settings.grayscale; }
+    if(typeof updateViewFilters === 'function') updateViewFilters(); updateLighting(); }
+    const currentRawSrc = viewer.getAttribute('data-raw-src') || viewer.getAttribute('src');
+    
+    // 【核心修复1】：导入时智能补全路径，兼容并自动修复之前由于 Bug 导出导致的残缺路径
+    let importSrc = parsed.modelSrc;
+    if (importSrc && !importSrc.startsWith('../') && !importSrc.startsWith('http') && !importSrc.startsWith('blob:')) {
+        importSrc = '../docs/model/' + importSrc;
+    }
+    
+    if(importSrc && currentRawSrc !== importSrc) {
+        viewer.setAttribute('src', importSrc);
+        viewer.removeAttribute('data-raw-src');
+    }
+    if(parsed.camera) {
+    if(parsed.camera.target) viewer.setAttribute('camera-target', parsed.camera.target); if(parsed.camera.orbit) viewer.setAttribute('camera-orbit', parsed.camera.orbit);
+    if(parsed.camera.fov) viewer.setAttribute('field-of-view', parsed.camera.fov); }
+    pointsData.forEach(p => { window.AnnotationPluginManager.dispatchMountDOM(p, viewer); });
+    renderState(); renderSnapshots(); setTimeout(() => { updateSVG(); annoSyncPerspectiveSlider(); }, 800); statusMsg.innerText = "场景及配置已完美还原"; } catch (err) { statusMsg.innerText = "导入失败: 数据损坏"; }
+    } else { statusMsg.innerText = "导入失败: 未找到有效数据"; } }; reader.readAsText(file); fileInput.value = ''; });
+
+    // --- 课程封面：绿框截取（参考 SolidCreate） ---
+    (function initAnnoCoverCrop() {
+        const cropBox = document.getElementById('anno-crop-box');
+        const dragH = document.getElementById('anno-crop-drag');
+        const resH = document.getElementById('anno-crop-resize');
+        const toggleBtn = document.getElementById('anno-crop-toggle-btn');
+        const capBtn = document.getElementById('anno-cover-capture-btn');
+        const clearBtnCover = document.getElementById('anno-cover-clear-btn');
+        if (!cropBox || !dragH || !resH) return;
+        window.toggleAnnoCropBox = function() {
+            cropBox.style.display = cropBox.style.display === 'none' ? 'block' : 'none';
+            if (toggleBtn) toggleBtn.style.outline = cropBox.style.display === 'none' ? '' : '1px solid #2ecc71';
+        };
+        if (toggleBtn) toggleBtn.addEventListener('click', () => window.toggleAnnoCropBox());
+        let cDrag = false, cRes = false, stX, stY, stW, stH, stL, stT;
+        dragH.addEventListener('pointerdown', e => {
+            cDrag = true; stX = e.clientX; stY = e.clientY; stL = cropBox.offsetLeft; stT = cropBox.offsetTop;
+            try { dragH.setPointerCapture(e.pointerId); } catch (_e) {}
+            e.stopPropagation(); e.preventDefault();
+        });
+        resH.addEventListener('pointerdown', e => {
+            cRes = true; stX = e.clientX; stY = e.clientY; stW = cropBox.offsetWidth; stH = cropBox.offsetHeight;
+            try { resH.setPointerCapture(e.pointerId); } catch (_e) {}
+            e.stopPropagation(); e.preventDefault();
+        });
+        window.addEventListener('pointermove', e => {
+            if (cDrag) { cropBox.style.left = (stL + e.clientX - stX) + 'px'; cropBox.style.top = (stT + e.clientY - stY) + 'px'; }
+            if (cRes) {
+                const AR = 16 / 9;
+                let w = Math.max(160, stW + e.clientX - stX);
+                /* 也参考纵向拖动，取更能拉开的一边，再锁 16:9 */
+                const wFromH = Math.max(160, (stH + e.clientY - stY) * AR);
+                w = Math.max(w, wFromH);
+                const h = Math.round(w / AR);
+                cropBox.style.width = w + 'px'; cropBox.style.height = h + 'px';
+            }
+        });
+        window.addEventListener('pointerup', () => {
+            if (cDrag || cRes) {
+                try {
+                    localStorage.setItem('annoCropBoxCache', JSON.stringify({
+                        left: cropBox.style.left, top: cropBox.style.top,
+                        width: cropBox.style.width, height: cropBox.style.height
+                    }));
+                } catch (_e) {}
+            }
+            cDrag = false; cRes = false;
+        });
+        try {
+            const cached = localStorage.getItem('annoCropBoxCache');
+            if (cached) {
+                const c = JSON.parse(cached);
+                const cw = parseFloat(c.width), ch = parseFloat(c.height);
+                const arOk = cw > 0 && ch > 0 && Math.abs((cw / ch) - (16 / 9)) < 0.08;
+                if (c.left) cropBox.style.left = c.left;
+                if (c.top) cropBox.style.top = c.top;
+                if (arOk) {
+                    cropBox.style.width = c.width;
+                    cropBox.style.height = c.height;
+                } else {
+                    cropBox.style.width = '384px';
+                    cropBox.style.height = '216px';
+                }
+            }
+        } catch (_e2) {}
+        if (capBtn) capBtn.addEventListener('click', async () => {
+            try {
+                if (!viewer.getAttribute('src') && !viewer.getAttribute('data-raw-src')) {
+                    flashToast('请先载入模型', true); return;
+                }
+                if (cropBox.style.display === 'none') window.toggleAnnoCropBox();
+                const dataUrl = await captureCoverFromCrop();
+                if (!dataUrl) { flashToast('封面截取失败', true); return; }
+                mainThumbnailData = dataUrl;
+                snapshotsData.forEach(s => { if (s) s.isCover = false; });
+                updateCoverPreview();
+                renderSnapshots();
+                generateCode();
+                flashToast('课程封面已截取');
+            } catch (err) {
+                console.error(err);
+                flashToast('封面截取失败', true);
+            }
+        });
+        if (clearBtnCover) clearBtnCover.addEventListener('click', () => {
+            mainThumbnailData = '';
+            snapshotsData.forEach(s => { if (s) s.isCover = false; });
+            updateCoverPreview();
+            renderSnapshots();
+            generateCode();
+            flashToast('已清除独立封面');
+        });
+        updateCoverPreview();
+    })();
+
+
+    // Recover workbench if Live Server reloaded the page right after overwrite
+    async function recoverAfterOverwriteReload() {
+        let raw = null;
+        try { raw = sessionStorage.getItem('picker_after_overwrite'); } catch (_e) { return false; }
+        if (!raw) return false;
+        let pack = null;
+        try { pack = JSON.parse(raw); } catch (_e2) { try { sessionStorage.removeItem('picker_after_overwrite'); } catch (_e3) {} return false; }
+        if (!pack || !pack.code || (Date.now() - (pack.ts || 0)) > 180000) {
+            try { sessionStorage.removeItem('picker_after_overwrite'); } catch (_e4) {}
+            return false;
+        }
+        try { sessionStorage.removeItem('picker_after_overwrite'); } catch (_e5) {}
+        try {
+            const file = new File([pack.code], pack.fileName || 'recover.json', { type: 'application/json' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;
+            fileInput.dispatchEvent(new Event('change'));
+            const lastKey = localStorage.getItem('picker_last_quick_dir');
+            setTimeout(async () => {
+                try {
+                    if (lastKey && typeof window.loadQuickDir === 'function') {
+                        await window.loadQuickDir(lastKey, false);
+                        if (window.currentDirHandle && pack.fileName) {
+                            for await (const entry of window.currentDirHandle.values()) {
+                                if (entry.kind === 'file' && entry.name === pack.fileName) {
+                                    window.currentFileHandle = entry;
+                                    const eb = document.querySelector('#export-btn');
+                                    if (eb) eb.innerText = '💾 覆写当前档案';
+                                    break;
+                                }
+                            }
+                            if (typeof refreshFileList === 'function') await refreshFileList();
+                        }
+                    }
+                } catch (_e6) {}
+                flashToast('已覆写 ' + (pack.fileName || '档案') + '（工作台已恢复）');
+            }, 700);
+            return true;
+        } catch (err) {
+            console.error(err);
+            flashToast('覆写后自动恢复失败，请重新引入档案', true);
+            return false;
+        }
+    }
+    recoverAfterOverwriteReload();
+    window.addEventListener('pageshow', () => { recoverAfterOverwriteReload(); });
+
+ 
+
+    // =========================================================
+    // 【阶段 1.5 优化】：工作区左侧分栏、高度拖拽与自动覆写引擎
+    // =========================================================
+    window.currentDirHandle = null;
+    window.currentFileHandle = null;
+
+    const exportBtn = document.querySelector('button[id*="export"]') || Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('导出'));
+    
+    // --- 1. 面板高度比例拖拽与缓存逻辑 ---
+    const snapshotPanel = document.getElementById('snapshot-panel');
+    const wsSection = document.getElementById('workspace-section');
+    const snapSection = document.getElementById('snapshot-section');
+    const splitter = document.getElementById('panel-splitter');
+
+    // --- 0. 数据库与快速挂载引擎 (移植自 SolidCreate) ---
+    const DB_NAME = 'AnnotationEditorDB'; const STORE_NAME = 'dirHandles';
+    function initDB() { return new Promise((res) => { const req = indexedDB.open(DB_NAME, 1); req.onupgradeneeded = e => { if(!e.target.result.objectStoreNames.contains(STORE_NAME)) e.target.result.createObjectStore(STORE_NAME); }; req.onsuccess = e => res(e.target.result); }); }
+    async function saveDirHandle(key, handle) { const db = await initDB(); const tx = db.transaction(STORE_NAME, 'readwrite'); tx.objectStore(STORE_NAME).put(handle, key); }
+    async function getDirHandle(key) { const db = await initDB(); return new Promise(res => { const req = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(key); req.onsuccess = e => res(e.target.result); req.onerror = () => res(null); }); }
+
+    window.loadQuickDir = async function(key, forceRebind = false) {
+        try {
+            let handle = forceRebind ? null : await getDirHandle(key);
+            if (handle) {
+                const perm = await handle.queryPermission({mode: 'readwrite'});
+                if (perm !== 'granted' && await handle.requestPermission({mode: 'readwrite'}) !== 'granted') handle = null;
+            }
+            if (!handle) {
+                handle = await window.showDirectoryPicker({mode: 'readwrite'});
+                await saveDirHandle(key, handle);
+            }
+            window.currentDirHandle = handle;
+            try { localStorage.setItem('picker_last_quick_dir', key); } catch (_e) {}
+            statusMsg.innerText = "已连接快捷库: " + handle.name;
+            await refreshFileList();
+        } catch(e) { console.warn("挂载取消"); }
+    };
+    
+    // 读取缓存比例（默认工作区占 35%）
+    let workspaceRatio = localStorage.getItem('hw_workspace_ratio') ? parseFloat(localStorage.getItem('hw_workspace_ratio')) : 0.35;
+    
+    function applyPanelRatio() {
+        if (!snapshotPanel || !wsSection || !snapSection) return;
+        const totalHeight = snapshotPanel.clientHeight - 30; // 减去上下的 padding(15*2)
+        const splitterHeight = 26; // splitter height(10) + margins(8*2)
+        const availableHeight = totalHeight - splitterHeight;
+        
+        let wsHeight = availableHeight * workspaceRatio;
+        // 边界限制：上下至少保留 80px 和 150px
+        if (wsHeight < 80) wsHeight = 80;
+        if (availableHeight - wsHeight < 150) wsHeight = availableHeight - 150;
+        
+        wsSection.style.height = `${wsHeight}px`;
+        snapSection.style.height = `${availableHeight - wsHeight}px`;
+    }
+    
+    setTimeout(applyPanelRatio, 100); // 延时等待 DOM 渲染
+    window.addEventListener('resize', applyPanelRatio);
+
+    let isDraggingSplitter = false;
+    let startY = 0;
+    let startWsHeight = 0;
+
+    splitter.addEventListener('pointerdown', (e) => {
+        isDraggingSplitter = true;
+        startY = e.clientY;
+        startWsHeight = wsSection.clientHeight;
+        splitter.classList.add('dragging');
+        document.body.style.cursor = 'ns-resize';
+        e.preventDefault(); 
+    });
+
+    window.addEventListener('pointermove', (e) => {
+        if (!isDraggingSplitter) return;
+        const deltaY = e.clientY - startY;
+        const availableHeight = snapshotPanel.clientHeight - 30 - 26;
+        
+        let newWsHeight = startWsHeight + deltaY;
+        if (newWsHeight < 80) newWsHeight = 80;
+        if (availableHeight - newWsHeight < 150) newWsHeight = availableHeight - 150;
+        
+        workspaceRatio = newWsHeight / availableHeight;
+        wsSection.style.height = `${newWsHeight}px`;
+        snapSection.style.height = `${availableHeight - newWsHeight}px`;
+    });
+
+    window.addEventListener('pointerup', () => {
+        if (isDraggingSplitter) {
+            isDraggingSplitter = false;
+            splitter.classList.remove('dragging');
+            document.body.style.cursor = 'default';
+            // 触发缓存写入
+            localStorage.setItem('hw_workspace_ratio', workspaceRatio); 
+        }
+    });
+
+    // --- 2. 左侧原生挂载逻辑 ---
+    const mountBtn = document.getElementById('btn-mount-workspace');
+    const fileListContainer = document.getElementById('workspace-file-list');
+
+    if (mountBtn) {
+        mountBtn.addEventListener('click', async () => {
+            try {
+                window.currentDirHandle = await window.showDirectoryPicker({mode: 'readwrite'});
+                if(db) await saveDirHandle('last_manual_dir', window.currentDirHandle); // 记录最后一次手动挂载
+                if(typeof statusMsg !== 'undefined') statusMsg.innerText = "已挂载: " + window.currentDirHandle.name;
+                await refreshFileList();
+            } catch (err) { console.warn("挂载取消:", err); }
+        });
+    }
+
+    let _refreshListId = 0; // 全局渲染令牌
+    async function refreshFileList() {
+        if (!window.currentDirHandle || !fileListContainer) return;
+        const currentId = ++_refreshListId; // 每次调用生成新令牌
+        
+        // 1. 先将文件全量收集到数组（不直接操作 DOM）
+        const files = [];
+        for await (const entry of window.currentDirHandle.values()) {
+            if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+                files.push(entry);
+            }
+        }
+        
+        // 2. 【核心防浪涌】：如果读取期间发起了新的请求，直接抛弃本次过期数据，防止重复渲染
+        if (currentId !== _refreshListId) return;
+        
+        // 3. 排序 (按名称自然排序，体验更好)
+        files.sort((a,b) => a.name.localeCompare(b.name, 'zh-CN', {numeric: true}));
+        
+        fileListContainer.innerHTML = '';
+        
+        if (files.length === 0) {
+            fileListContainer.innerHTML = '<div style="color: #666; text-align: center; padding: 15px 0;">当前目录下无 JSON 档案</div>';
+            return;
+        }
+
+        // 4. 同步挂载 DOM
+        files.forEach(entry => {
+            const item = document.createElement('div');
+            item.style.cssText = 'padding: 6px 8px; cursor: pointer; color: #aaa; border-radius: 3px; transition: 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid transparent;';
+            item.innerText = '📄 ' + entry.name;
+            
+            // 保留高亮背景逻辑
+            item.onmouseover = () => { if(window.currentFileHandle !== entry) item.style.background = '#333'; };
+            item.onmouseout = () => item.style.background = (window.currentFileHandle === entry) ? 'rgba(46, 204, 113, 0.15)' : 'transparent';
+            
+            item.onclick = async () => {
+                try {
+                    const file = await entry.getFile();
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    const fileInputEl = document.querySelector('input[type="file"]');
+                    if(fileInputEl) {
+                        fileInputEl.files = dt.files;
+                        fileInputEl.dispatchEvent(new Event('change'));
+                    }
+                    
+                    window.currentFileHandle = entry;
+                    document.querySelectorAll('#workspace-file-list div').forEach(d => { 
+                        d.style.color = '#aaa'; d.style.borderLeftColor = 'transparent'; d.style.background = 'transparent'; 
+                    });
+                    item.style.color = '#2ecc71';
+                    item.style.borderLeftColor = '#2ecc71';
+                    item.style.background = 'rgba(46, 204, 113, 0.15)';
+                    
+                    if (exportBtn) exportBtn.innerText = '💾 覆写当前档案';
+                } catch(e) { if(typeof statusMsg !== 'undefined') statusMsg.innerText = "读取失败"; }
+            };
+            fileListContainer.appendChild(item);
+        });
+    }
+
+    // --- 3. 拦截原有导出逻辑，实现“秒存覆写” ---
+    if (exportBtn) {
+        exportBtn.addEventListener('click', async (e) => {
+            if (window.currentFileHandle) {
+                e.preventDefault(); 
+                e.stopImmediatePropagation(); 
+                try {
+                    const codeStr = typeof generateCode === 'function' ? generateCode() : '';
+                    if (!codeStr) { flashToast('没有可保存的数据', true); return; }
+                    const fileName = window.currentFileHandle.name || 'archive.json';
+                    const savePack = { ts: Date.now(), fileName: fileName, code: codeStr };
+                    try {
+                        sessionStorage.setItem('picker_after_overwrite', JSON.stringify(savePack));
+                    } catch (_ss) {
+                        try {
+                            // fallback without huge thumbs if quota exceeded
+                            const slim = JSON.parse(codeStr);
+                            if (slim) { if (slim.mainThumbnail) slim.mainThumbnail = ''; if (slim.snapshots) slim.snapshots.forEach(s => { if (s) s.thumb = ''; }); }
+                            sessionStorage.setItem('picker_after_overwrite', JSON.stringify({
+                                ts: savePack.ts, fileName: fileName, code: JSON.stringify(slim)
+                            }));
+                        } catch (_ss2) {}
+                    }
+                    // Arm BEFORE createWritable (file truncate triggers watchers immediately)
+                    armAnnoReloadBlock(15000);
+                    
+                    const writable = await window.currentFileHandle.createWritable();
+                    await writable.write(codeStr);
+                    await writable.close();
+                    // 不要立刻清 sessionStorage：Live Server 常在写入后几百毫秒才 reload
+                    flashToast('已覆写 ' + fileName);
+                    setTimeout(() => {
+                        try {
+                            const raw = sessionStorage.getItem('picker_after_overwrite');
+                            if (!raw) return;
+                            const p = JSON.parse(raw);
+                            if (p && p.ts === savePack.ts) sessionStorage.removeItem('picker_after_overwrite');
+                        } catch (_ss3) {}
+                    }, 12000);
+                } catch (err) {
+                    console.error(err);
+                    flashToast('覆写失败，请检查权限', true);
+                }
+            }
+        }, true);
+    }
+
+    // =========================================================
+    // 【阶段 2 优化】：集成 Glb管理器 模态弹窗与重置逻辑
+    // =========================================================
+    const glbModal = document.getElementById('glb-manager-modal');
+    const glbIframe = document.getElementById('glb-iframe');
+
+    window.openGlbManager = function() {
+        if (!glbIframe.src) {
+            // 同源相对路径：父页请用 bat 开在 18080，内嵌 GLB 管理器才能记住路径
+            glbIframe.src = 'GBL管理器/Glb管理器.html';
+        }
+        glbModal.style.display = 'flex';
+        glbModal.offsetHeight; // 强制重绘触发过渡动画
+        glbModal.classList.add('show');
+    };
+
+    window.closeGlbManager = function() {
+        glbModal.classList.remove('show');
+        setTimeout(() => { glbModal.style.display = 'none'; }, 300);
+    };
+
+    document.getElementById('btn-open-glb').addEventListener('click', window.openGlbManager);
+
+    // 核心暴露函数：接收来自 Glb管理器.html 的模型加载指令 (增加 displayFileName 参数用于 UI 显示)
+    window.loadModelFromGlbManager = function(url, displayFileName) {
+        if (!url) return;
+        
+        // 安全防护：防止误触导致未保存的劳动成果丢失
+        if (pointsData.length > 0 && !confirm("载入新素模将清空当前画布所有未保存的标注和快照，是否继续？")) return;
+        
+        // 【新增】：释放上一个通过 Blob 加载的内存，防止内存泄漏！
+        const oldSrc = viewer.getAttribute('src');
+        if (oldSrc && oldSrc.startsWith('blob:')) {
+            URL.revokeObjectURL(oldSrc);
+        }
+
+        // 1. 切换底层 3D 模型
+        viewer.setAttribute('src', url);
+        if (displayFileName) viewer.setAttribute('data-raw-src', displayFileName);
+        else viewer.removeAttribute('data-raw-src');
+        
+        // 2. 彻底清空当前画布和业务数据，打扫战场
+        _baseCamRadius = null; 
+        viewer.querySelectorAll('.preview-hotspot, .ink-anchor').forEach(el => el.remove()); 
+        pointsData = []; 
+        snapshotsData = []; 
+        selectedSnapId = null;
+        mainThumbnailData = "";
+        currentLineDots = []; 
+        currentPolygonDots = []; 
+        pointIndex = 1; 
+        snapIndex = 1; 
+        
+        // 3. 解除对上一个 JSON 档案的挂载锁定，防止串台覆写
+        window.currentFileHandle = null;
+        document.querySelectorAll('#workspace-file-list div').forEach(d => { 
+            d.style.color = '#aaa'; d.style.borderLeftColor = 'transparent'; d.style.background = 'transparent'; 
+        });
+        const exportBtnEl = document.querySelector('button[id*="export"]');
+        if (exportBtnEl) exportBtnEl.innerText = '纯数据导出'; 
+        
+        // 4. 重绘空状态
+        if (typeof renderState === 'function') renderState(); 
+        if (typeof renderSnapshots === 'function') renderSnapshots(); 
+        if (typeof updateCoverPreview === 'function') updateCoverPreview();
+        if (typeof updateSVG === 'function') updateSVG(); 
+        
+        const nameToShow = displayFileName || url.split('/').pop();
+        if (typeof statusMsg !== 'undefined') statusMsg.innerText = "已成功载入空白基底: " + nameToShow;
+        window.closeGlbManager(); // 加载成功后自动关闭弹窗
+    };
+
+    // 兼容底层兜底：穷举拦截 Glb管理器 可能调用的所有父级全局函数名
+    window.loadGLB = window.loadModelFromGlbManager; 
+    window.loadModel = window.loadModelFromGlbManager;
+    window.selectGLB = window.loadModelFromGlbManager;
+    
+    // 贪婪消息拦截器：跨域 + 跨 iframe 对象提取引擎
+    window.addEventListener('message', function(e) {
+        if (typeof window.logDebug === 'function') {
+            const logMsg = typeof e.data === 'object' ? JSON.stringify(e.data) : String(e.data);
+            if (!logMsg.includes('webpack') && !logMsg.includes('react')) { 
+                window.logDebug("📨 收到跨域信号: " + logMsg);
+            }
+        }
+
+        let targetPath = null;
+        if (e.data && e.data.type === 'INSERT_GLB' && e.data.path) {
+            targetPath = e.data.path;
+        } else if (e.data && e.data.type === 'SELECT_GLB' && e.data.url) {
+            targetPath = e.data.url;
+        } else if (typeof e.data === 'string' && e.data.endsWith('.glb')) {
+            targetPath = e.data;
+        } else if (e.data && typeof e.data === 'object') {
+            targetPath = e.data.url || e.data.glb || e.data.src || e.data.file || e.data.path;
+        }
+
+        if (targetPath) {
+            // 【核心修复2】：收到管理器信号后，强制补齐相对路径前缀，确保导出为 JSON 时写入正确的寻址路径！
+            if (!targetPath.startsWith('../') && !targetPath.startsWith('http') && !targetPath.startsWith('blob:')) {
+                targetPath = '../docs/model/' + targetPath;
+            }
+            
+            window.logDebug("⚙️ 尝试解析模型数据...");
+            
+            // 【核心黑科技】：直接突破 iframe DOM，提取管理器里挂载的真实 File 流对象！
+            try {
+                const iframe = document.getElementById('glb-iframe');
+                if (iframe && iframe.contentDocument) {
+                    // 去 iframe 里面找刚才被选中的那个高亮卡片
+                    const activeCard = iframe.contentDocument.querySelector('.model-card.active');
+                    if (activeCard && activeCard.__modelData && activeCard.__modelData.file) {
+                        const file = activeCard.__modelData.file;
+                        // 将硬盘里的文件变成浏览器能认识的链接 (Blob URL)
+                        const blobUrl = URL.createObjectURL(file);
+                        window.logDebug("✅ 成功提取到底层 File 流，转换为 Blob URL 加载！");
+                        // 传入 blobUrl 给组件加载，传入 targetPath 用于在 UI 上显示真实名字
+                        window.loadModelFromGlbManager(blobUrl, targetPath);
+                        return; // 提取成功，立刻退出
+                    }
+                }
+            } catch(err) {
+                window.logDebug("⚠️ DOM提取受限，将降级为普通字符串路径加载");
+            }
+
+            // 兜底方案：万一上面的提取失败了，就死马当活马医，直接用它传过来的字符串去加载
+            window.loadModelFromGlbManager(targetPath, targetPath);
+        }
+    });
+
+    </script> <!-- 注入外挂插件系统 -->
+    <script src="../plugins_01/plugin-point.js"></script> <script src="../plugins_01/plugin-arrow.js"></script> <script src="../plugins_01/plugin-line.js"></script> <script src="../plugins_01/plugin-contour.js"></script>
+    <script src="../plugins_01/plugin-polygon.js"></script> <script src="../plugins_01/plugin-polygon3d.js"></script> <script src="../plugins_01/plugin-leader.js"></script> <script src="../plugins_01/plugin-prober.js"></script> </body> </html>

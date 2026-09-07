@@ -20,7 +20,9 @@
 4. 经典引出线的正确动作是 `Alt+Shift+拖拽`，不是单击。
 5. 每个关键节点都截图到 `runs/`，任务结束后只保留有价值的最终证据，其余即时清理。
 6. GLB 管理器历史文件夹：下拉切换、同名合并、删除；卡片「复制到」仅可复制到其它历史文件夹，同名冲突自动加时间戳。自测：`npm run selftest:glb-dir-switch`（需先 `serve:repo`）。
-7. GLB 管理器「打开所在文件夹」：右侧预览区按钮，通过 `/__api/reveal-in-explorer` 调起资源管理器并选中当前 GLB。**禁止粘贴路径弹窗**；「新文件夹」走 `/__api/pick-folder` 一次选目录即记住完整路径。自测：`npm run selftest:glb-reveal`（隔离模式，不污染真实历史）。
+7. GLB 管理器「打开所在文件夹」：浏览器**故意不把盘符路径交给网页**（能读内容 ≠ 知道 `E:\...`）。有 18080 时「新文件夹」**只选一次系统目录**即记住路径；旧历史若缺路径，点打开会再绑一次。自测：`npm run selftest:glb-reveal`（隔离模式）。
+7a. **GLB 管理器框选拆出**：高模（如 `head_parts_anatomy.glb`，50万+三角）禁止每帧/`setFromObject` 扫顶点；面数或连通块过多时整 mesh 当一件；优先包围盒投影选中；射线仅用于少数孤岛细分。自测：`npm run selftest:glb-box-select`（需 `serve:repo` + 本机 `E:/模型/五官下载/head_parts_anatomy.glb`，可用 `GLB_PATH` 覆盖）。
+7b. **分色/平涂 GLB 预览天坑**：`updateViewerFromThree` 曾把「限制最高 1024」用线性缩小贴图，10 色会串成 2000+ 脏色 fleck；预览禁止 `maxTextureSize`。柔和光默认关阴影（低模面阴影像黑三角）。导出缩图用最近邻 `nearestResizeMapsForExport`。贴图 `NEAREST` + 关 mipmap。自测：`node scripts/skull-tex-manager-selftest.js`（`PORT`/`serve:repo` 指向仓库根，常见 `18080`）。
 8. 肌肉标注换模（欧版 → 黄种人女 V8）：另存 `docs/json/结构_头骨骨点肌肉/03 肌肉详解_黄种人女V8.json`。先探测同索引是否真对应；若顶点已重排则改「旧世界坐标 → 新肌肉网格最近顶点」。Draco 用 `@gltf-transform/cli@4 copy` 解压。Playwright 对隐藏 `#file-input` 用 `state: 'attached'` 再 `setInputFiles`。自测：`npm run selftest:remap-muscle-v8`（需先 `serve:repo`）。
 9. 换模后若「点在脸上但聚焦却转到后脑勺」：多半是 **法线反了**（双面网格拉到内侧）。用 `npm run fix:muscle-v8-visual` 在浏览器里按原档案法线对准观看侧、对热点重拾射线写回 `pos/norm`；再用 `node scripts/visual-qa-muscle-v8.js` 点击列表聚焦抽检。
 10. 口周点位解剖纠偏：`node scripts/precise-repick-muscle-v8.js`（口轮匝肌锚点 + 手调偏移 + 近邻射线）；单点微调可用 `fix-dao-front.js` / `fix-dao-visual.js`。确认图务必用**正面**+斜视各一张，避免斜视投影误判高低。
@@ -28,6 +30,12 @@
 12. **肌肉色块硬对齐（推荐最终）**：欧版与 V8 的 Deform **UV 岛共享**但配色不同、顶点索引不共享。正确做法：`uv-muscle-remap-v8-nongap.py`——原版点→最近 Deform 顶点取 UV→V8 同 UV 候选（左右各一）按原版左右选侧→避开灰缝/头皮色吸附到肌腹；再用 `fixed-view-muscle-qa.js` / `dual-muscle-qa.js` 固定视角验收（勿只靠列表法线聚焦）。须先 `@gltf-transform/cli@4 copy` 解压 GLB。
 
 13. **肌肉快照手机取景对齐**：生产端参考框用**光学裁切**（不缩视口，框外模型仍可见）。`model-viewer` 竖屏会自动拉大 FOV，消费端 `applySnapshot` 用 FOV 锁把 `getFieldOfView` 拉回生产真实视角。验收：`PORT=18080 node scripts/mobile-frame-match-verify.js`。
+
+14. **五官局部模表面点位标注**：入口是 `自用工具文件_不部署/模型标注生产工具.html`（坐标拾取系统 Pro），工具模式默认 `表面点位 [Alt+左击]`，档案在 `docs/json/结构_五官/`。流程：`facial-features-capture-views.js` 多视角截图 → 对照 `docs/美术知识库/五官造型规律.md` 只标模型上看得见的部位 → `facial-features-annotate.js`（`ONLY=eye` / `SKIP_SHOT=1`）按模型屏幕包围盒 uv 射线写 `pointsData`（`type:point`，`desc` 可空）。同路径反复 `setInputFiles` 可能不触发 change；验收截图优先**每场景新开 page**。鼻孔等凹陷部位要用仰视再拾，避免与鼻中隔叠点。
+
+15. **五官点位微调**：先对照好大夫/系统解剖学等资料定「该落在脊/凹/缘哪一类」，再用 `facial-features-retouch.js` 重拾；关键偏差用 `facial-features-uvfix.js`（模型屏幕包围盒 uv，勿用画布中心像素，FOV 一变就漂）。鼻翼等侧壁要偏好更大 `+z`，避免点到后侧面。
+
+16. **坐标拾取生产端面板（2026-09）**：右侧已拆「标注 / 场景」Tab（默认标注）；画面双击 `.HotspotAnnotation` 可改名；列表 ✖ 与 Delete/Backspace（非输入框）均先 `confirm` 再删。代码框/复制/导入/清空已移除，导出与工作区存盘直接走 `generateCode()`；隐藏 `#file-input` 仍保留供自动化 `setInputFiles`。
 
 ## 新对话怎么直接用
 
@@ -138,6 +146,7 @@
 9. **PBR 路线**：`PBR_Preview` 去掉皮肤 `sfMatcap` 后仍可能只剩 `sfEyeball`。管理器不得因「仅有眼球 extras」就进 Matcap 直出（否则摄影棚/曝光无效）。大 GLB（~186MB）解析超时须 ≥180s；Agent 用 base64 注入会撑爆页面，改走本机 HTTP 拉 ArrayBuffer。
 10. **a4s / Anatomy Next**：列表页标 downloadable ≠ 篡改猴一定能导出；若 embed 里长期 `panel=false`，优先查篡改猴脚本是否语法错误（批量注入勿再包外层 IIFE）。Chrome profile 被占用时会报「用户数据目录已在使用中」，先关掉占用该 profile 的 Chrome。
 11. **批量下载假失败**：`panel=false` 且全程无 mesh，多半是 `篡改猴Sketchfab.js` 语法错误导致注入崩溃（Console 可见 `Unexpected token`）。`panel=true`、贴图就绪但无 download 事件，看面板是否 `导出崩溃`（如 `findTexIdx before initialization` = 函数声明顺序问题）。
+11b. **自动化 Chrome 必须能加载篡改猴**：Playwright 默认 `--disable-extensions`，会让 `chrome-profile-sketchfab` 里看不到篡改猴。`sketchfab-batch-download.js` 须 `ignoreDefaultArgs: ['--disable-extensions']` 并用 `--load-extension` 挂上扩展；脚本库可从本机 Chrome「Profile 1」同步 `Extensions/dhdgffkk…` + `Local Extension Settings/dhdgffkk…`。有扩展时优先走扩展内脚本，不再二次注入。
 12. **Anatomy Next 色块头肌图（colourcoded / Static）**：勿对 `Static` 走头扫「斜纹 Diffuse→Colour低频+Spec+Matcap」抢救。线上露出颧骨等是象牙/浅灰骨；误抢救会变成粉肤 `synth_albedo`+`skin_soft`。v9.9.85：`Static` 禁用 Matcap，骨色用 `Static_diffuse × Tekstura` 合成；对照用 Sketchfab embed + `Glb管理器` 截图（`scripts/compare-colourcoded-bone.js`）。
 
 ## Sketchfab → GLB 批量下载（可复用）
