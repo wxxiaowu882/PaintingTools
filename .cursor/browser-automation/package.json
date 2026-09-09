@@ -22,15 +22,24 @@
     "gate:gnm-euro-eye": "node scripts/gnm-euro-eye-gate.js",
     "accept:gnm-align-browser": "node scripts/gnm-align-browser-acceptance.js",
     "compare:gnm-euro-display": "node scripts/gnm-euro-display-compare.js",
-    "selftest:glb-dir-switch": "node scripts/glb-dir-history-switch-selftest.js"
+    "selftest:glb-dir-switch": "node scripts/glb-dir-history-switch-selftest.js",
+    "selftest:glb-reveal": "node scripts/glb-reveal-in-explorer-selftest.js",
+    "selftest:glb-box-select": "node scripts/glb-box-select-selftest.js",
+    "selftest:remap-muscle-v8": "node scripts/remap-muscle-annos-v8.js",
+    "fix:muscle-v8-visual": "node scripts/visual-fix-muscle-v8.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@gltf-transform/core": "^4.5.0",
+    "@gltf-transform/extensions": "^4.5.0",
+    "@gltf-transform/functions": "^4.5.0",
     "@playwright/test": "^1.62.1",
     "playwright": "^1.62.1",
-    "serve": "^14.2.6"
+    "serve": "^14.2.6",
+    "sharp": "^0.35.4",
+    "three": "^0.164.0"
   }
 }

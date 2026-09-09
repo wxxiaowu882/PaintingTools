@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 
 const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const port = process.env.PORT ? Number(process.env.PORT) : 18080;
@@ -397,6 +398,10 @@ async function handleIdentityTaxonomyApi(req, res) {
 }
 
 async function handleGlbDirHistoryApi(req, res) {
+  const isSyntheticTestDirName = (name) =>
+    /^(copy_src|copy_dst|folder_alpha|folder_beta|folder_del_[ab]|reveal_folder)$/i.test(
+      String(name || '').trim()
+    );
   await handleJsonFileApi(req, res, {
     filePath: GLB_DIR_HISTORY_PATH,
     backupDir: GLB_DIR_HISTORY_BACKUP_DIR,
@@ -405,23 +410,386 @@ async function handleGlbDirHistoryApi(req, res) {
       const folders = Array.isArray(body.folders)
         ? body.folders
             .filter((f) => f && typeof f.path === 'string' && f.path.trim())
-            .map((f) => ({
-              id: String(f.id || `dir_${Date.now()}`),
-              path: String(f.path).trim().replace(/\//g, '\\'),
-              name: String(f.name || path.basename(String(f.path).trim()) || f.path).trim(),
-              lastUsed: Number(f.lastUsed) || Date.now(),
-            }))
+            .filter((f) => !isSyntheticTestDirName(f.name) && !isSyntheticTestDirName(f.path))
+            .map((f) => {
+              const pathStr = String(f.path).trim().replace(/\//g, '\\');
+              const absRaw = f.absPath != null ? String(f.absPath).trim().replace(/\//g, '\\') : '';
+              const absPath = absRaw && (/^[a-zA-Z]:\\/.test(absRaw) || absRaw.startsWith('\\\\'))
+                ? absRaw.replace(/[\\\/]+$/, '')
+                : '';
+              const row = {
+                id: String(f.id || `dir_${Date.now()}`),
+                path: pathStr,
+                name: String(f.name || path.basename(pathStr) || f.path).trim(),
+                lastUsed: Number(f.lastUsed) || Date.now(),
+              };
+              if (absPath) row.absPath = absPath;
+              return row;
+            })
             .slice(0, 40)
         : [];
+      // 若客户端只提交了自测假目录，写成空列表，避免再次污染
       return {
         kind: 'glbManagerDirHistory',
         version: Number(body.version) || 1,
         updatedAt: new Date().toISOString(),
-        lastId: body.lastId ? String(body.lastId) : folders[0]?.id || null,
+        lastId: body.lastId && folders.some((f) => f.id === String(body.lastId))
+          ? String(body.lastId)
+          : folders[0]?.id || null,
         folders,
       };
     },
   });
+}
+
+/** 在 Windows 资源管理器中打开并选中文件（或打开目录） */
+async function handleRevealInExplorerApi(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: 'method not allowed' }));
+    return;
+  }
+  try {
+    const body = await readBody(req);
+    let target = String(body.path || body.filePath || '').trim().replace(/\//g, '\\');
+    if (!target) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'missing path' }));
+      return;
+    }
+    target = path.normalize(target);
+    if (!path.isAbsolute(target)) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'path must be absolute' }));
+      return;
+    }
+    if (!fs.existsSync(target)) {
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'path not found', path: target }));
+      return;
+    }
+    if (process.platform === 'win32') {
+      const st = fs.statSync(target);
+      if (st.isDirectory()) {
+        spawn('explorer', [target], { detached: true, stdio: 'ignore' }).unref();
+      } else {
+        spawn('explorer', [`/select,${target}`], { detached: true, stdio: 'ignore' }).unref();
+      }
+    } else {
+      const folder = fs.statSync(target).isDirectory() ? target : path.dirname(target);
+      spawn('xdg-open', [folder], { detached: true, stdio: 'ignore' }).unref();
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: true, path: target }));
+  } catch (e) {
+    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: e.message || String(e) }));
+  }
+}
+
+function assertPathInsideRoot(rootAbs, targetAbs) {
+  const root = path.normalize(rootAbs).replace(/[\\\/]+$/, '');
+  const target = path.normalize(targetAbs);
+  const rootLower = root.toLowerCase();
+  const targetLower = target.toLowerCase();
+  if (targetLower !== rootLower && !targetLower.startsWith(rootLower + path.sep)) {
+    throw new Error('path escapes root');
+  }
+  return target;
+}
+
+function pickFolderNative() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      resolve({ ok: false, error: 'pick-folder only supported on Windows' });
+      return;
+    }
+    const outFile = path.join(
+      require('os').tmpdir(),
+      `glb-pick-folder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`
+    );
+    // 独立可见进程 + TopMost 窗体，避免藏在浏览器后面 / 最小化服务窗口里无界面
+    const psScript = `
+$ErrorActionPreference = 'Stop'
+$out = ${JSON.stringify(outFile)}
+try {
+  Add-Type -AssemblyName System.Windows.Forms
+  $form = New-Object System.Windows.Forms.Form
+  $form.TopMost = $true
+  $form.Opacity = 0
+  $form.ShowInTaskbar = $false
+  $form.FormBorderStyle = 'None'
+  $form.StartPosition = 'Manual'
+  $form.Location = New-Object System.Drawing.Point(-10000, -10000)
+  $form.Size = New-Object System.Drawing.Size(1, 1)
+  $form.Show()
+  $form.Activate()
+  $d = New-Object System.Windows.Forms.FolderBrowserDialog
+  $d.Description = '选择 GLB 模型文件夹（将记住完整路径）'
+  $d.ShowNewFolderButton = $true
+  $r = $d.ShowDialog($form)
+  $form.Close()
+  $form.Dispose()
+  if ($r -eq [System.Windows.Forms.DialogResult]::OK -and $d.SelectedPath) {
+    [System.IO.File]::WriteAllText($out, $d.SelectedPath, [System.Text.UTF8Encoding]::new($false))
+  }
+} catch {
+  [System.IO.File]::WriteAllText($out, ('ERROR:' + $_.Exception.Message), [System.Text.UTF8Encoding]::new($false))
+  exit 1
+}
+`;
+    const psPath = path.join(
+      require('os').tmpdir(),
+      `glb-pick-folder-${Date.now()}.ps1`
+    );
+    try {
+      fs.writeFileSync(psPath, psScript, 'utf8');
+    } catch (e) {
+      resolve({ ok: false, error: e.message || String(e) });
+      return;
+    }
+    // start /wait 保证在交互桌面弹出，而不是挂在最小化的 node 服务窗口后
+    const child = spawn(
+      'cmd.exe',
+      ['/c', 'start', 'GLB选文件夹', '/wait', 'powershell.exe', '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', psPath],
+      {
+        windowsHide: false,
+        detached: false,
+        stdio: 'ignore',
+        shell: false,
+      }
+    );
+    child.on('error', (e) => {
+      try { fs.unlinkSync(psPath); } catch (_) {}
+      try { fs.unlinkSync(outFile); } catch (_) {}
+      resolve({ ok: false, error: e.message || String(e) });
+    });
+    child.on('close', () => {
+      let selected = '';
+      try {
+        if (fs.existsSync(outFile)) selected = fs.readFileSync(outFile, 'utf8').trim();
+      } catch (_) {}
+      try { fs.unlinkSync(psPath); } catch (_) {}
+      try { fs.unlinkSync(outFile); } catch (_) {}
+      if (!selected) {
+        resolve({ ok: false, cancelled: true, error: 'cancelled' });
+        return;
+      }
+      if (selected.startsWith('ERROR:')) {
+        resolve({ ok: false, error: selected.slice(6) });
+        return;
+      }
+      resolve({ ok: true, path: path.normalize(selected) });
+    });
+  });
+}
+
+function listGlbFilesUnder(rootAbs) {
+  const root = path.normalize(rootAbs);
+  const out = [];
+  const walk = (dir, rel) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (_) {
+      return;
+    }
+    for (const ent of entries) {
+      if (!ent.name || ent.name === '.' || ent.name === '..') continue;
+      const abs = path.join(dir, ent.name);
+      const childRel = rel ? `${rel}/${ent.name}` : ent.name;
+      if (ent.isDirectory()) {
+        walk(abs, childRel);
+      } else if (ent.isFile() && ent.name.toLowerCase().endsWith('.glb')) {
+        try {
+          const st = fs.statSync(abs);
+          out.push({
+            rel: childRel.replace(/\\/g, '/'),
+            name: ent.name,
+            size: st.size,
+            mtimeMs: st.mtimeMs,
+          });
+        } catch (_) {}
+      }
+    }
+  };
+  walk(root, '');
+  out.sort((a, b) => a.rel.localeCompare(b.rel));
+  return out;
+}
+
+async function handlePickFolderApi(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: 'method not allowed' }));
+    return;
+  }
+  const result = await pickFolderNative();
+  res.writeHead(result.ok ? 200 : result.cancelled ? 200 : 500, {
+    'Content-Type': 'application/json; charset=utf-8',
+  });
+  res.end(JSON.stringify(result));
+}
+
+async function handleFsListApi(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: 'method not allowed' }));
+    return;
+  }
+  try {
+    const body = await readBody(req);
+    const root = path.normalize(String(body.root || body.path || '').trim());
+    if (!root || !path.isAbsolute(root) || !fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'invalid root directory' }));
+      return;
+    }
+    const files = listGlbFilesUnder(root);
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: true, root, files, name: path.basename(root) }));
+  } catch (e) {
+    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: e.message || String(e) }));
+  }
+}
+
+async function handleFsReadApi(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: 'method not allowed' }));
+    return;
+  }
+  try {
+    const body = await readBody(req);
+    const root = path.normalize(String(body.root || '').trim());
+    const rel = String(body.rel || body.file || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
+    if (!root || !rel || !path.isAbsolute(root)) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'missing root/rel' }));
+      return;
+    }
+    const target = assertPathInsideRoot(root, path.resolve(root, rel));
+    if (!fs.existsSync(target) || !fs.statSync(target).isFile()) {
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'file not found' }));
+      return;
+    }
+    const buf = fs.readFileSync(target);
+    res.writeHead(200, {
+      'Content-Type': 'model/gltf-binary',
+      'Content-Length': buf.length,
+      'Cache-Control': 'no-store',
+      'X-Glb-Name': encodeURIComponent(path.basename(target)),
+      'X-Glb-Mtime': String(fs.statSync(target).mtimeMs),
+    });
+    res.end(buf);
+  } catch (e) {
+    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: e.message || String(e) }));
+  }
+}
+
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+async function handleFsWriteApi(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: 'method not allowed' }));
+    return;
+  }
+  try {
+    const root = decodeURIComponent(String(req.headers['x-glb-root'] || '')).trim();
+    const rel = decodeURIComponent(String(req.headers['x-glb-rel'] || '')).trim().replace(/\\/g, '/').replace(/^\/+/, '');
+    if (!root || !rel || !path.isAbsolute(root)) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'missing X-Glb-Root / X-Glb-Rel' }));
+      return;
+    }
+    const target = assertPathInsideRoot(root, path.resolve(root, rel));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    const buf = await readRawBody(req);
+    fs.writeFileSync(target, buf);
+    const st = fs.statSync(target);
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: true, path: target, size: st.size, mtimeMs: st.mtimeMs }));
+  } catch (e) {
+    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: e.message || String(e) }));
+  }
+}
+
+async function handleFsDeleteApi(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: 'method not allowed' }));
+    return;
+  }
+  try {
+    const body = await readBody(req);
+    const root = path.normalize(String(body.root || '').trim());
+    const rel = String(body.rel || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
+    if (!root || !rel || !path.isAbsolute(root)) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'missing root/rel' }));
+      return;
+    }
+    const target = assertPathInsideRoot(root, path.resolve(root, rel));
+    if (!fs.existsSync(target)) {
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'not found' }));
+      return;
+    }
+    fs.unlinkSync(target);
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: true }));
+  } catch (e) {
+    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: e.message || String(e) }));
+  }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -449,6 +817,30 @@ const server = http.createServer(async (req, res) => {
     }
     if (urlPath === '/__api/glb-dir-history') {
       await handleGlbDirHistoryApi(req, res);
+      return;
+    }
+    if (urlPath === '/__api/reveal-in-explorer') {
+      await handleRevealInExplorerApi(req, res);
+      return;
+    }
+    if (urlPath === '/__api/pick-folder') {
+      await handlePickFolderApi(req, res);
+      return;
+    }
+    if (urlPath === '/__api/fs/list') {
+      await handleFsListApi(req, res);
+      return;
+    }
+    if (urlPath === '/__api/fs/read') {
+      await handleFsReadApi(req, res);
+      return;
+    }
+    if (urlPath === '/__api/fs/write') {
+      await handleFsWriteApi(req, res);
+      return;
+    }
+    if (urlPath === '/__api/fs/delete') {
+      await handleFsDeleteApi(req, res);
       return;
     }
 
@@ -483,4 +875,7 @@ server.listen(port, () => {
   console.log(`Param favorites API: POST/GET http://localhost:${port}/__api/gnm-param-favorites`);
   console.log(`Identity taxonomy API: POST/GET http://localhost:${port}/__api/gnm-identity-taxonomy`);
   console.log(`GLB dir history API: POST/GET http://localhost:${port}/__api/glb-dir-history`);
+  console.log(`Reveal in Explorer API: POST http://localhost:${port}/__api/reveal-in-explorer`);
+  console.log(`Pick folder API: POST http://localhost:${port}/__api/pick-folder`);
+  console.log(`FS list/read/write/delete: /__api/fs/*`);
 });

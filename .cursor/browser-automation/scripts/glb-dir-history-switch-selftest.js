@@ -52,6 +52,7 @@ async function waitForTestApi(page, timeoutMs = 20000) {
 
     const step1 = await page.evaluate(async () => {
       const api = window.__GLB_DIR_HISTORY_TEST__;
+      api.beginIsolated();
       await api.resetHistory();
       const a = await api.connectMock('folder_alpha', ['alpha_one.glb', 'alpha_two.glb']);
       const b = await api.connectMock('folder_beta', ['beta_only.glb']);
@@ -132,6 +133,56 @@ async function waitForTestApi(page, timeoutMs = 20000) {
       '被删 id 不应还在列表中'
     );
 
+    // 跨历史文件夹复制（同名冲突自动加时间戳）
+    const copyCase = await page.evaluate(async () => {
+      const api = window.__GLB_DIR_HISTORY_TEST__;
+      await api.resetHistory();
+      await api.connectMock('copy_src', ['shared.glb', 'unique_src.glb']);
+      await api.connectMock('copy_dst', ['shared.glb', 'dst_only.glb']);
+      const st = api.getState();
+      const idSrc = st.history.find((h) => h.name === 'copy_src')?.id;
+      const idDst = st.history.find((h) => h.name === 'copy_dst')?.id;
+      await api.selectById(idSrc);
+      const copyUnique = await api.copyModelTo('unique_src.glb', idDst);
+      const copyConflict = await api.copyModelTo('shared.glb', idDst);
+      const dstNames = api.listDirNames(idDst) || [];
+      const uiHasCopyBtn = !!document.querySelector('.model-card .copy-btn');
+      return {
+        idSrc,
+        idDst,
+        copyUnique,
+        copyConflict,
+        dstNames,
+        uiHasCopyBtn,
+        stayedOnSrc: api.getState().currentId === idSrc,
+      };
+    });
+
+    await page.screenshot({ path: path.join(outDir, '04-after-copy.png'), fullPage: true });
+
+    assert(copyCase.uiHasCopyBtn, '卡片应有「复制到」按钮');
+    assert(copyCase.stayedOnSrc, '复制后应仍停留在源文件夹');
+    assert(copyCase.copyUnique?.result?.finalName === 'unique_src.glb', `无冲突应保持原名，实际 ${JSON.stringify(copyCase.copyUnique)}`);
+    assert(
+      Array.isArray(copyCase.dstNames) && copyCase.dstNames.includes('unique_src.glb'),
+      `目标目录应含 unique_src.glb，实际 ${JSON.stringify(copyCase.dstNames)}`
+    );
+    assert(
+      copyCase.copyConflict?.result?.finalName
+        && copyCase.copyConflict.result.finalName !== 'shared.glb'
+        && String(copyCase.copyConflict.result.finalName).startsWith('shared_')
+        && String(copyCase.copyConflict.result.finalName).endsWith('.glb'),
+      `同名冲突应追加时间戳，实际 ${JSON.stringify(copyCase.copyConflict)}`
+    );
+    assert(
+      copyCase.dstNames.includes(copyCase.copyConflict.result.finalName),
+      `目标目录应含冲突后文件名，实际 ${JSON.stringify(copyCase.dstNames)}`
+    );
+
+    await page.evaluate(async () => {
+      await window.__GLB_DIR_HISTORY_TEST__.endIsolated();
+    });
+
     const report = {
       ok: true,
       pageUrl,
@@ -140,6 +191,7 @@ async function waitForTestApi(page, timeoutMs = 20000) {
       switchedBeta,
       sameName,
       afterDelete,
+      copyCase,
       logs,
     };
     fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2), 'utf8');
