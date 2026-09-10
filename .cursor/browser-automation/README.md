@@ -42,6 +42,19 @@
 18. **笔刷局部加密（已弃用路径）**：真网格加密易在未焊接耳模上撕成纱窗。
 19. **笔刷临时 TPS 烘焙**：`sculpt-brush-20260908ag` 起，落笔临时控制点 + `fitTps`（与锚点拧形同原理）→ 烘焙 restPos；不进锚点列表、不加密。自测：`node scripts/ear-brush-warp-bake-qa.js`。
 
+20. **五官综合场景（石膏全身头像）**：产物 `docs/json/结构_五官/05 五官综合讲解.json`（01–04 全部约 52 名，模型 `石膏头像_女中青年_05_opt_石膏白.glb`）。脚本：`facial-composite-*.js`（眼区优先 `eye-fast-uv.js` / `brow-uv.js`）。要点：耳取模型 **+x**；眼眉取模型 **右眼（x&lt;0）**；鼻口走中线；面点偏好更大 `+z`。Playwright **`page.evaluate` 禁止传入函数**。鼻–人中–唇珠：鼻底 ≥ 鼻中隔 &gt; 人中（沟）/人中脊 &gt; 唇珠。名册：`runs/_facial_inventory.json`。
+    - **相机必须进临时 JSON 的 `camera` 字段**（加载档案会盖掉 JS 设的 orbit）；距离写死如 `0.30m`，**勿用 `auto`**（整脸取景易点到颊）；设完后 `jumpCameraToGoal()`。
+    - **眼区推荐相机**：`orbit: '-18deg 88deg 0.30m'`，`target: '-0.032m 0.192m 0.068m'`，`fov: '16deg'`。探针（中线 u=0.48）：虹膜约 v0.40/y0.205；眉脊约 v0.22–0.28/y0.225–0.232；上睑约 v0.35–0.38。
+    - **单点复核**：临时 JSON 只留 1 点；隐藏 DOM hotspot 不可靠。同页反复 `setInputFiles` 先 `input.value=''`。
+    - **眉易过冲到额**：用屏幕 uv + 每点 `yMin/yMax` 分层，勿用过宽 y 带粗扫（多点会压成同一命中）。
+    - **耳(+x) 侧视坑**：颊面高 `+z` 易冒充耳屏；纯侧视（≈88–100deg）强制 `z>0` 会点到颊。略偏正面（≈55deg）下耳软骨表面常为负 `z`，应用**高 u（耳块内）+ `x≥0.06`**，勿追高 z。耳轮可用高 x + 负 z 钉在 helix。侧视 AI 判读耳细部易不稳，关键点须结合几何与截图交叉确认。
+    - **耳推荐相机**：`orbit: '55deg 88deg 0.24m'`，`target: '0.060m 0.155m 0.018m'`，`fov: '13deg'`（整耳入画）。脚本：`facial-composite-ear-sep.js` / `ear-oncart.js`。
+
+21. **头部造型规律样板关标注（消费端 Solid）**：`sandbox=headform` 的 101/201。消费端需 `window.__solidHost`（camera/sceneGroup/THREE）才能 `page.evaluate` 射线。先用 `headform-uv-probe.js` 扫包围再定点；侧前头像约 **u0.40–0.625**。落地：`headform-anno-101-201.js`（`SCENE_IDS=` 可单关）。虚线 `norm` 必须是**模型局部法线**（与 `Plugin_DashedLine` 存盘一致）。统合只合并 `^\d+_.+\.json$`。计划：`runs/headform-anno-plan-101-201.md`。
+    - **验收硬性**：必须对截图做 **AI 视觉读图**，禁止只靠探针/命中日志宣称通过（见 `.cursor/rules/ai-vision-qa.mdc`）。
+    - **侧前外轮廓课**：主课是**远端**剪影（画面上对黑底的外缘），重点钉 **眉弓凸、颧骨凸**；勿标近侧耳颞，也勿把鼻梁中线当外轮廓主线。过侧的相机易让左缘变成鼻梁剪影，宜保持「更正的四分之三」。
+    - **虚线**：外轮廓宜用多点折线（勿用过疏的 `kind:straight` 弦切进脸内）。
+
 ## 新对话怎么直接用
 
 如果你开一个新对话，希望我直接按这套经验做，可以直接这样下达任务：

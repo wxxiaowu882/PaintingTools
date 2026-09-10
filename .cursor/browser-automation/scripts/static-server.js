@@ -112,7 +112,18 @@ function cors(res) {
 }
 
 function resolvePath(urlPath) {
-  let pathname = decodeURIComponent((urlPath || '/').split('?')[0]);
+  // 部分客户端会把中文路径以未编码 UTF-8 送来；decodeURIComponent 会抛 URI malformed。
+  const rawPath = (urlPath || '/').split('?')[0];
+  let pathname = rawPath;
+  try {
+    pathname = decodeURIComponent(rawPath);
+  } catch (_) {
+    try {
+      pathname = decodeURIComponent(escape(rawPath));
+    } catch (__ ) {
+      pathname = rawPath;
+    }
+  }
   if (pathname === '/') pathname = '/index.html';
   const cleaned = pathname.replace(/^\/+/, '');
   let absolutePath = path.resolve(repoRoot, cleaned);

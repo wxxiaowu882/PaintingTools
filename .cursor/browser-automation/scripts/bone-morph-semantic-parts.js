@@ -1,5 +1,5 @@
 /**
- * Selftest: semantic colour-class parts (整色块部件) + HSL.
+ * Selftest: 3D geometry-island coloring + HSL.
  * Run: BASE_URL=http://127.0.0.1:8765 node scripts/bone-morph-semantic-parts.js
  */
 const { chromium } = require("playwright");
@@ -12,7 +12,7 @@ const outDir = path.join(
   __dirname,
   "..",
   "runs",
-  `${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-morph-semantic-parts`
+  `${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-morph-geom-islands`
 );
 fs.mkdirSync(outDir, { recursive: true });
 
@@ -30,134 +30,135 @@ function check(name, ok, detail) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 960 } });
   await page.goto(`${BASE}/?_=${Date.now()}`, {
     waitUntil: "domcontentloaded",
-    timeout: 60000,
+    timeout: 120000,
   });
-  await page.click("[data-mode=morph]");
+
   await page.waitForFunction(
-    () =>
-      !!window.__boneMorph &&
-      (document.getElementById("viewerStatusMorph")?.textContent || "").includes(
-        "骨相拧形"
-      ),
+    () => {
+      const sel = document.querySelector("#projectSelect");
+      if (!sel) return false;
+      if (sel.options.length > 0 && sel.options[0].value) return true;
+      return sel.options.length > 0 && /暂无工程|加载失败/.test(sel.options[0].textContent || "");
+    },
+    { timeout: 60000 }
+  );
+
+  const hasProject = await page.evaluate(() => {
+    const sel = document.querySelector("#projectSelect");
+    return !!(sel && sel.value);
+  });
+  if (!hasProject) {
+    await page.click("#btnNewFromEuro");
+    await page.waitForFunction(
+      () => {
+        const sel = document.querySelector("#projectSelect");
+        return !!(sel && sel.value);
+      },
+      { timeout: 180000 }
+    );
+  } else {
+    const cur = await page.evaluate(() => document.querySelector("#projectSelect")?.value || "");
+    if (!cur) {
+      await page.selectOption("#projectSelect", { index: 0 });
+    }
+  }
+
+  await page.waitForFunction(() => !!window.__boneMorph?.getRoot?.(), {
+    timeout: 180000,
+  });
+  await page.waitForFunction(
+    () => window.__boneMorph?.getState?.()?.islandScanDone === true,
     { timeout: 180000 }
   );
-  await page.waitForTimeout(800);
+  await page.click('[data-morph-tab="color"]');
+  await page.waitForTimeout(300);
 
+  const st0 = await page.evaluate(() => window.__boneMorph.getState());
   check(
-    "morph panel has 3 tabs",
-    (await page.locator("[data-morph-tab]").count()) === 3,
-    "拧形/设色/存档"
+    "build id is geom-islands tree",
+    /geom-island/i.test(st0.buildId || ""),
+    st0.buildId
   );
+  check(
+    "island scan produced groups",
+    (st0.colorIslandGroups || []).length >= 1,
+    `groups=${(st0.colorIslandGroups || []).length}`
+  );
+  const totalIslands = (st0.colorIslandGroups || []).reduce(
+    (n, g) => n + (g.islands || []).length,
+    0
+  );
+  check("has geometry islands on model", totalIslands >= 1, `islands=${totalIslands}`);
+  const hasGeomLabel = (st0.colorIslandGroups || []).some((g) =>
+    (g.islands || []).some((isl) => /几何孤岛|gi_/.test(`${isl.label || ""}${isl.regionId || ""}`))
+  );
+  check("island labels look like geometry islands", hasGeomLabel, `total=${totalIslands}`);
 
-  const canvas = page.locator("#viewerHostMorph canvas");
-  const box = await canvas.boundingBox();
-
-  // side view for ear
-  await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.4);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width * 0.22, box.y + box.height * 0.4, {
-    steps: 14,
+  await page.evaluate(() => {
+    const st = window.__boneMorph.getState();
+    const g = st.colorIslandGroups?.[0];
+    const isl = g?.islands?.[0];
+    if (isl?.token) window.__boneMorph.flashIsland(isl.token);
   });
-  await page.mouse.up();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(120);
+  const flashMid = await page.evaluate(() => {
+    const token = window.__boneMorph.getState().islandHighlightToken;
+    let overlay = false;
+    window.__boneMorph.getRoot()?.traverse((o) => {
+      if (o.name === "__bm_island_highlight") overlay = true;
+    });
+    return { token, overlay };
+  });
+  check("flash island active mid-animation", !!flashMid.token && flashMid.overlay, JSON.stringify(flashMid));
+  await page.waitForTimeout(700);
+  const flashEnd = await page.evaluate(() => {
+    const token = window.__boneMorph.getState().islandHighlightToken;
+    let overlay = false;
+    window.__boneMorph.getRoot()?.traverse((o) => {
+      if (o.name === "__bm_island_highlight") overlay = true;
+    });
+    return { token, overlay };
+  });
+  check("flash island clears after timeout", !flashEnd.token && !flashEnd.overlay, JSON.stringify(flashEnd));
 
-  const earProbe = await page.evaluate(() => {
-    const bm = window.__boneMorph;
+  const pick = await page.evaluate(() => {
+    const st = window.__boneMorph.getState();
     let best = null;
-    for (let x = 0.7; x <= 0.82; x += 0.03) {
-      for (let y = 0.38; y <= 0.5; y += 0.03) {
-        const r = bm.debugFloodPickAtNdc(x, y);
-        if (!r?.best) continue;
-        const h = r.best.hex || "";
-        const rr = parseInt(h.slice(1, 3), 16);
-        const gg = parseInt(h.slice(3, 5), 16);
-        const bb = parseInt(h.slice(5, 7), 16);
-        const mx = Math.max(rr, gg, bb);
-        const coolDark = bb >= rr && mx < 160 && mx > 80 && r.best.px >= 4000 && r.best.px <= 120000;
-        // 偏好 Deform 暗冷灰局部部件，忌整颅灰
-        let score = coolDark ? r.best.px : r.best.px * 0.15;
-        if (/deform/i.test(r.best.mesh) && coolDark) score *= 2.5;
-        if (r.best.px > 150000) score *= 0.05;
-        if (!best || score > best._s) best = { ...r.best, nx: x, ny: y, _s: score };
+    for (const g of st.colorIslandGroups || []) {
+      const key = `${g.meshKey || ""} ${g.meshRawName || ""} ${g.meshLabel || ""}`.toLowerCase();
+      if (!/deform|static|变形|静态/.test(key)) continue;
+      for (const isl of g.islands || []) {
+        if (!best || isl.pixelCount > best.pixelCount) best = isl;
       }
     }
     return best;
   });
-  console.log("earProbe", JSON.stringify(earProbe, null, 2));
-  check(
-    "ear semantic part pickable",
-    !!(earProbe && earProbe.px >= 5000 && earProbe.regionId?.startsWith("cq_")),
-    JSON.stringify({
-      label: earProbe?.partLabel,
-      px: earProbe?.px,
-      hex: earProbe?.hex,
-      id: earProbe?.regionId,
-    })
-  );
+  check("found large deform/static island", !!pick && pick.pixelCount >= 2000, JSON.stringify(pick));
 
-  await page.click("#morphPickMesh");
-  await page.waitForTimeout(80);
-  const earPt = earProbe || { nx: 0.76, ny: 0.42 };
-  await page.mouse.click(box.x + box.width * earPt.nx, box.y + box.height * earPt.ny);
-  await page.waitForTimeout(400);
-  const afterPick = await page.evaluate(() => {
+  await page.evaluate((token) => {
+    window.__boneMorph.setIslandChecked([token]);
+    window.__boneMorph.setHslScope("parts");
+  }, pick.token);
+  await page.waitForTimeout(300);
+
+  const afterCheck = await page.evaluate(() => {
     const st = window.__boneMorph.getState();
-    return {
-      key: st.selectedMeshKey,
-      region: st.selectedRegionKey,
-      px: st.selectedRegionPixels,
-      hex: st.selectedRegionHex,
-      label: st.selectedPartLabel,
-      scope: st.hslScope,
-    };
+    return { scope: st.hslScope, checked: st.islandChecked || [] };
   });
   check(
-    "UI pick selects cq_ semantic part",
-    !!(afterPick.region?.startsWith("cq_") && afterPick.px >= 5000),
-    JSON.stringify(afterPick)
-  );
-  check(
-    "pick auto-opens color tab",
-    (await page.locator('[data-morph-tab="color"].on').count()) === 1 &&
-      !(await page.locator('[data-morph-pane="color"]').first().getAttribute("hidden")),
-    "设色 tab active"
-  );
-  check(
-    "HSL sliders enabled after pick",
-    !(await page.locator("#morphHslH").isDisabled()),
-    "morphHslH"
+    "island check enables parts scope",
+    afterCheck.scope === "parts" && afterCheck.checked.includes(pick.token),
+    JSON.stringify(afterCheck)
   );
 
-  // 作用域「选定」+ 普通单击（不点选部）
-  await page.evaluate(() => {
-    window.__boneMorph.clearSelectedMeshColor();
-    window.__boneMorph.setPickMuscleMode(false);
-    window.__boneMorph.setHslScope("selected");
+  const previewCount = await page.evaluate(() => {
+    const dock = document.getElementById("islandPreviewDock");
+    return dock ? dock.querySelectorAll(".island-preview-item").length : 0;
   });
-  await page.waitForTimeout(150);
-  await page.mouse.click(box.x + box.width * earPt.nx, box.y + box.height * earPt.ny);
-  await page.waitForTimeout(450);
-  const afterDirectClick = await page.evaluate(() => {
-    const st = window.__boneMorph.getState();
-    const h = document.getElementById("morphHslH");
-    return {
-      region: st.selectedRegionKey,
-      label: st.selectedPartLabel,
-      hslDisabled: h?.disabled,
-      scope: st.hslScope,
-    };
-  });
-  check(
-    "选定 scope + single click picks part",
-    !!(
-      afterDirectClick.region?.startsWith("cq_") &&
-      afterDirectClick.label &&
-      !afterDirectClick.hslDisabled
-    ),
-    JSON.stringify(afterDirectClick)
-  );
+  check("checked islands show preview dock", previewCount >= 1, `previews=${previewCount}`);
 
-  const beforePath = path.join(outDir, "01-ear-before.png");
+  const canvas = page.locator("#viewerHost > canvas").first();
+  const beforePath = path.join(outDir, "01-before.png");
   await canvas.screenshot({ path: beforePath });
   await page.evaluate(() => {
     const set = (id, v) => {
@@ -166,12 +167,13 @@ function check(name, ok, detail) {
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
     };
-    set("morphHslH", 90);
-    set("morphHslS", 55);
-    set("morphHslL", -5);
+    window.__boneMorph.setHslScope("parts");
+    set("morphHslH", 80);
+    set("morphHslS", 45);
+    set("morphHslL", -6);
   });
   await page.waitForTimeout(500);
-  const afterPath = path.join(outDir, "01-ear-part-hsl.png");
+  const afterPath = path.join(outDir, "01-island-hsl.png");
   await canvas.screenshot({ path: afterPath });
 
   const py = `
@@ -179,123 +181,15 @@ from PIL import Image
 a=Image.open(r'''${beforePath.replace(/\\/g, "/")}''').convert('RGB')
 b=Image.open(r'''${afterPath.replace(/\\/g, "/")}''').convert('RGB')
 w,h=a.size
-n=0; sx=0; sy=0; neck=0
+n=0
 for y in range(h):
   for x in range(w):
     pa=a.getpixel((x,y)); pb=b.getpixel((x,y))
-    if abs(pa[0]-pb[0])+abs(pa[1]-pb[1])+abs(pa[2]-pb[2])<45: continue
-    if not (pb[1]>pb[0]+12 and pb[1]>pb[2]+8 and pb[1]-pa[1]>18): continue
-    n+=1; sx+=x; sy+=y
-    if y>0.62*h: neck+=1
-print(n, round(sx/n/w,3) if n else 0, round(sy/n/h,3) if n else 0, neck)
+    if abs(pa[0]-pb[0])+abs(pa[1]-pb[1])+abs(pa[2]-pb[2])>40: n+=1
+print(n)
 `;
-  const earPix = spawnSync("python", ["-c", py], { encoding: "utf8" });
-  const parts = (earPix.stdout || "").trim().split(/\s+/);
-  const greenN = Number(parts[0] || 0);
-  const cx = Number(parts[1] || 0);
-  const cy = Number(parts[2] || 0);
-  const neck = Number(parts[3] || 0);
-  check(
-    "ear part HSL moves head-side pixels (not neck-dominant)",
-    greenN >= 400 && cy > 0.22 && cy < 0.58 && neck / Math.max(greenN, 1) < 0.4,
-    JSON.stringify({ greenN, cx, cy, neck, pick: afterPick })
-  );
-
-  // green temporalis — whole colour class should be large
-  const frontBtn = page.locator("#viewerHostMorph button", { hasText: "前" });
-  if (await frontBtn.count()) {
-    await frontBtn.first().click().catch(() => {});
-    await page.waitForTimeout(400);
-  }
-  // rotate a bit to side-oblique for temporalis
-  const box2 = await canvas.boundingBox();
-  await page.mouse.move(box2.x + box2.width * 0.5, box2.y + box2.height * 0.4);
-  await page.mouse.down();
-  await page.mouse.move(box2.x + box2.width * 0.35, box2.y + box2.height * 0.4, {
-    steps: 10,
-  });
-  await page.mouse.up();
-  await page.waitForTimeout(300);
-
-  const greenPick = await page.evaluate(() => {
-    const bm = window.__boneMorph;
-    let best = null;
-    for (let x = 0.45; x <= 0.7; x += 0.04) {
-      for (let y = 0.28; y <= 0.48; y += 0.04) {
-        const r = bm.debugFloodPickAtNdc(x, y);
-        if (!r?.best) continue;
-        const h = r.best.hex || "";
-        const rr = parseInt(h.slice(1, 3), 16);
-        const gg = parseInt(h.slice(3, 5), 16);
-        const bb = parseInt(h.slice(5, 7), 16);
-        if (!(gg > rr + 20 && gg > bb + 10)) continue;
-        if (!best || r.best.px > best.px) best = { ...r.best, nx: x, ny: y };
-      }
-    }
-    return best;
-  });
-  console.log("greenPick", JSON.stringify(greenPick));
-  check(
-    "green muscle part is whole colour class (px>=8000)",
-    !!(greenPick && greenPick.px >= 8000 && greenPick.regionId?.startsWith("cq_")),
-    JSON.stringify(greenPick)
-  );
-
-  if (greenPick) {
-    await page.click("#morphPickMesh");
-    await page.waitForTimeout(60);
-    await page.mouse.click(
-      box2.x + box2.width * greenPick.nx,
-      box2.y + box2.height * greenPick.ny
-    );
-    await page.waitForTimeout(350);
-    await page.evaluate(() => {
-      const set = (id, v) => {
-        const el = document.getElementById(id);
-        el.value = String(v);
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-      };
-      set("morphHslH", -40);
-      set("morphHslS", 20);
-      set("morphHslL", 0);
-    });
-    await page.waitForTimeout(400);
-    await canvas.screenshot({ path: path.join(outDir, "02-green-part-hsl.png") });
-  }
-
-  // Alt+click（不进入选部模式）应同样锁定部件并允许 HSL
-  await page.evaluate(() => {
-    window.__boneMorph.clearSelectedMeshColor();
-    window.__boneMorph.setPickMuscleMode(false);
-  });
-  await page.waitForTimeout(200);
-  await page.keyboard.down("Alt");
-  await page.mouse.click(box.x + box.width * earPt.nx, box.y + box.height * earPt.ny);
-  await page.keyboard.up("Alt");
-  await page.waitForTimeout(450);
-  const afterAlt = await page.evaluate(() => {
-    const st = window.__boneMorph.getState();
-    const h = document.getElementById("morphHslH");
-    const r = window.__boneMorph.setScopeHsl(0.25, 0.35, -0.05, { notify: true, immediate: true });
-    return {
-      region: st.selectedRegionKey,
-      label: st.selectedPartLabel,
-      hslDisabled: h?.disabled,
-      applyOk: r?.ok,
-      px: st.selectedRegionPixels,
-    };
-  });
-  check(
-    "Alt+click selects part and HSL applies",
-    !!(
-      afterAlt.region?.startsWith("cq_") &&
-      afterAlt.label &&
-      !afterAlt.hslDisabled &&
-      afterAlt.applyOk
-    ),
-    JSON.stringify(afterAlt)
-  );
+  const diffN = Number((spawnSync("python", ["-c", py], { encoding: "utf8" }).stdout || "").trim() || 0);
+  check("island HSL changes pixels", diffN >= 80, `diffN=${diffN}`);
 
   const report = { ok: checks.every((c) => c.ok), checks, outDir };
   fs.writeFileSync(path.join(outDir, "report.json"), JSON.stringify(report, null, 2));

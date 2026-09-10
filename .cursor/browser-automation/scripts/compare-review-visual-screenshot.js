@@ -15,7 +15,7 @@ const URL = "http://127.0.0.1:8765/";
 async function waitImages(page, timeout = 12000) {
   await page.waitForFunction(
     () => {
-      const imgs = document.querySelectorAll(".frame img, .slider-wrap img, #viewerHost canvas");
+      const imgs = document.querySelectorAll(".frame img, .slider-wrap img, .viewer-host canvas");
       if (!imgs.length) return false;
       for (const el of imgs) {
         if (el.tagName === "CANVAS") return true;
@@ -96,7 +96,7 @@ async function main() {
   // 3D GLB
   await page.click('button[data-mode="viewer3d"]');
   await page.waitForTimeout(2500);
-  const hasCanvas = await page.evaluate(() => !!document.querySelector("#viewerHost canvas"));
+  const hasCanvas = await page.evaluate(() => document.querySelectorAll(".viewer-host canvas").length >= 2);
   if (hasCanvas) {
     await shot(page, "glb_viewer_front.png");
   } else {

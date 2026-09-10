@@ -104,12 +104,28 @@ try {
 } catch (e) {
   window.unsafeWindow = window;
 }
+// Playwright route 已补丁 viewer JS；禁止篡改猴再 preventDefault+同步 XHR 替换，否则会冲掉 route 补丁或导出空壳。
+try { window._sf_viewer_patched = true; } catch (_e) {}
+try { window._sf_route_mesh_patch = true; } catch (_e) {}
 ${src}
 `;
 }
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
+}
+
+function glbMeshCount(filePath) {
+  try {
+    const buf = fs.readFileSync(filePath);
+    if (buf.length < 20 || buf.toString('utf8', 0, 4) !== 'glTF') return 0;
+    const jsonLen = buf.readUInt32LE(12);
+    const json = buf.slice(20, 20 + jsonLen).toString('utf8');
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed.meshes) ? parsed.meshes.length : 0;
+  } catch (_e) {
+    return 0;
+  }
 }
 
 function uniquePath(dir, filename) {
@@ -131,18 +147,61 @@ async function askEnter(promptText) {
   rl.close();
 }
 
+function resolveTampermonkeyExtensionPath() {
+  // 优先用自动化档案内已同步的篡改猴；否则回退本机 Chrome Profile 1/8
+  const candidates = [];
+  const localExtRoot = path.join(profileDir, 'Default', 'Extensions', 'dhdgffkkebhmkfjojejmpbldmpobfkfo');
+  if (fs.existsSync(localExtRoot)) {
+    const vers = fs.readdirSync(localExtRoot).filter((d) => fs.statSync(path.join(localExtRoot, d)).isDirectory());
+    vers.sort();
+    if (vers.length) candidates.push(path.join(localExtRoot, vers[vers.length - 1]));
+  }
+  const chromeUserData = process.env.LOCALAPPDATA
+    ? path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'User Data')
+    : '';
+  for (const prof of ['Profile 1', 'Profile 8']) {
+    const root = path.join(chromeUserData, prof, 'Extensions', 'dhdgffkkebhmkfjojejmpbldmpobfkfo');
+    if (!fs.existsSync(root)) continue;
+    const vers = fs.readdirSync(root).filter((d) => fs.statSync(path.join(root, d)).isDirectory());
+    vers.sort();
+    if (vers.length) candidates.push(path.join(root, vers[vers.length - 1]));
+  }
+  return candidates.find((p) => fs.existsSync(path.join(p, 'manifest.json'))) || null;
+}
+
 async function launchContext(opts) {
   ensureDir(profileDir);
   ensureDir(opts.out);
+  // Playwright 默认带 --disable-extensions，会导致档案里的篡改猴不加载。
+  // 这里显式放开扩展，并 --load-extension 挂上篡改猴（与人工浏览器一致）。
+  const tmExt = resolveTampermonkeyExtensionPath();
+  opts.tampermonkeyExtensionPath = tmExt || null;
+  const args = [
+    '--disable-blink-features=AutomationControlled',
+    '--autoplay-policy=no-user-gesture-required'
+  ];
+  // 本机 Clash 等代理（SKETCHFAB_PROXY / HTTPS_PROXY 可覆盖）
+  const proxy = process.env.SKETCHFAB_PROXY || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || 'http://127.0.0.1:7897';
+  if (proxy) {
+    const server = String(proxy).replace(/^https?:\/\//i, '');
+    args.push('--proxy-server=' + server);
+    console.log('代理:', proxy);
+  }
+  if (tmExt) {
+    args.push(`--disable-extensions-except=${tmExt}`);
+    args.push(`--load-extension=${tmExt}`);
+    console.log('篡改猴扩展已挂载:', tmExt);
+  } else {
+    console.log('警告: 未找到篡改猴扩展目录；仍会注入仓库脚本');
+  }
   const context = await chromium.launchPersistentContext(profileDir, {
     channel: 'chrome',
     headless: !opts.headed,
     acceptDownloads: true,
+    downloadsPath: opts.out,
     viewport: { width: 1400, height: 900 },
-    args: [
-      '--disable-blink-features=AutomationControlled',
-      '--autoplay-policy=no-user-gesture-required'
-    ]
+    ignoreDefaultArgs: ['--disable-extensions'],
+    args
   });
   // 下载统一落到目标目录
   try {
@@ -156,6 +215,28 @@ async function waitForGlbDownload(page, outDir, timeoutMs) {
   const download = await downloadPromise;
   const suggested = download.suggestedFilename() || `sketchfab_${Date.now()}.glb`;
   const target = uniquePath(outDir, suggested);
+  const fail = await download.failure();
+  if (fail) throw new Error('download_failed: ' + fail);
+
+  // 优先用流写入，避免 saveAs 依赖仍打开的 page/context
+  const stream = await download.createReadStream();
+  if (stream) {
+    await new Promise((resolve, reject) => {
+      const ws = fs.createWriteStream(target);
+      stream.pipe(ws);
+      ws.on('finish', resolve);
+      ws.on('error', reject);
+      stream.on('error', reject);
+    });
+    return { target, suggested };
+  }
+
+  // 回退：临时路径 / saveAs
+  const tmp = await download.path().catch(() => null);
+  if (tmp && fs.existsSync(tmp)) {
+    fs.copyFileSync(tmp, target);
+    return { target, suggested };
+  }
   await download.saveAs(target);
   return { target, suggested };
 }
@@ -182,14 +263,64 @@ async function downloadOne(context, item, opts, userscript, hooks = {}) {
   const result = { id: item.id, raw: item.raw, ok: false, file: null, error: null, ms: 0, shot: null };
 
   try {
+    // 仓库篡改猴脚本始终注入（与扩展内脚本同源）；扩展负责 document-start 级环境，
+    // 另用 route 补丁 viewer JS，避免 MutationObserver 漏拦导致 mesh=0。
     await page.addInitScript({ content: userscript });
+    await page.route(/sketchfab\.com\/.*\.(js)(\?|$)/i, async (route) => {
+      const req = route.request();
+      const url = req.url();
+      if (!(url.includes('web/dist/') || url.includes('standaloneViewer') || url.includes('web/dist'))) {
+        return route.continue();
+      }
+      try {
+        const resp = await route.fetch();
+        let body = await resp.text();
+        if (!body || body.indexOf('drawGeometry') < 0) {
+          return route.fulfill({ response: resp, body });
+        }
+        let mode = 'none';
+        const wrapper = /drawGeometry\s*:\s*function\s*\(\s*([a-zA-Z0-9_$]+)\s*\)\s*\{\s*this\._stateCache\.drawGeometry\(this\._graphicContext,\s*\1\s*\)/g;
+        const stateCache = /(this\._stateCache\.drawGeometry\(this\._graphicContext,\s*([a-zA-Z0-9_]+)\))/g;
+        if (wrapper.test(body)) {
+          wrapper.lastIndex = 0;
+          body = body.replace(wrapper, 'drawGeometry:function($1){try{window.attachbody&&window.attachbody($1);}catch(e){}this._stateCache.drawGeometry(this._graphicContext,$1)');
+          mode = 'drawGeometryWrapper';
+        } else if (stateCache.test(body)) {
+          stateCache.lastIndex = 0;
+          body = body.replace(stateCache, '(window.attachbody&&window.attachbody($2),$1)');
+          mode = 'stateCache';
+        }
+        if (mode !== 'none') {
+          console.log(`  route补丁 viewer JS: ${mode}`);
+        }
+        const headers = { ...resp.headers() };
+        delete headers['content-encoding'];
+        delete headers['content-length'];
+        return route.fulfill({ status: resp.status(), headers, body });
+      } catch (_e) {
+        return route.continue();
+      }
+    });
 
     onProgress({ phase: 'open', message: `打开 embed：${item.id}` });
     console.log(`\n=== [${item.id}] 打开 embed ===`);
     console.log(item.embed);
 
-    const downloadWait = waitForGlbDownload(page, opts.out, opts.timeout);
-    await page.goto(item.embed, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    let downloadWait = waitForGlbDownload(page, opts.out, opts.timeout);
+    // goto 失败时避免未处理的 download 监听拒绝把进程打崩
+    downloadWait = downloadWait.catch((err) => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      e.message = `download_wait: ${e.message}`;
+      throw e;
+    });
+    try {
+      await page.goto(item.embed, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    } catch (gotoErr) {
+      // 一次重试（Sketchfab 偶发超时）
+      console.log(`\n  ⚠ goto 失败，2s 后重试: ${gotoErr.message || gotoErr}`);
+      await new Promise((r) => setTimeout(r, 2000));
+      await page.goto(item.embed, { waitUntil: 'domcontentloaded', timeout: 180000 });
+    }
 
     const pollUntil = Date.now() + Math.min(opts.timeout - 15000, opts.timeout);
     let forced = false;
@@ -258,14 +389,34 @@ async function downloadOne(context, item, opts, userscript, hooks = {}) {
         }
       }
       const raced = await Promise.race([
-        downloadWait.then((d) => ({ type: 'download', d })),
+        downloadWait.then(
+          (d) => ({ type: 'download', d }),
+          (err) => ({ type: 'download_err', err })
+        ),
         new Promise((r) => setTimeout(() => r({ type: 'tick' }), 2000))
       ]);
+      if (raced.type === 'download_err') {
+        console.log(`\n  ⚠ 下载事件失败: ${raced.err && raced.err.message || raced.err}`);
+        downloadWait = waitForGlbDownload(page, opts.out, Math.max(30000, opts.timeout - (Date.now() - started)));
+        if (!forced && st && st.models > 0) {
+          await tryForceExport(page).catch(() => {});
+          forced = true;
+        }
+        continue;
+      }
       if (raced.type === 'download') {
+        const meshN = glbMeshCount(raced.d.target);
+        if (meshN <= 0) {
+          console.log(`\n  ⚠ 下载文件无网格 (meshes=0)，丢弃并继续等待: ${raced.d.target}`);
+          try { fs.unlinkSync(raced.d.target); } catch (_e) {}
+          // 重新挂下载监听
+          downloadWait = waitForGlbDownload(page, opts.out, Math.max(30000, opts.timeout - (Date.now() - started)));
+          continue;
+        }
         result.ok = true;
         result.file = raced.d.target;
         onProgress({ phase: 'done', message: `已保存 ${path.basename(result.file)}`, file: result.file });
-        console.log(`\n  ✅ 已保存: ${result.file}`);
+        console.log(`\n  ✅ 已保存: ${result.file} (meshes=${meshN})`);
         break;
       }
     }
@@ -273,10 +424,15 @@ async function downloadOne(context, item, opts, userscript, hooks = {}) {
     if (!result.ok && !shouldAbort()) {
       try {
         const d = await downloadWait;
+        const meshN = glbMeshCount(d.target);
+        if (meshN <= 0) {
+          try { fs.unlinkSync(d.target); } catch (_e) {}
+          throw new Error('downloaded_glb_has_no_meshes');
+        }
         result.ok = true;
         result.file = d.target;
         onProgress({ phase: 'done', message: `已保存 ${path.basename(result.file)}`, file: result.file });
-        console.log(`\n  ✅ 已保存: ${result.file}`);
+        console.log(`\n  ✅ 已保存: ${result.file} (meshes=${meshN})`);
       } catch (e) {
         result.error = e.message || String(e);
         const shotDir = path.join(baRoot, 'runs', `sketchfab-batch-${new Date().toISOString().slice(0, 10)}`);
@@ -295,6 +451,8 @@ async function downloadOne(context, item, opts, userscript, hooks = {}) {
     console.log(`\n  ❌ 异常: ${result.error}`);
   } finally {
     result.ms = Date.now() - started;
+    // 稍等下载收尾，避免大 GLB 仍在落盘时关页导致 saveAs 失败
+    await new Promise((r) => setTimeout(r, result.ok ? 1500 : 300));
     await page.close().catch(() => {});
   }
   return result;
