@@ -1,0 +1,197 @@
+{
+  "id": "L01",
+  "name": "【光位】侧前略高 · 环形明暗（Loop）",
+  "thumbnail": "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+  "camera": {
+    "pos": [
+      0.9,
+      1.15,
+      6.5
+    ],
+    "target": [
+      0,
+      0.95,
+      0
+    ],
+    "zoom": 0.62,
+    "fov": 16
+  },
+  "light": {
+    "type": "point",
+    "azimuth": 38,
+    "elevation": 34,
+    "distance": 12,
+    "temp": 34,
+    "size": 4.5,
+    "intensity": 2.8
+  },
+  "env": {
+    "hasWall": false,
+    "defaultMat": "origin",
+    "posterizeLevel": 0,
+    "wallColor": "#cccccc",
+    "groundColor": "#c8c4bc",
+    "skyColor": "#0d0d0f",
+    "skyLightScale": 0.22,
+    "atmosphere": {
+      "enabled": false,
+      "density": 0.02,
+      "type": "basic",
+      "color": "#ffffff",
+      "p1": 0,
+      "p2": 0
+    },
+    "dof": {
+      "enabled": false,
+      "aperture": 2.8,
+      "focusDistance": 10
+    },
+    "lightIndicatorEnabled": true
+  },
+  "crop": {
+    "display": "none"
+  },
+  "items": [
+    {
+      "type": "glb",
+      "url": "/docs/model/石膏头像_男中青年_大本 蝙蝠侠 布鲁斯韦恩_头像_opt.glb",
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        5.8,
+        5.8,
+        5.8
+      ],
+      "annotations": [
+        {
+          "id": "anno_l01_1",
+          "annotationKind": "leader",
+          "text": "亮面",
+          "detailText": "",
+          "collapsed": false,
+          "color": "#787878",
+          "dx": -100,
+          "dy": -45,
+          "dxN": 0,
+          "dyN": 0,
+          "dxW": 0,
+          "dyW": 0,
+          "localPos": [
+            -0.0601,
+            0.2147,
+            0.0337
+          ],
+          "localNormal": [
+            -0.696,
+            0.192,
+            0.692
+          ],
+          "baseDist": 6.4276,
+          "baseScale": 5.8,
+          "occludeDot": -0.35
+        },
+        {
+          "id": "anno_l01_2",
+          "annotationKind": "leader",
+          "text": "鼻侧环影",
+          "detailText": "",
+          "collapsed": false,
+          "color": "#787878",
+          "dx": 95,
+          "dy": -20,
+          "dxN": 0,
+          "dyN": 0,
+          "dxW": 0,
+          "dyW": 0,
+          "localPos": [
+            0.0249,
+            0.1708,
+            0.0676
+          ],
+          "localNormal": [
+            -0.277,
+            -0.318,
+            0.907
+          ],
+          "baseDist": 6.1564,
+          "baseScale": 5.8,
+          "occludeDot": -0.35
+        },
+        {
+          "id": "anno_l01_3",
+          "annotationKind": "leader",
+          "text": "颊影未接",
+          "detailText": "",
+          "collapsed": false,
+          "color": "#787878",
+          "dx": 110,
+          "dy": 12,
+          "dxN": 0,
+          "dyN": 0,
+          "dxW": 0,
+          "dyW": 0,
+          "localPos": [
+            0.054,
+            0.1557,
+            0.0486
+          ],
+          "localNormal": [
+            0.642,
+            0.315,
+            0.699
+          ],
+          "baseDist": 6.2506,
+          "baseScale": 5.8,
+          "occludeDot": -0.35
+        },
+        {
+          "id": "anno_l01_4",
+          "annotationKind": "leader",
+          "text": "交界带",
+          "detailText": "",
+          "collapsed": false,
+          "color": "#787878",
+          "dx": 80,
+          "dy": 40,
+          "dxN": 0,
+          "dyN": 0,
+          "dxW": 0,
+          "dyW": 0,
+          "localPos": [
+            0.0094,
+            0.1611,
+            0.0678
+          ],
+          "localNormal": [
+            0.817,
+            0.189,
+            0.545
+          ],
+          "baseDist": 6.1689,
+          "baseScale": 5.8,
+          "occludeDot": -0.35
+        }
+      ],
+      "dashedLines": []
+    }
+  ],
+  "groundAnnotations": [],
+  "groundNormArrows": [],
+  "groundPolygon3ds": [],
+  "groundColorSampleAnnotations": [],
+  "meta": {
+    "line": "light",
+    "slot": "L01",
+    "status": "wip",
+    "detail": "样板关：环形光（Loop）。钉鼻侧环影、亮面、颊影未接、交界带。",
+    "keyPoints": "本关只看光：侧前略高的环形明暗（Loop）。\n先找鼻旁那一小圈影——它还没有接到颊上的大阴影（接到了就更像伦勃朗）。\n亮面仍大；「颊影未接」是本关和戏剧光的分界。\n交界已经钉在头上；你可以轻轻换视角，看这条环影是否还在。"
+  }
+}
