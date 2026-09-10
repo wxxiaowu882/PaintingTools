@@ -77,18 +77,18 @@ def _has_conn_icon_near(
     ly: int,
     th: int,
 ) -> bool:
-    """Connection Error 卡片左侧应有黄色警示图标。"""
+    """Connection Error 卡片左侧应有警示图标（黄/灰三角均可）。"""
     tpl_icon = _load_template("tip_conn_icon.png")
     if tpl_icon is None:
         return True
-    sl = max(0, lx - 70)
-    st = max(0, ly - 8)
-    sr = min(roi.shape[1], lx + 15)
-    sb = min(roi.shape[0], ly + th + 8)
+    sl = max(0, lx - 80)
+    st = max(0, ly - 12)
+    sr = min(roi.shape[1], lx + 40)
+    sb = min(roi.shape[0], ly + th + 12)
     if sb - st < 10 or sr - sl < 10:
         return False
     sub = roi[st:sb, sl:sr]
-    return _match_in(sub, tpl_icon, config.CONN_ICON_MIN_SCORE) is not None
+    return _match_scaled(sub, tpl_icon, config.CONN_ICON_MIN_SCORE) is not None
 
 
 def _detect_connection_error(
@@ -101,17 +101,16 @@ def _detect_connection_error(
     conn_thr: float,
 ) -> Optional[TipHit]:
     """
-    Connection Error 须满足位置带；优先整卡，其次标题+正文共现。
+    Connection Error：位置带内优先整卡；其次标题+正文；再次高分标题。
     禁止单独用 unlimited Tab 正文（chat 历史里常有同类英文）。
     """
     band = config.CONN_TOAST_Y_BAND
     tpl_toast = _load_template("tip_conn_toast.png")
-    hit = _match_in(roi, tpl_toast, max(conn_thr, 0.74))
+    hit = _match_scaled(roi, tpl_toast, max(conn_thr, 0.70))
     if hit:
-        score, lx, ly = hit
-        th, tw = tpl_toast.shape[:2]
+        score, lx, ly, tw, th = hit
         if _match_y_in_band(ly, th, y0, screen_h, band):
-            if score >= 0.88 or _has_conn_icon_near(roi, lx, ly, th):
+            if score >= 0.82 or _has_conn_icon_near(roi, lx, ly, th):
                 return TipHit(
                     kind="connection_error",
                     left=mon_l + x0 + lx,
@@ -123,20 +122,21 @@ def _detect_connection_error(
 
     tpl_title = _load_template("tip_connection_error.png")
     tpl_body = _load_template("tip_unlimited_tab.png")
-    hit_t = _match_in(roi, tpl_title, max(conn_thr, 0.72))
-    hit_b = _match_in(roi, tpl_body, config.CONN_BODY_ONLY_THRESHOLD)
+    hit_t = _match_scaled(roi, tpl_title, max(conn_thr, 0.72))
+    hit_b = _match_scaled(roi, tpl_body, config.CONN_BODY_ONLY_THRESHOLD)
     if hit_t and hit_b:
-        score_t, lx_t, ly_t = hit_t
-        score_b, lx_b, ly_b = hit_b
-        th_t, tw_t = tpl_title.shape[:2]
-        th_b, tw_b = tpl_body.shape[:2]
-        # 标题应略高于正文，且二者纵向中心都在 toast 带内
-        if ly_t + th_t <= ly_b + 30 and abs(lx_t - lx_b) < 120:
+        score_t, lx_t, ly_t, tw_t, th_t = hit_t
+        score_b, lx_b, ly_b, tw_b, th_b = hit_b
+        # 标题应略高于正文，横向大致对齐
+        if ly_t + th_t <= ly_b + 40 and abs(lx_t - lx_b) < 160:
             if _match_y_in_band(ly_t, th_t, y0, screen_h, band) and _match_y_in_band(
                 ly_b, th_b, y0, screen_h, band
             ):
-                if _has_conn_icon_near(roi, min(lx_t, lx_b), min(ly_t, ly_b), th_t + th_b):
-                    score = max(score_t, score_b)
+                score = max(score_t, score_b)
+                # 双模板高分时可免图标；低分仍要求图标共现
+                if score >= 0.86 or _has_conn_icon_near(
+                    roi, min(lx_t, lx_b), min(ly_t, ly_b), th_t + th_b
+                ):
                     l = min(x0 + lx_t, x0 + lx_b)
                     t = min(y0 + ly_t, y0 + ly_b)
                     r = max(x0 + lx_t + tw_t, x0 + lx_b + tw_b)
@@ -149,6 +149,19 @@ def _detect_connection_error(
                         bottom=mon_t + b,
                         score=score,
                     )
+
+    # 标题单独高分（新模板「Connection Error」足够独特）
+    if hit_t:
+        score_t, lx_t, ly_t, tw_t, th_t = hit_t
+        if score_t >= 0.88 and _match_y_in_band(ly_t, th_t, y0, screen_h, band):
+            return TipHit(
+                kind="connection_error",
+                left=mon_l + x0 + lx_t,
+                top=mon_t + y0 + ly_t,
+                right=mon_l + x0 + lx_t + tw_t,
+                bottom=mon_t + y0 + ly_t + th_t,
+                score=score_t,
+            )
     return None
 
 
@@ -222,6 +235,48 @@ def _match_in(
     if max_v < threshold:
         return None
     return float(max_v), int(max_l[0]), int(max_l[1])
+
+
+def _match_scaled(
+    hay: np.ndarray,
+    needle: np.ndarray,
+    threshold: float,
+    scales: Optional[Tuple[float, ...]] = None,
+) -> Optional[Tuple[float, int, int, int, int]]:
+    """
+    多尺度模板匹配。返回 (score, lx, ly, tw, th)，tw/th 为实际匹配用的模板尺寸。
+    """
+    if needle is None or hay is None:
+        return None
+    best = None  # score, lx, ly, tw, th
+    use_scales = scales if scales is not None else getattr(
+        config, "MATCH_SCALES", (1.0,)
+    )
+    for scale in use_scales:
+        if abs(scale - 1.0) < 1e-6:
+            scaled = needle
+        else:
+            nw = max(8, int(round(needle.shape[1] * scale)))
+            nh = max(8, int(round(needle.shape[0] * scale)))
+            if nh >= hay.shape[0] or nw >= hay.shape[1]:
+                continue
+            scaled = cv2.resize(needle, (nw, nh), interpolation=cv2.INTER_AREA)
+        if scaled.shape[0] >= hay.shape[0] or scaled.shape[1] >= hay.shape[1]:
+            continue
+        res = cv2.matchTemplate(hay, scaled, cv2.TM_CCOEFF_NORMED)
+        _min_v, max_v, _min_l, max_l = cv2.minMaxLoc(res)
+        if max_v < threshold:
+            continue
+        cand = (
+            float(max_v),
+            int(max_l[0]),
+            int(max_l[1]),
+            int(scaled.shape[1]),
+            int(scaled.shape[0]),
+        )
+        if best is None or cand[0] > best[0]:
+            best = cand
+    return best
 
 
 def detect_tip(threshold: Optional[float] = None) -> Optional[TipHit]:
@@ -304,27 +359,27 @@ def _find_post_open_tip_box(
 ) -> Optional[Tuple[Tuple[int, int, int, int], str, str, float]]:
     """打开工程后清 tip：返回 (tip_box, kind, matched_name, score)。"""
     tpl_toast = _load_template("tip_conn_toast.png")
-    hit = _match_in(roi, tpl_toast, 0.74)
+    hit = _match_scaled(roi, tpl_toast, 0.70)
     if hit:
-        score, lx, ly = hit
-        th, tw = tpl_toast.shape[:2]
+        score, lx, ly, tw, th = hit
         if _match_y_in_band(ly, th, y0, screen_h, config.CONN_TOAST_Y_BAND):
-            if score >= 0.88 or _has_conn_icon_near(roi, lx, ly, th):
+            if score >= 0.82 or _has_conn_icon_near(roi, lx, ly, th):
                 box = (x0 + lx, y0 + ly, x0 + lx + tw, y0 + ly + th)
                 return box, "connection_error", "tip_conn_toast.png", score
 
     tpl_title = _load_template("tip_connection_error.png")
     tpl_body = _load_template("tip_unlimited_tab.png")
-    hit_t = _match_in(roi, tpl_title, 0.72)
-    hit_b = _match_in(roi, tpl_body, config.CONN_BODY_ONLY_THRESHOLD)
+    hit_t = _match_scaled(roi, tpl_title, 0.72)
+    hit_b = _match_scaled(roi, tpl_body, config.CONN_BODY_ONLY_THRESHOLD)
     if hit_t and hit_b:
-        score_t, lx_t, ly_t = hit_t
-        score_b, lx_b, ly_b = hit_b
-        th_t, tw_t = tpl_title.shape[:2]
-        th_b, tw_b = tpl_body.shape[:2]
-        if ly_t + th_t <= ly_b + 30 and abs(lx_t - lx_b) < 120:
+        score_t, lx_t, ly_t, tw_t, th_t = hit_t
+        score_b, lx_b, ly_b, tw_b, th_b = hit_b
+        if ly_t + th_t <= ly_b + 40 and abs(lx_t - lx_b) < 160:
             if _match_y_in_band(ly_t, th_t, y0, screen_h, config.CONN_TOAST_Y_BAND):
-                if _has_conn_icon_near(roi, min(lx_t, lx_b), min(ly_t, ly_b), th_t + th_b):
+                score = max(score_t, score_b)
+                if score >= 0.86 or _has_conn_icon_near(
+                    roi, min(lx_t, lx_b), min(ly_t, ly_b), th_t + th_b
+                ):
                     l = min(x0 + lx_t, x0 + lx_b)
                     t = min(y0 + ly_t, y0 + ly_b)
                     r = max(x0 + lx_t + tw_t, x0 + lx_b + tw_b)
@@ -333,8 +388,15 @@ def _find_post_open_tip_box(
                         (l, t, r, b),
                         "connection_error",
                         "tip_connection_error.png",
-                        max(score_t, score_b),
+                        score,
                     )
+    elif hit_t:
+        score_t, lx_t, ly_t, tw_t, th_t = hit_t
+        if score_t >= 0.88 and _match_y_in_band(
+            ly_t, th_t, y0, screen_h, config.CONN_TOAST_Y_BAND
+        ):
+            box = (x0 + lx_t, y0 + ly_t, x0 + lx_t + tw_t, y0 + ly_t + th_t)
+            return box, "connection_error", "tip_connection_error.png", score_t
 
     for name, kind, thr in (
         ("tip_usage_toast.png", "usage_limit", 0.78),

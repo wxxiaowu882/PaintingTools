@@ -29,6 +29,8 @@ class Monitor:
         self._fail_cooldown_until: float = 0.0
         self._tip_streak_kind: str | None = None
         self._tip_streak_count: int = 0
+        self._conn_resume_until: float = 0.0
+        self._resuming_conn = False
 
     def in_grace(self) -> bool:
         return time.time() < self.grace_until
@@ -42,6 +44,33 @@ class Monitor:
         self._reset_tip_streak()
         end = datetime.fromtimestamp(self.grace_until).strftime("%H:%M:%S")
         log(f"宽限 开始 结束于={end} 时长={config.GRACE_SECONDS}秒")
+
+    def do_network_resume(self) -> None:
+        """Connection Error：关 tip → 发送网络恢复续写，不换号。"""
+        if self._resuming_conn or self._switching:
+            return
+        self._resuming_conn = True
+        try:
+            log("状态 网络续写中")
+            try:
+                detect_tip.close_tip()
+            except Exception:
+                pass
+            time.sleep(0.4)
+            ok = ui_cursor.send_continue_in_chat(config.NETWORK_RESUME_PROMPT)
+            if ok:
+                self._conn_resume_until = time.time() + config.CONN_RESUME_COOLDOWN
+                end = datetime.fromtimestamp(self._conn_resume_until).strftime("%H:%M:%S")
+                log(f"网络续写 结果=成功 冷却至={end}")
+            else:
+                log("网络续写 结果=失败")
+                self._conn_resume_until = time.time() + 8
+        except Exception as e:
+            log(f"错误 网络续写异常 {e}")
+            self._conn_resume_until = time.time() + 8
+        finally:
+            self._resuming_conn = False
+            log("状态 监控中")
 
     def do_switch(self, tip_kind: str) -> None:
         """完整换号流程（互斥）。重启未发生则中止，不进入宽限。"""
@@ -88,12 +117,44 @@ class Monitor:
             # 工程窗必须置前最大化，否则关 tip 会点到被挡住的区域
             time.sleep(0.6)
             ui_cursor.bring_paintingtools_front_max()
-            # Connection Error tip 常晚于最大化才出现，多等一会再扫
-            time.sleep(2.0)
-            cleared = detect_tip.close_post_open_tips(max_rounds=5)
-            log(f"打开后清提示 结果={cleared}")
-            time.sleep(0.6)
-            ui_cursor.send_continue_in_chat()
+            # Connection Error 常晚几秒才弹出：主动等待并走网络续写
+            time.sleep(1.5)
+            conn_done = False
+            deadline = time.time() + getattr(config, "POST_OPEN_CONN_WAIT", 20)
+            while time.time() < deadline:
+                hit = detect_tip.detect_tip(threshold=0.70)
+                if hit is not None and hit.kind == "connection_error":
+                    log(
+                        f"打开后检出连接错误 分数={hit.score:.2f} "
+                        f"位置={hit.left},{hit.top} → 网络续写"
+                    )
+                    try:
+                        detect_tip.close_tip()
+                    except Exception:
+                        pass
+                    time.sleep(0.4)
+                    ok = ui_cursor.send_continue_in_chat(config.NETWORK_RESUME_PROMPT)
+                    if ok:
+                        self._conn_resume_until = (
+                            time.time() + config.CONN_RESUME_COOLDOWN
+                        )
+                        log("打开后网络续写 结果=成功")
+                    else:
+                        log("打开后网络续写 结果=失败")
+                    conn_done = True
+                    break
+                if hit is not None and hit.kind in ("usage_limit", "error_resume", "chat_toast"):
+                    try:
+                        detect_tip.close_tip()
+                    except Exception:
+                        pass
+                time.sleep(1.0)
+
+            if not conn_done:
+                cleared = detect_tip.close_post_open_tips(max_rounds=5)
+                log(f"打开后清提示 结果={cleared}")
+                time.sleep(0.6)
+                ui_cursor.send_continue_in_chat()
             self.start_grace()
         except Exception as e:
             log(f"错误 换号异常 {e}")
@@ -105,9 +166,36 @@ class Monitor:
 
     def on_tip(self, hit: detect_tip.TipHit) -> None:
         cn = config.TIP_TYPE_CN.get(hit.kind, hit.kind)
-        if self._switching or self.state == "换号中":
-            log(f"提示 {cn} 动作=忽略 原因=换号中")
+        if self._switching or self.state == "换号中" or self._resuming_conn:
+            log(f"提示 {cn} 动作=忽略 原因=流程中")
             return
+
+        # Connection Error：网络中断 → 续写，不换号（宽限内也处理）
+        if hit.kind == "connection_error":
+            if time.time() < self._conn_resume_until:
+                log(f"提示 {cn} 动作=忽略 原因=网络续写冷却中 分数={hit.score:.2f}")
+                self._reset_tip_streak()
+                return
+            if hit.kind == self._tip_streak_kind:
+                self._tip_streak_count += 1
+            else:
+                self._tip_streak_kind = hit.kind
+                self._tip_streak_count = 1
+            need = config.CONN_RESUME_CONFIRM_POLLS
+            if self._tip_streak_count < need:
+                log(
+                    f"提示 {cn} 动作=待确认续写 连续={self._tip_streak_count}/{need} "
+                    f"分数={hit.score:.2f} 位置={hit.left},{hit.top}"
+                )
+                return
+            self._reset_tip_streak()
+            log(
+                f"提示 {cn} 动作=网络续写 连续确认={need} "
+                f"分数={hit.score:.2f} 文案={config.NETWORK_RESUME_PROMPT}"
+            )
+            self.do_network_resume()
+            return
+
         if self.in_grace():
             # 宽限内不处理 tip：续写后 chat 历史易误匹配，强行关 tip 还会提前结束宽限
             log(f"提示 {cn} 动作=忽略 宽限中=是 分数={hit.score:.2f}")
@@ -144,7 +232,7 @@ class Monitor:
         )
         while True:
             try:
-                if self._switching:
+                if self._switching or self._resuming_conn:
                     time.sleep(config.POLL_INTERVAL)
                     continue
                 hit = detect_tip.detect_tip()

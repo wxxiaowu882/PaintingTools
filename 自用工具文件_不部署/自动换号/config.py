@@ -50,8 +50,15 @@ TIP_ROI_REL = (0.45, 0.55, 1.0, 0.98)  # left, top, right, bottom
 TIP_CLOSE_OFFSET = (12, 12)  # 从 tip 框右上角向内偏
 
 CONTINUE_PROMPT = "请继续你的工作"
-# 右下角 chat 输入框：相对工程窗口客户区的比例（避免点到任务栏）
-CHAT_INPUT_REL = (0.78, 0.88)
+# Connection Error（网络中断）时发送，不换号
+NETWORK_RESUME_PROMPT = "刚才网络断了，现在请继续"
+# 网络续写：连续确认次数（比换号少，尽快恢复）
+CONN_RESUME_CONFIRM_POLLS = 2
+# 网络续写成功后冷却，避免同一 tip 连发
+CONN_RESUME_COOLDOWN = 45
+# chat 输入框安全点击点（相对工程窗口）：
+# x 略靠中右，y 贴近底部，避免误点右侧 Files 列表
+CHAT_INPUT_REL = (0.64, 0.96)
 
 # Tip 类型中文名
 TIP_TYPE_CN = {
@@ -64,11 +71,15 @@ TIP_TYPE_CN = {
 # 打开工程后清 tip：右下角 chat 区相对比例
 POST_OPEN_TIP_ROI = (0.50, 0.45, 1.0, 0.96)
 
-# Connection Error 浮层只出现在 chat 输入框上方窄带；chat 历史区文字易误匹配
-CONN_TOAST_Y_BAND = (0.70, 0.88)  # 命中框纵向中心，占整屏高度比例
+# Connection Error 浮层在 chat 输入框上方；有 Review 栏时会略偏上
+CONN_TOAST_Y_BAND = (0.62, 0.92)  # 命中框纵向中心，占整屏高度比例
 # 用量上限 / 恢复会话失败 toast 也在 chat 输入框上方，排除顶栏 Upgrade to Pro
 CHAT_TOAST_Y_BAND = (0.68, 0.90)
-# 单独 unlimited Tab 正文模板对比度低，须更高分或搭配标题
-CONN_BODY_ONLY_THRESHOLD = 0.82
-# 整卡 Connection Error 低分时要求左侧警示图标共现
-CONN_ICON_MIN_SCORE = 0.65
+# 正文「Get Cursor Pro…」模板阈值
+CONN_BODY_ONLY_THRESHOLD = 0.78
+# 警示图标共现（现多为灰色三角，非黄）
+CONN_ICON_MIN_SCORE = 0.60
+# 模板来自截图放大，实机 DPI 可能略偏，做多尺度匹配
+MATCH_SCALES = (0.78, 0.86, 0.93, 1.0, 1.08, 1.16)
+# 换号后等待 Connection Error 出现再网络续写（秒）
+POST_OPEN_CONN_WAIT = 20

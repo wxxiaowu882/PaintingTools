@@ -198,9 +198,9 @@ def _type_unicode(text: str) -> None:
                 raise OSError(f"SendInput 失败 code={ctypes.get_last_error()}")
 
 
-def send_continue_in_chat() -> bool:
+def send_continue_in_chat(prompt: Optional[str] = None) -> bool:
     """
-    右下角 chat 输入框：点进去，输入「请继续你的工作」，Ctrl+Enter 发送。
+    底部 chat 输入框：点进去，输入续写文案，Ctrl+Enter 发送。
     优先剪贴板粘贴（中文稳）；失败再试 Unicode 直输。
     """
     found = find_paintingtools_hwnd(timeout=3.0)
@@ -218,7 +218,10 @@ def send_continue_in_chat() -> bool:
     rx, ry = config.CHAT_INPUT_REL
     cx = int(l + (r - l) * rx)
     cy = int(t + (b - t) * ry)
-    text = config.CONTINUE_PROMPT
+    # 强制贴底：避免误点到右侧 Files 列表区域
+    cy = max(cy, b - 48)
+    cx = min(max(cx, l + 120), r - 120)
+    text = prompt if prompt else config.CONTINUE_PROMPT
     try:
         import pyautogui
 
