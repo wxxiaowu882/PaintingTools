@@ -541,7 +541,6 @@ class OverlayApp {
     }
     this._syncOp?.();
     if (this.eyeOnlyMode) {
-      this.frameEyes();
       setStatus(`模型视图：${this._modelViewStatusLabel()}`);
     } else {
       const chk = $('#chk-landmarks');
