@@ -2095,6 +2095,8 @@
         triggerUnsupported('init_path_tracer_reject', ptErr.message); return; } } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
         if (window.DoFManager) window.DoFManager.init(camera, scene, renderer.domElement);
         controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 0, 0); camera.lookAt(0, 0, 0); controls.update(); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; controls.enabled = false; window._orbitInteracting = false; window._solidLastInteractAt = 0;
+        // 自动化 / 自测只读宿主（不改交互）；标注脚本用射线定点
+        try { window.__solidHost = { getTHREE: () => THREE, getCamera: () => camera, getRenderer: () => renderer, getSceneGroup: () => sceneGroup, getScene: () => scene }; } catch (_eHost) {}
         let _orbitStartPos = null, _orbitStartTarget = null, _orbitStartQuat = null, _orbitStartZoom = 0;
         controls.addEventListener('start', () => {
             window._orbitInteracting = true;

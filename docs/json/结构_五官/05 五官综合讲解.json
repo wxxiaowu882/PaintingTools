@@ -1,0 +1,812 @@
+{
+  "version": "1.6.5",
+  "timestamp": 1789031122396,
+  "mainThumbnail": "",
+  "modelSrc": "../docs/model/石膏头像_女中青年_05_opt_石膏白.glb",
+  "settings": {
+    "defaultColor": "#1E88E5",
+    "defaultOpacity": "0.3",
+    "modelOpacity": "1",
+    "surfaceGloss": "0.3",
+    "ambient": "1.4",
+    "ambientTemp": "6500",
+    "ambientX": "40",
+    "ambientY": "25",
+    "spot": "2.8",
+    "spotTemp": "4800",
+    "spotX": "130",
+    "spotY": "40",
+    "shadowIntensity": "0.55",
+    "envRotOffset": 0,
+    "posterize": "0",
+    "grayscale": false
+  },
+  "camera": {
+    "orbit": "0deg 85deg auto",
+    "target": "auto auto auto",
+    "fov": "26deg"
+  },
+  "pointsData": [
+    {
+      "id": 1,
+      "type": "point",
+      "slot": "hotspot-1",
+      "pos": "0.0633m 0.1685m -0.0065m",
+      "norm": "0.8264m -0.0513m 0.5607m",
+      "text": "耳轮脚",
+      "color": "#E53935",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 2,
+      "type": "point",
+      "slot": "hotspot-2",
+      "pos": "0.0737m 0.1920m -0.0372m",
+      "norm": "0.9028m -0.2333m -0.3614m",
+      "text": "耳轮",
+      "color": "#1E88E5",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 3,
+      "type": "point",
+      "slot": "hotspot-3",
+      "pos": "0.0547m 0.1412m 0.0125m",
+      "norm": "0.8763m -0.4674m -0.1168m",
+      "text": "耳垂",
+      "color": "#43A047",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 4,
+      "type": "point",
+      "slot": "hotspot-4",
+      "pos": "0.0683m 0.1682m -0.0163m",
+      "norm": "0.9621m -0.1080m 0.2506m",
+      "text": "对耳轮",
+      "color": "#FB8C00",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 5,
+      "type": "point",
+      "slot": "hotspot-5",
+      "pos": "0.0655m 0.1847m -0.0068m",
+      "norm": "0.9937m 0.0611m -0.0941m",
+      "text": "对耳轮上脚",
+      "color": "#8E24AA",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 6,
+      "type": "point",
+      "slot": "hotspot-6",
+      "pos": "0.0626m 0.1738m 0.0107m",
+      "norm": "0.9793m -0.2024m -0.0029m",
+      "text": "对耳轮下脚",
+      "color": "#00BCD4",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 7,
+      "type": "point",
+      "slot": "hotspot-7",
+      "pos": "0.0617m 0.1624m -0.0063m",
+      "norm": "0.4525m -0.6465m 0.6142m",
+      "text": "耳屏",
+      "color": "#FDD835",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 8,
+      "type": "point",
+      "slot": "hotspot-8",
+      "pos": "0.0585m 0.1511m 0.0152m",
+      "norm": "0.9751m -0.2214m -0.0154m",
+      "text": "对耳屏",
+      "color": "#D81B60",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 9,
+      "type": "point",
+      "slot": "hotspot-9",
+      "pos": "0.0590m 0.1570m 0.0226m",
+      "norm": "0.9522m -0.2040m 0.2275m",
+      "text": "凹入缺口",
+      "color": "#3949AB",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 10,
+      "type": "point",
+      "slot": "hotspot-10",
+      "pos": "0.0613m 0.1682m -0.0029m",
+      "norm": "0.9712m -0.1591m 0.1773m",
+      "text": "前缺口",
+      "color": "#795548",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 11,
+      "type": "point",
+      "slot": "hotspot-11",
+      "pos": "0.0654m 0.1620m -0.0148m",
+      "norm": "0.5650m -0.8097m -0.1589m",
+      "text": "耳甲腔",
+      "color": "#FF5722",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 12,
+      "type": "point",
+      "slot": "hotspot-12",
+      "pos": "0.0660m 0.1702m -0.0104m",
+      "norm": "0.8533m -0.1923m 0.4847m",
+      "text": "耳甲艇",
+      "color": "#009688",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 13,
+      "type": "point",
+      "slot": "hotspot-13",
+      "pos": "0.0688m 0.1760m -0.0158m",
+      "norm": "0.9585m 0.1910m 0.2118m",
+      "text": "三角凹",
+      "color": "#673AB7",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 14,
+      "type": "point",
+      "slot": "hotspot-14",
+      "pos": "0.0702m 0.1722m -0.0264m",
+      "norm": "0.9685m -0.2450m 0.0456m",
+      "text": "舟状凹",
+      "color": "#FF4081",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 15,
+      "type": "point",
+      "slot": "hotspot-15",
+      "pos": "0.0726m 0.1864m -0.0342m",
+      "norm": "0.9753m 0.0402m 0.2171m",
+      "text": "耳廓结节",
+      "color": "#84FFFF",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "ear"
+      }
+    },
+    {
+      "id": 16,
+      "type": "point",
+      "slot": "hotspot-16",
+      "pos": "-0.0000m 0.2045m 0.0747m",
+      "norm": "0.0470m 0.1088m 0.9929m",
+      "text": "鼻根",
+      "color": "#AEEA00",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "nose"
+      }
+    },
+    {
+      "id": 17,
+      "type": "point",
+      "slot": "hotspot-17",
+      "pos": "-0.0012m 0.1715m 0.0935m",
+      "norm": "-0.0375m -0.0141m 0.9992m",
+      "text": "鼻梁(鼻背)",
+      "color": "#FF6E40",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "nose"
+      }
+    },
+    {
+      "id": 18,
+      "type": "point",
+      "slot": "hotspot-18",
+      "pos": "-0.0000m 0.1657m 0.0902m",
+      "norm": "-0.0166m -0.7995m 0.6005m",
+      "text": "鼻头",
+      "color": "#1565C0",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "nose"
+      }
+    },
+    {
+      "id": 19,
+      "type": "point",
+      "slot": "hotspot-19",
+      "pos": "0.0179m 0.1536m 0.0740m",
+      "norm": "0.5238m 0.1882m 0.8308m",
+      "text": "鼻翼",
+      "color": "#2E7D32",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "nose"
+      }
+    },
+    {
+      "id": 20,
+      "type": "point",
+      "slot": "hotspot-20",
+      "pos": "0.0210m 0.1478m 0.0718m",
+      "norm": "0.6692m -0.2991m 0.6803m",
+      "text": "鼻唇沟起点",
+      "color": "#EF6C00",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "nose"
+      }
+    },
+    {
+      "id": 21,
+      "type": "point",
+      "slot": "hotspot-21",
+      "pos": "0.0045m 0.1460m 0.0804m",
+      "norm": "0.1273m -0.8733m 0.4702m",
+      "text": "鼻底",
+      "color": "#6A1B9A",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "nose"
+      }
+    },
+    {
+      "id": 22,
+      "type": "point",
+      "slot": "hotspot-22",
+      "pos": "0.0015m 0.1401m 0.0802m",
+      "norm": "0.2153m 0.0675m 0.9742m",
+      "text": "鼻中隔",
+      "color": "#00838F",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "nose"
+      }
+    },
+    {
+      "id": 23,
+      "type": "point",
+      "slot": "hotspot-23",
+      "pos": "0.0198m 0.1340m 0.0667m",
+      "norm": "0.5304m -0.2459m 0.8113m",
+      "text": "鼻翼脚",
+      "color": "#F9A825",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "nose"
+      }
+    },
+    {
+      "id": 24,
+      "type": "point",
+      "slot": "hotspot-24",
+      "pos": "-0.0042m 0.1337m 0.0748m",
+      "norm": "-0.1249m 0.4685m 0.8746m",
+      "text": "人中（沟）",
+      "color": "#AD1457",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 25,
+      "type": "point",
+      "slot": "hotspot-25",
+      "pos": "0.0081m 0.1324m 0.0727m",
+      "norm": "0.4286m 0.2857m 0.8572m",
+      "text": "人中脊",
+      "color": "#283593",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 26,
+      "type": "point",
+      "slot": "hotspot-26",
+      "pos": "-0.0000m 0.1345m 0.0769m",
+      "norm": "0.0971m -0.9390m 0.3300m",
+      "text": "人中切迹",
+      "color": "#5D4037",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 27,
+      "type": "point",
+      "slot": "hotspot-27",
+      "pos": "0.0144m 0.1355m 0.0708m",
+      "norm": "0.5531m -0.3254m 0.7669m",
+      "text": "唇峰",
+      "color": "#D84315",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 28,
+      "type": "point",
+      "slot": "hotspot-28",
+      "pos": "-0.0008m 0.1289m 0.0737m",
+      "norm": "0.0786m 0.1506m 0.9855m",
+      "text": "唇珠",
+      "color": "#00695C",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 29,
+      "type": "point",
+      "slot": "hotspot-29",
+      "pos": "0.0180m 0.1292m 0.0665m",
+      "norm": "0.5546m -0.1934m 0.8093m",
+      "text": "翼状凹",
+      "color": "#4527A0",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 30,
+      "type": "point",
+      "slot": "hotspot-30",
+      "pos": "0.0144m 0.1158m 0.0651m",
+      "norm": "0.5478m -0.5301m 0.6472m",
+      "text": "下唇圆形隆起",
+      "color": "#C2185B",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 31,
+      "type": "point",
+      "slot": "hotspot-31",
+      "pos": "-0.0000m 0.1192m 0.0739m",
+      "norm": "0.0941m -0.2588m 0.9613m",
+      "text": "沟状凹",
+      "color": "#0277BD",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 32,
+      "type": "point",
+      "slot": "hotspot-32",
+      "pos": "0.0107m 0.1340m 0.0724m",
+      "norm": "0.4348m -0.4683m 0.7692m",
+      "text": "白脊（口唇外圈脊状隆起线）",
+      "color": "#558B2F",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 33,
+      "type": "point",
+      "slot": "hotspot-33",
+      "pos": "0.0320m 0.1300m 0.0620m",
+      "norm": "0.7721m -0.5210m 0.3638m",
+      "text": "口角(窝)",
+      "color": "#FF8F00",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 34,
+      "type": "point",
+      "slot": "hotspot-34",
+      "pos": "-0.0013m 0.1190m 0.0740m",
+      "norm": "0.0163m -0.7796m 0.6260m",
+      "text": "颏唇沟",
+      "color": "#7B1FA2",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 35,
+      "type": "point",
+      "slot": "hotspot-35",
+      "pos": "-0.0000m 0.1129m 0.0703m",
+      "norm": "0.1039m -0.7193m 0.6869m",
+      "text": "白脊（下唇）",
+      "color": "#00ACC1",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "mouth"
+      }
+    },
+    {
+      "id": 36,
+      "type": "point",
+      "slot": "hotspot-36",
+      "pos": "-0.0207m 0.2324m 0.0730m",
+      "norm": "-0.2933m 0.2415m 0.9250m",
+      "text": "眉弓隆起",
+      "color": "#C0CA33",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 37,
+      "type": "point",
+      "slot": "hotspot-37",
+      "pos": "-0.0171m 0.2256m 0.0752m",
+      "norm": "-0.1527m 0.0680m 0.9859m",
+      "text": "眉头",
+      "color": "#E91E63",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 38,
+      "type": "point",
+      "slot": "hotspot-38",
+      "pos": "-0.0425m 0.2257m 0.0647m",
+      "norm": "-0.3252m 0.0650m 0.9434m",
+      "text": "眉峰",
+      "color": "#3F51B5",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 39,
+      "type": "point",
+      "slot": "hotspot-39",
+      "pos": "-0.0364m 0.2249m 0.0683m",
+      "norm": "-0.2853m 0.1189m 0.9510m",
+      "text": "眉毛最浓处",
+      "color": "#8D6E63",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 40,
+      "type": "point",
+      "slot": "hotspot-40",
+      "pos": "-0.0312m 0.2474m 0.0640m",
+      "norm": "-0.5299m 0.2540m 0.8091m",
+      "text": "眼眶上缘+脂肪垫",
+      "color": "#FF7043",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 41,
+      "type": "point",
+      "slot": "hotspot-41",
+      "pos": "-0.0325m 0.2216m 0.0695m",
+      "norm": "-0.3389m -0.0743m 0.9379m",
+      "text": "睑眉沟",
+      "color": "#26A69A",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 42,
+      "type": "point",
+      "slot": "hotspot-42",
+      "pos": "-0.0326m 0.2129m 0.0699m",
+      "norm": "-0.2896m 0.0930m 0.9526m",
+      "text": "睑上沟",
+      "color": "#7E57C2",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 43,
+      "type": "point",
+      "slot": "hotspot-43",
+      "pos": "-0.0328m 0.2091m 0.0697m",
+      "norm": "-0.2727m -0.1212m 0.9544m",
+      "text": "上眼睑",
+      "color": "#EC407A",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 44,
+      "type": "point",
+      "slot": "hotspot-44",
+      "pos": "-0.0323m 0.1974m 0.0690m",
+      "norm": "-0.2416m -0.2248m 0.9440m",
+      "text": "下眼睑",
+      "color": "#42A5F5",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 45,
+      "type": "point",
+      "slot": "hotspot-45",
+      "pos": "-0.0188m 0.2033m 0.0696m",
+      "norm": "-0.4165m -0.2182m 0.8826m",
+      "text": "内眦",
+      "color": "#66BB6A",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 46,
+      "type": "point",
+      "slot": "hotspot-46",
+      "pos": "-0.0498m 0.2055m 0.0552m",
+      "norm": "-0.7197m -0.1997m 0.6649m",
+      "text": "外眦",
+      "color": "#FFA726",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 47,
+      "type": "point",
+      "slot": "hotspot-47",
+      "pos": "-0.0272m 0.2055m 0.0668m",
+      "norm": "-0.5035m -0.2196m 0.8356m",
+      "text": "眼球",
+      "color": "#AB47BC",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 48,
+      "type": "point",
+      "slot": "hotspot-48",
+      "pos": "-0.0314m 0.2055m 0.0662m",
+      "norm": "-0.4131m -0.5508m 0.7252m",
+      "text": "虹膜",
+      "color": "#26C6DA",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 49,
+      "type": "point",
+      "slot": "hotspot-49",
+      "pos": "-0.0318m 0.2082m 0.0674m",
+      "norm": "-0.2817m -0.0563m 0.9579m",
+      "text": "角膜",
+      "color": "#FFEE58",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 50,
+      "type": "point",
+      "slot": "hotspot-50",
+      "pos": "-0.0232m 0.2055m 0.0678m",
+      "norm": "0.2227m -0.0278m 0.9745m",
+      "text": "巩白",
+      "color": "#F06292",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 51,
+      "type": "point",
+      "slot": "hotspot-51",
+      "pos": "-0.0320m 0.1940m 0.0679m",
+      "norm": "-0.2403m -0.0556m 0.9691m",
+      "text": "卧蚕",
+      "color": "#5C6BC0",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    },
+    {
+      "id": 52,
+      "type": "point",
+      "slot": "hotspot-52",
+      "pos": "-0.0332m 0.1732m 0.0698m",
+      "norm": "-0.3349m -0.0345m 0.9416m",
+      "text": "睑下沟",
+      "color": "#A1887F",
+      "hidden": false,
+      "showTextOnLoad": true,
+      "desc": "",
+      "customData": {
+        "group": "eye"
+      }
+    }
+  ],
+  "snapshots": []
+}
