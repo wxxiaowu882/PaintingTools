@@ -1,11 +1,13 @@
 {
   "version": 1,
-  "notes": "欧版 colourcoded：部件=贴图上与种子色紧匹配的整块平涂。Plastyma 纤维灰层用整层 id plastyma_sheet。",
+  "notes": "欧版 colourcoded：彩色肌块可整色类选；暗冷灰（耳/后脖颈背）Alt+点选为局部连通块。Plastyma 用整层 plastyma_sheet。",
   "quantStep": 8,
   "parts": {
     "plastyma_sheet": { "label": "颈阔肌", "hint": "Plastyma 整层纤维灰（跨明度）" },
-    "104,104,136": { "label": "耳/暗冷灰肌", "hint": "Deform 偏暗冷灰，常见于耳周" },
-    "96,96,144": { "label": "耳/暗冷灰肌", "hint": "粗量化别名" },
+    "104,104,136": { "label": "耳周肌", "hint": "点小区域=耳；点后脖颈/背=大块灰肌" },
+    "96,96,144": { "label": "耳周肌", "hint": "粗量化别名；局部连通" },
+    "104,104,128": { "label": "耳周肌", "hint": "粗量化别名；局部连通" },
+    "112,112,144": { "label": "耳周肌", "hint": "粗量化别名；局部连通" },
     "168,180,192": { "label": "帽状腱膜/浅冷灰", "hint": "Deform 浅冷灰 galea" },
     "168,168,168": { "label": "浅灰肌/软骨", "hint": "Static 中灰块" },
     "144,144,144": { "label": "中灰肌", "hint": "中灰色块" },

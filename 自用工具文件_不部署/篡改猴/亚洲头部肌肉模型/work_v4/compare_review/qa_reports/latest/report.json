@@ -1,0 +1,809 @@
+{
+  "stamp": "2026-08-31 14:21:45",
+  "ok": true,
+  "earPass": 4,
+  "earCases": [
+    {
+      "id": "user_side_L",
+      "view": "用户复现·左侧面点耳",
+      "point": "(58%, 46%)",
+      "hslNote": "H=-56° S=35",
+      "pick": {
+        "label": "整耳",
+        "px": 18307,
+        "region": "cq_ear_geom_L",
+        "meshColors": [
+          "Mesh_(2)_Static_0",
+          "Mesh_Deform_0"
+        ],
+        "buildId": "ear-roi-20260831j"
+      },
+      "paint": {
+        "pick": {
+          "label": "整耳",
+          "px": 18307,
+          "key": "Mesh_(2)_Static_0",
+          "region": "cq_ear_geom_L"
+        },
+        "meshColorKeys": [
+          "Mesh_(2)_Static_0",
+          "Mesh_Deform_0"
+        ],
+        "static": {
+          "name": "Mesh_(2)_Static_0",
+          "changed": 10187,
+          "inMaskChanged": 10187,
+          "inMaskTotal": 10187,
+          "inMaskCoverage": 1,
+          "outMaskChanged": 0
+        },
+        "deform": {
+          "name": "Mesh_Deform_0",
+          "changed": 8120,
+          "inMaskChanged": 8120,
+          "inMaskTotal": 8120,
+          "inMaskCoverage": 1,
+          "outMaskChanged": 0
+        }
+      },
+      "verdict": {
+        "ok": true,
+        "reasons": [],
+        "visual": {
+          "ear": {
+            "changed": 588,
+            "hueShift": 329,
+            "samples": [
+              {
+                "x": 0.843,
+                "y": 0.009,
+                "d": 75,
+                "before": [
+                  175,
+                  183,
+                  192
+                ],
+                "after": [
+                  206,
+                  204,
+                  215
+                ]
+              },
+              {
+                "x": 0.843,
+                "y": 0.017,
+                "d": 27,
+                "before": [
+                  150,
+                  160,
+                  174
+                ],
+                "after": [
+                  163,
+                  150,
+                  178
+                ]
+              },
+              {
+                "x": 0.843,
+                "y": 0.026,
+                "d": 43,
+                "before": [
+                  150,
+                  161,
+                  175
+                ],
+                "after": [
+                  171,
+                  146,
+                  182
+                ]
+              },
+              {
+                "x": 0.843,
+                "y": 0.035,
+                "d": 56,
+                "before": [
+                  150,
+                  162,
+                  176
+                ],
+                "after": [
+                  177,
+                  143,
+                  186
+                ]
+              },
+              {
+                "x": 0.843,
+                "y": 0.043,
+                "d": 49,
+                "before": [
+                  150,
+                  162,
+                  176
+                ],
+                "after": [
+                  174,
+                  146,
+                  185
+                ]
+              }
+            ]
+          },
+          "neck": {
+            "changed": 25,
+            "hueShift": 8,
+            "samples": [
+              {
+                "x": 0.468,
+                "y": 0,
+                "d": 25,
+                "before": [
+                  63,
+                  64,
+                  64
+                ],
+                "after": [
+                  76,
+                  76,
+                  64
+                ]
+              },
+              {
+                "x": 0.477,
+                "y": 0,
+                "d": 20,
+                "before": [
+                  76,
+                  76,
+                  77
+                ],
+                "after": [
+                  86,
+                  86,
+                  77
+                ]
+              },
+              {
+                "x": 0.468,
+                "y": 0.01,
+                "d": 28,
+                "before": [
+                  56,
+                  56,
+                  56
+                ],
+                "after": [
+                  70,
+                  70,
+                  56
+                ]
+              },
+              {
+                "x": 0.477,
+                "y": 0.01,
+                "d": 21,
+                "before": [
+                  86,
+                  86,
+                  87
+                ],
+                "after": [
+                  96,
+                  96,
+                  88
+                ]
+              },
+              {
+                "x": 0.468,
+                "y": 0.021,
+                "d": 28,
+                "before": [
+                  58,
+                  58,
+                  59
+                ],
+                "after": [
+                  72,
+                  72,
+                  59
+                ]
+              }
+            ]
+          }
+        },
+        "bleed": 0
+      },
+      "imgEarBefore": "user_side_L_ear_before.png",
+      "imgEarAfter": "user_side_L_ear_after.png",
+      "imgNeckBefore": "user_side_L_neck_before.png",
+      "imgNeckAfter": "user_side_L_neck_after.png",
+      "imgFullAfter": "user_side_L_full_after.png"
+    },
+    {
+      "id": "side_L",
+      "view": "左侧面",
+      "point": "(59%, 54%)",
+      "hslNote": "H=43° S=85",
+      "pick": {
+        "label": "整耳",
+        "px": 17902,
+        "region": "cq_ear_geom_L",
+        "meshColors": [
+          "Mesh_(2)_Static_0",
+          "Mesh_Deform_0"
+        ],
+        "buildId": "ear-roi-20260831j"
+      },
+      "paint": {
+        "pick": {
+          "label": "整耳",
+          "px": 17902,
+          "key": "Mesh_(2)_Static_0",
+          "region": "cq_ear_geom_L"
+        },
+        "meshColorKeys": [
+          "Mesh_(2)_Static_0",
+          "Mesh_Deform_0"
+        ],
+        "static": {
+          "name": "Mesh_(2)_Static_0",
+          "changed": 9967,
+          "inMaskChanged": 9967,
+          "inMaskTotal": 9967,
+          "inMaskCoverage": 1,
+          "outMaskChanged": 0
+        },
+        "deform": {
+          "name": "Mesh_Deform_0",
+          "changed": 7935,
+          "inMaskChanged": 7935,
+          "inMaskTotal": 7935,
+          "inMaskCoverage": 1,
+          "outMaskChanged": 0
+        }
+      },
+      "verdict": {
+        "ok": true,
+        "reasons": [],
+        "visual": {
+          "ear": {
+            "changed": 473,
+            "hueShift": 16,
+            "samples": [
+              {
+                "x": 0.812,
+                "y": 0,
+                "d": 114,
+                "before": [
+                  146,
+                  157,
+                  171
+                ],
+                "after": [
+                  206,
+                  192,
+                  152
+                ]
+              },
+              {
+                "x": 0.82,
+                "y": 0,
+                "d": 93,
+                "before": [
+                  147,
+                  143,
+                  135
+                ],
+                "after": [
+                  196,
+                  176,
+                  124
+                ]
+              },
+              {
+                "x": 0.828,
+                "y": 0,
+                "d": 32,
+                "before": [
+                  207,
+                  206,
+                  201
+                ],
+                "after": [
+                  224,
+                  218,
+                  198
+                ]
+              },
+              {
+                "x": 0.812,
+                "y": 0.009,
+                "d": 120,
+                "before": [
+                  142,
+                  150,
+                  159
+                ],
+                "after": [
+                  206,
+                  188,
+                  141
+                ]
+              },
+              {
+                "x": 0.82,
+                "y": 0.009,
+                "d": 133,
+                "before": [
+                  134,
+                  133,
+                  134
+                ],
+                "after": [
+                  203,
+                  180,
+                  117
+                ]
+              }
+            ]
+          },
+          "neck": {
+            "changed": 9,
+            "hueShift": 4,
+            "samples": [
+              {
+                "x": 0.323,
+                "y": 0.082,
+                "d": 90,
+                "before": [
+                  145,
+                  146,
+                  144
+                ],
+                "after": [
+                  176,
+                  177,
+                  172
+                ]
+              },
+              {
+                "x": 0.383,
+                "y": 0.267,
+                "d": 81,
+                "before": [
+                  155,
+                  153,
+                  147
+                ],
+                "after": [
+                  183,
+                  180,
+                  173
+                ]
+              },
+              {
+                "x": 0.477,
+                "y": 0.369,
+                "d": 74,
+                "before": [
+                  163,
+                  160,
+                  153
+                ],
+                "after": [
+                  187,
+                  185,
+                  178
+                ]
+              },
+              {
+                "x": 0.817,
+                "y": 0.585,
+                "d": 70,
+                "before": [
+                  232,
+                  232,
+                  231
+                ],
+                "after": [
+                  255,
+                  255,
+                  255
+                ]
+              },
+              {
+                "x": 0.987,
+                "y": 0.718,
+                "d": 51,
+                "before": [
+                  229,
+                  229,
+                  229
+                ],
+                "after": [
+                  215,
+                  214,
+                  207
+                ]
+              }
+            ]
+          }
+        },
+        "bleed": 0
+      },
+      "imgEarBefore": "side_L_ear_before.png",
+      "imgEarAfter": "side_L_ear_after.png",
+      "imgNeckBefore": "side_L_neck_before.png",
+      "imgNeckAfter": "side_L_neck_after.png",
+      "imgFullAfter": "side_L_full_after.png"
+    },
+    {
+      "id": "side_R",
+      "view": "右侧面",
+      "point": "(38%, 48%)",
+      "hslNote": "H=43° S=85",
+      "pick": {
+        "label": "整耳",
+        "px": 17042,
+        "region": "cq_ear_geom_R",
+        "meshColors": [
+          "Mesh_(2)_Static_0",
+          "Mesh_Deform_0"
+        ],
+        "buildId": "ear-roi-20260831j"
+      },
+      "paint": {
+        "pick": {
+          "label": "整耳",
+          "px": 17042,
+          "key": "Mesh_(2)_Static_0",
+          "region": "cq_ear_geom_R"
+        },
+        "meshColorKeys": [
+          "Mesh_(2)_Static_0",
+          "Mesh_Deform_0"
+        ],
+        "static": {
+          "name": "Mesh_(2)_Static_0",
+          "changed": 9665,
+          "inMaskChanged": 9665,
+          "inMaskTotal": 9665,
+          "inMaskCoverage": 1,
+          "outMaskChanged": 0
+        },
+        "deform": {
+          "name": "Mesh_Deform_0",
+          "changed": 7377,
+          "inMaskChanged": 7377,
+          "inMaskTotal": 7377,
+          "inMaskCoverage": 1,
+          "outMaskChanged": 0
+        }
+      },
+      "verdict": {
+        "ok": true,
+        "reasons": [],
+        "visual": {
+          "ear": {
+            "changed": 379,
+            "hueShift": 0,
+            "samples": [
+              {
+                "x": 0.291,
+                "y": 0,
+                "d": 29,
+                "before": [
+                  131,
+                  141,
+                  153
+                ],
+                "after": [
+                  147,
+                  150,
+                  149
+                ]
+              },
+              {
+                "x": 0.284,
+                "y": 0.061,
+                "d": 30,
+                "before": [
+                  225,
+                  227,
+                  231
+                ],
+                "after": [
+                  241,
+                  236,
+                  226
+                ]
+              },
+              {
+                "x": 0.284,
+                "y": 0.07,
+                "d": 31,
+                "before": [
+                  225,
+                  227,
+                  230
+                ],
+                "after": [
+                  241,
+                  237,
+                  225
+                ]
+              },
+              {
+                "x": 0.284,
+                "y": 0.078,
+                "d": 31,
+                "before": [
+                  224,
+                  227,
+                  230
+                ],
+                "after": [
+                  241,
+                  236,
+                  225
+                ]
+              },
+              {
+                "x": 0.284,
+                "y": 0.087,
+                "d": 38,
+                "before": [
+                  195,
+                  199,
+                  204
+                ],
+                "after": [
+                  215,
+                  211,
+                  198
+                ]
+              }
+            ]
+          },
+          "neck": {
+            "changed": 1,
+            "hueShift": 0,
+            "samples": [
+              {
+                "x": 0.809,
+                "y": 0.01,
+                "d": 22,
+                "before": [
+                  119,
+                  119,
+                  117
+                ],
+                "after": [
+                  128,
+                  128,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        "bleed": 0
+      },
+      "imgEarBefore": "side_R_ear_before.png",
+      "imgEarAfter": "side_R_ear_after.png",
+      "imgNeckBefore": "side_R_neck_before.png",
+      "imgNeckAfter": "side_R_neck_after.png",
+      "imgFullAfter": "side_R_full_after.png"
+    },
+    {
+      "id": "three_q_L",
+      "view": "左四分之三",
+      "point": "(40%, 50%)",
+      "hslNote": "H=43° S=85",
+      "pick": {
+        "label": "整耳",
+        "px": 17095,
+        "region": "cq_ear_geom_R",
+        "meshColors": [
+          "Mesh_(2)_Static_0",
+          "Mesh_Deform_0"
+        ],
+        "buildId": "ear-roi-20260831j"
+      },
+      "paint": {
+        "pick": {
+          "label": "整耳",
+          "px": 17095,
+          "key": "Mesh_(2)_Static_0",
+          "region": "cq_ear_geom_R"
+        },
+        "meshColorKeys": [
+          "Mesh_(2)_Static_0",
+          "Mesh_Deform_0"
+        ],
+        "static": {
+          "name": "Mesh_(2)_Static_0",
+          "changed": 9618,
+          "inMaskChanged": 9618,
+          "inMaskTotal": 9618,
+          "inMaskCoverage": 1,
+          "outMaskChanged": 0
+        },
+        "deform": {
+          "name": "Mesh_Deform_0",
+          "changed": 7477,
+          "inMaskChanged": 7477,
+          "inMaskTotal": 7477,
+          "inMaskCoverage": 1,
+          "outMaskChanged": 0
+        }
+      },
+      "verdict": {
+        "ok": true,
+        "reasons": [],
+        "visual": {
+          "ear": {
+            "changed": 2989,
+            "hueShift": 60,
+            "samples": [
+              {
+                "x": 0.759,
+                "y": 0,
+                "d": 30,
+                "before": [
+                  167,
+                  193,
+                  147
+                ],
+                "after": [
+                  168,
+                  198,
+                  171
+                ]
+              },
+              {
+                "x": 0.766,
+                "y": 0,
+                "d": 59,
+                "before": [
+                  224,
+                  219,
+                  179
+                ],
+                "after": [
+                  228,
+                  228,
+                  225
+                ]
+              },
+              {
+                "x": 0.774,
+                "y": 0,
+                "d": 57,
+                "before": [
+                  224,
+                  218,
+                  179
+                ],
+                "after": [
+                  227,
+                  227,
+                  224
+                ]
+              },
+              {
+                "x": 0.782,
+                "y": 0,
+                "d": 57,
+                "before": [
+                  223,
+                  217,
+                  178
+                ],
+                "after": [
+                  226,
+                  226,
+                  223
+                ]
+              },
+              {
+                "x": 0.766,
+                "y": 0.009,
+                "d": 57,
+                "before": [
+                  224,
+                  219,
+                  179
+                ],
+                "after": [
+                  227,
+                  227,
+                  225
+                ]
+              }
+            ]
+          },
+          "neck": {
+            "changed": 4,
+            "hueShift": 4,
+            "samples": [
+              {
+                "x": 0.188,
+                "y": 0.081,
+                "d": 85,
+                "before": [
+                  206,
+                  206,
+                  201
+                ],
+                "after": [
+                  234,
+                  234,
+                  230
+                ]
+              },
+              {
+                "x": 0.339,
+                "y": 0.419,
+                "d": 83,
+                "before": [
+                  201,
+                  201,
+                  201
+                ],
+                "after": [
+                  229,
+                  229,
+                  228
+                ]
+              },
+              {
+                "x": 0.348,
+                "y": 0.43,
+                "d": 81,
+                "before": [
+                  228,
+                  228,
+                  228
+                ],
+                "after": [
+                  255,
+                  255,
+                  255
+                ]
+              },
+              {
+                "x": 0.366,
+                "y": 0.453,
+                "d": 64,
+                "before": [
+                  210,
+                  209,
+                  205
+                ],
+                "after": [
+                  230,
+                  230,
+                  228
+                ]
+              }
+            ]
+          }
+        },
+        "bleed": 0
+      },
+      "imgEarBefore": "three_q_L_ear_before.png",
+      "imgEarAfter": "three_q_L_ear_after.png",
+      "imgNeckBefore": "three_q_L_neck_before.png",
+      "imgNeckAfter": "three_q_L_neck_after.png",
+      "imgFullAfter": "three_q_L_full_after.png"
+    }
+  ],
+  "galea": {
+    "name": "帽状腱膜",
+    "ok": true,
+    "reasons": []
+  }
+}

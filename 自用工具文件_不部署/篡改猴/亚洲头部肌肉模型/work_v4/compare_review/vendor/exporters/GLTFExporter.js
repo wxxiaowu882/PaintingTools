@@ -199,7 +199,7 @@ class GLTFExporter {
 		}
 
 		writer.setPlugins( plugins );
-		writer.write( input, onDone, options ).catch( onError );
+		writer.write( input, onDone, options, onError ).catch( onError );
 
 	}
 
@@ -530,7 +530,7 @@ class GLTFWriter {
 	 * @param  {Function} onDone  Callback on completed
 	 * @param  {Object} options options
 	 */
-	async write( input, onDone, options = {} ) {
+	async write( input, onDone, options = {}, onError ) {
 
 		this.options = Object.assign( {
 			// default options
@@ -580,7 +580,14 @@ class GLTFWriter {
 
 			const reader = new FileReader();
 			reader.readAsArrayBuffer( blob );
+			reader.onerror = function () {
+
+				if ( onError ) onError( new Error( 'GLTFExporter: binary blob read failed' ) );
+
+			};
 			reader.onloadend = function () {
+
+				try {
 
 				// Binary chunk.
 				const binaryChunk = getPaddedArrayBuffer( reader.result );
@@ -614,11 +621,30 @@ class GLTFWriter {
 
 				const glbReader = new FileReader();
 				glbReader.readAsArrayBuffer( glbBlob );
-				glbReader.onloadend = function () {
+				glbReader.onerror = function () {
 
-					onDone( glbReader.result );
+					if ( onError ) onError( new Error( 'GLTFExporter: GLB read failed' ) );
 
 				};
+				glbReader.onloadend = function () {
+
+					try {
+
+						onDone( glbReader.result );
+
+					} catch ( error ) {
+
+						if ( onError ) onError( error );
+
+					}
+
+				};
+
+				} catch ( error ) {
+
+					if ( onError ) onError( error );
+
+				}
 
 			};
 

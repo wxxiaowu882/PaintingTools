@@ -1,0 +1,81 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"/>
+<title>设色 QA 2026-08-31 14:21:45</title>
+<style>
+body{font-family:"Microsoft YaHei",sans-serif;background:#111;color:#eee;padding:20px;max-width:1400px;margin:0 auto}
+h1{margin:0 0 8px} h2{margin-top:28px;border-bottom:1px solid #333;padding-bottom:6px}
+.summary{padding:14px 16px;border-radius:8px;margin:16px 0;font-size:1.05rem}
+.summary.pass{background:#1a3d32;border:1px solid #3a8}
+.summary.fail{background:#3d1a1a;border:1px solid #a44}
+.case{border:1px solid #444;border-radius:8px;padding:14px;margin:14px 0}
+.case.pass{border-color:#3a8}.case.fail{border-color:#a44}
+.badge{font-size:.72rem;padding:2px 8px;border-radius:4px;margin-left:8px}
+.badge.pass{background:#2a8;color:#fff}.badge.fail{background:#c44;color:#fff}
+.meta{color:#bbb;margin:4px 0;font-size:.9rem}.meta.visual{color:#9cf}
+.ok-line{color:#6d9}.fail-list{color:#faa;margin:8px 0 8px 18px}
+.shots{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
+.shots figure{margin:0;text-align:center}
+.shots img{max-width:300px;border:2px solid #555;border-radius:4px;background:#fff}
+.shots figcaption{font-size:.75rem;color:#999;margin-top:4px}
+.note{background:#222;border-left:3px solid #6af;padding:10px 12px;margin:12px 0;font-size:.88rem;color:#ccc}
+</style></head><body>
+<h1>设色 QA（截图肉眼验收）</h1>
+<p>2026-08-31 14:21:45</p>
+<div class="summary pass">✅ 全部通过</div>
+<div class="note">判定：① 整耳双层 ② 耳区裁剪图前后对比应有大量变色像素 ③ <strong>脖子区裁剪图应几乎不变</strong>（像素差&gt;28 的计数≤阈值）。不再用「探针凑数」代替整耳目视。</div>
+<p>耳朵 4/4 · 帽状腱膜 通过</p>
+<h2>耳朵整耳设色</h2><article class="case pass">
+<h3>用户复现·左侧面点耳 <span class="badge pass">PASS</span></h3>
+<p class="meta">点击 (58%, 46%) · 整耳 · 18307px · HSL H=-56° S=35</p>
+<p class="meta">贴图 Static 10187/10187 · Deform 8120/8120</p>
+<p class="meta visual">截图分析：耳区变色像素 <strong>588</strong> · 脖子区 <strong>25</strong></p>
+<p class='ok-line'>✅ 截图可视 + 数据均通过</p>
+<div class="shots">
+<figure><img src="user_side_L_ear_before.png" alt="耳区前"/><figcaption>耳区·设色前</figcaption></figure>
+<figure><img src="user_side_L_ear_after.png" alt="耳区后"/><figcaption>耳区·设色后（应整耳变色）</figcaption></figure>
+<figure><img src="user_side_L_neck_before.png" alt="脖子前"/><figcaption>脖子区·设色前</figcaption></figure>
+<figure><img src="user_side_L_neck_after.png" alt="脖子后"/><figcaption>脖子区·设色后（应不变色）</figcaption></figure>
+<figure><img src="user_side_L_full_after.png" alt="全图后"/><figcaption>全画布·设色后</figcaption></figure>
+</div></article>
+<article class="case pass">
+<h3>左侧面 <span class="badge pass">PASS</span></h3>
+<p class="meta">点击 (59%, 54%) · 整耳 · 17902px · HSL H=43° S=85</p>
+<p class="meta">贴图 Static 9967/9967 · Deform 7935/7935</p>
+<p class="meta visual">截图分析：耳区变色像素 <strong>473</strong> · 脖子区 <strong>9</strong></p>
+<p class='ok-line'>✅ 截图可视 + 数据均通过</p>
+<div class="shots">
+<figure><img src="side_L_ear_before.png" alt="耳区前"/><figcaption>耳区·设色前</figcaption></figure>
+<figure><img src="side_L_ear_after.png" alt="耳区后"/><figcaption>耳区·设色后（应整耳变色）</figcaption></figure>
+<figure><img src="side_L_neck_before.png" alt="脖子前"/><figcaption>脖子区·设色前</figcaption></figure>
+<figure><img src="side_L_neck_after.png" alt="脖子后"/><figcaption>脖子区·设色后（应不变色）</figcaption></figure>
+<figure><img src="side_L_full_after.png" alt="全图后"/><figcaption>全画布·设色后</figcaption></figure>
+</div></article>
+<article class="case pass">
+<h3>右侧面 <span class="badge pass">PASS</span></h3>
+<p class="meta">点击 (38%, 48%) · 整耳 · 17042px · HSL H=43° S=85</p>
+<p class="meta">贴图 Static 9665/9665 · Deform 7377/7377</p>
+<p class="meta visual">截图分析：耳区变色像素 <strong>379</strong> · 脖子区 <strong>1</strong></p>
+<p class='ok-line'>✅ 截图可视 + 数据均通过</p>
+<div class="shots">
+<figure><img src="side_R_ear_before.png" alt="耳区前"/><figcaption>耳区·设色前</figcaption></figure>
+<figure><img src="side_R_ear_after.png" alt="耳区后"/><figcaption>耳区·设色后（应整耳变色）</figcaption></figure>
+<figure><img src="side_R_neck_before.png" alt="脖子前"/><figcaption>脖子区·设色前</figcaption></figure>
+<figure><img src="side_R_neck_after.png" alt="脖子后"/><figcaption>脖子区·设色后（应不变色）</figcaption></figure>
+<figure><img src="side_R_full_after.png" alt="全图后"/><figcaption>全画布·设色后</figcaption></figure>
+</div></article>
+<article class="case pass">
+<h3>左四分之三 <span class="badge pass">PASS</span></h3>
+<p class="meta">点击 (40%, 50%) · 整耳 · 17095px · HSL H=43° S=85</p>
+<p class="meta">贴图 Static 9618/9618 · Deform 7477/7477</p>
+<p class="meta visual">截图分析：耳区变色像素 <strong>2989</strong> · 脖子区 <strong>4</strong></p>
+<p class='ok-line'>✅ 截图可视 + 数据均通过</p>
+<div class="shots">
+<figure><img src="three_q_L_ear_before.png" alt="耳区前"/><figcaption>耳区·设色前</figcaption></figure>
+<figure><img src="three_q_L_ear_after.png" alt="耳区后"/><figcaption>耳区·设色后（应整耳变色）</figcaption></figure>
+<figure><img src="three_q_L_neck_before.png" alt="脖子前"/><figcaption>脖子区·设色前</figcaption></figure>
+<figure><img src="three_q_L_neck_after.png" alt="脖子后"/><figcaption>脖子区·设色后（应不变色）</figcaption></figure>
+<figure><img src="three_q_L_full_after.png" alt="全图后"/><figcaption>全画布·设色后</figcaption></figure>
+</div></article>
+<h2>帽状腱膜</h2>
+<article class="case pass"><h3>帽状腱膜</h3>
+<p>✅ OK</p></article>
+</body></html>

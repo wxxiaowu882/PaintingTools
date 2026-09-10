@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "notes": "语义部件目录：每叶节点对应贴图上一组 authoring 色类（整件变色，非 flood）。meshes 为名称子串过滤。",
+  "quantStep": 8,
+  "tree": [
+    {
+      "id": "grp_skull",
+      "label": "颅骨与硬组织",
+      "children": [
+        {
+          "id": "skull_cream",
+          "label": "颅骨（奶油色）",
+          "colorKeys": ["240,240,192", "252,240,192"],
+          "meshes": ["static", "skiedras"]
+        },
+        {
+          "id": "skull_gray_bright",
+          "label": "颅骨（亮灰）",
+          "colorKeys": ["192,192,192"],
+          "meshes": ["static", "skiedras"]
+        },
+        {
+          "id": "skull_gray_mid",
+          "label": "颅骨（中灰）",
+          "colorKeys": ["168,168,168", "144,144,144"],
+          "meshes": ["static"]
+        }
+      ]
+    },
+    {
+      "id": "grp_muscle",
+      "label": "肌肉（彩色肌块）",
+      "children": [
+        {
+          "id": "temporalis",
+          "label": "颞肌",
+          "colorKeys": ["128,200,136", "84,168,84", "126,168,84"],
+          "meshes": ["deform", "static"]
+        },
+        {
+          "id": "masseter",
+          "label": "咬肌",
+          "colorKeys": ["168,84,84"],
+          "meshes": ["deform", "static"]
+        },
+        {
+          "id": "frontalis",
+          "label": "额肌",
+          "colorKeys": ["126,84,126"],
+          "meshes": ["deform"]
+        },
+        {
+          "id": "zygomatic",
+          "label": "颧肌/面颊",
+          "colorKeys": ["200,130,140", "200,205,140"],
+          "meshes": ["deform"]
+        }
+      ]
+    },
+    {
+      "id": "grp_fascia",
+      "label": "腱膜与浅层",
+      "children": [
+        {
+          "id": "galea",
+          "label": "帽状腱膜",
+          "colorKeys": ["168,180,192"],
+          "meshes": ["deform"]
+        },
+        {
+          "id": "gray_muscle_sheet",
+          "label": "浅灰肌层",
+          "colorKeys": ["168,168,168", "160,160,160"],
+          "meshes": ["deform"]
+        }
+      ]
+    },
+    {
+      "id": "grp_ear",
+      "label": "耳部",
+      "children": [
+        {
+          "id": "ear_static_cartilage",
+          "label": "耳软骨（Static）",
+          "colorKeys": ["168,168,168", "192,192,192", "240,240,192", "252,240,192", "144,144,144"],
+          "meshes": ["static"]
+        },
+        {
+          "id": "ear_deform_peri",
+          "label": "耳周肌（Deform）",
+          "colorKeys": ["104,104,136", "96,96,144", "104,104,128", "112,112,144", "112,112,136"],
+          "meshes": ["deform"]
+        }
+      ]
+    },
+    {
+      "id": "grp_neck",
+      "label": "颈区",
+      "children": [
+        {
+          "id": "plastyma",
+          "label": "颈阔肌",
+          "special": "plastyma_sheet",
+          "meshes": ["plastyma"]
+        },
+        {
+          "id": "neck_posterior_gray",
+          "label": "后颈/背阔灰肌",
+          "colorKeys": ["104,104,136", "112,112,136", "96,96,144"],
+          "meshes": ["deform"]
+        }
+      ]
+    }
+  ]
+}

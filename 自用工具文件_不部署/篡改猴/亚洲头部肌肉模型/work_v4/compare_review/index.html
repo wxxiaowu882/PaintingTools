@@ -29,26 +29,134 @@
       font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
-    header {
-      padding: 16px 20px 12px;
+    header.app-header {
+      padding: 10px 14px;
       border-bottom: 1px solid var(--line);
       background: var(--panel);
-      position: sticky;
-      top: 0;
+      flex: 0 0 auto;
       z-index: 10;
     }
-    h1 {
-      margin: 0 0 6px;
-      font-size: 1.15rem;
-      font-weight: 600;
-      letter-spacing: 0.02em;
+    .app-header-inner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 12px;
     }
-    .sub { color: var(--muted); font-size: 0.85rem; line-height: 1.45; max-width: 960px; }
-    .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; align-items: center; }
-    label { font-size: 0.8rem; color: var(--muted); margin-right: 4px; }
-    select, button {
+    h1.app-title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .header-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      flex: 1 1 320px;
+      min-width: 0;
+    }
+    .project-select {
+      flex: 1 1 200px;
+      min-width: 160px;
+      max-width: 420px;
+      padding: 7px 10px;
+      font-size: 0.82rem;
+    }
+    .header-bar button { font-size: 0.78rem; padding: 7px 10px; white-space: nowrap; }
+    .header-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-left: auto;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 240px;
+    }
+    main.workspace {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(280px, 32vw) minmax(0, 1fr) minmax(268px, 320px);
+      gap: 10px;
+      padding: 10px 12px 12px;
+      align-items: stretch;
+    }
+    @media (max-width: 1100px) {
+      main.workspace {
+        grid-template-columns: minmax(240px, 36vw) minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) auto;
+      }
+      .control-panel { grid-column: 1 / -1; max-height: 42vh; }
+    }
+    @media (max-width: 820px) {
+      main.workspace { grid-template-columns: 1fr; grid-template-rows: minmax(200px, 34vh) minmax(0, 1fr) auto; }
+      .tree-sidebar { max-height: 34vh; }
+    }
+    .tree-sidebar {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .tree-sidebar[hidden] { display: none !important; }
+    .tree-sidebar-head {
+      flex: 0 0 auto;
+      padding: 8px 8px 6px;
+      border-bottom: 1px solid var(--line);
+      background: #262a2f;
+    }
+    .tree-mode-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 6px;
+    }
+    .tree-mode-tabs button {
+      flex: 1;
+      font-size: 0.72rem;
+      padding: 6px 4px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: #2a2e33;
+      color: var(--muted);
+    }
+    .tree-mode-tabs button.on {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: #32383f;
+    }
+    .tree-sidebar-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding: 4px 6px 8px;
+    }
+    .tree-sidebar-body .part-tree {
+      border: none;
+      background: transparent;
+      max-height: none;
+      min-height: 100%;
+    }
+    .tree-empty {
+      color: var(--muted);
+      font-size: 0.76rem;
+      padding: 12px 8px;
+      line-height: 1.45;
+    }
+    .viewer-column {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    button, select {
       background: #2e3338;
       color: var(--text);
       border: 1px solid var(--line);
@@ -57,76 +165,95 @@
       font: inherit;
       cursor: pointer;
     }
-    button.active, .chip.active {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip {
-      background: #2e3338;
+    button.on { border-color: var(--accent); color: var(--accent); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .viewer-card {
+      background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 0.82rem;
-      cursor: pointer;
-      color: var(--text);
-    }
-    main { padding: 16px 20px 40px; }
-    .mode-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-    .stage {
-      display: grid;
-      gap: 12px;
-    }
-    .stage.side { grid-template-columns: 1fr 1fr; }
-    .stage.stack { grid-template-columns: 1fr; }
-    .stage.viewer3d { grid-template-columns: 1fr 1fr; }
-    .stage.morph {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(280px, 340px);
-      align-items: stretch;
-    }
-    .stage.morph .card {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-    .stage.morph .viewer-host,
-    .stage.morph .morph-ref-frame {
-      width: 100%;
-      height: min(78vh, 720px);
-      min-height: 360px;
-      aspect-ratio: auto;
-      background: #fff;
-      position: relative;
+      border-radius: 10px;
       overflow: hidden;
       flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
     }
-    .stage.morph .morph-ref-frame img {
-      position: absolute;
-      inset: 0;
+    .viewer-host {
       width: 100%;
-      height: 100%;
-      object-fit: contain;
-      max-width: none;
-      max-height: none;
+      flex: 1 1 auto;
+      min-height: 280px;
+      background: #fff;
+      position: relative;
     }
-    @media (max-width: 1100px) {
-      .stage.morph { grid-template-columns: 1fr; }
+    .viewer-host canvas { display: block; width: 100% !important; height: 100% !important; }
+    .island-preview-dock {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: calc(100% - 20px);
+      overflow-y: auto;
+      pointer-events: none;
     }
-    @media (max-width: 900px) {
-      .stage.viewer3d { grid-template-columns: 1fr; }
+    .island-preview-dock[hidden] { display: none !important; }
+    .island-preview-item {
+      width: 112px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid #d4d4d4;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+    }
+    .island-preview-item canvas {
+      display: block;
+      width: 112px;
+      height: 112px;
+    }
+    .island-preview-item span {
+      display: block;
+      padding: 4px 6px;
+      font-size: 0.62rem;
+      color: #333;
+      text-align: center;
+      background: #fafafa;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .part-tree-item.is-flash > .part-tree-line {
+      animation: island-tree-flash 0.68s ease-out;
+    }
+    @keyframes island-tree-flash {
+      0% { background: #5a4a00; border-color: #ffea00; box-shadow: inset 4px 0 0 #ffea00; }
+      100% { background: transparent; border-color: transparent; box-shadow: none; }
+    }
+    .viewer-status {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      background: rgba(0,0,0,0.45);
+      padding: 4px 8px;
+      border-radius: 4px;
+      pointer-events: none;
     }
     .morph-panel {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 10px;
-      padding: 10px 12px 14px;
-      max-height: min(78vh, 720px);
+      padding: 8px 10px 10px;
+      min-height: 0;
       overflow: auto;
       font-size: 0.78rem;
+      display: flex;
+      flex-direction: column;
     }
     .morph-panel h3 {
-      margin: 10px 0 6px;
-      font-size: 0.82rem;
+      margin: 8px 0 4px;
+      font-size: 0.8rem;
       font-weight: 600;
       color: var(--accent);
     }
@@ -149,7 +276,6 @@
       border: 1px solid var(--line);
       background: #2a2e33;
       color: var(--muted);
-      cursor: pointer;
     }
     .morph-tabs button.on {
       border-color: var(--accent);
@@ -176,9 +302,8 @@
     .morph-row label { color: var(--text); font-size: 0.75rem; margin: 0; }
     .morph-row input[type="range"] { width: 100%; }
     .morph-row .val { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 3.2em; text-align: right; }
-    .morph-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-    .morph-actions button { font-size: 0.72rem; padding: 5px 8px; }
-    .morph-actions button.on { border-color: var(--accent); color: var(--accent); }
+    .morph-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+    .morph-actions button { font-size: 0.68rem; padding: 4px 7px; }
     .morph-xyz { display: grid; grid-template-columns: 28px 1fr; gap: 4px 8px; align-items: center; }
     .morph-xyz input[type="number"] {
       width: 100%;
@@ -189,16 +314,261 @@
       padding: 4px 6px;
       font: inherit;
     }
-    .morph-select {
+    .morph-xyz-row input[type="number"] {
       width: 100%;
-      margin-bottom: 6px;
+      background: #2e3338;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 4px 6px;
+      font: inherit;
+      font-size: 0.72rem;
+    }
+    .morph-panel.parts-active {
+      overflow: hidden;
+      max-height: min(82vh, 760px);
+    }
+    .morph-panel.parts-active .morph-tabs,
+    .morph-panel.parts-active #morphStatus {
+      flex: 0 0 auto;
+    }
+    .morph-panel.parts-active .morph-pane-parts:not([hidden]) {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .morph-pane-parts {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      gap: 4px;
+    }
+    .part-tree-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+      flex: 0 0 auto;
+    }
+    .part-tree-toolbar .lm-stat { margin: 0; font-size: 0.66rem; flex: 1 1 100%; }
+    .part-tree-wrap {
+      flex: 1 1 0;
+      min-height: 96px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .part-tree {
+      list-style: none;
+      margin: 0;
+      padding: 4px 0;
+      flex: 1 1 auto;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #252a2f;
+    }
+    .part-tree-children {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .part-tree-item {
+      margin: 0;
+      padding: 0;
+    }
+    .part-tree-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      margin: 1px 4px;
+      border-radius: 5px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .part-tree-line:hover {
+      background: #2f363d;
+      border-color: #3a424a;
+    }
+    .part-tree-item.is-checked > .part-tree-line {
+      background: #2a3540;
+      border-color: #3d4f5c;
+    }
+    .part-tree-item.on > .part-tree-line {
+      background: #2a4a35;
+      border-color: #6fcf97;
+      box-shadow: inset 4px 0 0 #6fcf97, 0 0 0 1px rgba(111, 207, 151, 0.25);
+    }
+    .part-tree-item.on.is-checked > .part-tree-line {
+      background: #1f5a38;
+      border-color: #7dffb0;
+    }
+    .part-tree-item.on > .part-tree-line strong,
+    .part-tree-item.on > .part-tree-line .part-tree-label {
+      color: #d8ffe8;
+    }
+    .part-tree-label {
+      flex: 1;
+      min-width: 0;
+      line-height: 1.3;
+    }
+    .part-tree-label strong {
+      display: block;
+      font-size: 0.74rem;
+      word-break: break-all;
+    }
+    .part-tree .type {
+      color: var(--muted);
+      font-size: 0.6rem;
+      margin-left: 4px;
+    }
+    .part-tree-item.on .type { color: #9fe8b8; }
+    .part-tree-fold {
+      flex: 0 0 18px;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.62rem;
+      line-height: 1;
+    }
+    .part-tree-fold:hover {
+      background: #3a424a;
+      color: #e8edf2;
+    }
+    .part-tree-group.is-collapsed > .part-tree-children { display: none; }
+    .part-tree-group.is-collapsed > .part-tree-line .part-tree-fold { transform: rotate(-90deg); }
+    .part-tree-group.has-focus > .part-tree-line {
+      border-color: #4a6a55;
+      background: #2a3530;
+    }
+    .island-swatch {
+      flex: 0 0 12px;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      border: 1px solid rgba(255,255,255,0.25);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2);
+    }
+    .part-tree-item.is-filtered { display: none; }
+    .part-tree-group.is-filtered { display: none; }
+    .island-tree-search {
+      flex: 1 1 120px;
+      min-width: 96px;
+      padding: 4px 8px;
+      border-radius: 5px;
+      border: 1px solid var(--line);
+      background: #1e2328;
+      color: inherit;
+      font-size: 0.72rem;
+    }
+    .morph-panel.color-active {
+      overflow: hidden;
+      max-height: min(82vh, 760px);
+    }
+    .morph-panel.color-active .morph-pane-color:not([hidden]) {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .morph-pane-color .part-tree-wrap {
+      flex: 1 1 0;
+      min-height: 120px;
+    }
+    .part-offset-panel {
+      flex: 0 0 auto;
+      border-top: 1px solid var(--line);
+      padding-top: 6px;
+      margin-top: 2px;
+      background: var(--panel);
+    }
+    .part-offset-panel h3 { margin-top: 0; margin-bottom: 2px; }
+    .part-offset-row {
+      display: grid;
+      grid-template-columns: 22px 78px 1fr;
+      gap: 2px 6px;
+      align-items: center;
+      margin: 3px 0;
+    }
+    .part-offset-row label {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .part-offset-row input[type="number"] {
+      width: 100%;
+      padding: 2px 4px;
+      font-size: 0.68rem;
+      border-radius: 4px;
+      border: 1px solid var(--line);
+      background: #1e2226;
+      color: var(--text);
+    }
+    .part-offset-row input[type="range"] {
+      width: 100%;
+      margin: 0;
+    }
+    .part-offset-meta {
+      color: var(--muted);
+      font-size: 0.66rem;
+      margin: 0 0 4px;
+      line-height: 1.3;
+    }
+    .morph-select { width: 100%; margin-bottom: 6px; }
+    .morph-panel.io-active {
+      overflow: hidden;
+    }
+    .morph-panel.io-active .morph-tabs,
+    .morph-panel.io-active #morphStatus {
+      flex: 0 0 auto;
+    }
+    .morph-panel.io-active .morph-pane-io:not([hidden]) {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .morph-pane-io .morph-io-head {
+      flex: 0 0 auto;
+    }
+    .morph-pane-io .morph-history-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #252a2f;
+      padding: 2px 4px;
+    }
+    .morph-pane-io .morph-io-foot {
+      flex: 0 0 auto;
+    }
+    .morph-io-hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.64rem;
+      line-height: 1.35;
+      word-break: break-all;
+    }
+    .morph-io-hint code {
+      font-size: 0.62rem;
+      color: var(--text);
     }
     .morph-history {
       list-style: none;
       margin: 0;
       padding: 0;
-      max-height: 180px;
-      overflow: auto;
     }
     .morph-history li {
       border: 1px solid var(--line);
@@ -209,11 +579,88 @@
       background: #2a2e33;
     }
     .morph-history li:hover { border-color: var(--accent); }
+    .morph-history li.on {
+      border-color: var(--accent);
+      background: #32383f;
+      box-shadow: inset 0 0 0 1px rgba(122, 184, 255, 0.25);
+    }
     .morph-history .meta { color: var(--muted); font-size: 0.68rem; }
-    .morph-history .del {
-      float: right;
+    .morph-actions button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .export-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(10, 12, 14, 0.72);
+      backdrop-filter: blur(2px);
+    }
+    .export-overlay[hidden] { display: none !important; }
+    .export-overlay-card {
+      width: min(420px, 92vw);
+      padding: 16px 18px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+    .export-overlay-title {
+      margin: 0 0 6px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .export-overlay-step {
+      margin: 0 0 10px;
+      font-size: 0.74rem;
+      color: var(--text);
+      line-height: 1.4;
+      min-height: 2.8em;
+      white-space: pre-line;
+    }
+    .export-progress-track {
+      height: 8px;
+      border-radius: 999px;
+      background: #1e2328;
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+    .export-progress-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #8a6d42, var(--accent));
+      transition: width 0.25s ease;
+    }
+    .export-progress-bar.is-busy {
+      width: 100% !important;
+      transition: none;
+      background: linear-gradient(
+        90deg,
+        #5a4a2e 0%,
+        var(--accent) 35%,
+        #e8d4b0 50%,
+        var(--accent) 65%,
+        #5a4a2e 100%
+      );
+      background-size: 200% 100%;
+      animation: export-indeterminate 1.1s linear infinite;
+    }
+    @keyframes export-indeterminate {
+      0% { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
+    }
+    .export-progress-pct {
+      margin-top: 6px;
       font-size: 0.68rem;
-      padding: 2px 6px;
+      color: var(--muted);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
     .morph-point-list {
       list-style: none;
@@ -238,454 +685,234 @@
       box-shadow: inset 3px 0 0 var(--accent);
     }
     .morph-point-list .meta { color: var(--muted); font-size: 0.66rem; }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    .card h2 {
-      margin: 0;
-      padding: 10px 14px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    .card h2 span { color: var(--muted); font-weight: 400; font-size: 0.78rem; }
-    .frame {
-      background: #fff;
-      min-height: 280px;
-      aspect-ratio: 1 / 1;
-      position: relative;
-      overflow: hidden;
-    }
-    .frame img {
-      position: absolute;
-      max-width: none;
-      max-height: none;
-      display: block;
-      pointer-events: none;
-    }
-    .lm-svg {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: all;
-      overflow: visible;
-    }
-    .lm-bar {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      padding: 4px 6px;
-      background: #1e293b;
-      border-radius: 6px 6px 0 0;
-      font-size: 0.72rem;
-      color: #cbd5e1;
-    }
-    .lm-bar select, .lm-bar button {
-      font-size: 0.72rem;
-      padding: 2px 6px;
-      border-radius: 4px;
-      border: 1px solid #475569;
-      background: #0f172a;
-      color: #e2e8f0;
-      cursor: pointer;
-    }
-    .lm-stat { color: #94a3b8; }
-    #lmToggle.active { background: #16a34a; color: #fff; }
-    .viewer-host {
-      width: 100%;
-      height: min(78vh, 720px);
-      background: #fff;
-      position: relative;
-    }
-    .viewer-host canvas { display: block; width: 100% !important; height: 100% !important; }
-    .viewer-status {
-      position: absolute;
-      left: 12px;
-      bottom: 12px;
-      font-size: 0.78rem;
-      color: var(--muted);
-      background: rgba(0,0,0,0.45);
-      padding: 4px 8px;
-      border-radius: 4px;
-      pointer-events: none;
-    }
-    .slider-wrap {
-      position: relative;
-      width: 100%;
-      max-width: 960px;
-      margin: 0 auto;
-      aspect-ratio: 1 / 1;
-      background: #fff;
-      overflow: hidden;
-      user-select: none;
-      touch-action: none;
-    }
-    .slider-wrap .layer {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-    }
-    .frame img,
-    .slider-wrap img {
-      position: absolute;
-      max-width: none;
-      max-height: none;
-      pointer-events: none;
-    }
-    .slider-wrap .top { clip-path: inset(0 50% 0 0); }
-    .slider-wrap .handle {
-      position: absolute;
-      top: 0; bottom: 0; left: 50%;
-      width: 2px;
-      background: var(--accent);
-      transform: translateX(-50%);
-    }
-    .slider-wrap .handle::after {
-      content: "";
-      position: absolute;
-      top: 50%; left: 50%;
-      width: 28px; height: 28px;
-      border: 2px solid var(--accent);
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(26, 28, 30, 0.85);
-    }
-    .hint { color: var(--muted); font-size: 0.8rem; margin-top: 8px; text-align: center; }
-    .note {
-      margin-top: 18px;
-      padding: 12px 14px;
-      border: 1px dashed var(--line);
-      border-radius: 8px;
-      color: var(--muted);
-      font-size: 0.82rem;
-      line-height: 1.5;
-    }
-    .chip.aux { opacity: 0.72; border-style: dashed; }
-    .view-sep {
-      font-size: 0.72rem;
-      color: var(--muted);
-      padding: 6px 4px 6px 8px;
-      align-self: center;
-    }
-    @media (max-width: 860px) {
-      .stage.side { grid-template-columns: 1fr; }
-    }
+    .lm-stat { color: var(--muted); }
   </style>
 </head>
 <body>
-  <header>
-    <h1>头部肌肉色彩变更</h1>
-    <p class="sub">主审视角：<strong>正 / 侧 / 背</strong>（大型比例验收）。前侧/后侧仅辅助参考。均为正交取景，与 Base15 一致。</p>
-    <div class="row">
-      <label>候选版本</label>
-      <select id="cand"></select>
-      <label>视角</label>
-      <div class="chips" id="views"></div>
-    </div>
-    <div class="row mode-bar">
-      <button type="button" class="active" data-mode="side">并排对照</button>
-      <button type="button" data-mode="slider">拖拽叠图</button>
-      <button type="button" data-mode="stack">上下对照</button>
-      <button type="button" data-mode="viewer3d">3D预览 GLB</button>
-      <button type="button" data-mode="morph">骨相拧形</button>
-      <button type="button" id="lmToggle">锚点叠层 ⊕</button>
+  <header class="app-header">
+    <div class="app-header-inner">
+      <h1 class="app-title">头部肌肉色彩变更</h1>
+      <div class="header-bar">
+        <select id="projectSelect" class="project-select" title="切换工程">
+          <option value="">加载中…</option>
+        </select>
+        <button type="button" id="btnImportGlb">导入 GLB</button>
+        <input type="file" id="fileGlb" accept=".glb,.gltf" hidden />
+        <button type="button" id="btnNewFromEuro">欧版新建</button>
+        <button type="button" id="btnDeleteProject" disabled title="删除当前工程">删除</button>
+        <span id="modelName" class="header-meta">未选择工程</span>
+      </div>
     </div>
   </header>
-  <main>
-    <div id="stage" class="stage side"></div>
-    <div id="lmToolbar"></div>
-    <p class="hint" id="hint"></p>
-    <p class="hint" style="opacity:0.55;font-size:0.72rem">对照页 v8 · 白底3D正交截取 · Base15调色 · 默认 SHELL_v8</p>
-    <div class="note" id="candNote"></div>
+  <main class="workspace" id="workspace">
+    <aside class="tree-sidebar" id="treeSidebar" hidden>
+      <div class="tree-sidebar-head">
+        <div class="part-tree-toolbar" id="leftTreeToolbar"></div>
+      </div>
+      <div class="tree-sidebar-body">
+        <ul class="part-tree" id="leftTreeList"></ul>
+      </div>
+    </aside>
+    <section class="viewer-column">
+      <div class="viewer-card">
+        <div class="viewer-host" id="viewerHost">
+          <div class="viewer-status" id="viewerStatus">请选择或新建工程</div>
+        </div>
+      </div>
+    </section>
+    <aside class="control-panel morph-panel" id="morphPanel"><p class="lm-stat">加载模型后显示控制面板…</p></aside>
   </main>
+  <div id="exportOverlay" class="export-overlay" hidden>
+    <div class="export-overlay-card" role="status" aria-live="polite" aria-busy="true">
+      <div class="export-overlay-title">正在导出 GLB</div>
+      <div class="export-overlay-step" id="exportStepText">准备中…</div>
+      <div class="export-progress-track">
+        <div class="export-progress-bar" id="exportProgressBar"></div>
+      </div>
+      <div class="export-progress-pct" id="exportProgressPct">0%</div>
+    </div>
+  </div>
   <script type="module">
     import * as THREE from "three";
     import { OrbitControls } from "./vendor/controls/OrbitControls.js";
     import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
     import { DRACOLoader } from "./vendor/loaders/DRACOLoader.js";
-    import { createLandmarkController } from "./landmarks.js";
-    import { createBoneMorphController } from "./bone_morph.js";
+    import { createBoneMorphController } from "./bone_morph.js?build=sculpt-brush-20260908ag";
     import { GLTFExporter } from "./vendor/exporters/GLTFExporter.js";
 
-    const PRIMARY_VIEWS = [
-      { id: "front", label: "正" },
-      { id: "side", label: "侧" },
-      { id: "back", label: "背" },
-    ];
-    const AUX_VIEWS = [
-      { id: "front_three_quarter", label: "前侧" },
-      { id: "rear_three_quarter", label: "后侧" },
-    ];
-    const VIEWS = [...PRIMARY_VIEWS, ...AUX_VIEWS];
-    const FALLBACK_CANDS = [
-      { id: "SKULL_v2", note: "人眼纠偏：加宽+略收前后", glb: true },
-      { id: "SKULL_v1", note: "上版正/顶别扭", glb: true },
-      { id: "PROP_v2", note: "已废弃坏例", glb: true },
-    ];
-    const GLB_CANDS = new Set(["SKULL_v2", "SKULL_v1", "PROP_v1", "PROP_v2"]);
-
-    let cands = FALLBACK_CANDS.slice();
-    let viewId = "front";
-    let mode = "side";
-    let candId = "PROP_v2";
     const boneMorph = createBoneMorphController(THREE);
-    let morphBusy = false;
+    const elHost = document.getElementById("viewerHost");
+    const elStatus = document.getElementById("viewerStatus");
+    const elModelName = document.getElementById("modelName");
+    const elFile = document.getElementById("fileGlb");
+    const elProjectSelect = document.getElementById("projectSelect");
+    const elBtnDeleteProject = document.getElementById("btnDeleteProject");
+    const elTreeSidebar = document.getElementById("treeSidebar");
+    const elWorkspace = document.getElementById("workspace");
 
-    const elCand = document.getElementById("cand");
-    const elViews = document.getElementById("views");
-    const elStage = document.getElementById("stage");
-    const elHint = document.getElementById("hint");
-    const elNote = document.getElementById("candNote");
+    let viewerSlot = null;
+    let currentProjectId = "";
+    let currentModelLabel = "";
+    let projects = [];
+    let activeProjectId = "";
+    let morphPanelTab = "color";
+    let selectedHistoryId = "";
+    let leftTreeMode = "islands";
+    let morphPanelPickToken = "";
+    let morphPartHighlightId = "";
+    let morphIslandFocusToken = "";
+    let pendingIslandTreeScroll = "";
+    let morphIslandTreeFilter = "";
+    let morphPartTreeFilter = "";
+    let exportInProgress = false;
+    const partTreeCollapsed = new Set();
+    let partOffsetUiSyncing = false;
+    let morphPanelDelegated = false;
+    /** workspace 面板委托的 AbortController；与 morphPanelDelegated 一起保证只绑一次 */
+    let morphPanelAborter = null;
+    let partTreeCollapsedInit = false;
+    let projectBusy = false;
+    /** 同一工程会话内，Farkas 默认锚点清空提示只问一次 */
+    let defaultLandmarksPromptKey = "";
+    let defaultLandmarksPromptDone = false;
 
-    let viewers = [];
-    let syncingOrbit = false;
-    let alignCache = new Map();
-    let alignObservers = [];
+    async function fetchProjects() {
+      const r = await fetch(`/api/projects?_=${Date.now()}`);
+      if (!r.ok) throw new Error("无法读取工程列表");
+      const data = await r.json();
+      projects = data.items || [];
+      activeProjectId = data.activeId || "";
+      renderProjectList();
+      return data;
+    }
 
-    const lmc = createLandmarkController(THREE);
-    let lmActive = false;
-    lmc.setOnRefresh(() => mountLandmarks());
+    function renderProjectSelect() {
+      if (!elProjectSelect) return;
+      if (!projects.length) {
+        elProjectSelect.innerHTML = `<option value="">暂无工程</option>`;
+        elProjectSelect.disabled = true;
+        if (elBtnDeleteProject) elBtnDeleteProject.disabled = true;
+        return;
+      }
+      elProjectSelect.disabled = false;
+      elProjectSelect.innerHTML = projects
+        .map((p) => {
+          const when = (p.updatedAt || p.createdAt || "").replace("T", " ").slice(0, 16);
+          const meta = p.originalName || p.glbFile || "";
+          const label = `${p.label || p.id}${meta ? ` · ${meta}` : ""}${when ? ` · ${when}` : ""}`;
+          const sel = p.id === currentProjectId ? " selected" : "";
+          return `<option value="${p.id}"${sel}>${label}</option>`;
+        })
+        .join("");
+      if (elBtnDeleteProject) elBtnDeleteProject.disabled = !currentProjectId;
+    }
 
-    let assetRev = "";
+    function renderProjectList() {
+      renderProjectSelect();
+    }
 
-    function loadImage(src) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = src;
+    function syncTreeModeUi() {
+      if (elTreeSidebar) {
+        elTreeSidebar.hidden = !boneMorph.getRoot();
+      }
+    }
+
+    async function setActiveProjectOnServer(id) {
+      await fetch("/api/projects/active", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: id || "" }),
       });
+      activeProjectId = id || "";
     }
 
-    function cornerBg(data, sw, sh) {
-      const pts = [[0, 0], [sw - 1, 0], [0, sh - 1], [sw - 1, sh - 1]];
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      for (const [x, y] of pts) {
-        const i = (y * sw + x) * 4;
-        r += data[i];
-        g += data[i + 1];
-        b += data[i + 2];
-      }
-      return { r: r / 4, g: g / 4, b: b / 4 };
-    }
-
-    function isForeground(i, data, bg, minDelta = 14) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const a = data[i + 3];
-      if (a < 8) return false;
-      const dr = Math.abs(r - bg.r);
-      const dg = Math.abs(g - bg.g);
-      const db = Math.abs(b - bg.b);
-      return dr + dg + db > minDelta;
-    }
-
-    function analyzeImage(img) {
-      const maxSide = 1200;
-      let sw = img.naturalWidth;
-      let sh = img.naturalHeight;
-      if (sw < 1 || sh < 1) {
-        return { left: 0, top: 0, right: 1, bottom: 1, w: 1, h: 1, cx: 0.5, cy: 0.5, span: 1 };
-      }
-      if (Math.max(sw, sh) > maxSide) {
-        const ds = maxSide / Math.max(sw, sh);
-        sw = Math.max(1, Math.round(sw * ds));
-        sh = Math.max(1, Math.round(sh * ds));
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = sw;
-      canvas.height = sh;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      ctx.drawImage(img, 0, 0, sw, sh);
-      const data = ctx.getImageData(0, 0, sw, sh).data;
-      const bg = cornerBg(data, sw, sh);
-
-      let minX = sw;
-      let minY = sh;
-      let maxX = 0;
-      let maxY = 0;
-      let found = false;
-      for (let y = 0; y < sh; y++) {
-        for (let x = 0; x < sw; x++) {
-          if (!isForeground((y * sw + x) * 4, data, bg)) continue;
-          found = true;
-          minX = Math.min(minX, x);
-          minY = Math.min(minY, y);
-          maxX = Math.max(maxX, x);
-          maxY = Math.max(maxY, y);
-        }
-      }
-      if (!found) {
-        return { left: 0, top: 0, right: 1, bottom: 1, w: 1, h: 1, cx: 0.5, cy: 0.5, span: 1 };
-      }
-
-      const x0 = Math.floor(sw * 0.22);
-      const x1 = Math.ceil(sw * 0.78);
-      let headTop = sh;
-      let headBottom = -1;
-      let cxSum = 0;
-      let cxCount = 0;
-      for (let y = 0; y < sh; y++) {
-        let rowCount = 0;
-        let rowXSum = 0;
-        for (let x = x0; x < x1; x++) {
-          if (!isForeground((y * sw + x) * 4, data, bg)) continue;
-          rowCount++;
-          rowXSum += x;
-        }
-        if (rowCount >= 4) {
-          headTop = Math.min(headTop, y);
-          headBottom = Math.max(headBottom, y);
-          cxSum += rowXSum / rowCount;
-          cxCount++;
-        }
-      }
-      if (headBottom < 0) {
-        headTop = minY;
-        headBottom = maxY;
-        cxSum = (minX + maxX) * 0.5;
-        cxCount = 1;
-      }
-
-      const top = headTop / sh;
-      const bottom = (headBottom + 1) / sh;
-      const left = minX / sw;
-      const right = (maxX + 1) / sw;
-      const span = bottom - top;
-      const cx = (cxSum / Math.max(cxCount, 1)) / sw;
-      const cy = (top + bottom) * 0.5;
-      return { left, top, right, bottom, w: right - left, h: span, cx, cy, span };
-    }
-
-    async function fetchJson(url) {
+    async function openProject(project, { skipSave = false, force = false } = {}) {
+      if (!project?.id || !project?.glbUrl) return;
+      if (project.id === currentProjectId && !force) return;
+      if (projectBusy && !force) return;
+      const ownedBusy = !projectBusy;
+      if (ownedBusy) projectBusy = true;
+      const prevId = currentProjectId;
       try {
-        const r = await fetch(url);
-        if (!r.ok) return null;
-        return await r.json();
-      } catch {
-        return null;
+        if (boneMorph?.setShowSelectionOverlay) boneMorph.setShowSelectionOverlay(false);
+        currentProjectId = project.id;
+        currentModelLabel = project.label || project.id;
+        if (defaultLandmarksPromptKey !== project.id) {
+          defaultLandmarksPromptKey = project.id;
+          defaultLandmarksPromptDone = false;
+        }
+        renderProjectList();
+        elModelName.textContent = currentModelLabel;
+        elStatus.textContent = "加载中… " + currentModelLabel;
+        disposeViewer();
+        const activeReq = setActiveProjectOnServer(project.id);
+        const loadReq = loadGltfFromUrl(`${project.glbUrl}?_=${Date.now()}`, currentModelLabel, project.id);
+        await Promise.all([activeReq, loadReq]);
+      } catch (err) {
+        console.error(err);
+        elStatus.textContent = "切换工程失败";
+        alert("切换工程失败：" + (err?.message || err));
+      } finally {
+        if (ownedBusy) projectBusy = false;
       }
     }
 
-    function pickBox(meta, view) {
-      if (meta && meta[view] && typeof meta[view].span === "number") return meta[view];
-      return null;
+    async function importProjectFile(file) {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      elStatus.textContent = "上传中… " + file.name;
+      const r = await fetch("/api/projects/import", { method: "POST", body: fd });
+      const data = await r.json();
+      if (!r.ok || !data.ok) throw new Error(data.error || "导入失败");
+      disposeViewer();
+      await fetchProjects();
+      await openProject(data.project, { skipSave: true });
     }
 
-    async function getAlignPair(baseSrc, oursSrc) {
-      const key = `${viewId}|${candId}|${baseSrc}|${oursSrc}`;
-      if (alignCache.has(key)) return alignCache.get(key);
-      const [baseImg, oursImg] = await Promise.all([loadImage(baseSrc), loadImage(oursSrc)]);
-      // 大型对齐必须基于「PNG 可见轮廓」，不能用 Blender 3D 框（斜视图可差 10%+）
-      const refBox = analyzeImage(baseImg);
-      const baseBox = refBox;
-      const oursBox = analyzeImage(oursImg);
-      const pair = { baseImg, oursImg, refBox, baseBox, oursBox, source: { ref: "pixels", ours: "pixels" } };
-      alignCache.set(key, pair);
-      return pair;
+    async function createProjectFromDefault() {
+      elStatus.textContent = "从欧版创建工程…";
+      const r = await fetch("/api/projects/from-default", { method: "POST" });
+      const data = await r.json();
+      if (!r.ok || !data.ok) throw new Error(data.error || "创建失败");
+      disposeViewer();
+      await fetchProjects();
+      await openProject(data.project, { skipSave: true });
     }
 
-    function clearAlignObservers() {
-      alignObservers.forEach((ro) => ro.disconnect());
-      alignObservers = [];
-    }
-
-    function applyAlignedImage(host, imgEl, img, bbox, refBox) {
-      const paint = () => {
-        const w = host.clientWidth;
-        const h = host.clientHeight;
-        if (w < 2 || h < 2 || img.naturalWidth < 1 || img.naturalHeight < 1) return;
-        const refSpan = (refBox.span || refBox.h) * h;
-        const srcSpan = (bbox.span || bbox.h) * img.naturalHeight;
-        const scale = refSpan / Math.max(srcSpan, 1);
-        const dispW = img.naturalWidth * scale;
-        const dispH = img.naturalHeight * scale;
-        const left = (refBox.cx || 0.5) * w - (bbox.cx || 0.5) * dispW;
-        const top = refBox.top * h - bbox.top * dispH;
-        imgEl.style.width = `${dispW}px`;
-        imgEl.style.height = `${dispH}px`;
-        imgEl.style.left = `${left}px`;
-        imgEl.style.top = `${top}px`;
-        imgEl.dataset.headTop = String(refBox.top * h);
-        imgEl.dataset.headBottom = String(refBox.bottom * h);
-      };
-      const schedule = () => requestAnimationFrame(() => requestAnimationFrame(paint));
-      schedule();
-      imgEl.addEventListener("load", schedule);
-      const ro = new ResizeObserver(schedule);
-      ro.observe(host);
-      if (host.parentElement) ro.observe(host.parentElement);
-      alignObservers.push(ro);
-    }
-
-    function mountAlignedFrame(host, img, bbox, refBox) {
-      host.innerHTML = "";
-      const imgEl = document.createElement("img");
-      imgEl.alt = host.dataset.label || "";
-      imgEl.src = img.src;
-      imgEl.decoding = "async";
-      host.appendChild(imgEl);
-      applyAlignedImage(host, imgEl, img, bbox, refBox);
-    }
-
-    function baseUrl(view) { return `base15/${view}.png${assetRev ? "?v=" + assetRev : ""}`; }
-    function oursUrl(cand, view) { return `ours/${cand}/muscle_${view}.png${assetRev ? "?v=" + assetRev : ""}`; }
-    function glbUrl(cand) { return `glb/${cand}.glb${assetRev ? "?v=" + assetRev : ""}`; }
-    function hasGlb(cand) {
-      const c = cands.find((x) => x.id === cand);
-      if (c && typeof c.glb === "boolean") return c.glb;
-      return GLB_CANDS.has(cand);
-    }
-
-    function isPrimaryView(id) {
-      return PRIMARY_VIEWS.some((v) => v.id === id);
-    }
-
-    function fillControls() {
-      elCand.innerHTML = cands.map((c) => `<option value="${c.id}">${c.id}${hasGlb(c.id) ? " ·GLB" : ""}</option>`).join("");
-      elCand.value = candId;
-      const chip = (v, aux) =>
-        `<button type="button" class="chip${aux ? " aux" : ""}${v.id === viewId ? " active" : ""}" data-view="${v.id}">${v.label}</button>`;
-      elViews.innerHTML =
-        PRIMARY_VIEWS.map((v) => chip(v, false)).join("") +
-        `<span class="view-sep">辅助</span>` +
-        AUX_VIEWS.map((v) => chip(v, true)).join("");
-    }
-
-    function viewHint() {
-      if (mode === "viewer3d") return "";
-      if (mode === "morph") {
-        return "骨相拧形：欧版中性底 + Farkas 控制点/语义滑块。右栏对照 Base15（切正/侧/背）。可自加点。";
+    async function deleteProject(id) {
+      if (projectBusy) return;
+      const p = projects.find((x) => x.id === id);
+      const name = p?.label || id;
+      if (!confirm(`删除工程「${name}」？\n将删除该目录下模型与全部存档，不可恢复。`)) return;
+      projectBusy = true;
+      try {
+        if (currentProjectId === id) {
+          disposeViewer();
+          currentProjectId = "";
+        }
+        const r = await fetch(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
+        const data = await r.json();
+        if (!r.ok || !data.ok) throw new Error(data.error || "删除失败");
+        await fetchProjects();
+        if (currentProjectId) return;
+        const next = projects.find((x) => x.id === data.activeId) || projects[0];
+        if (next) {
+          try {
+            await openProject(next, { skipSave: true, force: true });
+          } catch (e) {
+            console.warn("open next project after delete failed", e);
+            elModelName.textContent = "未选择工程";
+            elStatus.textContent = "工程已删除，请手动选择其它工程";
+          }
+        } else {
+          elModelName.textContent = "未选择工程";
+          elStatus.textContent = "请选择或新建工程";
+          document.getElementById("morphPanel").innerHTML =
+            `<p class="lm-stat">请先导入 GLB 或从欧版新建工程。</p>`;
+        }
+      } finally {
+        projectBusy = false;
       }
-      if (!isPrimaryView(viewId)) {
-        return "辅助视角（前侧/后侧）：相机角与 Base15 画稿未必一致，勿作大型比例硬结论。请以正/侧/背为准。";
-      }
-      return mode === "side"
-        ? "主审「正/侧/背」：同一显示尺度（头顶/下巴对齐 Base15），优先看大型比例。"
-        : mode === "slider"
-          ? "主审视角：头顶/下巴已对齐；拖中间线看轮廓差。"
-          : "主审视角：上下排列，同一显示尺度。";
-    }
-
-    function currentNote() {
-      const c = cands.find((x) => x.id === candId);
-      return c ? c.note || "" : "";
-    }
-
-    function euroGlbUrl() {
-      // 对照源：参考用_欧洲人头部肌肉_20260324204416_opt.glb（副本 glb/euro_ref.glb）
-      return `glb/euro_ref.glb${assetRev ? "?v=" + assetRev : ""}`;
     }
 
     function makeGltfLoader() {
@@ -697,20 +924,227 @@
     }
 
     function disposeViewer() {
+      boneMorph.setIslandPreviewDock(null);
       boneMorph.dispose();
-      for (const v of viewers) {
-        cancelAnimationFrame(v.raf);
-        if (v.controls) v.controls.dispose();
-        if (v.renderer) v.renderer.dispose();
-        if (v.ro) v.ro.disconnect();
+      if (viewerSlot) {
+        cancelAnimationFrame(viewerSlot.raf);
+        if (viewerSlot.controls) viewerSlot.controls.dispose();
+        if (viewerSlot.renderer) viewerSlot.renderer.dispose();
+        if (viewerSlot.ro) viewerSlot.ro.disconnect();
+        if (viewerSlot.root && viewerSlot.scene) viewerSlot.scene.remove(viewerSlot.root);
+        viewerSlot = null;
       }
-      viewers = [];
-      syncingOrbit = false;
+      // 勿重置 morphPanelDelegated：click/change 等委托挂在持久 #workspace 上，
+      // 切工程若只清标志不 removeEventListener，会重复绑定（存档保存/删除确认框弹两次等）。
+      selectedHistoryId = "";
     }
 
-    let morphPanelTab = "anchors";
-    let morphPanelPickToken = "";
-    let morphPanelDelegated = false;
+    function fitCamera(camera, controls, object, host) {
+      const box = new THREE.Box3().setFromObject(object);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z, 1e-6);
+      const aspect = Math.max((host.clientWidth || 800) / Math.max(host.clientHeight || 560, 1), 1e-6);
+      const padding = 1.12;
+      const frustumHeight = maxDim * padding;
+      camera.left = (-frustumHeight * aspect) / 2;
+      camera.right = (frustumHeight * aspect) / 2;
+      camera.top = frustumHeight / 2;
+      camera.bottom = -frustumHeight / 2;
+      camera.near = -maxDim * 30;
+      camera.far = maxDim * 30;
+      camera.zoom = 1;
+      camera.position.set(center.x, center.y, center.z + maxDim * 3);
+      camera.lookAt(center);
+      camera.updateProjectionMatrix();
+      controls.target.copy(center);
+      controls.update();
+      return { frustumHeight, baseRadius: maxDim * 3 };
+    }
+
+    function prepareMeshMaterials(root) {
+      root.traverse((obj) => {
+        if (!obj.isMesh || !obj.material) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const mat of mats) {
+          if (!mat) continue;
+          if ("metalness" in mat) mat.metalness = 0;
+          if ("roughness" in mat) mat.roughness = Math.max(Number(mat.roughness) || 0.5, 0.48);
+          mat.needsUpdate = true;
+        }
+      });
+    }
+
+    function ensureViewer() {
+      if (viewerSlot) return viewerSlot;
+      const w = elHost.clientWidth || 800;
+      const h = elHost.clientHeight || 560;
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xffffff);
+      const aspect = w / Math.max(h, 1);
+      const camera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, -1000, 1000);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(w, h, false);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.LinearToneMapping;
+      renderer.toneMappingExposure = 1.35;
+
+      const statusEl = elStatus;
+      elHost.innerHTML = "";
+      elHost.appendChild(renderer.domElement);
+      const islandPreviewDock = document.createElement("div");
+      islandPreviewDock.id = "islandPreviewDock";
+      islandPreviewDock.className = "island-preview-dock";
+      islandPreviewDock.hidden = true;
+      elHost.appendChild(islandPreviewDock);
+      boneMorph.setIslandPreviewDock(islandPreviewDock);
+      if (statusEl) elHost.appendChild(statusEl);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0xd0d0d0, 1.35);
+      scene.add(hemi);
+      const dir = new THREE.DirectionalLight(0xffffff, 1.25);
+      dir.position.set(2.2, 3.5, 2.8);
+      scene.add(dir);
+      const fill = new THREE.DirectionalLight(0xffffff, 0.7);
+      fill.position.set(-2.5, 1.2, -1.5);
+      scene.add(fill);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+
+      viewerSlot = {
+        scene,
+        camera,
+        renderer,
+        controls,
+        raf: 0,
+        ro: null,
+        frustumHeight: 1,
+        baseRadius: 1,
+        root: null,
+      };
+
+      const tick = () => {
+        viewerSlot.raf = requestAnimationFrame(tick);
+        controls.update();
+        boneMorph.renderCheckedIslandPreviews();
+        renderer.render(scene, camera);
+      };
+      const ro = new ResizeObserver(() => {
+        const nw = elHost.clientWidth;
+        const nh = elHost.clientHeight;
+        if (nw < 2 || nh < 2) return;
+        const a = nw / nh;
+        const fh = viewerSlot.frustumHeight || 1;
+        camera.left = (-fh * a) / 2;
+        camera.right = (fh * a) / 2;
+        camera.top = fh / 2;
+        camera.bottom = -fh / 2;
+        camera.updateProjectionMatrix();
+        renderer.setSize(nw, nh, false);
+      });
+      ro.observe(elHost);
+      viewerSlot.ro = ro;
+      tick();
+      return viewerSlot;
+    }
+
+    async function attachGltfRoot(root, label, projectId) {
+      const slot = ensureViewer();
+      if (slot.root) {
+        slot.scene.remove(slot.root);
+        slot.root = null;
+      }
+      prepareMeshMaterials(root);
+      slot.scene.add(root);
+      slot.root = root;
+      const fit = fitCamera(slot.camera, slot.controls, root, elHost);
+      slot.frustumHeight = fit.frustumHeight;
+      slot.baseRadius = fit.baseRadius;
+      currentModelLabel = label;
+      elModelName.textContent = `当前工程：${label}`;
+      elStatus.textContent = "就绪 · 勾选调色 · Alt+点或点行闪黄确认 · " + label;
+      await boneMorph.attach({
+        root,
+        scene: slot.scene,
+        camera: slot.camera,
+        domElement: slot.renderer.domElement,
+        controls: slot.controls,
+        projectId: projectId || currentProjectId,
+        islandPreviewDockEl: document.getElementById("islandPreviewDock"),
+        onChange: () => requestAnimationFrame(() => patchMorphPanel()),
+      });
+      window.__boneMorph = boneMorph;
+      window.__setMorphSideView = () => {
+        const slot = viewerSlot;
+        if (!slot?.controls || !slot?.camera || !slot?.root) return false;
+        const center = new THREE.Vector3();
+        const box3 = new THREE.Box3().setFromObject(slot.root);
+        box3.getCenter(center);
+        const radius = slot.baseRadius || box3.getSize(new THREE.Vector3()).length() * 0.55 || 3;
+        slot.controls.target.copy(center);
+        slot.camera.position.set(center.x + radius * 2.05, center.y + radius * 0.06, center.z);
+        slot.camera.lookAt(center);
+        slot.controls.update();
+        return true;
+      };
+      window.__forceMorphRender = (frames = 3) => {
+        const slot = viewerSlot;
+        if (!slot?.renderer || !slot?.scene || !slot?.camera) return false;
+        for (let i = 0; i < frames; i++) {
+          slot.controls?.update?.();
+          boneMorph.renderCheckedIslandPreviews();
+          slot.renderer.render(slot.scene, slot.camera);
+        }
+        return true;
+      };
+      morphPanelTab = "color";
+      fillMorphPanel();
+      maybePromptClearDefaultLandmarks();
+    }
+
+    function maybePromptClearDefaultLandmarks() {
+      const key = currentProjectId || currentModelLabel || "";
+      if (!key || !boneMorph.getRoot?.()) return;
+      if (defaultLandmarksPromptKey === key && defaultLandmarksPromptDone) return;
+      defaultLandmarksPromptKey = key;
+      defaultLandmarksPromptDone = true;
+      if (!boneMorph.hasDefaultLandmarks?.()) return;
+      const ok = confirm(
+        "检测到头部默认锚点，是否一键清空？仅删 Farkas 默认点，自加点保留。"
+      );
+      if (!ok) return;
+      boneMorph.clearDefaultLandmarks();
+      fillMorphPanel();
+    }
+
+    function loadGltfFromUrl(url, label, projectId) {
+      elStatus.textContent = "加载中… " + label;
+      const loader = makeGltfLoader();
+      return new Promise((resolve, reject) => {
+        loader.load(
+          url,
+          async (gltf) => {
+            try {
+              await attachGltfRoot(gltf.scene || gltf.scenes[0], label, projectId);
+              resolve();
+            } catch (e) {
+              console.error(e);
+              elStatus.textContent = "初始化失败：" + e.message;
+              reject(e);
+            }
+          },
+          undefined,
+          (err) => {
+            console.error(err);
+            elStatus.textContent = "加载失败：" + label;
+            reject(err);
+          }
+        );
+      });
+    }
 
     function morphPointLabel(st, id) {
       const lm = (st.farkas.landmarks || []).find((l) => l.id === id);
@@ -728,19 +1162,24 @@
             return `<li data-point="${id}"${on}><strong>${label}</strong><div class="meta">${id}</div></li>`;
           })
           .join("") ||
-        `<li class="meta" style="cursor:default;padding:8px">暂无锚点（请先加载 rest 或加点）</li>`
+        `<li class="meta" style="cursor:default;padding:8px">暂无锚点，进入加点模式后在模型上点击</li>`
       );
     }
 
     function morphPickBannerHtml(st) {
-      if (st.hslScope === "selected" && st.selectedMeshKey && st.selectedRegionKey) {
-        const mesh = (st.meshes || []).find((m) => m.key === st.selectedMeshKey);
-        const name = st.selectedPartLabel || st.selectedRegionHex || "部件";
-        const px = st.selectedRegionPixels ? ` · ${st.selectedRegionPixels}px` : "";
-        return `<div class="morph-pick-banner" id="morphPickBanner">已选：<strong>${name}</strong>${px}<br/><span style="color:var(--muted)">${mesh?.name || st.selectedMeshKey}</span></div>`;
+      if (st.hslScope === "parts") {
+        const checked = st.islandChecked || [];
+        if (!st.islandScanDone) {
+          return `<div class="morph-pick-banner" id="morphPickBanner" style="color:var(--muted)">扫描中…</div>`;
+        }
+        if (checked.length) {
+          return `<div class="morph-pick-banner" id="morphPickBanner">已勾选 <strong>${checked.length}</strong> 块 · 右上角预览</div>`;
+        }
+        return `<div class="morph-pick-banner" id="morphPickBanner" style="color:var(--muted)">左侧树：勾选设色/位移 · Alt+点或点行定位</div>`;
       }
-      if (st.hslScope === "selected") {
-        return `<div class="morph-pick-banner" id="morphPickBanner" style="color:var(--muted)">作用域「选定」：按住 <strong>Alt</strong> + 鼠标左键点击模型色块选部</div>`;
+      if (st.hslScope === "all" || st.hslScope === "muscles") {
+        const label = st.hslScope === "all" ? "全部" : "肌肉层";
+        return `<div class="morph-pick-banner" id="morphPickBanner">作用域：<strong>${label}</strong></div>`;
       }
       return "";
     }
@@ -754,143 +1193,6 @@
       }
       if (el) el.outerHTML = html;
       else host.querySelector('[data-morph-pane="color"]')?.insertAdjacentHTML("afterbegin", html);
-    }
-
-    function setupMorphPanelDelegation(host) {
-      if (morphPanelDelegated || !host) return;
-      morphPanelDelegated = true;
-      host.addEventListener("click", (e) => {
-        const tabBtn = e.target.closest("[data-morph-tab]");
-        if (tabBtn) {
-          morphPanelTab = tabBtn.getAttribute("data-morph-tab") || "morph";
-          fillMorphPanel();
-          return;
-        }
-        const id = e.target.id;
-        if (id === "morphAdd") {
-          boneMorph.setAddMode(true, true);
-          morphPanelTab = "anchors";
-          fillMorphPanel();
-        } else if (id === "morphAddAsym") {
-          boneMorph.setAddMode(true, false);
-          morphPanelTab = "anchors";
-          fillMorphPanel();
-        } else if (id === "morphDel") {
-          boneMorph.deletePoint(boneMorph.getState().selectedId);
-          fillMorphPanel();
-        } else if (id === "morphMirror") {
-          boneMorph.setMirrorLock(!boneMorph.getState().mirrorLock);
-          fillMorphPanel();
-        } else if (id === "morphEditRest") {
-          boneMorph.setEditRest(!boneMorph.getState().editRest);
-          fillMorphPanel();
-        } else if (id === "morphHslScopeAll") {
-          boneMorph.setHslScope("all");
-          fillMorphPanel();
-        } else if (id === "morphHslScopeMuscles") {
-          boneMorph.setHslScope("muscles");
-          fillMorphPanel();
-        } else if (id === "morphHslScopeSelected") {
-          boneMorph.setHslScope("selected");
-          morphPanelTab = "color";
-          fillMorphPanel();
-        } else if (id === "morphMeshColorReset") {
-          boneMorph.clearSelectedMeshColor();
-          fillMorphPanel();
-        } else if (id === "morphHistSave") {
-          (async () => {
-            const label = prompt("版本名称（可空）", "") ?? "";
-            try {
-              const vid = await boneMorph.saveHistoryVersion(label.trim() || undefined);
-              document.getElementById("morphStatus").textContent = "已写入历史 " + vid;
-              fillMorphPanel();
-            } catch (err) {
-              alert("保存历史失败：" + err.message);
-            }
-          })();
-        } else if (id === "morphReset") {
-          boneMorph.resetMorph();
-          fillMorphPanel();
-        } else if (id === "morphReseed") {
-          if (!confirm("用 Static 表面极值重新播种 rest，并清零拧形？")) return;
-          boneMorph.reseed();
-          fillMorphPanel();
-        } else if (id === "morphSaveRest") {
-          boneMorph.saveRest().then(
-            () => {
-              document.getElementById("morphStatus").textContent = "rest 已保存";
-            },
-            (err) => alert("保存 rest 失败：" + err.message)
-          );
-        } else if (id === "morphSaveSession") {
-          boneMorph.saveSession().then(
-            () => {
-              document.getElementById("morphStatus").textContent = "session 已保存";
-            },
-            (err) => alert("保存 session 失败：" + err.message)
-          );
-        } else if (id === "morphExport") {
-          exportWarpedGlb();
-        }
-        const del = e.target.closest("[data-hist-del]");
-        if (del) {
-          e.stopPropagation();
-          const hid = del.getAttribute("data-hist-del");
-          if (!confirm("删除该历史版本？")) return;
-          boneMorph.deleteHistoryVersion(hid).then(
-            () => fillMorphPanel(),
-            (err) => alert(err.message)
-          );
-          return;
-        }
-        const li = e.target.closest("[data-hist]");
-        if (li) {
-          const hid = li.getAttribute("data-hist");
-          boneMorph.loadHistoryVersion(hid).then(
-            () => {
-              document.getElementById("morphStatus").textContent = "已加载 " + hid;
-              fillMorphPanel();
-            },
-            (err) => alert("加载失败：" + err.message)
-          );
-          return;
-        }
-        const pt = e.target.closest("[data-point]");
-        if (pt) {
-          boneMorph.setSelected(pt.getAttribute("data-point"));
-          patchMorphPanel();
-        }
-      });
-      host.addEventListener("change", (e) => {
-        if (e.target.id === "morphPointSelect") {
-          boneMorph.setSelected(e.target.value);
-          patchMorphPanel();
-          return;
-        }
-        if (e.target.matches("[data-xyz]")) {
-          const st2 = boneMorph.getState();
-          const pid = st2.selectedId;
-          if (!pid) return;
-          const cur = (st2.xyzOffset[pid] || [0, 0, 0]).slice();
-          cur[parseInt(e.target.getAttribute("data-xyz"), 10)] = parseFloat(e.target.value) || 0;
-          boneMorph.setXyz(pid, cur[0], cur[1], cur[2]);
-          return;
-        }
-        if (e.target.id === "morphHslH" || e.target.id === "morphHslS" || e.target.id === "morphHslL") {
-          applyMorphHslFromUi(host, true);
-        }
-      });
-      host.addEventListener("input", (e) => {
-        if (e.target.matches("[data-slider]")) {
-          boneMorph.setSlider(e.target.getAttribute("data-slider"), parseFloat(e.target.value));
-          const row = e.target.closest(".morph-row");
-          if (row) row.querySelector(".val").textContent = Number(e.target.value).toFixed(4);
-          return;
-        }
-        if (e.target.id === "morphHslH" || e.target.id === "morphHslS" || e.target.id === "morphHslL") {
-          applyMorphHslFromUi(host, false);
-        }
-      });
     }
 
     function applyMorphHslFromUi(host, notify) {
@@ -909,6 +1211,863 @@
       });
     }
 
+    const XYZ_MIN = -0.02;
+    const XYZ_MAX = 0.02;
+    const XYZ_STEP = 0.0005;
+    const PART_OFFSET_MIN = -0.02;
+    const PART_OFFSET_MAX = 0.02;
+    const PART_OFFSET_STEP = 0.0005;
+
+    function syncAnchorXyzUi(host, xyz) {
+      if (!host || !xyz) return;
+      [0, 1, 2].forEach((i) => {
+        const v = Number((xyz[i] || 0).toFixed(4));
+        const valEl = host.querySelector(`[data-xyz-val="${i}"]`);
+        const rangeEl = host.querySelector(`[data-xyz-range="${i}"]`);
+        const numEl = host.querySelector(`[data-xyz="${i}"]`);
+        if (valEl && document.activeElement !== rangeEl && document.activeElement !== numEl) {
+          valEl.textContent = v.toFixed(4);
+        }
+        if (rangeEl && document.activeElement !== rangeEl) rangeEl.value = String(v);
+        if (numEl && document.activeElement !== numEl) numEl.value = String(v);
+      });
+    }
+
+    function applyAnchorXyzAxis(host, axis, value) {
+      const st = boneMorph.getState();
+      const pid = st.selectedId;
+      if (!pid) return;
+      const cur = (st.xyzOffset[pid] || [0, 0, 0]).slice();
+      cur[axis] = value;
+      boneMorph.setXyz(pid, cur[0], cur[1], cur[2]);
+      syncAnchorXyzUi(host, cur);
+    }
+
+    function anchorXyzRowHtml(axis, label, value) {
+      const v = Number((value || 0).toFixed(4));
+      return `<div class="morph-row morph-xyz-row">
+        <label>${label}</label>
+        <span class="val" data-xyz-val="${axis}">${v.toFixed(4)}</span>
+        <input type="range" data-xyz-range="${axis}" min="${XYZ_MIN}" max="${XYZ_MAX}" step="${XYZ_STEP}" value="${v}" style="grid-column:1/-1" />
+        <input type="number" data-xyz="${axis}" step="${XYZ_STEP}" min="${XYZ_MIN}" max="${XYZ_MAX}" value="${v}" style="grid-column:1/-1" />
+      </div>`;
+    }
+
+    function partOffsetRowHtml(axis, label, value, disabled = false) {
+      const v = Number((value || 0).toFixed(4));
+      const dis = disabled ? " disabled" : "";
+      return `<div class="part-offset-row">
+        <label>${label}</label>
+        <input type="number" data-part-offset="${axis}" step="${PART_OFFSET_STEP}" min="${PART_OFFSET_MIN}" max="${PART_OFFSET_MAX}" value="${v}"${dis} />
+        <input type="range" data-part-offset-range="${axis}" min="${PART_OFFSET_MIN}" max="${PART_OFFSET_MAX}" step="${PART_OFFSET_STEP}" value="${v}"${dis} />
+      </div>`;
+    }
+
+    function readPartOffsetAxis(host, axis) {
+      const numEl = host.querySelector(`[data-part-offset="${axis}"]`);
+      const rangeEl = host.querySelector(`[data-part-offset-range="${axis}"]`);
+      if (document.activeElement === numEl && numEl) return parseFloat(numEl.value) || 0;
+      if (document.activeElement === rangeEl && rangeEl) return parseFloat(rangeEl.value) || 0;
+      if (numEl) return parseFloat(numEl.value) || 0;
+      return parseFloat(rangeEl?.value || "0") || 0;
+    }
+
+    function syncPartOffsetUi(host, offset, force) {
+      if (!host || !offset) return;
+      partOffsetUiSyncing = true;
+      try {
+        [0, 1, 2].forEach((i) => {
+          const v = Number((offset[i] || 0).toFixed(4));
+          const numEl = host.querySelector(`[data-part-offset="${i}"]`);
+          const rangeEl = host.querySelector(`[data-part-offset-range="${i}"]`);
+          if (numEl && (force || document.activeElement !== numEl)) numEl.value = String(v);
+          if (rangeEl && (force || document.activeElement !== rangeEl)) rangeEl.value = String(v);
+        });
+      } finally {
+        partOffsetUiSyncing = false;
+      }
+      const meta = host.querySelector(".part-offset-meta");
+      if (meta) {
+        const st = boneMorph.getState();
+        const n = st.islandAdjustedCount || 0;
+        const chk = (st.islandChecked || []).length;
+        const tgt = st.islandOffsetTargetCount || 0;
+        if (tgt > 1) {
+          meta.textContent = `已勾选 ${chk} 块 · 联动位移 ${tgt} 块 · 已有 ${n} 块保留位移`;
+        } else if (st.islandFocusToken) {
+          meta.textContent = `定位编辑中 · 已有 ${n} 块保留位移 · 世界坐标 m`;
+        } else {
+          meta.textContent = `勾选孤岛后可位移 · 点空白取消定位 · 已有 ${n} 块保留位移`;
+        }
+      }
+    }
+
+    function applyPartOffsetFromUi(host) {
+      if (partOffsetUiSyncing) return;
+      const dx = readPartOffsetAxis(host, 0);
+      const dy = readPartOffsetAxis(host, 1);
+      const dz = readPartOffsetAxis(host, 2);
+      const ok = boneMorph.setIslandOffset(dx, dy, dz);
+      if (!ok) {
+        const status = host.querySelector("#morphStatus");
+        if (status) status.textContent = "请先勾选要打乱的孤岛";
+        return;
+      }
+      syncPartOffsetUi(host, boneMorph.getState().islandOffset || [0, 0, 0], false);
+    }
+
+    function collectPartNodeIds(nodes, out = []) {
+      for (const n of nodes || []) {
+        out.push(n.id);
+        if (n.children?.length) collectPartNodeIds(n.children, out);
+      }
+      return out;
+    }
+
+    function islandMeshCheckState(group, checked) {
+      const tokens = (group.islands || []).map((x) => x.token);
+      if (!tokens.length) return { on: false, indeterminate: false };
+      let n = 0;
+      for (const t of tokens) if (checked.includes(t)) n++;
+      return {
+        on: n === tokens.length,
+        indeterminate: n > 0 && n < tokens.length,
+      };
+    }
+
+    function islandTreeMatchesFilter(text, filter) {
+      const q = String(filter || "").trim().toLowerCase();
+      if (!q) return true;
+      return String(text || "").toLowerCase().includes(q);
+    }
+
+    function colorIslandTreeHtml(st, filter = "") {
+      const checked = st.islandChecked || [];
+      const focus = st.islandFocusToken || "";
+      const groups = st.colorIslandGroups || [];
+      if (!st.islandScanDone) {
+        return `<li class="meta" style="cursor:default;padding:8px">正在扫描几何孤岛…</li>`;
+      }
+      if (!groups.length) {
+        return `<li class="meta" style="cursor:default;padding:8px">未找到几何孤岛（需带 UV 贴图的网格；3D 上连续的表面只会算一块）</li>`;
+      }
+      const total = groups.reduce((n, g) => n + (g.islands || []).length, 0);
+      const rows = groups
+        .map((g) => {
+          const meshChk = islandMeshCheckState(g, checked);
+          const collapsed = !!g.collapsed;
+          const childRows = (g.islands || [])
+            .map((isl) => {
+              const isChk = checked.includes(isl.token);
+              const isFocus = isl.token === focus;
+              const match = islandTreeMatchesFilter(
+                `${isl.shortLabel} ${isl.subLabel} ${isl.label} ${g.meshLabel}`,
+                filter
+              );
+              const cls = ["part-tree-item", isFocus ? "on" : "", isChk ? "is-checked" : "", match ? "" : "is-filtered"]
+                .filter(Boolean)
+                .join(" ");
+              return `<li class="${cls}" data-island-item="${isl.token}">
+                <div class="part-tree-line" data-island-line="${isl.token}" style="padding-left:28px" title="${isl.label}">
+                  <span class="island-swatch" style="background:${isl.previewHex || "#888"}"></span>
+                  <input type="checkbox" data-island-check="${isl.token}"${isChk ? " checked" : ""} />
+                  <span class="part-tree-label">
+                    <strong>${isl.shortLabel || isl.label}</strong>
+                    <span class="type">${isl.subLabel || ""}</span>
+                  </span>
+                </div>
+              </li>`;
+            })
+            .join("");
+          const groupMatch =
+            islandTreeMatchesFilter(`${g.meshLabel} ${g.meshRawName}`, filter) ||
+            (g.islands || []).some((isl) =>
+              islandTreeMatchesFilter(`${isl.shortLabel} ${isl.subLabel} ${isl.label}`, filter)
+            );
+          const groupCls = [
+            "part-tree-group",
+            collapsed ? "is-collapsed" : "",
+            groupMatch ? "" : "is-filtered",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          return `<li class="${groupCls}" data-island-group="${g.meshKey}">
+            <div class="part-tree-line" data-island-mesh-line="${g.meshKey}" style="padding-left:8px" title="${g.meshRawName || g.meshKey}">
+              <button type="button" class="part-tree-fold" data-island-fold="${g.meshKey}" title="${collapsed ? "展开" : "折叠"}">▼</button>
+              <input type="checkbox" data-island-mesh-check="${g.meshKey}"${meshChk.on ? " checked" : ""} />
+              <span class="part-tree-label">
+                <strong>${g.meshLabel}</strong>
+                <span class="type">${(g.islands || []).length} 个孤岛</span>
+              </span>
+            </div>
+            <ul class="part-tree-children">${childRows || `<li class="meta" style="padding-left:28px">无孤岛</li>`}</ul>
+          </li>`;
+        })
+        .join("");
+      const visible = filter
+        ? groups.reduce((n, g) => {
+            return (
+              n +
+              (g.islands || []).filter((isl) =>
+                islandTreeMatchesFilter(
+                  `${isl.shortLabel} ${isl.subLabel} ${isl.label} ${g.meshLabel}`,
+                  filter
+                )
+              ).length
+            );
+          }, 0)
+        : total;
+      const head =
+        filter && visible !== total
+          ? `<li class="meta" style="cursor:default;padding:6px 8px">筛选「${filter}」：${visible} / ${total}</li>`
+          : "";
+      return head + rows;
+    }
+
+    function collectAllIslandTokens(st) {
+      const out = [];
+      for (const g of st.colorIslandGroups || []) {
+        for (const isl of g.islands || []) out.push(isl.token);
+      }
+      return out;
+    }
+
+    function partTreeMatchesFilter(node, filter) {
+      const q = String(filter || "").trim().toLowerCase();
+      if (!q) return true;
+      const self = `${node.name || ""} ${node.type || ""}`.toLowerCase().includes(q);
+      if (self) return true;
+      return (node.children || []).some((c) => partTreeMatchesFilter(c, filter));
+    }
+
+    function collectPartSubtreeIds(nodes, out = []) {
+      for (const n of nodes || []) {
+        out.push(n.id);
+        if (n.children?.length) collectPartSubtreeIds(n.children, out);
+      }
+      return out;
+    }
+
+    function partSubtreeCheckState(node, checked) {
+      const ids = collectPartSubtreeIds([node]);
+      let n = 0;
+      for (const id of ids) if (checked.includes(id)) n++;
+      return { on: n > 0 && n === ids.length, indeterminate: n > 0 && n < ids.length, count: n, total: ids.length };
+    }
+
+    function partTreeHtml(nodes, checked, highlightId, filter = "", depth = 0) {
+      if (!nodes?.length) {
+        return `<li class="meta" style="cursor:default;padding:8px">无可用部件节点</li>`;
+      }
+      return nodes
+        .map((n) => {
+          if (!partTreeMatchesFilter(n, filter)) return "";
+          const isOn = n.id === highlightId;
+          const isChk = checked.includes(n.id);
+          const hasKids = !!(n.children && n.children.length);
+          const collapsed = partTreeCollapsed.has(n.id);
+          const chkState = hasKids ? partSubtreeCheckState(n, checked) : { on: isChk, indeterminate: false };
+          const itemCls = [
+            hasKids ? "part-tree-group" : "part-tree-item",
+            collapsed ? "is-collapsed" : "",
+            isOn ? "on" : "",
+            isChk || chkState.indeterminate ? "is-checked" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          const pad = 8 + depth * 12;
+          const foldBtn = hasKids
+            ? `<button type="button" class="part-tree-fold" data-part-fold="${n.id}" title="${collapsed ? "展开" : "折叠"}">▼</button>`
+            : `<span class="part-tree-fold" style="visibility:hidden"></span>`;
+          const kids = hasKids
+            ? `<ul class="part-tree-children">${partTreeHtml(n.children, checked, highlightId, filter, depth + 1)}</ul>`
+            : "";
+          const attr = hasKids ? `data-part-group="${n.id}"` : `data-part-item="${n.id}"`;
+          return `<li class="${itemCls}" ${attr}>
+            <div class="part-tree-line" data-part-name="${n.id}" style="padding-left:${pad}px" title="${n.name}">
+              ${foldBtn}
+              <input type="checkbox" data-part-check="${n.id}"${chkState.on ? " checked" : ""} />
+              <span class="part-tree-label"><strong>${n.name}</strong><span class="type">${n.type}${hasKids ? ` · ${n.children.length}` : ""}</span></span>
+            </div>
+            ${kids}
+          </li>`;
+        })
+        .join("");
+    }
+
+    function leftTreeToolbarHtml(st) {
+      const total = (st.colorIslandGroups || []).reduce((n, g) => n + (g.islands || []).length, 0);
+      return `<span class="lm-stat" style="flex:1 1 100%;margin:0 0 2px">共 ${total} 块 · 点行/Alt+点定位 · 勾选调色/位移</span>
+        <button type="button" id="islandTreeExpandAll">展开</button>
+        <button type="button" id="islandTreeCollapseAll">收起</button>
+        <button type="button" id="colorPartCheckAll">全选</button>
+        <button type="button" id="colorPartCheckNone">清选</button>
+        <input type="search" id="islandTreeFilter" class="island-tree-search" placeholder="搜索…" value="${morphIslandTreeFilter.replace(/"/g, "&quot;")}" />`;
+    }
+
+    function fillLeftTreePanel(st) {
+      const list = document.getElementById("leftTreeList");
+      const toolbar = document.getElementById("leftTreeToolbar");
+      if (!list || !toolbar) return;
+      if (!boneMorph.getRoot()) {
+        list.innerHTML = `<li class="tree-empty">加载模型后显示孤岛树</li>`;
+        toolbar.innerHTML = "";
+        if (elTreeSidebar) elTreeSidebar.hidden = true;
+        return;
+      }
+      if (elTreeSidebar) elTreeSidebar.hidden = false;
+      toolbar.innerHTML = leftTreeToolbarHtml(st);
+      syncTreeModeUi();
+      if (!st.islandScanDone) {
+        list.innerHTML = `<li class="tree-empty">正在扫描几何孤岛…</li>`;
+        return;
+      }
+      list.innerHTML = colorIslandTreeHtml(st, morphIslandTreeFilter);
+      syncIslandTreeUi(document.getElementById("treeSidebar"), st);
+    }
+
+    function scrollIslandTreeToToken(token) {
+      if (!token) return;
+      pendingIslandTreeScroll = token;
+      boneMorph.revealIslandTreeToken(token);
+      fillLeftTreePanel(boneMorph.getState());
+    }
+
+    function flushIslandTreeScroll(token) {
+      if (!token || !elTreeSidebar) return;
+      const row = elTreeSidebar.querySelector(`[data-island-item="${token}"]`);
+      if (!row) return;
+      row.classList.remove("is-flash");
+      void row.offsetWidth;
+      row.classList.add("is-flash");
+      row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      pendingIslandTreeScroll = "";
+    }
+
+    function syncPartTreeUi(host, st) {
+      if (!host) return;
+      const checked = st.partChecked || [];
+      const highlight = st.partHighlightId || "";
+      host.querySelectorAll("[data-part-check]").forEach((el) => {
+        const id = el.getAttribute("data-part-check");
+        const li = el.closest("[data-part-item], [data-part-group]");
+        const nodeId = li?.getAttribute("data-part-item") || li?.getAttribute("data-part-group");
+        if (!nodeId) {
+          el.checked = checked.includes(id);
+          return;
+        }
+        const findNode = (nodes) => {
+          for (const n of nodes || []) {
+            if (n.id === nodeId) return n;
+            const sub = findNode(n.children);
+            if (sub) return sub;
+          }
+          return null;
+        };
+        const node = findNode(st.partTree || []);
+        if (node?.children?.length) {
+          const cs = partSubtreeCheckState(node, checked);
+          el.checked = cs.on;
+          el.indeterminate = cs.indeterminate;
+        } else {
+          el.checked = checked.includes(id);
+          el.indeterminate = false;
+        }
+      });
+      host.querySelectorAll("[data-part-item], [data-part-group]").forEach((li) => {
+        const id = li.getAttribute("data-part-item") || li.getAttribute("data-part-group");
+        li.classList.toggle("on", id === highlight);
+        li.classList.toggle("is-checked", checked.includes(id));
+        li.classList.toggle("is-collapsed", partTreeCollapsed.has(id));
+      });
+    }
+
+    function expandAllPartTree(nodes) {
+      for (const n of nodes || []) {
+        partTreeCollapsed.delete(n.id);
+        if (n.children?.length) expandAllPartTree(n.children);
+      }
+    }
+
+    function collapseAllPartTree(nodes) {
+      for (const n of nodes || []) {
+        if (n.children?.length) {
+          partTreeCollapsed.add(n.id);
+          collapseAllPartTree(n.children);
+        }
+      }
+    }
+
+    let textureSynthUiTimer = 0;
+    function scheduleIslandTextureParamsFromUi(host) {
+      if (!host) return;
+      if (textureSynthUiTimer) clearTimeout(textureSynthUiTimer);
+      textureSynthUiTimer = setTimeout(() => {
+        textureSynthUiTimer = 0;
+        applyIslandTextureParamsFromUi(host, true);
+      }, 180);
+    }
+
+    function applyIslandTextureParamsFromUi(host, schedule = false) {
+      if (!host) return;
+      const seedEl = host.querySelector("#islandTextureSeed");
+      const simEl = host.querySelector("#islandTextureSimilarity");
+      const blockEl = host.querySelector("#islandTextureBlockScale");
+      const seed = parseInt(seedEl?.value || "12345", 10) >>> 0;
+      const similarity = (parseFloat(simEl?.value || "70") || 0) / 100;
+      const blockScale = parseFloat(blockEl?.value || "24") || 24;
+      const simVal = host.querySelector("#islandTextureSimVal");
+      const blockVal = host.querySelector("#islandTextureBlockVal");
+      const seedVal = host.querySelector("#islandTextureSeedVal");
+      if (simVal) simVal.textContent = String(Math.round(similarity * 100));
+      if (blockVal) blockVal.textContent = String(Math.round(blockScale));
+      if (seedVal) seedVal.textContent = String(seed);
+      boneMorph.setIslandTextureSynthParams({ seed, similarity, blockScale });
+      if (schedule && (boneMorph.getState().islandChecked || []).length) {
+        boneMorph.scheduleIslandTextureSynth({ immediate: true });
+      }
+    }
+
+    function setupMorphPanelDelegation(host) {
+      if (!elWorkspace) return;
+      // 页面生命周期内只绑一次（监听挂在持久 #workspace，与 viewer dispose 无关）
+      if (morphPanelDelegated) return;
+      morphPanelDelegated = true;
+      if (morphPanelAborter) morphPanelAborter.abort();
+      morphPanelAborter = new AbortController();
+      const onEv = { signal: morphPanelAborter.signal };
+      elWorkspace.addEventListener("dblclick", (e) => {
+        const li = e.target.closest("[data-hist]");
+        if (!li) return;
+        selectedHistoryId = li.getAttribute("data-hist") || "";
+        loadSelectedHistoryVersion();
+      }, onEv);
+      elWorkspace.addEventListener("click", (e) => {
+        const treeModeBtn = e.target.closest("[data-tree-mode]");
+        if (treeModeBtn) return;
+        const tabBtn = e.target.closest("[data-morph-tab]");
+        if (tabBtn) {
+          morphPanelTab = tabBtn.getAttribute("data-morph-tab") || "color";
+          syncMarkerVisibilityForTab();
+          fillMorphPanel();
+          return;
+        }
+        const id = e.target.id;
+        if (id === "morphModeWarp" || id === "morphModeMove" || id === "morphModeAddSym" || id === "morphModeAddAsym" || id === "morphModeBrush") {
+          const modeMap = {
+            morphModeWarp: "warp",
+            morphModeMove: "move",
+            morphModeAddSym: "addSym",
+            morphModeAddAsym: "addAsym",
+            morphModeBrush: "brush",
+          };
+          const next = modeMap[id];
+          const cur = boneMorph.getAnchorToolMode?.() || boneMorph.getState().anchorToolMode || "warp";
+          // 再点同一加点/笔刷模式 → 退出到拧形
+          if ((next === "addSym" || next === "addAsym" || next === "brush") && cur === next) {
+            boneMorph.setAnchorToolMode("warp");
+          } else {
+            boneMorph.setAnchorToolMode(next);
+          }
+          morphPanelTab = "anchors";
+          fillMorphPanel();
+        } else if (id === "morphBrushAdd") {
+          boneMorph.setBrushSign(1);
+          fillMorphPanel();
+        } else if (id === "morphBrushSub") {
+          boneMorph.setBrushSign(-1);
+          fillMorphPanel();
+        } else if (id === "morphBrushUndo") {
+          boneMorph.undoBrushStroke?.();
+          fillMorphPanel();
+        } else if (id === "morphMirror") {
+          boneMorph.setMirrorLock(!boneMorph.getState().mirrorLock);
+          fillMorphPanel();
+        } else if (id === "morphHslScopeAll") {
+          boneMorph.setHslScope("all");
+          fillMorphPanel();
+        } else if (id === "morphHslScopeMuscles") {
+          boneMorph.setHslScope("muscles");
+          fillMorphPanel();
+        } else if (id === "morphHslScopeParts") {
+          boneMorph.setHslScope("parts");
+          fillMorphPanel();
+        } else if (id === "morphMeshColorReset") {
+          boneMorph.clearSelectedMeshColor();
+          fillMorphPanel();
+        } else if (id === "morphColorApply") {
+          (async () => {
+            try {
+              const r = await boneMorph.applyCommittedColorAdjustments();
+              selectedHistoryId = r.historyId || "";
+              document.getElementById("morphStatus").textContent = `设色已应用 · 历史 ${r.historyId}`;
+              fillLeftTreePanel(boneMorph.getState());
+              fillMorphPanel();
+            } catch (err) {
+              alert("应用设色失败：" + (err?.message || err));
+            }
+          })();
+        } else if (id === "morphShowSelection") {
+          boneMorph.toggleSelectionOverlay();
+          patchMorphPanel();
+        } else if (id === "islandTextureReroll") {
+          applyIslandTextureParamsFromUi(document.getElementById("morphPanel"), false);
+          boneMorph.randomizeIslandTextureSeed().then(() => patchMorphPanel()).catch((err) => {
+            console.warn(err);
+            const stEl = document.getElementById("morphStatus");
+            if (stEl) stEl.textContent = `纹理合成失败：${err?.message || err}`;
+            patchMorphPanel();
+          });
+        } else if (id === "islandTextureClear") {
+          boneMorph.clearIslandTextureSynth();
+          patchMorphPanel();
+        } else if (id === "morphHistSave") {
+          (async () => {
+            const label = prompt("版本名称（可空）", "") ?? "";
+            try {
+              const vid = await boneMorph.saveHistoryVersion(label.trim() || undefined);
+              selectedHistoryId = vid;
+              document.getElementById("morphStatus").textContent = "已写入历史 " + vid;
+              fillMorphPanel();
+            } catch (err) {
+              alert("保存历史失败：" + err.message);
+            }
+          })();
+        } else if (id === "morphHistLoad") {
+          loadSelectedHistoryVersion();
+        } else if (id === "morphHistDelete") {
+          deleteSelectedHistoryVersion();
+        } else if (id === "morphReset") {
+          boneMorph.resetMorph();
+          fillMorphPanel();
+        } else if (id === "partTreeExpandAll") {
+          expandAllPartTree(boneMorph.getState().partTree || []);
+          fillLeftTreePanel(boneMorph.getState());
+        } else if (id === "partTreeCollapseAll") {
+          collapseAllPartTree(boneMorph.getState().partTree || []);
+          fillLeftTreePanel(boneMorph.getState());
+        } else if (id === "partCheckAll" || id === "colorPartCheckAll") {
+          const st2 = boneMorph.getState();
+          if (id === "colorPartCheckAll") {
+            boneMorph.setIslandChecked(collectAllIslandTokens(st2));
+            boneMorph.setHslScope("parts");
+          } else {
+            boneMorph.setPartChecked(collectPartNodeIds(st2.partTree || []));
+          }
+          patchMorphPanel();
+        } else if (id === "islandTreeExpandAll") {
+          boneMorph.expandAllIslandGroups();
+          patchMorphPanel();
+        } else if (id === "islandTreeCollapseAll") {
+          boneMorph.collapseAllIslandGroups();
+          patchMorphPanel();
+        } else if (id === "partCheckNone" || id === "colorPartCheckNone") {
+          if (id === "colorPartCheckNone") boneMorph.setIslandChecked([]);
+          else boneMorph.setPartChecked([]);
+          patchMorphPanel();
+        } else if (id === "partOffsetReset" || id === "islandOffsetReset") {
+          boneMorph.resetIslandOffsets();
+          fillMorphPanel();
+        } else if (id === "morphExport") {
+          exportWarpedGlb();
+        }
+        const li = e.target.closest("[data-hist]");
+        if (li) {
+          selectedHistoryId = li.getAttribute("data-hist") || "";
+          syncHistoryListUi(document.getElementById("morphPanel"));
+          return;
+        }
+        const pt = e.target.closest("[data-point]");
+        if (pt) {
+          boneMorph.setSelected(pt.getAttribute("data-point"));
+          patchMorphPanel();
+        }
+        const partFold = e.target.closest("[data-part-fold]");
+        if (partFold) {
+          e.stopPropagation();
+          const pid = partFold.getAttribute("data-part-fold");
+          if (partTreeCollapsed.has(pid)) partTreeCollapsed.delete(pid);
+          else partTreeCollapsed.add(pid);
+          patchMorphPanel();
+          return;
+        }
+        const partLine = e.target.closest("[data-part-name]");
+        if (partLine && !e.target.matches("[data-part-check]") && !e.target.closest("[data-part-fold]")) {
+          const pid = partLine.getAttribute("data-part-name");
+          boneMorph.highlightPartNode(pid);
+          const row = elTreeSidebar?.querySelector(`[data-part-item="${pid}"], [data-part-group="${pid}"]`);
+          if (row) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          patchMorphPanel();
+          return;
+        }
+        const islandFold = e.target.closest("[data-island-fold]");
+        if (islandFold) {
+          e.stopPropagation();
+          boneMorph.toggleIslandTreeCollapsed(islandFold.getAttribute("data-island-fold"));
+          patchMorphPanel();
+          return;
+        }
+        const islandMeshLine = e.target.closest("[data-island-mesh-line]");
+        if (islandMeshLine && !e.target.matches("[data-island-mesh-check]") && !e.target.closest("[data-island-fold]")) {
+          const mk = islandMeshLine.getAttribute("data-island-mesh-line");
+          boneMorph.toggleIslandTreeCollapsed(mk);
+          patchMorphPanel();
+          return;
+        }
+        const islandLine = e.target.closest("[data-island-line]");
+        if (islandLine && !e.target.matches("[data-island-check]")) {
+          const token = islandLine.getAttribute("data-island-line");
+          boneMorph.highlightIsland(token);
+          scrollIslandTreeToToken(token);
+          requestAnimationFrame(() => flushIslandTreeScroll(token));
+          patchMorphPanel();
+          return;
+        }
+      }, onEv);
+      elWorkspace.addEventListener("change", (e) => {
+        const panel = document.getElementById("morphPanel");
+        if (e.target.matches("[data-island-mesh-check]")) {
+          const mk = e.target.getAttribute("data-island-mesh-check");
+          boneMorph.toggleIslandMeshChecked(mk);
+          if (e.target.checked) boneMorph.setHslScope("parts");
+          patchMorphPanel();
+          return;
+        }
+        if (e.target.matches("[data-island-check]")) {
+          const token = e.target.getAttribute("data-island-check");
+          boneMorph.toggleIslandChecked(token);
+          if (e.target.checked) boneMorph.setHslScope("parts");
+          patchMorphPanel();
+          return;
+        }
+        if (e.target.matches("[data-part-check]")) {
+          const pid = e.target.getAttribute("data-part-check");
+          boneMorph.togglePartChecked(pid);
+          if (e.target.checked) boneMorph.highlightPartNode(pid);
+          patchMorphPanel();
+          return;
+        }
+        if (e.target.id === "partTreeFilter") {
+          morphPartTreeFilter = e.target.value || "";
+          fillLeftTreePanel(boneMorph.getState());
+          return;
+        }
+        if (e.target.id === "islandTreeFilter") {
+          morphIslandTreeFilter = e.target.value || "";
+          fillLeftTreePanel(boneMorph.getState());
+          return;
+        }
+        if (e.target.id === "morphPointSelect") {
+          boneMorph.setSelected(e.target.value);
+          patchMorphPanel();
+          return;
+        }
+        if (e.target.matches("[data-xyz]")) {
+          const axis = parseInt(e.target.getAttribute("data-xyz"), 10);
+          applyAnchorXyzAxis(panel, axis, parseFloat(e.target.value) || 0);
+          const rangeEl = panel?.querySelector(`[data-xyz-range="${axis}"]`);
+          if (rangeEl) rangeEl.value = e.target.value;
+          return;
+        }
+        if (e.target.matches("[data-part-offset]")) {
+          if (partOffsetUiSyncing) return;
+          const axis = parseInt(e.target.getAttribute("data-part-offset"), 10);
+          const rangeEl = panel?.querySelector(`[data-part-offset-range="${axis}"]`);
+          if (rangeEl) rangeEl.value = e.target.value;
+          applyPartOffsetFromUi(panel);
+          return;
+        }
+        if (e.target.id === "morphHslH" || e.target.id === "morphHslS" || e.target.id === "morphHslL") {
+          applyMorphHslFromUi(panel, true);
+        }
+        if (
+          e.target.id === "islandTextureSimilarity" ||
+          e.target.id === "islandTextureBlockScale" ||
+          e.target.id === "islandTextureSeed"
+        ) {
+          applyIslandTextureParamsFromUi(panel, true);
+        }
+        if (e.target.id === "morphBrushRadius") {
+          boneMorph.setBrushRadius(parseFloat(e.target.value) || 0.02);
+          const v = panel?.querySelector("#morphBrushRadiusVal");
+          if (v) v.textContent = Number(e.target.value).toFixed(4);
+        }
+        if (e.target.id === "morphBrushSoftness") {
+          boneMorph.setBrushSoftness(parseFloat(e.target.value) || 0);
+          const v = panel?.querySelector("#morphBrushSoftnessVal");
+          if (v) v.textContent = `${Math.round((parseFloat(e.target.value) || 0) * 100)}%`;
+        }
+        if (e.target.id === "morphBrushStrength") {
+          boneMorph.setBrushStrength(parseFloat(e.target.value) || 0.35);
+          const v = panel?.querySelector("#morphBrushStrengthVal");
+          if (v) v.textContent = `${Math.round((parseFloat(e.target.value) || 0) * 100)}%`;
+        }
+      }, onEv);
+      elWorkspace.addEventListener("input", (e) => {
+        const panel = document.getElementById("morphPanel");
+        if (e.target.id === "islandTreeFilter") {
+          morphIslandTreeFilter = e.target.value || "";
+          fillLeftTreePanel(boneMorph.getState());
+          return;
+        }
+        if (e.target.id === "partTreeFilter") {
+          morphPartTreeFilter = e.target.value || "";
+          fillLeftTreePanel(boneMorph.getState());
+          return;
+        }
+        if (e.target.matches("[data-xyz-range]")) {
+          const axis = parseInt(e.target.getAttribute("data-xyz-range"), 10);
+          applyAnchorXyzAxis(panel, axis, parseFloat(e.target.value) || 0);
+          const numEl = panel?.querySelector(`[data-xyz="${axis}"]`);
+          if (numEl && document.activeElement !== numEl) numEl.value = e.target.value;
+          return;
+        }
+        if (e.target.matches("[data-part-offset-range]")) {
+          if (partOffsetUiSyncing) return;
+          const axis = parseInt(e.target.getAttribute("data-part-offset-range"), 10);
+          const numEl = panel?.querySelector(`[data-part-offset="${axis}"]`);
+          if (numEl && document.activeElement !== numEl) numEl.value = e.target.value;
+          applyPartOffsetFromUi(panel);
+          return;
+        }
+        if (e.target.matches("[data-part-offset]")) {
+          if (partOffsetUiSyncing) return;
+          const axis = parseInt(e.target.getAttribute("data-part-offset"), 10);
+          const rangeEl = panel?.querySelector(`[data-part-offset-range="${axis}"]`);
+          if (rangeEl && document.activeElement !== rangeEl) rangeEl.value = e.target.value;
+          applyPartOffsetFromUi(panel);
+          return;
+        }
+        if (e.target.matches("[data-slider]")) {
+          boneMorph.setSlider(e.target.getAttribute("data-slider"), parseFloat(e.target.value));
+          const row = e.target.closest(".morph-row");
+          if (row) row.querySelector(".val").textContent = Number(e.target.value).toFixed(4);
+          return;
+        }
+        if (e.target.id === "morphHslH" || e.target.id === "morphHslS" || e.target.id === "morphHslL") {
+          applyMorphHslFromUi(panel, false);
+        }
+        if (e.target.id === "islandTextureSimilarity" || e.target.id === "islandTextureBlockScale") {
+          const panel2 = document.getElementById("morphPanel");
+          const simEl = e.target.id === "islandTextureSimilarity" ? e.target : panel2?.querySelector("#islandTextureSimilarity");
+          const blockEl = e.target.id === "islandTextureBlockScale" ? e.target : panel2?.querySelector("#islandTextureBlockScale");
+          const simVal = panel2?.querySelector("#islandTextureSimVal");
+          const blockVal = panel2?.querySelector("#islandTextureBlockVal");
+          if (simVal && simEl) simVal.textContent = simEl.value;
+          if (blockVal && blockEl) blockVal.textContent = blockEl.value;
+          scheduleIslandTextureParamsFromUi(panel2);
+        }
+        if (e.target.id === "islandTextureSeed") {
+          const panel2 = document.getElementById("morphPanel");
+          const seedVal = panel2?.querySelector("#islandTextureSeedVal");
+          if (seedVal) seedVal.textContent = e.target.value;
+          scheduleIslandTextureParamsFromUi(panel2);
+        }
+        if (e.target.id === "morphBrushRadius") {
+          boneMorph.setBrushRadius(parseFloat(e.target.value) || 0.02);
+          const v = panel?.querySelector("#morphBrushRadiusVal");
+          if (v) v.textContent = Number(e.target.value).toFixed(4);
+        }
+        if (e.target.id === "morphBrushSoftness") {
+          boneMorph.setBrushSoftness(parseFloat(e.target.value) || 0);
+          const v = panel?.querySelector("#morphBrushSoftnessVal");
+          if (v) v.textContent = `${Math.round((parseFloat(e.target.value) || 0) * 100)}%`;
+        }
+        if (e.target.id === "morphBrushStrength") {
+          boneMorph.setBrushStrength(parseFloat(e.target.value) || 0.35);
+          const v = panel?.querySelector("#morphBrushStrengthVal");
+          if (v) v.textContent = `${Math.round((parseFloat(e.target.value) || 0) * 100)}%`;
+        }
+      }, onEv);
+    }
+
+    function syncIslandTreeUi(host, st) {
+      if (!host) return;
+      host.querySelectorAll("[data-island-check]").forEach((el) => {
+        const token = el.getAttribute("data-island-check");
+        el.checked = (st.islandChecked || []).includes(token);
+      });
+      host.querySelectorAll("[data-island-item]").forEach((li) => {
+        const token = li.getAttribute("data-island-item");
+        li.classList.toggle("on", token === (st.islandFocusToken || ""));
+        li.classList.toggle("is-checked", (st.islandChecked || []).includes(token));
+      });
+      host.querySelectorAll("[data-island-group]").forEach((li) => {
+        const mk = li.getAttribute("data-island-group");
+        const grp = (st.colorIslandGroups || []).find((g) => g.meshKey === mk);
+        li.classList.toggle("is-collapsed", !!grp?.collapsed);
+        li.classList.remove("has-focus");
+        const meshChk = grp ? islandMeshCheckState(grp, st.islandChecked || []) : { on: false, indeterminate: false };
+        const cb = li.querySelector("[data-island-mesh-check]");
+        if (cb) {
+          cb.checked = meshChk.on;
+          cb.indeterminate = meshChk.indeterminate;
+        }
+      });
+    }
+
+    function leftTreeShowsIslandScanning() {
+      const list = document.getElementById("leftTreeList");
+      return !!list && /正在扫描几何孤岛/.test(list.textContent || "");
+    }
+
+    function syncHistoryListUi(host) {
+      if (!host) return;
+      host.querySelectorAll("[data-hist]").forEach((li) => {
+        li.classList.toggle("on", li.getAttribute("data-hist") === selectedHistoryId);
+      });
+      const hasSel = !!selectedHistoryId;
+      const loadBtn = host.querySelector("#morphHistLoad");
+      const delBtn = host.querySelector("#morphHistDelete");
+      if (loadBtn) loadBtn.disabled = !hasSel;
+      if (delBtn) delBtn.disabled = !hasSel;
+    }
+
+    function ensureSelectedHistoryStillValid(st) {
+      if (!selectedHistoryId) return;
+      const ok = (st.history || []).some((v) => v.id === selectedHistoryId);
+      if (!ok) selectedHistoryId = "";
+    }
+
+    async function loadSelectedHistoryVersion() {
+      if (!selectedHistoryId) {
+        alert("请先选中一条存档");
+        return;
+      }
+      try {
+        await boneMorph.loadHistoryVersion(selectedHistoryId);
+        const meta = boneMorph.getState().history?.find((v) => v.id === selectedHistoryId);
+        document.getElementById("morphStatus").textContent = `已加载 ${meta?.label || selectedHistoryId}`;
+        fillMorphPanel();
+      } catch (err) {
+        alert("加载失败：" + (err?.message || err));
+      }
+    }
+
+    async function deleteSelectedHistoryVersion() {
+      if (!selectedHistoryId) {
+        alert("请先选中一条存档");
+        return;
+      }
+      const st = boneMorph.getState();
+      const meta = (st.history || []).find((v) => v.id === selectedHistoryId);
+      const label = meta?.label || selectedHistoryId;
+      if (!confirm(`删除存档「${label}」？\n对应 JSON 文件将一并删除，不可恢复。`)) return;
+      const hid = selectedHistoryId;
+      try {
+        await boneMorph.deleteHistoryVersion(hid);
+        if (selectedHistoryId === hid) selectedHistoryId = "";
+        document.getElementById("morphStatus").textContent = `已删除 ${label}`;
+        fillMorphPanel();
+      } catch (err) {
+        alert("删除失败：" + (err?.message || err));
+      }
+    }
+
+    function syncMarkerVisibilityForTab() {
+      boneMorph.setMarkersVisible?.(morphPanelTab !== "color");
+    }
+
     function patchMorphPanel() {
       const host = document.getElementById("morphPanel");
       if (!host || !host.querySelector("[data-morph-tab]")) {
@@ -916,8 +2075,8 @@
         return;
       }
       const st = boneMorph.getState();
-      const pickToken = `${st.selectedMeshKey}|${st.selectedRegionKey}`;
-      if (st.selectedRegionKey && pickToken !== morphPanelPickToken) {
+      const pickToken = `${st.hslScope}|${(st.islandChecked || []).join(",")}`;
+      if (st.hslScope === "parts" && (st.islandChecked || []).length && pickToken !== morphPanelPickToken) {
         morphPanelPickToken = pickToken;
         morphPanelTab = "color";
         fillMorphPanel();
@@ -925,16 +2084,67 @@
       }
       const status = host.querySelector("#morphStatus");
       if (status) {
-        status.textContent = st.hasRest
-          ? `点 ${st.pointIds.length} · 选中 ${st.selectedId || "—"}`
-          : "无 rest";
+        const axis = st.dragAxisHint ? ` · 拖轴 ${st.dragAxisHint}` : "";
+        if (morphPanelTab === "anchors") {
+          const mode = st.anchorToolMode || "warp";
+          const modeLabel =
+            mode === "move"
+              ? "移锚点"
+              : mode === "addSym"
+                ? "对称加点"
+                : mode === "addAsym"
+                  ? "单点加点"
+                  : mode === "brush"
+                    ? "笔刷"
+                    : "拧形";
+          status.textContent =
+            mode === "brush"
+              ? `模式：笔刷 · ${st.brushSign < 0 ? "减料" : "堆料"} · 空白拖旋转 · 按住表面刷 · Ctrl+Z撤销 · Esc退出`
+              : `模式：${modeLabel} · 选中 ${st.selectedId || "—"} · 空白拖旋转 · 拖球=${mode === "move" ? "移锚点" : mode === "warp" ? "拧形" : "选中"} · Del删除 · 方向键微调${axis}`;
+        } else {
+          status.textContent = st.hasRest
+            ? `点 ${st.pointIds.length} · 选中 ${st.selectedId || "—"}${axis}`
+            : "无 rest";
+        }
+      }
+      const mode = st.anchorToolMode || "warp";
+      host.querySelector("#morphModeWarp")?.classList.toggle("on", mode === "warp");
+      host.querySelector("#morphModeMove")?.classList.toggle("on", mode === "move");
+      host.querySelector("#morphModeAddSym")?.classList.toggle("on", mode === "addSym");
+      host.querySelector("#morphModeAddAsym")?.classList.toggle("on", mode === "addAsym");
+      host.querySelector("#morphModeBrush")?.classList.toggle("on", mode === "brush");
+      host.querySelector("#morphBrushAdd")?.classList.toggle("on", (st.brushSign ?? 1) >= 0);
+      host.querySelector("#morphBrushSub")?.classList.toggle("on", (st.brushSign ?? 1) < 0);
+      host.querySelector("#morphMirror")?.classList.toggle("on", !!st.mirrorLock);
+      const pointListEl = host.querySelector("#morphPointList");
+      if (pointListEl) {
+        const sig = st.pointIds.join("|");
+        if (pointListEl.dataset.pointSig !== sig) {
+          pointListEl.dataset.pointSig = sig;
+          pointListEl.innerHTML = morphPointListHtml(st);
+          const ptSelRefresh = host.querySelector("#morphPointSelect");
+          if (ptSelRefresh) {
+            ptSelRefresh.innerHTML =
+              st.pointIds
+                .map((id) => {
+                  const label = morphPointLabel(st, id);
+                  return `<option value="${id}"${id === st.selectedId ? " selected" : ""}>${label} (${id})</option>`;
+                })
+                .join("") || `<option value="">暂无锚点</option>`;
+          }
+          const countEl = host.querySelector('[data-morph-pane="anchors"] > .lm-stat');
+          if (countEl) countEl.textContent = `锚点 ${st.pointIds.length}`;
+        }
       }
       updateMorphPickBanner(host, st);
-      const hslNeedPick =
-        st.hslScope === "selected" && !(st.selectedMeshKey && st.selectedRegionKey);
+      const hslNeedPick = st.hslScope === "parts" && !(st.islandChecked || []).length;
+      const islandOffNeedPick = !(st.islandChecked || []).length;
       ["morphHslH", "morphHslS", "morphHslL"].forEach((id) => {
         const el = host.querySelector("#" + id);
         if (el) el.disabled = hslNeedPick;
+      });
+      host.querySelectorAll("[data-part-offset], [data-part-offset-range]").forEach((el) => {
+        el.disabled = islandOffNeedPick;
       });
       const rh = st.regionHsl || {};
       const hEl = host.querySelector("#morphHslH");
@@ -972,6 +2182,9 @@
       host.querySelectorAll("[data-morph-pane]").forEach((pane) => {
         pane.hidden = pane.getAttribute("data-morph-pane") !== morphPanelTab;
       });
+      host.classList.toggle("color-active", morphPanelTab === "color");
+      host.classList.toggle("io-active", morphPanelTab === "io");
+      syncMarkerVisibilityForTab();
       host.querySelectorAll("[data-point]").forEach((li) => {
         li.classList.toggle("on", li.getAttribute("data-point") === st.selectedId);
       });
@@ -981,13 +2194,57 @@
       }
       host.querySelector("#morphHslScopeAll")?.classList.toggle("on", st.hslScope === "all");
       host.querySelector("#morphHslScopeMuscles")?.classList.toggle("on", st.hslScope === "muscles");
-      host.querySelector("#morphHslScopeSelected")?.classList.toggle("on", st.hslScope === "selected");
+      host.querySelector("#morphHslScopeParts")?.classList.toggle("on", st.hslScope === "parts");
+      host.querySelector("#morphShowSelection")?.classList.toggle("on", !!st.showSelectionOverlay);
+      if (st.selectedId) {
+        const xyz = (st.xyzOffset[st.selectedId] || [0, 0, 0]).map((n) => Number(n));
+        syncAnchorXyzUi(host, xyz);
+      }
+      const hlChanged = (st.partHighlightId || "") !== morphPartHighlightId;
+      morphPartHighlightId = st.partHighlightId || "";
+      syncPartOffsetUi(host, st.islandOffset || [0, 0, 0], hlChanged);
+      const focusChanged = (st.islandFocusToken || "") !== morphIslandFocusToken;
+      morphIslandFocusToken = st.islandFocusToken || "";
+      syncIslandTreeUi(elTreeSidebar, st);
+      syncTreeModeUi();
+      const texMeta = host.querySelector(".part-offset-meta");
+      if (texMeta) {
+        if (st.islandTextureSynthBusy) {
+          texMeta.textContent = "重排本岛条纹/纤维纹理 · 合成中…";
+        } else if (st.islandTextureSynthLastError) {
+          texMeta.textContent = `合成失败：${st.islandTextureSynthLastError}`;
+        } else {
+          texMeta.textContent = `拖相似度/块尺度时请保持视角不动 · 已变体 ${st.islandTextureSynthCheckedCount || 0} 块`;
+        }
+      }
+      const texBusy = !!st.islandTextureSynthBusy;
+      host.querySelector("#islandTextureReroll")?.toggleAttribute("disabled", texBusy || !(st.islandChecked || []).length);
+      host.querySelector("#islandTextureClear")?.toggleAttribute("disabled", texBusy || !(st.islandChecked || []).length);
+      host.querySelector("#islandTextureSimilarity")?.toggleAttribute("disabled", texBusy || !(st.islandChecked || []).length);
+      host.querySelector("#islandTextureBlockScale")?.toggleAttribute("disabled", texBusy || !(st.islandChecked || []).length);
+      host.querySelector("#islandTextureSeed")?.toggleAttribute("disabled", texBusy || !(st.islandChecked || []).length);
+      if (focusChanged && st.islandFocusToken) {
+        scrollIslandTreeToToken(st.islandFocusToken);
+        requestAnimationFrame(() => flushIslandTreeScroll(st.islandFocusToken));
+      } else if (pendingIslandTreeScroll) {
+        requestAnimationFrame(() => flushIslandTreeScroll(pendingIslandTreeScroll));
+      }
+      if (st.islandScanDone && leftTreeShowsIslandScanning()) {
+        fillLeftTreePanel(st);
+      }
+      syncHistoryListUi(host);
     }
 
     function fillMorphPanel() {
       const host = document.getElementById("morphPanel");
       if (!host) return;
+      if (!boneMorph.getRoot()) {
+        host.innerHTML = `<p class="lm-stat">请先导入或新建工程。</p>`;
+        fillLeftTreePanel({});
+        return;
+      }
       const st = boneMorph.getState();
+      ensureSelectedHistoryStillValid(st);
       const sel = st.selectedId;
       const xyz = (st.xyzOffset[sel] || [0, 0, 0]).map((n) => Number(n.toFixed(5)));
       const pointList = morphPointListHtml(st);
@@ -997,75 +2254,77 @@
           return `<option value="${id}"${id === sel ? " selected" : ""}>${label} (${id})</option>`;
         })
         .join("");
-      const sliders = (st.sliderDefs.sliders || [])
-        .map((s) => {
-          const v = st.sliderValues[s.id] ?? s.default ?? 0;
-          return `<div class="morph-row">
-            <label title="${s.measure || ""}">${s.label}</label>
-            <span class="val">${Number(v).toFixed(4)}</span>
-            <input type="range" data-slider="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" style="grid-column:1/-1" />
-          </div>`;
-        })
-        .join("");
+      const mode = st.anchorToolMode || "warp";
+      const modeLabel =
+        mode === "move"
+          ? "移锚点"
+          : mode === "addSym"
+            ? "对称加点"
+            : mode === "addAsym"
+              ? "单点加点"
+              : mode === "brush"
+                ? "笔刷"
+                : "拧形";
+      const brushR = st.brushRadius ?? 0.02;
+      const brushSoft = st.brushSoftness ?? 0.7;
+      const brushStr = st.brushStrength ?? 0.25;
+      const brushPanelHtml =
+        mode === "brush"
+          ? `          <div class="morph-actions">
+            <button type="button" id="morphBrushAdd" class="${(st.brushSign ?? 1) >= 0 ? "on" : ""}">堆料</button>
+            <button type="button" id="morphBrushSub" class="${(st.brushSign ?? 1) < 0 ? "on" : ""}">减料</button>
+            <button type="button" id="morphBrushUndo" ${(st.brushUndoCount ?? 0) > 0 ? "" : "disabled"}>撤销上一笔</button>
+          </div>
+          <div class="morph-row">
+            <label>半径</label>
+            <span class="val" id="morphBrushRadiusVal">${Number(brushR).toFixed(4)}</span>
+            <input type="range" id="morphBrushRadius" min="${Math.max(brushR * 0.05, 0.0005)}" max="${Math.max(brushR * 12, 0.15)}" step="0.0005" value="${brushR}" style="grid-column:1/-1" />
+          </div>
+          <div class="morph-row">
+            <label>软边</label>
+            <span class="val" id="morphBrushSoftnessVal">${Math.round(brushSoft * 100)}%</span>
+            <input type="range" id="morphBrushSoftness" min="0" max="1" step="0.01" value="${brushSoft}" style="grid-column:1/-1" />
+          </div>
+          <div class="morph-row">
+            <label>力度</label>
+            <span class="val" id="morphBrushStrengthVal">${Math.round(brushStr * 100)}%</span>
+            <input type="range" id="morphBrushStrength" min="0.05" max="1" step="0.01" value="${brushStr}" style="grid-column:1/-1" />
+          </div>
+          <p class="lm-stat">贴面笔刷：临时控制点走与「拧形」相同的 TPS，刷完烘焙进网格；不进锚点列表、不加密。Ctrl+Z 撤销上一笔。</p>`
+          : "";
+      const histJsonDir = boneMorph.getProjectStorage()
+        ? `${boneMorph.getProjectStorage()}/history/`
+        : "landmarks/euro_morph_history/";
       const hist = (st.history || [])
         .map(
-          (v) => `<li data-hist="${v.id}">
-            <button type="button" class="del" data-hist-del="${v.id}">删</button>
+          (v) => `<li data-hist="${v.id}" class="${selectedHistoryId === v.id ? "on" : ""}">
             <div><strong>${v.label || v.id}</strong></div>
-            <div class="meta">${(v.createdAt || "").replace("T", " ").slice(0, 19)} · ${v.pointCount || "?"}点 · ${v.sliderSummary || ""}</div>
+            <div class="meta">${(v.createdAt || "").replace("T", " ").slice(0, 19)} · ${v.pointCount || "?"}点</div>
           </li>`
         )
         .join("") || `<li class="meta" style="cursor:default">暂无历史版本</li>`;
-      const hslDisabled =
-        st.hslScope === "selected" && !(st.selectedMeshKey && st.selectedRegionKey);
+      const hslDisabled = st.hslScope === "parts" && !(st.islandChecked || []).length;
+      const islandOffDisabled = !(st.islandChecked || []).length;
+      const texDisabled = islandOffDisabled || !!st.islandTextureSynthBusy;
+      const texParams = st.islandTextureSynthParams || { seed: 12345, similarity: 0.7, blockScale: 24 };
+      const simPct = Math.round((texParams.similarity ?? 0.7) * 100);
+      const texStatus = st.islandTextureSynthBusy
+        ? "合成中…"
+        : `已变体 ${st.islandTextureSynthCheckedCount || 0} 块`;
       const tabBtn = (id, label) =>
         `<button type="button" data-morph-tab="${id}" class="${morphPanelTab === id ? "on" : ""}">${label}</button>`;
-      const pickToken = `${st.selectedMeshKey}|${st.selectedRegionKey}`;
-      if (st.selectedRegionKey) morphPanelPickToken = pickToken;
-      host.innerHTML = `
-        <div class="morph-tabs">
-          ${tabBtn("anchors", "锚点")}
-          ${tabBtn("morph", "拧形")}
-          ${tabBtn("color", "设色")}
-          ${tabBtn("io", "存档")}
-        </div>
-        <div class="morph-pane" data-morph-pane="anchors"${morphPanelTab !== "anchors" ? " hidden" : ""}>
-          <h3>锚点列表</h3>
-          <p style="color:var(--muted);margin:0 0 6px;line-height:1.35">点击选中 · 拖 3D 球体沿 X/Y/Z 轴 · 共 ${st.pointIds.length} 点</p>
-          <ul class="morph-point-list" id="morphPointList">${pointList}</ul>
-          <select class="morph-select" id="morphPointSelect" title="快速跳转">${pointOpts}</select>
-          <div class="morph-actions">
-            <button type="button" id="morphAdd" class="${st.addMode ? "on" : ""}">加点${st.addSymmetric ? "(对称)" : ""}</button>
-            <button type="button" id="morphAddAsym">加点(单)</button>
-            <button type="button" id="morphDel">删当前</button>
-            <button type="button" id="morphMirror" class="${st.mirrorLock ? "on" : ""}">镜像${st.mirrorLock ? "开" : "关"}</button>
-            <button type="button" id="morphEditRest" class="${st.editRest ? "on" : ""}">${st.editRest ? "拖rest" : "拖目标"}</button>
-          </div>
-          <details class="morph-adv">
-            <summary>单点 XYZ 偏移</summary>
-            <div class="morph-xyz" style="margin-top:6px">
-              <span>dx</span><input type="number" step="0.0005" data-xyz="0" value="${xyz[0]}" />
-              <span>dy</span><input type="number" step="0.0005" data-xyz="1" value="${xyz[1]}" />
-              <span>dz</span><input type="number" step="0.0005" data-xyz="2" value="${xyz[2]}" />
-            </div>
-          </details>
-        </div>
-        <div class="morph-pane" data-morph-pane="morph"${morphPanelTab !== "morph" ? " hidden" : ""}>
-          <h3>语义滑块（Farkas 测量）</h3>
-          <p style="color:var(--muted);margin:0 0 8px;line-height:1.4">以欧版中性姿为 0；不对齐 SHELL。拖锚点仅沿世界 X/Y/Z 正交轴。</p>
-          ${sliders || "<p class='lm-stat'>滑块定义未加载</p>"}
-        </div>
-        <div class="morph-pane" data-morph-pane="color"${morphPanelTab !== "color" ? " hidden" : ""}>
+      const islandOff = st.islandOffset || [0, 0, 0];
+      const hslPanelHtml = `
           ${morphPickBannerHtml(st)}
-          <p style="color:var(--muted);margin:0 0 6px;line-height:1.35">作用域：<strong>全部</strong>=所有贴图；<strong>所有肌肉</strong>=肌层整张；<strong>选定</strong>=语义色块整块。滑条像 PS Ctrl+U。</p>
-          <p style="color:var(--accent);margin:0 0 8px;line-height:1.4">选部快捷键：<strong>Alt + 鼠标左键</strong> 点击模型上的色块（普通左键只旋转视角，不会选部）。</p>
           <div class="morph-actions">
             <button type="button" id="morphHslScopeAll" class="${st.hslScope === "all" ? "on" : ""}">全部</button>
-            <button type="button" id="morphHslScopeMuscles" class="${st.hslScope === "muscles" ? "on" : ""}">所有肌肉</button>
-            <button type="button" id="morphHslScopeSelected" class="${st.hslScope === "selected" ? "on" : ""}">选定</button>
+            <button type="button" id="morphHslScopeMuscles" class="${st.hslScope === "muscles" ? "on" : ""}">肌肉</button>
+            <button type="button" id="morphHslScopeParts" class="${st.hslScope === "parts" ? "on" : ""}">勾选岛</button>
           </div>
           <div class="morph-actions">
-            <button type="button" id="morphMeshColorReset">恢复原色</button>
+            <button type="button" id="morphMeshColorReset">原色</button>
+            <button type="button" id="morphColorApply">应用</button>
+            <button type="button" id="morphShowSelection" class="${st.showSelectionOverlay ? "on" : ""}" title="显示已勾选">已勾选</button>
           </div>
           <div class="morph-row" style="margin-top:6px">
             <label>色相</label>
@@ -1082,587 +2341,320 @@
             <span class="val" id="morphHslLVal">${Math.round((st.regionHsl?.dl || 0) * 100)}</span>
             <input type="range" id="morphHslL" min="-100" max="100" step="1" value="${Math.round((st.regionHsl?.dl || 0) * 100)}" style="grid-column:1/-1"${hslDisabled ? " disabled" : ""} />
           </div>
-        </div>
-        <div class="morph-pane" data-morph-pane="io"${morphPanelTab !== "io" ? " hidden" : ""}>
-          <h3>历史版本</h3>
+          <h3 style="margin-top:12px">纹理变体</h3>
+          <p class="part-offset-meta">拖相似度/块尺度时请保持视角不动 · ${texStatus}</p>
           <div class="morph-actions">
-            <button type="button" id="morphHistSave">保存到历史</button>
+            <button type="button" id="islandTextureReroll"${texDisabled ? " disabled" : ""}>换一版</button>
+            <button type="button" id="islandTextureClear"${texDisabled ? " disabled" : ""}>清除变体</button>
           </div>
-          <ul class="morph-history" id="morphHistList">${hist}</ul>
-          <h3>存档 / 导出</h3>
+          <div class="morph-row">
+            <label>种子</label>
+            <span class="val" id="islandTextureSeedVal">${texParams.seed ?? 12345}</span>
+            <input type="number" id="islandTextureSeed" min="0" max="4294967295" step="1" value="${texParams.seed ?? 12345}" style="grid-column:1/-1"${texDisabled ? " disabled" : ""} />
+          </div>
+          <div class="morph-row">
+            <label>相似度</label>
+            <span class="val" id="islandTextureSimVal">${simPct}</span>
+            <input type="range" id="islandTextureSimilarity" min="40" max="100" step="1" value="${Math.max(40, simPct)}" style="grid-column:1/-1"${texDisabled ? " disabled" : ""} />
+          </div>
+          <div class="morph-row">
+            <label>块尺度</label>
+            <span class="val" id="islandTextureBlockVal">${texParams.blockScale ?? 24}</span>
+            <input type="range" id="islandTextureBlockScale" min="8" max="48" step="1" value="${texParams.blockScale ?? 24}" style="grid-column:1/-1"${texDisabled ? " disabled" : ""} />
+          </div>
+          <h3 style="margin-top:12px">位移</h3>
+          <p class="part-offset-meta">已调 ${st.islandAdjustedCount || 0} · 作用 ${st.islandOffsetTargetCount || 0} 块</p>
           <div class="morph-actions">
-            <button type="button" id="morphReset">Reset 拧形</button>
-            <button type="button" id="morphReseed">重新播种 rest</button>
-            <button type="button" id="morphSaveRest">保存 rest</button>
-            <button type="button" id="morphSaveSession">保存 session</button>
-            <button type="button" id="morphExport">下载 warped GLB</button>
+            <button type="button" id="islandOffsetReset">位移归零</button>
+          </div>
+          ${partOffsetRowHtml(0, "dx", islandOff[0], islandOffDisabled)}
+          ${partOffsetRowHtml(1, "dy", islandOff[1], islandOffDisabled)}
+          ${partOffsetRowHtml(2, "dz", islandOff[2], islandOffDisabled)}`;
+      host.innerHTML = `
+        <div class="morph-tabs">
+          ${tabBtn("color", "设色")}
+          ${tabBtn("anchors", "锚点")}
+          ${tabBtn("io", "存档")}
+        </div>
+        <div class="morph-pane morph-pane-color" data-morph-pane="color"${morphPanelTab !== "color" ? " hidden" : ""}>
+          ${hslPanelHtml}
+        </div>
+        <div class="morph-pane" data-morph-pane="anchors"${morphPanelTab !== "anchors" ? " hidden" : ""}>
+          <p class="lm-stat" style="margin:0 0 6px">锚点 ${st.pointIds.length}</p>
+          <ul class="morph-point-list" id="morphPointList">${pointList}</ul>
+          <select class="morph-select" id="morphPointSelect" title="快速跳转">${pointOpts || `<option value="">暂无锚点</option>`}</select>
+          <div class="morph-actions">
+            <button type="button" id="morphModeWarp" class="${mode === "warp" ? "on" : ""}">拧形</button>
+            <button type="button" id="morphModeMove" class="${mode === "move" ? "on" : ""}">移锚点</button>
+            <button type="button" id="morphModeAddSym" class="${mode === "addSym" ? "on" : ""}">对称加点</button>
+            <button type="button" id="morphModeAddAsym" class="${mode === "addAsym" ? "on" : ""}">单点加点</button>
+            <button type="button" id="morphModeBrush" class="${mode === "brush" ? "on" : ""}">笔刷</button>
+          </div>
+          ${brushPanelHtml}
+          <div class="morph-actions">
+            <button type="button" id="morphMirror" class="${st.mirrorLock ? "on" : ""}">镜像${st.mirrorLock ? "开" : "关"}</button>
+            <button type="button" id="morphReset">拧形归零</button>
+          </div>
+          <details class="morph-adv">
+            <summary>单点 XYZ</summary>
+            <div style="margin-top:6px">
+              ${anchorXyzRowHtml(0, "dx", xyz[0])}
+              ${anchorXyzRowHtml(1, "dy", xyz[1])}
+              ${anchorXyzRowHtml(2, "dz", xyz[2])}
+            </div>
+          </details>
+        </div>
+        <div class="morph-pane morph-pane-io" data-morph-pane="io"${morphPanelTab !== "io" ? " hidden" : ""}>
+          <div class="morph-io-head">
+            <div class="morph-actions">
+              <button type="button" id="morphHistSave">保存历史</button>
+              <button type="button" id="morphHistLoad"${selectedHistoryId ? "" : " disabled"}>加载</button>
+              <button type="button" id="morphHistDelete"${selectedHistoryId ? "" : " disabled"}>删除</button>
+            </div>
+            <p class="morph-io-hint">单击选中存档，点「加载」还原；双击列表项也可加载。每条存档对应 JSON，目录：<code>${histJsonDir}</code></p>
+          </div>
+          <div class="morph-history-wrap">
+            <ul class="morph-history" id="morphHistList">${hist}</ul>
+          </div>
+          <div class="morph-io-foot morph-actions">
+            <button type="button" id="morphExport">导出 GLB</button>
           </div>
         </div>
-        <p class="lm-stat" id="morphStatus">${st.hasRest ? `点 ${st.pointIds.length} · 选中 ${sel || "—"}` : "无 rest"}</p>
+        <p class="lm-stat" id="morphStatus">${
+          morphPanelTab === "anchors"
+            ? mode === "brush"
+              ? `模式：笔刷 · ${(st.brushSign ?? 1) < 0 ? "减料" : "堆料"} · 空白拖旋转 · 按住表面刷`
+              : `模式：${modeLabel} · 选中 ${sel || "—"} · 空白拖旋转 · 拖球=${mode === "move" ? "移锚点" : mode === "warp" ? "拧形" : "选中"} · Del删除 · 方向键微调`
+            : st.hasRest
+              ? `点 ${st.pointIds.length} · 选中 ${sel || "—"}`
+              : "无 rest"
+        }</p>
       `;
+      fillLeftTreePanel(st);
       setupMorphPanelDelegation(host);
+      host.classList.toggle("color-active", morphPanelTab === "color");
+      host.classList.toggle("io-active", morphPanelTab === "io");
+      syncMarkerVisibilityForTab();
+      syncHistoryListUi(host);
+      morphPartHighlightId = boneMorph.getState().partHighlightId || "";
+      morphIslandFocusToken = st.islandFocusToken || "";
     }
 
-    function exportWarpedGlb() {
+    function yieldToBrowser() {
+      return new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, 0);
+        });
+      });
+    }
+
+    function setExportProgress(pct, stepText, { busy = false } = {}) {
+      const bar = document.getElementById("exportProgressBar");
+      const pctEl = document.getElementById("exportProgressPct");
+      const step = document.getElementById("exportStepText");
+      const overlay = document.getElementById("exportOverlay");
+      const v = Math.max(0, Math.min(100, pct));
+      if (bar) {
+        bar.classList.toggle("is-busy", !!busy);
+        if (!busy) bar.style.width = `${v}%`;
+      }
+      if (pctEl) pctEl.textContent = busy ? "处理中…" : `${Math.round(v)}%`;
+      if (step && stepText) step.textContent = stepText;
+      if (overlay) overlay.setAttribute("aria-busy", busy || v < 100 ? "true" : "false");
+    }
+
+    function showExportOverlay(show) {
+      const el = document.getElementById("exportOverlay");
+      if (el) el.hidden = !show;
+    }
+
+    function setExportUiBusy(busy) {
+      document.getElementById("morphExport")?.toggleAttribute("disabled", busy);
+      document.getElementById("btnImportGlb")?.toggleAttribute("disabled", busy);
+      document.getElementById("btnNewFromEuro")?.toggleAttribute("disabled", busy);
+      elProjectSelect?.toggleAttribute("disabled", busy);
+    }
+
+    async function exportWarpedGlb() {
+      if (exportInProgress) return;
       const root = boneMorph.getRoot();
       if (!root) {
         alert("尚未加载模型");
         return;
       }
+
+      exportInProgress = true;
+      setExportUiBusy(true);
+      showExportOverlay(true);
+      setExportProgress(0, "准备导出…");
+      await yieldToBrowser();
+
       const markers = boneMorph.markerGroup();
-      if (markers) markers.visible = false;
-      const exporter = new GLTFExporter();
-      exporter.parse(
-        root,
-        (result) => {
-          if (markers) markers.visible = true;
-          const blob =
-            result instanceof ArrayBuffer
-              ? new Blob([result], { type: "model/gltf-binary" })
-              : new Blob([JSON.stringify(result)], { type: "application/json" });
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = "euro_bone_morph_warped.glb";
-          a.click();
-          URL.revokeObjectURL(a.href);
-          const st = document.getElementById("morphStatus");
-          if (st) st.textContent = "已下载 warped GLB";
-        },
-        (err) => {
-          if (markers) markers.visible = true;
-          console.error(err);
-          alert("导出失败：" + (err?.message || err));
-        },
-        { binary: true }
-      );
-    }
-
-    function mountMorphBaseRef() {
-      const host = document.getElementById("morphBaseFrame");
-      if (!host) return;
-      const v = ["front", "side", "back"].includes(viewId) ? viewId : "side";
-      host.innerHTML = "";
-      const img = document.createElement("img");
-      img.alt = "Base15";
-      img.src = baseUrl(v);
-      host.appendChild(img);
-    }
-
-    async function initMorphViewer(host, statusEl) {
-      const w = host.clientWidth || 800;
-      const h = host.clientHeight || 560;
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xffffff);
-      const aspect = w / Math.max(h, 1);
-      const camera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, -1000, 1000);
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(w, h, false);
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.LinearToneMapping;
-      renderer.toneMappingExposure = 1.35;
-      host.innerHTML = "";
-      host.appendChild(renderer.domElement);
-      if (statusEl) host.appendChild(statusEl);
-
-      const hemi = new THREE.HemisphereLight(0xffffff, 0xd0d0d0, 1.35);
-      scene.add(hemi);
-      const dir = new THREE.DirectionalLight(0xffffff, 1.25);
-      dir.position.set(2.2, 3.5, 2.8);
-      scene.add(dir);
-      const fill = new THREE.DirectionalLight(0xffffff, 0.7);
-      fill.position.set(-2.5, 1.2, -1.5);
-      scene.add(fill);
-
-      const controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.06;
-
-      const slot = {
-        scene,
-        camera,
-        renderer,
-        controls,
-        raf: 0,
-        ro: null,
-        frustumHeight: 1,
-        baseRadius: 1,
-        ready: false,
-        label: "morph",
+      const restoreMarkers = () => {
+        if (markers) markers.visible = morphPanelTab !== "color";
       };
-      viewers.push(slot);
+      let exportUserDataStash = null;
 
-      statusEl.textContent = "加载欧版…";
-      const loader = makeGltfLoader();
-      loader.load(
-        euroGlbUrl(),
-        async (gltf) => {
-          const root = gltf.scene || gltf.scenes[0];
-          root.traverse((obj) => {
-            if (!obj.isMesh || !obj.material) return;
-            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-            for (const mat of mats) {
-              if (!mat) continue;
-              if ("metalness" in mat) mat.metalness = 0;
-              if ("roughness" in mat) mat.roughness = Math.max(Number(mat.roughness) || 0.5, 0.48);
-              mat.needsUpdate = true;
-            }
-          });
-          scene.add(root);
-          const fit = fitCamera(camera, controls, root, host);
-          slot.frustumHeight = fit.frustumHeight;
-          slot.baseRadius = fit.baseRadius;
-          slot.ready = true;
-          try {
-            await boneMorph.attach({
-              root,
-              scene,
-              camera,
-              domElement: renderer.domElement,
-              controls,
-              onChange: () => {
-                requestAnimationFrame(() => patchMorphPanel());
-              },
-            });
-            window.__boneMorph = boneMorph;
-            statusEl.textContent = "骨相拧形 · 拖点/滑块 · 欧版";
-            fillMorphPanel();
-          } catch (e) {
-            console.error(e);
-            statusEl.textContent = "拧形初始化失败：" + e.message;
-          }
-        },
-        undefined,
-        (err) => {
-          console.error(err);
-          statusEl.textContent = "欧版加载失败";
-        }
-      );
-
-      const tick = () => {
-        slot.raf = requestAnimationFrame(tick);
-        controls.update();
-        renderer.render(scene, camera);
-      };
-      const ro = new ResizeObserver(() => {
-        const nw = host.clientWidth;
-        const nh = host.clientHeight;
-        if (nw < 2 || nh < 2) return;
-        const a = nw / nh;
-        const fh = slot.frustumHeight || 1;
-        camera.left = (-fh * a) / 2;
-        camera.right = (fh * a) / 2;
-        camera.top = fh / 2;
-        camera.bottom = -fh / 2;
-        camera.updateProjectionMatrix();
-        renderer.setSize(nw, nh, false);
-      });
-      ro.observe(host);
-      slot.ro = ro;
-      tick();
-      return slot;
-    }
-
-    function fitCamera(camera, controls, object, host) {
-      const box = new THREE.Box3().setFromObject(object);
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z, 1e-6);
-      const aspect = Math.max((host.clientWidth || 800) / Math.max(host.clientHeight || 560, 1), 1e-6);
-      const padding = 1.12;
-      const frustumHeight = maxDim * padding;
-      camera.left = (-frustumHeight * aspect) / 2;
-      camera.right = (frustumHeight * aspect) / 2;
-      camera.top = frustumHeight / 2;
-      camera.bottom = -frustumHeight / 2;
-      camera.near = -maxDim * 30;
-      camera.far = maxDim * 30;
-      camera.zoom = 1;
-      camera.position.set(center.x, center.y, center.z + maxDim * 3);
-      camera.lookAt(center);
-      camera.updateProjectionMatrix();
-      controls.target.copy(center);
-      controls.update();
-      return { frustumHeight, baseRadius: maxDim * 3 };
-    }
-
-    function applyOrbitFrom(source, target) {
-      if (!source || !target || !source.ready || !target.ready) return;
-      const offset = new THREE.Vector3().subVectors(source.camera.position, source.controls.target);
-      const sph = new THREE.Spherical().setFromVector3(offset);
-      const radius = target.baseRadius || sph.radius;
-      const next = new THREE.Vector3().setFromSpherical(
-        new THREE.Spherical(radius, sph.phi, sph.theta)
-      );
-      target.camera.position.copy(target.controls.target).add(next);
-      target.camera.zoom = source.camera.zoom;
-      target.camera.up.copy(source.camera.up);
-      target.camera.updateProjectionMatrix();
-      target.camera.lookAt(target.controls.target);
-      target.controls.update();
-    }
-
-    function bindOrbitSync(slot) {
-      slot.controls.addEventListener("change", () => {
-        if (syncingOrbit || !slot.ready) return;
-        syncingOrbit = true;
-        for (const other of viewers) {
-          if (other === slot) continue;
-          applyOrbitFrom(slot, other);
-        }
-        syncingOrbit = false;
-      });
-    }
-
-    function initViewer(host, statusEl, url, label) {
-      const w = host.clientWidth || 800;
-      const h = host.clientHeight || 560;
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xffffff);
-      const aspect = w / Math.max(h, 1);
-      const camera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, -1000, 1000);
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(w, h, false);
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.LinearToneMapping;
-      renderer.toneMappingExposure = 1.35;
-      host.innerHTML = "";
-      host.appendChild(renderer.domElement);
-      if (statusEl) host.appendChild(statusEl);
-
-      const hemi = new THREE.HemisphereLight(0xffffff, 0xd0d0d0, 1.35);
-      scene.add(hemi);
-      const dir = new THREE.DirectionalLight(0xffffff, 1.25);
-      dir.position.set(2.2, 3.5, 2.8);
-      scene.add(dir);
-      const fill = new THREE.DirectionalLight(0xffffff, 0.70);
-      fill.position.set(-2.5, 1.2, -1.5);
-      scene.add(fill);
-      const front = new THREE.DirectionalLight(0xffffff, 0.55);
-      front.position.set(0.2, 1.4, 4.0);
-      scene.add(front);
-
-      const controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.06;
-
-      const slot = {
-        scene,
-        camera,
-        renderer,
-        controls,
-        raf: 0,
-        ro: null,
-        frustumHeight: 1,
-        baseRadius: 1,
-        ready: false,
-        label,
-      };
-      viewers.push(slot);
-      bindOrbitSync(slot);
-
-      const loader = makeGltfLoader();
-      statusEl.textContent = "加载中… " + url;
-      loader.load(
-        url,
-        (gltf) => {
-          const root = gltf.scene || gltf.scenes[0];
-          root.traverse((obj) => {
-            if (!obj.isMesh || !obj.material) return;
-            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-            for (const mat of mats) {
-              if (!mat) continue;
-              if ("metalness" in mat) mat.metalness = 0;
-              if ("roughness" in mat) mat.roughness = Math.max(Number(mat.roughness) || 0.5, 0.48);
-              mat.needsUpdate = true;
-            }
-          });
-          scene.add(root);
-          const fit = fitCamera(camera, controls, root, host);
-          slot.frustumHeight = fit.frustumHeight;
-          slot.baseRadius = fit.baseRadius;
-          slot.ready = true;
-          statusEl.textContent = "正交 · 白底 · 拖拽旋转 · " + label;
-          // If peer already ready, match its orbit so both open with the same view.
-          const peer = viewers.find((v) => v !== slot && v.ready);
-          if (peer) applyOrbitFrom(peer, slot);
-        },
-        undefined,
-        (err) => {
-          console.error(label, url, err);
-          statusEl.textContent = "加载失败：" + label + "（见控制台）";
-        }
-      );
-
-      const tick = () => {
-        slot.raf = requestAnimationFrame(tick);
-        controls.update();
-        renderer.render(scene, camera);
-      };
-
-      const ro = new ResizeObserver(() => {
-        const nw = host.clientWidth;
-        const nh = host.clientHeight;
-        if (nw < 2 || nh < 2) return;
-        const a = nw / nh;
-        const fh = slot.frustumHeight || 1;
-        camera.left = (-fh * a) / 2;
-        camera.right = (fh * a) / 2;
-        camera.top = fh / 2;
-        camera.bottom = -fh / 2;
-        camera.updateProjectionMatrix();
-        renderer.setSize(nw, nh, false);
-      });
-      ro.observe(host);
-      slot.ro = ro;
-      tick();
-      return slot;
-    }
-
-    async function render() {
-      alignCache.clear();
-      const ref = baseUrl(viewId);
-      const ours = oursUrl(candId, viewId);
-      const vLabel = (VIEWS.find((v) => v.id === viewId) || {}).label || viewId;
-      elNote.textContent = `当前：${candId} · ${
-        mode === "viewer3d" ? "3D GLB" : mode === "morph" ? "骨相拧形" : vLabel
-      }。${currentNote()}`;
-
-      if (mode === "morph") {
-        clearAlignObservers();
-        morphPanelDelegated = false;
-        morphPanelPickToken = "";
-        morphPanelTab = "anchors";
-        elStage.className = "stage morph";
-        const refView = ["front", "side", "back"].includes(viewId) ? viewId : "side";
-        elStage.innerHTML = `
-          <div class="card">
-            <h2>Base15 对照 <span>${refView}</span></h2>
-            <div class="morph-ref-frame" id="morphBaseFrame"></div>
-          </div>
-          <div class="card">
-            <h2>欧版 · 可拧 <span>euro_ref · Farkas / TPS</span></h2>
-            <div class="viewer-host" id="viewerHostMorph"><div class="viewer-status" id="viewerStatusMorph"></div></div>
-          </div>
-          <div class="morph-panel" id="morphPanel"><p class="lm-stat">加载中…</p></div>`;
-        elHint.textContent = viewHint();
-        disposeViewer();
-        mountMorphBaseRef();
-        initMorphViewer(
-          document.getElementById("viewerHostMorph"),
-          document.getElementById("viewerStatusMorph")
-        );
-        if (lmActive) await mountLandmarks();
-        else document.getElementById("lmToolbar").innerHTML = "";
-        return;
-      }
-
-      if (mode === "viewer3d") {
-        clearAlignObservers();
-        elStage.className = "stage viewer3d";
-        const ok = hasGlb(candId);
-        elStage.innerHTML = `
-          <div class="card">
-            <h2>欧版参考 <span>参考用_欧洲人头部肌肉… · 正交</span></h2>
-            <div class="viewer-host" id="viewerHostEuro"><div class="viewer-status" id="viewerStatusEuro"></div></div>
-          </div>
-          <div class="card">
-            <h2>当前成果 <span>${candId}${ok ? ".glb" : "（无 GLB）"} · 正交</span></h2>
-            <div class="viewer-host" id="viewerHostOurs"><div class="viewer-status" id="viewerStatusOurs"></div></div>
-          </div>`;
-        elHint.textContent = viewHint() || (ok
-          ? "左右双 3D：左欧版 / 右当前候选。拖拽任一侧，另一侧视角联动。"
-          : "左侧为欧版参考；右侧候选未导出 GLB。");
-        disposeViewer();
-        initViewer(
-          document.getElementById("viewerHostEuro"),
-          document.getElementById("viewerStatusEuro"),
-          euroGlbUrl(),
-          "欧版"
-        );
-        if (ok) {
-          initViewer(
-            document.getElementById("viewerHostOurs"),
-            document.getElementById("viewerStatusOurs"),
-            glbUrl(candId),
-            candId
-          );
-        } else {
-          document.getElementById("viewerStatusOurs").textContent = "该候选未导出 GLB。";
-        }
-        if (lmActive) await mountLandmarks();
-        else document.getElementById("lmToolbar").innerHTML = "";
-        return;
-      }
-
-      disposeViewer();
-      clearAlignObservers();
-      elStage.className = "stage " + (mode === "stack" ? "stack" : mode === "side" ? "side" : "stack");
-
-      if (mode === "slider") {
-        elStage.innerHTML = `
-          <div class="card">
-            <h2>拖拽对照 <span>左半 Base15 · 右半 我们的 · 同尺度对齐</span></h2>
-            <div class="slider-wrap" id="slider">
-              <div class="layer" id="layerOurs"></div>
-              <div class="layer top" id="layerBase"></div>
-              <div class="handle" id="handle"></div>
-            </div>
-          </div>`;
-        elHint.textContent = viewHint() || "头顶/下巴已按 Base15 尺度对齐；按住中间线左右拖动看轮廓差。";
-        try {
-          const pair = await getAlignPair(ref, ours);
-          mountAlignedFrame(document.getElementById("layerBase"), pair.baseImg, pair.baseBox, pair.refBox);
-          mountAlignedFrame(document.getElementById("layerOurs"), pair.oursImg, pair.oursBox, pair.refBox);
-          setupSlider();
-        } catch (err) {
-          console.error(err);
-          elHint.textContent = "图片加载失败，请确认已生成正交截图。";
-        }
-        return;
-      }
-
-      elStage.innerHTML = `
-        <div class="card">
-          <h2>Base15 <span>${vLabel}</span></h2>
-          <div class="frame" id="frameBase" data-label="Base15"></div>
-        </div>
-        <div class="card">
-          <h2>${candId} <span>${vLabel}</span></h2>
-          <div class="frame" id="frameOurs" data-label="${candId}"></div>
-        </div>`;
-      elHint.textContent = viewHint() || (mode === "side"
-        ? "左右并排：同一显示尺度（头顶/下巴对齐 Base15），便于直接比轮廓与比例。"
-        : "上下排列，同一显示尺度。");
       try {
-        const pair = await getAlignPair(ref, ours);
-        mountAlignedFrame(document.getElementById("frameBase"), pair.baseImg, pair.baseBox, pair.refBox);
-        mountAlignedFrame(document.getElementById("frameOurs"), pair.oursImg, pair.oursBox, pair.refBox);
-        if (lmActive) {
-          await mountLandmarks();
+        setExportProgress(4, "第 1/3 步：准备贴图与纹理合成…");
+        await yieldToBrowser();
+        try {
+          await boneMorph.prepareAtlasForExport((subPct, subMsg) => {
+            const mapped = 4 + (subPct / 100) * 28;
+            setExportProgress(mapped, `第 1/3 步：${subMsg}`);
+          });
+        } catch (e) {
+          console.warn("[export] texture synth flush", e);
         }
+
+        setExportProgress(34, "第 2/3 步：正在序列化模型与编码贴图…\n此步可能需数十秒，页面暂时无响应属正常，请稍候。");
+        await yieldToBrowser();
+        if (markers) markers.visible = false;
+        await yieldToBrowser();
+
+        setExportProgress(36, "第 2/3 步：正在序列化模型与编码贴图…\n此步可能需数十秒，页面暂时无响应属正常，请稍候。", {
+          busy: true,
+        });
+        await yieldToBrowser();
+
+        const base = (currentModelLabel || "model").replace(/\.glb$/i, "");
+        try {
+          exportUserDataStash = boneMorph.beginGltfExportSanitize(root);
+        } catch (e) {
+          console.warn("[export] sanitize userData", e);
+        }
+
+        const result = await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            reject(new Error("导出超时（超过 8 分钟）。若贴图很大，可稍后重试或联系我们优化。"));
+          }, 8 * 60 * 1000);
+          setTimeout(() => {
+            try {
+              const exporter = new GLTFExporter();
+              exporter.parse(
+                root,
+                (data) => {
+                  clearTimeout(timer);
+                  resolve(data);
+                },
+                (err) => {
+                  clearTimeout(timer);
+                  reject(err);
+                },
+                { binary: true, maxTextureSize: 4096 }
+              );
+            } catch (e) {
+              clearTimeout(timer);
+              reject(e);
+            }
+          }, 16);
+        });
+
+        restoreMarkers();
+        setExportProgress(90, "第 3/3 步：正在生成下载文件…", { busy: false });
+        await yieldToBrowser();
+
+        const blob =
+          result instanceof ArrayBuffer
+            ? new Blob([result], { type: "model/gltf-binary" })
+            : new Blob([JSON.stringify(result)], { type: "application/json" });
+        const sizeMb = (blob.size / (1024 * 1024)).toFixed(2);
+
+        setExportProgress(96, `第 3/3 步：写入 ${base}_baked.glb（约 ${sizeMb} MB）…`);
+        await yieldToBrowser();
+
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${base}_baked.glb`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        setExportProgress(100, `导出完成：${base}_baked.glb（${sizeMb} MB）`);
+        const st = document.getElementById("morphStatus");
+        if (st) st.textContent = `已下载烘焙 GLB · ${sizeMb} MB`;
+        await yieldToBrowser();
+        setTimeout(() => showExportOverlay(false), 800);
       } catch (err) {
+        restoreMarkers();
         console.error(err);
-        elHint.textContent = "图片加载失败，请确认已生成正交截图。";
+        setExportProgress(0, `导出失败：${err?.message || err}`, { busy: false });
+        showExportOverlay(false);
+        alert("导出失败：" + (err?.message || err));
+      } finally {
+        try {
+          boneMorph.endGltfExportSanitize(exportUserDataStash);
+        } catch (e) {
+          console.warn("[export] restore userData in finally", e);
+        }
+        exportInProgress = false;
+        setExportUiBusy(false);
       }
     }
 
-    async function mountLandmarks() {
-      const lmHost = document.getElementById("lmToolbar");
-      if (mode === "morph" || mode === "viewer3d") {
-        if (lmHost && lmActive) {
-          lmHost.innerHTML = `<div class="lm-bar"><span class="lm-stat">2D 锚点叠层仅用于并排/叠图/上下对照；骨相拧形请在右栏「锚点」页查看列表。</span></div>`;
+    document.getElementById("btnImportGlb").addEventListener("click", () => elFile.click());
+    elFile.addEventListener("change", async () => {
+      const file = elFile.files?.[0];
+      elFile.value = "";
+      if (!file) return;
+      try {
+        await importProjectFile(file);
+      } catch (e) {
+        console.error(e);
+        alert("导入失败：" + e.message);
+        elStatus.textContent = "导入失败";
+      }
+    });
+    document.getElementById("btnNewFromEuro").addEventListener("click", async () => {
+      try {
+        await createProjectFromDefault();
+      } catch (e) {
+        console.error(e);
+        alert("创建失败：" + e.message);
+        elStatus.textContent = "创建失败";
+      }
+    });
+    elProjectSelect?.addEventListener("change", async () => {
+      if (projectBusy) return;
+      const id = elProjectSelect.value;
+      if (!id || id === currentProjectId) return;
+      const p = projects.find((x) => x.id === id);
+      if (!p) return;
+      try {
+        await openProject(p);
+      } catch (err) {
+        alert("切换工程失败：" + err.message);
+      }
+    });
+    elBtnDeleteProject?.addEventListener("click", async () => {
+      if (!currentProjectId) return;
+      try {
+        await deleteProject(currentProjectId);
+      } catch (err) {
+        alert("删除失败：" + err.message);
+      }
+    });
+
+    (async function boot() {
+      try {
+        const data = await fetchProjects();
+        const prefer =
+          projects.find((p) => p.id === data.activeId) ||
+          projects.find((p) => p.id === activeProjectId) ||
+          projects[0];
+        if (prefer) await openProject(prefer, { skipSave: true });
+        else {
+          elModelName.textContent = "未选择工程";
+          document.getElementById("morphPanel").innerHTML =
+            `<p class="lm-stat">请先导入或新建工程。</p>`;
         }
-        return;
-      }
-      const frameBase = document.getElementById("frameBase");
-      const frameOurs = document.getElementById("frameOurs");
-      if (!frameBase || !frameOurs) {
-        if (lmHost) lmHost.innerHTML = "";
-        return;
-      }
-      const camMetaUrl = `ours/${candId}/camera_meta.json?v=${assetRev || Date.now()}`;
-      await lmc.mountOverlay({ frameBase, frameOurs, candId, viewId, camMetaUrl });
-    }
-
-    function setupSlider() {
-      const wrap = document.getElementById("slider");
-      const topLayer = document.getElementById("layerBase");
-      const handle = document.getElementById("handle");
-      if (!wrap || !topLayer) return;
-      const setX = (clientX) => {
-        const r = wrap.getBoundingClientRect();
-        let t = (clientX - r.left) / r.width;
-        t = Math.max(0.02, Math.min(0.98, t));
-        topLayer.style.clipPath = `inset(0 ${(1 - t) * 100}% 0 0)`;
-        handle.style.left = `${t * 100}%`;
-      };
-      const onMove = (e) => {
-        const x = e.touches ? e.touches[0].clientX : e.clientX;
-        setX(x);
-      };
-      const stop = () => {
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", stop);
-        window.removeEventListener("touchmove", onMove);
-        window.removeEventListener("touchend", stop);
-      };
-      wrap.addEventListener("pointerdown", (e) => {
-        setX(e.clientX);
-        window.addEventListener("pointermove", onMove);
-        window.addEventListener("pointerup", stop);
-      });
-      wrap.addEventListener("touchstart", (e) => {
-        setX(e.touches[0].clientX);
-        window.addEventListener("touchmove", onMove, { passive: true });
-        window.addEventListener("touchend", stop);
-      }, { passive: true });
-    }
-
-    elCand.addEventListener("change", () => {
-      candId = elCand.value;
-      render();
-    });
-    elViews.addEventListener("click", (e) => {
-      const b = e.target.closest("[data-view]");
-      if (!b) return;
-      viewId = b.getAttribute("data-view");
-      fillControls();
-      if (mode === "morph") {
-        mountMorphBaseRef();
-        const h2 = elStage.querySelector(".card:nth-child(1) h2 span");
-        if (h2) {
-          const refView = ["front", "side", "back"].includes(viewId) ? viewId : "side";
-          h2.textContent = refView;
+      } catch (e) {
+        console.error(e);
+        if (elProjectSelect) {
+          elProjectSelect.innerHTML = `<option value="">工程列表加载失败</option>`;
+          elProjectSelect.disabled = true;
         }
-        return;
       }
-      if (mode !== "viewer3d") render();
-      else fillControls();
-    });
-    document.querySelectorAll(".mode-bar button[data-mode]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".mode-bar button[data-mode]").forEach((x) => x.classList.remove("active"));
-        btn.classList.add("active");
-        mode = btn.getAttribute("data-mode");
-        render();
-      });
-    });
-
-    const lmToggleBtn = document.getElementById("lmToggle");
-    lmToggleBtn.addEventListener("click", async () => {
-      lmActive = !lmActive;
-      lmToggleBtn.classList.toggle("active", lmActive);
-      lmToggleBtn.textContent = lmActive ? "锚点叠层 ✓" : "锚点叠层 ⊕";
-      if (lmActive) {
-        await mountLandmarks();
-      } else {
-        lmc.clearOverlays();
-      }
-    });
-
-    fetch(`manifest.json?_=${Date.now()}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data && Array.isArray(data.candidates) && data.candidates.length) {
-          cands = data.candidates.map((c) => ({
-            ...c,
-            glb: typeof c.glb === "boolean" ? c.glb : GLB_CANDS.has(c.id),
-          }));
-          const prefer =
-            cands.find((c) => c.id === data.default_review) ||
-            cands.find((c) => c.id === data.stage) ||
-            cands[0];
-          candId = prefer.id;
-          assetRev = data.asset_rev || "";
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        fillControls();
-        render();
-      });
+    })();
   </script>
 </body>
 </html>

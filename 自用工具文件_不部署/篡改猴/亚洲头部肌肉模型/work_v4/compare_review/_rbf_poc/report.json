@@ -1,0 +1,21 @@
+{
+  "n_ctrl": 128,
+  "n_anatomical_seeds": 10,
+  "align_scale": 1.02322,
+  "ctrl_mean_move_m": 0.0123,
+  "smooth": 0.0001,
+  "attach_before": {
+    "static_arch_hw": 0.11365,
+    "deform_arch_hw": 0.0933,
+    "muscle_minus_bone": -0.02035
+  },
+  "attach_after": {
+    "static_arch_hw": 0.11338,
+    "deform_arch_hw": 0.1004,
+    "muscle_minus_bone": -0.01298
+  },
+  "blend": "D:\\Git仓库位置\\PaintingTools\\自用工具文件_不部署\\篡改猴\\亚洲头部肌肉模型\\work_v4\\checkpoints\\RBF_euro_to_asian_poc.blend",
+  "glb": "D:\\Git仓库位置\\PaintingTools\\自用工具文件_不部署\\篡改猴\\亚洲头部肌肉模型\\work_v4\\compare_review\\_rbf_poc\\RBF_euro_to_asian_poc.glb",
+  "iso": "D:\\Git仓库位置\\PaintingTools\\自用工具文件_不部署\\篡改猴\\亚洲头部肌肉模型\\work_v4\\compare_review\\_rbf_poc\\rbf_warped_side.png",
+  "note": "PoC: same RBF field on all Euro meshes toward Asian SHELL Static."
+}
