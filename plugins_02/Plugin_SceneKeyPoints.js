@@ -17,6 +17,8 @@
     let _orbitWasEnabled = null;
 
     function plainText(str) {
+        // 旧脚本偶发把 keyPoints 写成数组；String(arr) 会变成逗号拼接、丢掉换行
+        if (Array.isArray(str)) str = str.join('\n');
         // contenteditable 空行常变成 \n\n\n；消费端 pre-wrap 会显示成两行空，压成最多一个空行
         return String(str || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n{3,}/g, '\n\n');
     }
@@ -152,7 +154,8 @@
             }
         });
         const html = out.innerHTML;
-        return /<strong/i.test(html) ? html : '';
+        // 无粗体也要保留 br/换行结构；否则 Create 存盘只留 plain，且 plain 若被压扁则消费端整段不换行
+        return String(html || '').trim() ? html : '';
     }
 
     /** 纯文本回填编辑器：用 br 表达换行，避免只靠 textContent+\\n 在部分路径丢失 */
@@ -166,12 +169,26 @@
 
     function plainFromHtml(htmlOrEl) {
         if (!htmlOrEl) return '';
+        let root;
         if (typeof htmlOrEl === 'string') {
-            const d = document.createElement('div');
-            d.innerHTML = htmlOrEl;
-            return plainText(d.innerText || '');
+            root = document.createElement('div');
+            root.innerHTML = htmlOrEl;
+        } else {
+            root = htmlOrEl.cloneNode(true);
         }
-        return plainText(htmlOrEl.innerText || '');
+        // 不单靠 innerText：部分路径下 br/块级会被压成空格；显式换成 \n
+        try {
+            root.querySelectorAll('br').forEach((br) => {
+                br.parentNode && br.parentNode.replaceChild(document.createTextNode('\n'), br);
+            });
+            root.querySelectorAll('div, p, li').forEach((block) => {
+                if (!block.parentNode) return;
+                const nl = document.createTextNode('\n');
+                if (block.nextSibling) block.parentNode.insertBefore(nl, block.nextSibling);
+                else block.parentNode.appendChild(nl);
+            });
+        } catch (_e) {}
+        return plainText(root.textContent || '');
     }
 
     function metaHasKeyPoints(meta) {
@@ -342,18 +359,25 @@
                 display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
             }
             .solid-kp-producer-toolbar button {
-                font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer;
+                font-size: 14px; padding: 5px 10px; border-radius: 4px; cursor: pointer;
                 background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
                 color: #eee;
             }
             .solid-kp-producer-toolbar button:active { background: rgba(255,255,255,0.16); }
             .solid-kp-producer-editor {
-                min-height: 120px; max-height: 280px; overflow-y: auto;
-                padding: 6px 8px; font-size: 11px; line-height: 1.45;
+                min-height: 120px; max-height: 280px; overflow-y: auto; overflow-x: hidden;
+                padding: 10px 12px 12px 16px; font-size: 14px; line-height: 1.5;
                 background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.18);
                 border-radius: 4px; color: #eee; outline: none;
                 white-space: pre-wrap; word-break: break-word;
                 -webkit-user-select: text; user-select: text;
+                box-sizing: border-box;
+            }
+            .solid-kp-producer-editor ol,
+            .solid-kp-producer-editor ul {
+                list-style-position: inside;
+                margin: 0.35em 0;
+                padding-left: 0;
             }
             .solid-kp-producer-editor:empty:before {
                 content: attr(data-placeholder);
@@ -522,7 +546,11 @@
         readProducerFields: function (editorEl) {
             if (!editorEl) return { keyPoints: '', keyPointsRich: '' };
             const keyPoints = plainFromHtml(editorEl);
-            const keyPointsRich = sanitizeKeyPointsRichHtml(editorEl.innerHTML);
+            let keyPointsRich = sanitizeKeyPointsRichHtml(editorEl.innerHTML);
+            // 无粗体时仍要留下 br 结构，避免下次加载只剩被压扁的 plain
+            if (!keyPointsRich && keyPoints && keyPoints.indexOf('\n') >= 0) {
+                keyPointsRich = plainToEditorHtml(keyPoints);
+            }
             return { keyPoints, keyPointsRich };
         },
 
@@ -557,12 +585,12 @@
             boldBtn.textContent = '粗体';
             boldBtn.title = '选中文字：有粗体则全部去粗去色；无粗体则全部加粗上色（Ctrl+B）';
             const colorLabel = document.createElement('label');
-            colorLabel.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#bbb;';
+            colorLabel.style.cssText = 'display:inline-flex;align-items:center;gap:6px;font-size:14px;color:#eee;font-weight:500;';
             colorLabel.textContent = '粗体色';
             const colorInput = document.createElement('input');
             colorInput.type = 'color';
             colorInput.value = '#ffd966';
-            colorInput.style.cssText = 'width:22px;height:22px;padding:0;border:none;background:none;cursor:pointer;';
+            colorInput.style.cssText = 'width:26px;height:26px;padding:0;border:none;background:none;cursor:pointer;';
             colorLabel.appendChild(colorInput);
             toolbar.appendChild(boldBtn);
             toolbar.appendChild(colorLabel);
