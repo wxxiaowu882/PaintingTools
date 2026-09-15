@@ -66,6 +66,12 @@
     .scene-tab { flex:none; display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.55); font-size:11px; cursor:pointer; user-select:none; white-space:nowrap; -webkit-tap-highlight-color: transparent; }
     .scene-tab:hover { background:rgba(255,255,255,0.08); } .scene-tab.active { background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.90); border-color:rgba(255,255,255,0.16); }
     .scene-empty { padding:18px 10px; color:rgba(255,255,255,0.45); font-size:11px; line-height:1.6; text-align:center; border:1px dashed rgba(255,255,255,0.10); border-radius:12px; }
+    .scene-model-ref { flex:none; margin-left:6px; padding:2px 7px; border-radius:999px; border:1px solid rgba(46,204,113,0.35); background:rgba(46,204,113,0.14); color:rgba(46,204,113,0.95); font-size:10px; white-space:nowrap; }
+    .scene-subtabbar { display:flex; flex-wrap:nowrap; gap:6px; margin: 0 0 12px 0; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; -ms-overflow-style:none; padding:1px 2px 6px; }
+    .scene-subtabbar::-webkit-scrollbar { display:none; width:0; height:0; }
+    .scene-subtab { flex:none; display:inline-flex; align-items:center; justify-content:center; padding:5px 9px; border-radius:999px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03); color:rgba(255,255,255,0.50); font-size:10.5px; cursor:pointer; user-select:none; white-space:nowrap; -webkit-tap-highlight-color: transparent; }
+    .scene-subtab:hover { background:rgba(255,255,255,0.07); color:rgba(255,255,255,0.78); }
+    .scene-subtab.active { background:rgba(255,255,255,0.14); color:rgba(255,255,255,0.94); border-color:rgba(255,255,255,0.20); }
     /* v2：避免卡片上移导致顶部描边被遮挡 */
     html.solid-scene-list-v2 .scene-item:hover, html.solid-scene-list-v2 .scene-item.active { transform:none; }
     html.solid-scene-list-v2 .scene-item.active::after { inset:1px; }
@@ -174,6 +180,7 @@
         resolveSolidItemEffectiveMat,
         applySolidMaterialToRoot,
         applySolidMaterialsFromSceneItems,
+        sanitizeSolidGlbLoaderDefaultMaterialSlot,
     } from './plugins_02/SolidMaterialShared.js';
     import { getSolidGlbLoadMaxConcurrent, createSolidGlbLoadQueue } from './plugins_02/SolidGlbLoadQueueShared.js';
     import { createSolidGlbPersistCache, normalizeSolidGlbCacheKey } from './plugins_02/SolidGlbPersistCacheShared.js';
@@ -1388,6 +1395,7 @@
     if (!mesh || !mesh.isMesh || !mesh.material) return;
     if (!mesh.userData) mesh.userData = {};
     if (mesh.userData.originalMaterial) return;
+    try { sanitizeSolidGlbLoaderDefaultMaterialSlot(mesh.material); } catch (_eSan) {}
     mesh.userData.originalMaterial = solidSceneCloneMaterialSlot(mesh.material);
     mesh.userData.__solidMatStamped = true;
     }
@@ -1560,7 +1568,7 @@
     if (typeof window.updateAnnotationEyeButtonVisibility === 'function') window.updateAnnotationEyeButtonVisibility();
     document.getElementById('scene-grid-modal').style.display = 'none';
     document.querySelector('.modal-close').style.display = 'inline-flex';
-    document.getElementById('scene-trigger-top').innerText = data.name || `场景 ${index+1}`;
+    try { document.getElementById('scene-trigger-top').innerText = (typeof solidSceneTriggerLabel === 'function') ? solidSceneTriggerLabel(data, index) : (data.name || `场景 ${index+1}`); } catch (_eTrig) { try { document.getElementById('scene-trigger-top').innerText = data.name || `场景 ${index+1}`; } catch (_eTrig2) {} }
     document.getElementById('scene-loader').style.display = 'flex'; document.getElementById('scene-loader').style.opacity = '1'; solidSceneLoadUxStart(); solidSetLoadPhase('layout', { force: true });
     if(window.PluginManager) window.PluginManager.trigger('onClearScene');
     for(let i = sceneGroup.children.length - 1; i >= 0; i--) { const obj = sceneGroup.children[i]; if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(obj); else sceneGroup.remove(obj); }
@@ -1813,19 +1821,40 @@
                 if (localStorage.getItem(nvk) == null) {
                     const legacyV = localStorage.getItem(SOLID_FAV_VIEW_LEGACY_KEY);
                     if (legacyV != null && (sk === 'geometry' || sk === 'portrait')) localStorage.setItem(nvk, legacyV);
-                    else localStorage.setItem(nvk, 'all');
+                    else localStorage.setItem(nvk, (sk === 'headform') ? '外轮廓规律' : 'all');
                 }
             } catch (_eMig) {}
         }
         solidMaybeMigrateFavKeys();
         const SOLID_SCENE_CATEGORIES_DEFAULT = ['几何体', '色彩', '氛围', '构图', '几何体写生', '静物写生'];
+        const SOLID_HEADFORM_LINE_CATS = ['外轮廓规律', '交界线规律'];
+        function solidIsHeadformSandbox() {
+            return (window.__solidSandboxKey || '') === 'headform';
+        }
         function solidSceneCategories() {
             const sk = window.__solidSandboxKey || 'geometry';
-            if (sk === 'headform' || sk === 'portrait') return [];
+            if (sk === 'headform') return SOLID_HEADFORM_LINE_CATS.slice();
+            if (sk === 'portrait') return [];
             return SOLID_SCENE_CATEGORIES_DEFAULT;
+        }
+        function solidHeadformLineCategoryOf(sceneData) {
+            try {
+                const line = sceneData && sceneData.meta ? sceneData.meta.line : '';
+                if (line === 'view') return '外轮廓规律';
+                if (line === 'light') return '交界线规律';
+                return '';
+            } catch (_e) { return ''; }
+        }
+        function solidSceneSlotOf(sceneData) {
+            try {
+                const m = sceneData && sceneData.meta ? sceneData.meta : null;
+                if (m && m.slot != null && String(m.slot).trim() !== '') return String(m.slot).trim();
+            } catch (_e) {}
+            return '';
         }
         function solidSceneCategoryOf(sceneData) {
             try {
+                if (solidIsHeadformSandbox()) return solidHeadformLineCategoryOf(sceneData);
                 const cats = solidSceneCategories();
                 const c = sceneData && sceneData.meta ? sceneData.meta.category : '';
                 const s = String(c == null ? '' : c).trim();
@@ -1840,110 +1869,99 @@
             }
             return 'idx:' + String(idx);
         }
-        function solidLoadFavSet() {
+        function solidSceneTriggerLabel(sceneData, idx) {
+            const name = (sceneData && sceneData.name) ? String(sceneData.name) : (`场景 ${(Number(idx) || 0) + 1}`);
+            if (!solidIsHeadformSandbox()) return name;
             try {
-                solidMaybeMigrateFavKeys();
-                const raw = localStorage.getItem(solidFavStorageKey());
-                if (!raw) return new Set();
-                const arr = JSON.parse(raw);
-                if (!Array.isArray(arr)) return new Set();
-                return new Set(arr.map(String));
-            } catch (_e) { return new Set(); }
+                const lab = sceneData && sceneData.meta && sceneData.meta.modelLabel != null ? String(sceneData.meta.modelLabel).trim() : '';
+                if (lab) return name + ' · ' + lab;
+            } catch (_e) {}
+            return name;
         }
-        function solidSaveFavSet(set) {
-            try { localStorage.setItem(solidFavStorageKey(), JSON.stringify(Array.from(set))); } catch (_e) {}
+        function solidHeadformLessonMemKey() {
+            return 'SolidConsumer_HeadformLesson_v1';
         }
-        function solidGetFavViewMode() {
+        function solidLoadHeadformLessonMem() {
             try {
-                solidMaybeMigrateFavKeys();
-                const cats = solidSceneCategories();
-                const v = localStorage.getItem(solidFavViewStorageKey());
-                if (v === 'fav' || v === 'all') return v;
-                if (cats.indexOf(v) >= 0) return v;
-                return 'all';
-            } catch (_e) { return 'all'; }
+                const raw = localStorage.getItem(solidHeadformLessonMemKey());
+                if (!raw) return { viewSlot: '', lightSlot: '' };
+                const o = JSON.parse(raw);
+                return {
+                    viewSlot: (o && o.viewSlot != null) ? String(o.viewSlot) : '',
+                    lightSlot: (o && o.lightSlot != null) ? String(o.lightSlot) : ''
+                };
+            } catch (_e) { return { viewSlot: '', lightSlot: '' }; }
         }
-        function solidSetFavViewMode(v) {
+        function solidSaveHeadformLessonMem(mem) {
             try {
-                const cats = solidSceneCategories();
-                let next = 'all';
-                if (v === 'fav' || v === 'all') next = v;
-                else if (cats.indexOf(v) >= 0) next = v;
-                localStorage.setItem(solidFavViewStorageKey(), next);
+                localStorage.setItem(solidHeadformLessonMemKey(), JSON.stringify({
+                    viewSlot: (mem && mem.viewSlot) ? String(mem.viewSlot) : '',
+                    lightSlot: (mem && mem.lightSlot) ? String(mem.lightSlot) : ''
+                }));
             } catch (_e) {}
         }
-        function buildSceneGridUI(dataArr) {
-        const container = document.getElementById('scene-grid-container'); container.innerHTML = '';
-        const favSet = solidLoadFavSet();
-        const all = (dataArr || []).map((sceneData, i) => ({ sceneData, i, k: solidSceneKey(sceneData, i) }));
-        const favCount = all.reduce((n, it) => n + (favSet.has(it.k) ? 1 : 0), 0);
-    
-        // Tabbar：全部 / 收藏夹 / 场景类别（互斥单选；自动换行）
-        const wrap = container.parentElement;
-        if (wrap) {
-            let tab = document.getElementById('scene-tabbar');
-            if (!tab) {
-                tab = document.createElement('div');
-                tab.id = 'scene-tabbar';
-                tab.className = 'scene-tabbar';
-                wrap.insertBefore(tab, container);
+        function solidHeadformLineKeyOfCat(cat) {
+            if (cat === '外轮廓规律') return 'view';
+            if (cat === '交界线规律') return 'light';
+            return '';
+        }
+        function solidDeriveLessonTabLabel(sceneData) {
+            try {
+                const meta = (sceneData && sceneData.meta) || {};
+                if (meta.lessonTabLabel != null && String(meta.lessonTabLabel).trim() !== '') {
+                    return String(meta.lessonTabLabel).trim();
+                }
+                let name = (sceneData && sceneData.name) ? String(sceneData.name) : '';
+                name = name.replace(/^【外轮廓规律】/, '').replace(/^【交界线规律】/, '').trim();
+                if (meta.line === 'light' && name.indexOf('·') >= 0) {
+                    const parts = name.split('·');
+                    const tail = String(parts[parts.length - 1] || '').trim();
+                    if (tail) return tail;
+                }
+                return name || (meta.slot ? String(meta.slot) : '未命名课');
+            } catch (_e) { return '未命名课'; }
+        }
+        function solidCollectHeadformLessons(itemList, lineCat) {
+            const order = [];
+            const map = Object.create(null);
+            for (let i = 0; i < itemList.length; i++) {
+                const it = itemList[i];
+                if (solidSceneCategoryOf(it.sceneData) !== lineCat) continue;
+                const slot = solidSceneSlotOf(it.sceneData);
+                if (!slot) continue;
+                if (!map[slot]) {
+                    map[slot] = { slot: slot, label: '', ref: null, any: it };
+                    order.push(slot);
+                }
+                const g = map[slot];
+                const role = it.sceneData && it.sceneData.meta ? it.sceneData.meta.modelRole : '';
+                if (role === 'reference') g.ref = it;
+                else if (!g.any) g.any = it;
             }
-            const mode = solidGetFavViewMode();
-            const cats = solidSceneCategories();
-            let tabHtml = `<button type="button" class="scene-tab ${mode === 'all' ? 'active' : ''}" data-mode="all">全部</button>`;
-            for (let ci = 0; ci < cats.length; ci++) {
-                const cat = cats[ci];
-                tabHtml += `<button type="button" class="scene-tab ${mode === cat ? 'active' : ''}" data-mode="${escapeHtml(cat)}">${escapeHtml(cat)}</button>`;
-            }
-            tabHtml += `<button type="button" class="scene-tab ${mode === 'fav' ? 'active' : ''}" data-mode="fav">收藏夹（${favCount}）</button>`;
-            tab.innerHTML = tabHtml;
-            Array.from(tab.querySelectorAll('.scene-tab')).forEach(btn => {
-                btn.onclick = function(e) {
-                    e.preventDefault(); e.stopPropagation();
-                    const m = this.getAttribute('data-mode') || 'all';
-                    solidSetFavViewMode(m);
-                    buildSceneGridUI(dataArr);
+            return order.map(function (slot) {
+                const g = map[slot];
+                const primary = g.ref || g.any;
+                return {
+                    slot: slot,
+                    label: solidDeriveLessonTabLabel(primary.sceneData)
                 };
             });
         }
-    
-        const mode = solidGetFavViewMode();
-        let list;
-        if (mode === 'fav') {
-            list = all.filter(it => favSet.has(it.k));
-        } else if (mode === 'all') {
-            list = all; // 全部：保持原顺序（含未分类）
-        } else {
-            // 类别视图：仅精确匹配 meta.category；缺字段不进入（3B）
-            list = all.filter(it => solidSceneCategoryOf(it.sceneData) === mode);
+        function solidHeadformModelTitle(sceneData, withLesson) {
+            let model = '未命名头模';
+            try {
+                const meta = (sceneData && sceneData.meta) || {};
+                if (meta.modelLabel != null && String(meta.modelLabel).trim() !== '') model = String(meta.modelLabel).trim();
+                else if (meta.modelId != null && String(meta.modelId).trim() !== '') model = String(meta.modelId).trim();
+            } catch (_e) {}
+            if (!withLesson) return model;
+            const lesson = solidDeriveLessonTabLabel(sceneData);
+            if (lesson && lesson !== model) return lesson + ' · ' + model;
+            return model;
         }
-    
-        if (mode === 'fav' && list.length === 0) {
-            container.innerHTML = `<div class="scene-empty">这里是你的收藏夹。<br>在“全部”里点右侧的 ★ 收藏场景。</div>`;
-            return;
-        }
-        if (mode !== 'all' && mode !== 'fav' && list.length === 0) {
-            container.innerHTML = `<div class="scene-empty">「${escapeHtml(mode)}」暂无场景。<br>未填类别的场景只在「全部」中显示。</div>`;
-            return;
-        }
-    
-        list.forEach(({ sceneData, i, k }) => {
-        const meta = (sceneData && typeof sceneData === 'object' ? sceneData.meta : null) || {};
-        const title = (sceneData && sceneData.name) ? String(sceneData.name) : '未命名场景';
-        const thumb = (sceneData && sceneData.thumbnail) ? String(sceneData.thumbnail) : '';
-        const detailRaw = meta.detail != null ? String(meta.detail) : (meta.description != null ? String(meta.description) : '');
-        // 生产端 textarea 在 Windows 下通常是 \r\n；这里统一转 <br>
-        const detailEsc = escapeHtml(detailRaw).replace(/\r?\n/g, '<br>');
-        // 仅允许 <b></b> 作为轻量强调，其它 HTML 依然保持转义，避免注入
-        const detailSafe = detailEsc.replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>');
-        const item = document.createElement('div');
-        const curIdx = Number(window.currentSceneIndex);
-        item.className = 'scene-item' + ((curIdx >= 0 && i === curIdx) ? ' active' : '');
-        // iOS Safari：在可滚动容器内，DIV onclick 可能出现“首次点按无效/第二次才触发”的合成 click 问题；
-        // 这里改为 pointerup/touchend 优先，并加“防滚动误触”阈值，click 仅作兜底。
-        (function bindSceneItemActivate(el, idx) {
+        function solidBindSceneItemActivate(el, idx) {
             let sx = 0, sy = 0, moved = false, hadTouch = false;
-            const TH = 8; // px
+            const TH = 8;
             function _pt(e) {
                 try {
                     if (e && e.changedTouches && e.changedTouches[0]) return e.changedTouches[0];
@@ -1996,29 +2014,274 @@
                 _activate(e);
             }, { passive: true });
             el.addEventListener('click', (e) => {
-                // 触摸设备上避免 touchend + click 双触发
                 if (hadTouch) return;
                 _activate(e);
             });
-        })(item, i);
-        item.innerHTML =
-        `<img src="${escapeHtml(thumb)}" class="scene-thumb" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Crect width=\\'100%25\\' height=\\'100%25\\' fill=\\'%23111\\'/%3E%3C/svg%3E'">` +
-        `<div class="scene-meta">` +
-          `<div class="scene-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>` +
-          (detailSafe ? `<div class="scene-detail">${detailSafe}</div>` : ``) +
-        `</div>` +
-        `<button type="button" class="scene-fav-btn ${favSet.has(k) ? 'is-fav' : ''}" aria-label="收藏" title="收藏">★</button>`;
-        const favBtn = item.querySelector('.scene-fav-btn');
-        if (favBtn) {
-            favBtn.addEventListener('click', function (e) {
-                e.preventDefault(); e.stopPropagation();
-                const nowFav = !favSet.has(k);
-                if (nowFav) favSet.add(k); else favSet.delete(k);
-                solidSaveFavSet(favSet);
-                buildSceneGridUI(dataArr);
+        }
+        function solidAppendSceneListItem(container, sceneData, i, k, favSet, dataArr) {
+            const meta = (sceneData && typeof sceneData === 'object' ? sceneData.meta : null) || {};
+            const isHeadform = solidIsHeadformSandbox();
+            // headform 列表常跨多课：标题用「课短名 · 头模」，单课筛选时也一致可读
+            const title = isHeadform ? solidHeadformModelTitle(sceneData, true) : ((sceneData && sceneData.name) ? String(sceneData.name) : '未命名场景');
+            const thumb = (sceneData && sceneData.thumbnail) ? String(sceneData.thumbnail) : '';
+            const detailRaw = meta.detail != null ? String(meta.detail) : (meta.description != null ? String(meta.description) : '');
+            const detailEsc = escapeHtml(detailRaw).replace(/\r?\n/g, '<br>');
+            const detailSafe = detailEsc.replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>');
+            const item = document.createElement('div');
+            const curIdx = Number(window.currentSceneIndex);
+            item.className = 'scene-item' + ((curIdx >= 0 && i === curIdx) ? ' active' : '');
+            solidBindSceneItemActivate(item, i);
+            const refBadge = (isHeadform && meta.modelRole === 'reference')
+                ? '<span class="scene-model-ref">参考</span>'
+                : '';
+            const titleTitle = isHeadform
+                ? (escapeHtml(title) + ((sceneData && sceneData.name) ? (' · ' + escapeHtml(String(sceneData.name))) : ''))
+                : escapeHtml(title);
+            item.innerHTML =
+            `<img src="${escapeHtml(thumb)}" class="scene-thumb" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Crect width=\\'100%25\\' height=\\'100%25\\' fill=\\'%23111\\'/%3E%3C/svg%3E'">` +
+            `<div class="scene-meta">` +
+              `<div class="scene-title" title="${titleTitle}" style="display:flex;align-items:center;gap:4px;white-space:normal;">` +
+                `<span style="min-width:0;flex:1;">${escapeHtml(title)}</span>${refBadge}` +
+              `</div>` +
+              (detailSafe ? `<div class="scene-detail">${detailSafe}</div>` : ``) +
+            `</div>` +
+            `<button type="button" class="scene-fav-btn ${favSet.has(k) ? 'is-fav' : ''}" aria-label="收藏" title="收藏">★</button>`;
+            const favBtn = item.querySelector('.scene-fav-btn');
+            if (favBtn) {
+                favBtn.addEventListener('click', function (e) {
+                    e.preventDefault(); e.stopPropagation();
+                    const nowFav = !favSet.has(k);
+                    if (nowFav) favSet.add(k); else favSet.delete(k);
+                    solidSaveFavSet(favSet);
+                    buildSceneGridUI(dataArr);
+                });
+            }
+            container.appendChild(item);
+        }
+        function solidLoadFavSet() {
+            try {
+                solidMaybeMigrateFavKeys();
+                const raw = localStorage.getItem(solidFavStorageKey());
+                if (!raw) return new Set();
+                const arr = JSON.parse(raw);
+                if (!Array.isArray(arr)) return new Set();
+                return new Set(arr.map(String));
+            } catch (_e) { return new Set(); }
+        }
+        function solidSaveFavSet(set) {
+            try { localStorage.setItem(solidFavStorageKey(), JSON.stringify(Array.from(set))); } catch (_e) {}
+        }
+        function solidGetFavViewMode() {
+            try {
+                solidMaybeMigrateFavKeys();
+                const cats = solidSceneCategories();
+                const v = localStorage.getItem(solidFavViewStorageKey());
+                if (v === 'fav') return v;
+                // headform：无「全部」；旧值 all 映射到外轮廓规律
+                if (solidIsHeadformSandbox()) {
+                    if (cats.indexOf(v) >= 0) return v;
+                    return cats.length > 0 ? cats[0] : 'fav';
+                }
+                if (v === 'all') return v;
+                if (cats.indexOf(v) >= 0) return v;
+                return 'all';
+            } catch (_e) {
+                return solidIsHeadformSandbox() ? '外轮廓规律' : 'all';
+            }
+        }
+        function solidSetFavViewMode(v) {
+            try {
+                const cats = solidSceneCategories();
+                let next = solidIsHeadformSandbox() ? (cats[0] || 'fav') : 'all';
+                if (v === 'fav') next = 'fav';
+                else if (!solidIsHeadformSandbox() && v === 'all') next = 'all';
+                else if (cats.indexOf(v) >= 0) next = v;
+                localStorage.setItem(solidFavViewStorageKey(), next);
+            } catch (_e) {}
+        }
+        function buildSceneGridUI(dataArr) {
+        const container = document.getElementById('scene-grid-container'); container.innerHTML = '';
+        const favSet = solidLoadFavSet();
+        const all = (dataArr || []).map((sceneData, i) => ({ sceneData, i, k: solidSceneKey(sceneData, i) }));
+        const favCount = all.reduce((n, it) => n + (favSet.has(it.k) ? 1 : 0), 0);
+        const isHeadform = solidIsHeadformSandbox();
+    
+        // Tabbar：全部 / 收藏夹 / 场景类别（headform 无「全部」）
+        const wrap = container.parentElement;
+        let subTab = document.getElementById('scene-subtabbar');
+        if (wrap) {
+            let tab = document.getElementById('scene-tabbar');
+            if (!tab) {
+                tab = document.createElement('div');
+                tab.id = 'scene-tabbar';
+                tab.className = 'scene-tabbar';
+                wrap.insertBefore(tab, container);
+            }
+            if (!subTab) {
+                subTab = document.createElement('div');
+                subTab.id = 'scene-subtabbar';
+                subTab.className = 'scene-subtabbar';
+                subTab.setAttribute('aria-label', '课筛选');
+                wrap.insertBefore(subTab, container);
+            }
+            const mode = solidGetFavViewMode();
+            const cats = solidSceneCategories();
+            let tabHtml = '';
+            if (!isHeadform) {
+                tabHtml += `<button type="button" class="scene-tab ${mode === 'all' ? 'active' : ''}" data-mode="all">全部</button>`;
+            }
+            for (let ci = 0; ci < cats.length; ci++) {
+                const cat = cats[ci];
+                tabHtml += `<button type="button" class="scene-tab ${mode === cat ? 'active' : ''}" data-mode="${escapeHtml(cat)}">${escapeHtml(cat)}</button>`;
+            }
+            tabHtml += `<button type="button" class="scene-tab ${mode === 'fav' ? 'active' : ''}" data-mode="fav">收藏夹（${favCount}）</button>`;
+            tab.innerHTML = tabHtml;
+            Array.from(tab.querySelectorAll('.scene-tab')).forEach(btn => {
+                btn.onclick = function(e) {
+                    e.preventDefault(); e.stopPropagation();
+                    const m = this.getAttribute('data-mode') || (isHeadform ? '外轮廓规律' : 'all');
+                    solidSetFavViewMode(m);
+                    // headform：点一级课线时，列表展示该线下全部场景（二级重置为「全部」）
+                    if (isHeadform && (m === '外轮廓规律' || m === '交界线规律')) {
+                        const lk = solidHeadformLineKeyOfCat(m);
+                        const m2 = solidLoadHeadformLessonMem();
+                        if (lk === 'view') m2.viewSlot = '__all__';
+                        else if (lk === 'light') m2.lightSlot = '__all__';
+                        solidSaveHeadformLessonMem(m2);
+                    }
+                    buildSceneGridUI(dataArr);
+                };
             });
         }
-        container.appendChild(item);
+    
+        const mode = solidGetFavViewMode();
+
+        // headform：一级课线 + 二级课芯片 + 列表按头模
+        if (isHeadform) {
+            if (mode === 'fav') {
+                if (subTab) {
+                    subTab.style.display = 'none';
+                    subTab.innerHTML = '';
+                }
+                const list = all.filter(it => favSet.has(it.k));
+                if (list.length === 0) {
+                    container.innerHTML = `<div class="scene-empty">这里是你的收藏夹。<br>在课下列表里点右侧的 ★ 收藏头模场景。</div>`;
+                    return;
+                }
+                list.forEach(function (it) {
+                    solidAppendSceneListItem(container, it.sceneData, it.i, it.k, favSet, dataArr);
+                });
+            } else {
+                const lessons = solidCollectHeadformLessons(all, mode);
+                if (lessons.length === 0) {
+                    if (subTab) {
+                        subTab.style.display = 'none';
+                        subTab.innerHTML = '';
+                    }
+                    container.innerHTML = `<div class="scene-empty">「${escapeHtml(mode)}」暂无课程。</div>`;
+                    return;
+                }
+                const lineKey = solidHeadformLineKeyOfCat(mode);
+                const mem = solidLoadHeadformLessonMem();
+                let curSlot = (lineKey === 'view') ? mem.viewSlot : ((lineKey === 'light') ? mem.lightSlot : '');
+                const slotSet = Object.create(null);
+                lessons.forEach(function (L) { slotSet[L.slot] = true; });
+                // 默认 / 无效记忆 → 展示该一级下全部场景
+                if (!curSlot || (curSlot !== '__all__' && !slotSet[curSlot])) curSlot = '__all__';
+                if (lineKey === 'view') mem.viewSlot = curSlot;
+                else if (lineKey === 'light') mem.lightSlot = curSlot;
+                solidSaveHeadformLessonMem(mem);
+
+                if (subTab) {
+                    subTab.style.display = 'flex';
+                    let subHtml = `<button type="button" class="scene-subtab ${curSlot === '__all__' ? 'active' : ''}" data-slot="__all__">全部</button>`;
+                    subHtml += lessons.map(function (L) {
+                        const active = L.slot === curSlot;
+                        return `<button type="button" class="scene-subtab ${active ? 'active' : ''}" data-slot="${escapeHtml(L.slot)}">${escapeHtml(L.label)}</button>`;
+                    }).join('');
+                    subTab.innerHTML = subHtml;
+                    Array.from(subTab.querySelectorAll('.scene-subtab')).forEach(function (btn) {
+                        btn.onclick = function (e) {
+                            e.preventDefault(); e.stopPropagation();
+                            const slot = this.getAttribute('data-slot') || '__all__';
+                            const m2 = solidLoadHeadformLessonMem();
+                            if (lineKey === 'view') m2.viewSlot = slot;
+                            else if (lineKey === 'light') m2.lightSlot = slot;
+                            solidSaveHeadformLessonMem(m2);
+                            buildSceneGridUI(dataArr);
+                        };
+                    });
+                    requestAnimationFrame(function () {
+                        try {
+                            const activeChip = subTab.querySelector('.scene-subtab.active');
+                            if (activeChip && typeof activeChip.scrollIntoView === 'function') {
+                                activeChip.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+                            }
+                        } catch (_eChip) {}
+                    });
+                }
+
+                const models = all.filter(function (it) {
+                    if (solidSceneCategoryOf(it.sceneData) !== mode) return false;
+                    if (curSlot === '__all__') return true;
+                    return solidSceneSlotOf(it.sceneData) === curSlot;
+                }).slice().sort(function (a, b) {
+                    // 全量时按统合顺序；单课时 reference 优先
+                    if (curSlot === '__all__') return a.i - b.i;
+                    const ra = (a.sceneData && a.sceneData.meta && a.sceneData.meta.modelRole === 'reference') ? 0 : 1;
+                    const rb = (b.sceneData && b.sceneData.meta && b.sceneData.meta.modelRole === 'reference') ? 0 : 1;
+                    if (ra !== rb) return ra - rb;
+                    return a.i - b.i;
+                });
+                if (models.length === 0) {
+                    container.innerHTML = `<div class="scene-empty">本课暂无头模场景。</div>`;
+                    return;
+                }
+                models.forEach(function (it) {
+                    solidAppendSceneListItem(container, it.sceneData, it.i, it.k, favSet, dataArr);
+                });
+            }
+            try {
+                const modal = document.getElementById('scene-grid-modal');
+                const modalOpen = modal && (modal.style.display === 'flex' || (typeof getComputedStyle === 'function' && getComputedStyle(modal).display === 'flex'));
+                if (modalOpen) {
+                    requestAnimationFrame(function () {
+                        try {
+                            const active = container.querySelector('.scene-item.active');
+                            if (active && typeof active.scrollIntoView === 'function') active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                        } catch (_eScr) {}
+                    });
+                }
+            } catch (_eOpen) {}
+            return;
+        }
+
+        if (subTab) {
+            subTab.style.display = 'none';
+            subTab.innerHTML = '';
+        }
+
+        let list;
+        if (mode === 'fav') {
+            list = all.filter(it => favSet.has(it.k));
+        } else if (mode === 'all') {
+            list = all; // 全部：保持原顺序（含未分类）
+        } else {
+            // 类别视图：几何沙盒匹配 meta.category
+            list = all.filter(it => solidSceneCategoryOf(it.sceneData) === mode);
+        }
+    
+        if (mode === 'fav' && list.length === 0) {
+            container.innerHTML = `<div class="scene-empty">这里是你的收藏夹。<br>在“全部”里点右侧的 ★ 收藏场景。</div>`;
+            return;
+        }
+        if (mode !== 'all' && mode !== 'fav' && list.length === 0) {
+            container.innerHTML = `<div class="scene-empty">「${escapeHtml(mode)}」暂无场景。<br>未填类别的场景只在「全部」中显示。</div>`;
+            return;
+        }
+    
+        list.forEach(({ sceneData, i, k }) => {
+        solidAppendSceneListItem(container, sceneData, i, k, favSet, dataArr);
         });
         // 列表已打开时（切 Tab / 收藏），把当前场景滚入视野
         try {
