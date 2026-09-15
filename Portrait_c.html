@@ -174,7 +174,8 @@
           { name: '耳朵详解', url: './docs/json/结构_五官/01 耳朵详解.json' },
           { name: '鼻子详解', url: './docs/json/结构_五官/02 鼻子详解.json' },
           { name: '嘴巴详解', url: './docs/json/结构_五官/03 嘴巴详解.json' },
-          { name: '眼眉详解', url: './docs/json/结构_五官/04 眼眉详解.json' }
+          { name: '眼眉详解', url: './docs/json/结构_五官/04 眼眉详解.json' },
+          { name: '五官综合详解', url: './docs/json/结构_五官/05 五官综合详解.json' }
       ];
   }
 
@@ -841,7 +842,7 @@
   let activePointId = null; let svgRafId = null; let _isSvgUpdating = false;
   // 【初始名称可见】：进页/离开快照时按 showTextOnLoad 挂 show-text；缺省字段视为可见（1A）
   window._hasAppliedSnapshot = false;
-  function getAnnoSlot(p) { return (p.type==='line'||p.type==='spline'||p.type==='contour')&&p.dots ? p.dots[p.midIndex||Math.floor(p.dots.length/2)].slot : p.slot; }
+  function getAnnoSlot(p) { return (p.type==='line'||p.type==='spline'||p.type==='contour'||p.type==='bezier')&&p.dots ? p.dots[p.midIndex||Math.floor(p.dots.length/2)].slot : p.slot; }
   function clearShowTextClasses() { viewer.querySelectorAll('.preview-hotspot.show-text, .ink-mid.show-text').forEach(el => el.classList.remove('show-text')); }
   function applyInitialShowText() { if (!currentData || !currentData.pointsData) return; clearShowTextClasses();
   currentData.pointsData.forEach(p => { if (p.hidden || p.showTextOnLoad === false) return; const el = viewer.querySelector(`[slot="${getAnnoSlot(p)}"]`); if (el) el.classList.add('show-text'); }); }
@@ -853,8 +854,8 @@
   const isBackFace = (normStr) => { if (!normStr) return false; const [nx, ny, nz] = normStr.replace(/m/g, '').split(' ').map(Number); return (nx * camVec.x + ny * camVec.y + nz * camVec.z) < -0.05; };
   const checkOccluded = (el) => { return el.style.display === 'none' || !el.hasAttribute('visible') || el.getAttribute('visible') === 'false'; };
   currentData.pointsData.forEach(p => { if (p.hidden) return; const readData = window.AnnotationPluginManager.dispatchGetOcclusionReads(p, viewer, checkOccluded, isBackFace); if (readData) reads.push(readData); });
-  currentData.pointsData.forEach(p => { const slotEl = viewer.querySelector(`[slot="${(p.type==='line'||p.type==='spline'||p.type==='contour')&&p.dots?p.dots[p.midIndex||Math.floor(p.dots.length/2)].slot:p.slot}"]`); if (slotEl) slotEl.style.display = p.hidden ? 'none' : '';
-  if ((p.type==='line'||p.type==='spline'||p.type==='polygon'||p.type==='polygon3d'||p.type==='contour')&&p.dots) p.dots.forEach(d => { const del = viewer.querySelector(`[slot="${d.slot}"]`); if(del) del.style.display = p.hidden ? 'none' : ''; });
+  currentData.pointsData.forEach(p => { const slotEl = viewer.querySelector(`[slot="${(p.type==='line'||p.type==='spline'||p.type==='contour'||p.type==='bezier')&&p.dots?p.dots[p.midIndex||Math.floor(p.dots.length/2)].slot:p.slot}"]`); if (slotEl) slotEl.style.display = p.hidden ? 'none' : '';
+  if ((p.type==='line'||p.type==='spline'||p.type==='polygon'||p.type==='polygon3d'||p.type==='contour'||p.type==='bezier')&&p.dots) p.dots.forEach(d => { const del = viewer.querySelector(`[slot="${d.slot}"]`); if(del) del.style.display = p.hidden ? 'none' : ''; });
   if (p.type==='normal-arrow') { [p.slotEnd, p.slotP1, p.slotP2, p.slotP3].forEach(s => { if(s){ const del = viewer.querySelector(`[slot="${s}"]`); if(del) del.style.display = p.hidden ? 'none' : ''; } }); }
   }); const getRenderAlpha = (isOccluded, baseOp) => { if (!isOccluded) return baseOp; const mo = parseFloat(globalModelOpacity); if (mo >= 1.0) return 0; return (1 - mo) * 0.9; };
   const lightData = { amb: envSettings.amb, spt: envSettings.spt, sX: envSettings.sX, sY: envSettings.sY, envRot: envSettings.envRotOffset }; reads.forEach(item => { const p = item.p;
@@ -1021,5 +1022,5 @@
       window.openCourseGallery();
   });
   </script> <script src="./plugins_01/plugin-point.js"></script><script src="./plugins_01/plugin-arrow.js"></script>
-  <script src="./plugins_01/plugin-line.js"></script> <script src="./plugins_01/plugin-contour.js"></script> <script src="./plugins_01/plugin-polygon.js"></script> <script src="./plugins_01/plugin-leader.js"></script>
+  <script src="./plugins_01/plugin-line.js"></script> <script src="./plugins_01/plugin-bezier.js"></script> <script src="./plugins_01/plugin-contour.js"></script> <script src="./plugins_01/plugin-polygon.js"></script> <script src="./plugins_01/plugin-leader.js"></script>
   <script src="./plugins_01/plugin-polygon3d.js"></script> <script src="./plugins_01/plugin-prober.js"></script> </body> </html>

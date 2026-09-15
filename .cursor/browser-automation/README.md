@@ -37,6 +37,8 @@
 
 16. **坐标拾取生产端面板（2026-09）**：右侧已拆「标注 / 场景」Tab（默认标注）；画面双击 `.HotspotAnnotation` 可改名；列表 ✖ 与 Delete/Backspace（非输入框）均先 `confirm` 再删。代码框/复制/导入/清空已移除，导出与工作区存盘直接走 `generateCode()`；隐藏 `#file-input` 仍保留供自动化 `setInputFiles`。
 
+16a. **贝塞尔曲线（plugins_01/plugin-bezier.js）**：生产端 Alt+Shift 点两点；柄屏坐标须用持久 hotspot + 一帧后再读，或用相机基近似（保留离弦分量），**禁止**弦投影把柄压回线上，也禁止直接用 `Symbol(scene).camera.project`（与 hotspot 2D 系不一致）。建线后 `__bezierSuppressClickUntil` 防探照灯抢选中。探照灯抬起后须 `removeProperty('pointer-events')`，**禁止**给 SVG 写 inline `pointer-events:none`。双击插点：第一次点选会重绘并叠上锚/柄，原生 dblclick 易丢目标——用 `_dblArm`（450ms 内二次按下）+ `detail===2`，`insertAnchorAtClient(..., {loose:true})`。自测：`node scripts/bezier-dblclick-qa.js`（真实两次 down/up，需 18080）。
+
 17. **头部肌肉色彩变更 · 笔刷筛孔**：石膏耳等多材质薄壳，背景纯白；只动命中网格或按顶点法线推，会在接缝/打穿处漏出规则白点。现行 build 起：同侧多网格+同位焊接、命中法线位移、壳厚限制减料。自测：`node scripts/ear-brush-sieve-qa.js`（服务 `8765`）。
 
 18. **笔刷局部加密（已弃用路径）**：真网格加密易在未焊接耳模上撕成纱窗。

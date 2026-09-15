@@ -209,7 +209,7 @@ window.AnnotationPluginManager.register({
         this.updateProbeMath(pData, azimuth, elevation, null);
         pData.text = this.getToneData(pData.probeData.angle).text;
         
-        pointsData.push(pData);
+        if (typeof window.addAnnotationToList === 'function') window.addAnnotationToList(pData); else pointsData.push(pData);
         this.mountDOM(pData, viewer);
         
         if (typeof statusMsg !== 'undefined') statusMsg.innerText = `受光探针 ${pointIndex} 已放置`;
