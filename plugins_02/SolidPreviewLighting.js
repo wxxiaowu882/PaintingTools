@@ -9,12 +9,13 @@ import {
   SOLID_RASTER_IRRADIANCE_PROBES,
   SOLID_RASTER_PREVIEW_AO,
   SOLID_RASTER_AREA_LIGHT_RIG,
+  SOLID_DIR_GROUND_DISTANCE_FADE,
   getSolidRasterPreviewLightingDerived,
 } from '../Config/PaintingConfig.js';
 import { solidInstallOnBeforeCompilePatch, solidSyncOnBeforeCompileExternalHead } from './SolidShaderCompilePipelineShared.js';
 
 /** 地面 SOLID_SHADOW_SOFT_GROUND 片元补丁修订号：递增可强制清缓存重编译（勿随意改）。 */
-const SOLID_GROUND_SHADOW_PATCH_REVISION = 10;
+const SOLID_GROUND_SHADOW_PATCH_REVISION = 13;
 
 /**
  * 与 Solid.html 中 shouldSkipEnvProbe 条件一致，供消费端与生产端共用，避免各写一套导致行为分叉。
@@ -1112,6 +1113,62 @@ export function createSolidPreviewLightingManager(opts) {
   }
 
   // ---------- Shadow soft ground patch (consumer extracted) ----------
+  function _dirGroundFadeCfg() {
+    try {
+      return SOLID_DIR_GROUND_DISTANCE_FADE || {};
+    } catch (_e) {
+      return {};
+    }
+  }
+
+  const _dirGroundFadeCenterTmp = new THREE.Vector3();
+  const _dirGroundFadeBoxTmp = new THREE.Box3();
+
+  function _ensureDirGroundFadeUniforms(ud) {
+    if (!ud) return;
+    if (!ud.uSolidDirGroundFadeEnable) ud.uSolidDirGroundFadeEnable = { value: 0.0 };
+    if (!ud.uSolidDirGroundFadeCenter) ud.uSolidDirGroundFadeCenter = { value: new THREE.Vector3(0, 0, 0) };
+    if (!ud.uSolidDirGroundFadeNear) ud.uSolidDirGroundFadeNear = { value: 14.0 };
+    if (!ud.uSolidDirGroundFadeFar) ud.uSolidDirGroundFadeFar = { value: 42.0 };
+    if (!ud.uSolidDirGroundFadeMin) ud.uSolidDirGroundFadeMin = { value: 0.12 };
+  }
+
+  function _syncDirGroundDistanceFadeUniforms(ud, mainLight, sceneGroup) {
+    try {
+      if (!ud) return;
+      _ensureDirGroundFadeUniforms(ud);
+      const cfg = _dirGroundFadeCfg();
+      const want = !!(cfg.enabled !== false && mainLight && mainLight.isDirectionalLight);
+      ud.uSolidDirGroundFadeEnable.value = want ? 1.0 : 0.0;
+      let near = Number(cfg.near);
+      let far = Number(cfg.far);
+      let minF = Number(cfg.minFactor);
+      if (!Number.isFinite(near)) near = 14;
+      if (!Number.isFinite(far)) far = 42;
+      if (!Number.isFinite(minF)) minF = 0.12;
+      near = Math.max(0.5, near);
+      far = Math.max(near + 0.5, far);
+      minF = Math.max(0, Math.min(1, minF));
+      ud.uSolidDirGroundFadeNear.value = near;
+      ud.uSolidDirGroundFadeFar.value = far;
+      ud.uSolidDirGroundFadeMin.value = minF;
+
+      const c = _dirGroundFadeCenterTmp.set(0, 0, 0);
+      try {
+        if (sceneGroup) {
+          _dirGroundFadeBoxTmp.setFromObject(sceneGroup);
+          if (!_dirGroundFadeBoxTmp.isEmpty()) {
+            _dirGroundFadeBoxTmp.getCenter(c);
+            c.y = 0;
+          }
+        }
+      } catch (_eC) {
+        c.set(0, 0, 0);
+      }
+      ud.uSolidDirGroundFadeCenter.value.copy(c);
+    } catch (_e) {}
+  }
+
   function _fitRasterShadowFrustumForSceneGroup(lightOverride) {
     try {
       const mainLight = lightOverride || getShadowLight();
@@ -1206,6 +1263,8 @@ export function createSolidPreviewLightingManager(opts) {
       if (ud.uSolidContactPatchEnable) ud.uSolidContactPatchEnable.value = _contactPatchEnabled() ? 1.0 : 0.0;
       if (ud.uSolidSphereDebug) ud.uSolidSphereDebug.value = _contactPatchDebugAllEnabled() ? 1.0 : 0.0;
       if (ud.uSolidDbgForceRed) ud.uSolidDbgForceRed.value = _contactPatchForceRedEnabled() ? 1.0 : 0.0;
+
+      try { _syncDirGroundDistanceFadeUniforms(ud, mainLight, sceneGroup); } catch (_eFade) {}
 
       // Apply dynamic uniform quality (taps/rotate) only on tier changes.
       // This keeps interaction fast while guaranteeing idle recovers to baseline.
@@ -1525,6 +1584,8 @@ export function createSolidPreviewLightingManager(opts) {
           if (!m.userData.uSolidMainLightType) m.userData.uSolidMainLightType = { value: 0 };
           if (!m.userData.uSolidMainLightPos) m.userData.uSolidMainLightPos = { value: new THREE.Vector3() };
           if (!m.userData.uSolidMainLightDir) m.userData.uSolidMainLightDir = { value: new THREE.Vector3(0, 1, 0) };
+          _ensureDirGroundFadeUniforms(m.userData);
+          try { _syncDirGroundDistanceFadeUniforms(m.userData, mainLight, sceneGroup); } catch (_eFadeInit) {}
           if (!m.userData.uSolidShadowContactPull) m.userData.uSolidShadowContactPull = { value: 0.00065 };
           // Dark-side contact seam leak fix (ground-only; directional/spot use 2D shadow map).
           if (!m.userData.uSolidShadowSeamStrength) m.userData.uSolidShadowSeamStrength = { value: 0.85 };
@@ -2123,6 +2184,11 @@ export function createSolidPreviewLightingManager(opts) {
             shader.uniforms.uSolidMainLightType = m.userData.uSolidMainLightType;
             shader.uniforms.uSolidMainLightPos = m.userData.uSolidMainLightPos;
             shader.uniforms.uSolidMainLightDir = m.userData.uSolidMainLightDir;
+            shader.uniforms.uSolidDirGroundFadeEnable = m.userData.uSolidDirGroundFadeEnable;
+            shader.uniforms.uSolidDirGroundFadeCenter = m.userData.uSolidDirGroundFadeCenter;
+            shader.uniforms.uSolidDirGroundFadeNear = m.userData.uSolidDirGroundFadeNear;
+            shader.uniforms.uSolidDirGroundFadeFar = m.userData.uSolidDirGroundFadeFar;
+            shader.uniforms.uSolidDirGroundFadeMin = m.userData.uSolidDirGroundFadeMin;
 
             shader.fragmentShader =
               'varying vec3 vSolidShadowGroundPos;\n' +
@@ -2153,6 +2219,11 @@ export function createSolidPreviewLightingManager(opts) {
               'uniform int uSolidMainLightType;\n' +
               'uniform vec3 uSolidMainLightPos;\n' +
               'uniform vec3 uSolidMainLightDir;\n' +
+              'uniform float uSolidDirGroundFadeEnable;\n' +
+              'uniform vec3 uSolidDirGroundFadeCenter;\n' +
+              'uniform float uSolidDirGroundFadeNear;\n' +
+              'uniform float uSolidDirGroundFadeFar;\n' +
+              'uniform float uSolidDirGroundFadeMin;\n' +
               'float solidRaySphereOcc( vec3 ro, vec3 rd, float tMax, vec3 c, float r ) {\n' +
               '  vec3 oc = ro - c;\n' +
               '  float b = dot( oc, rd );\n' +
@@ -2239,6 +2310,58 @@ export function createSolidPreviewLightingManager(opts) {
               }
             } catch (_eDbg) {}
 
+            // Parallel-light ground distance fade: darken distant lighting (smoothstep).
+            // Apply both after lights_fragment_end (reflectedLight) and after opaque (gl_FragColor),
+            // because SH/IBL may dominate and some hosts re-touch lighting after the lights chunk.
+            try {
+              if (shader.fragmentShader) {
+                const fadeTag = '#include <lights_fragment_end>';
+                if (shader.fragmentShader.includes(fadeTag) && !shader.fragmentShader.includes('solidDirGroundDistanceFade')) {
+                  const fadeCode =
+                    '\n{\n' +
+                    '\t// solidDirGroundDistanceFade: dir-only ground falloff vs scene center xz\n' +
+                    '\t// Direct alone is not enough: ground is often SH/IBL-dominated in raster preview.\n' +
+                    '\tif ( uSolidDirGroundFadeEnable > 0.5 && uSolidMainLightType == 0 ) {\n' +
+                    '\t\tfloat dFade = length( vSolidShadowGroundPos.xz - uSolidDirGroundFadeCenter.xz );\n' +
+                    '\t\tfloat tFade = smoothstep( uSolidDirGroundFadeNear, uSolidDirGroundFadeFar, dFade );\n' +
+                    '\t\tfloat fFade = mix( 1.0, uSolidDirGroundFadeMin, tFade );\n' +
+                    '\t\treflectedLight.directDiffuse *= fFade;\n' +
+                    '\t\treflectedLight.directSpecular *= fFade;\n' +
+                    '\t\treflectedLight.indirectDiffuse *= mix( 1.0, fFade, 0.92 );\n' +
+                    '\t}\n' +
+                    '}\n';
+                  shader.fragmentShader = shader.fragmentShader.replace(fadeTag, fadeTag + fadeCode);
+                }
+                if (!shader.fragmentShader.includes('solidDirGroundDistanceFadeOut')) {
+                  const fadeOut =
+                    '\n{\n' +
+                    '\t// solidDirGroundDistanceFadeOut: final ground color falloff (dir only)\n' +
+                    '\tif ( uSolidDirGroundFadeEnable > 0.5 && uSolidMainLightType == 0 ) {\n' +
+                    '\t\tfloat dFadeOut = length( vSolidShadowGroundPos.xz - uSolidDirGroundFadeCenter.xz );\n' +
+                    '\t\tfloat tFadeOut = smoothstep( uSolidDirGroundFadeNear, uSolidDirGroundFadeFar, dFadeOut );\n' +
+                    '\t\tfloat fFadeOut = mix( 1.0, uSolidDirGroundFadeMin, tFadeOut );\n' +
+                    '\t\tgl_FragColor.rgb *= fFadeOut;\n' +
+                    '\t}\n' +
+                    '}\n';
+                  const outTags = [
+                    '#include <opaque_fragment>',
+                    '#include <output_fragment>',
+                    '#include <tonemapping_fragment>',
+                  ];
+                  let injectedOut = false;
+                  for (let oi = 0; oi < outTags.length; oi++) {
+                    const ot = outTags[oi];
+                    if (shader.fragmentShader.includes(ot)) {
+                      shader.fragmentShader = shader.fragmentShader.replace(ot, ot + fadeOut);
+                      injectedOut = true;
+                      break;
+                    }
+                  }
+                  if (!injectedOut) shader.fragmentShader += fadeOut;
+                }
+              }
+            } catch (_eFadeInj) {}
+
             // gaussian PCF params (constants wrapped as uniforms for easy tuning)
             try {
               const mob = (isMobile || isIosHost);
@@ -2273,6 +2396,7 @@ export function createSolidPreviewLightingManager(opts) {
           } catch (_eDbgV) {
             log('[RasterShadowSoft] ground patch armed');
           }
+          try { solidSyncOnBeforeCompileExternalHead(m); } catch (_eSyncHead) {}
           m.needsUpdate = true;
         }
       } catch (_eGs) {}
@@ -2667,6 +2791,8 @@ export function createSolidPreviewLightingManager(opts) {
   function _solidShEnsureDiffusePatch(material) {
     if (!material || (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial)) return;
     if (!_solidShIrrEnabled()) return;
+    // 先于 onBeforeCompile 建好同一套 uniforms，避免 finalize 里 push 时 _solidShUni 尚不存在、shMix 长期停在 0。
+    try { _solidShEnsureUniforms(material); } catch (_eUni0) {}
     if (material.userData.__solidShPatchVer === _SOLID_SH_PATCH_VER) return;
     material.userData.__solidShPatchVer = _SOLID_SH_PATCH_VER;
     solidInstallOnBeforeCompilePatch(material, {

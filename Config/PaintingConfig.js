@@ -190,6 +190,24 @@ export const SOLID_RASTER_PREVIEW_CANVAS_FILTER = {
  */
 export const SOLID_RASTER_PREVIEW_LIGHTING_PRESET = 'balanced';
 
+/**
+ * 平行光 · 光栅预览：只让「地面」远处慢慢变暗（假衰减，平行光本身仍不按距离变暗）。
+ * 距离按「离场景中心（头模脚下一带）在地面上有多远」来算，单位是场景世界尺寸。
+ *
+ * 通俗调参：
+ * - near：多远以内地面保持全亮（头模附近别先暗）。数值越大，亮区越大。
+ * - far：多远以外基本暗到位（接近地平线）。数值越大，变暗来得越晚、过渡带越长。
+ * - minFactor：最远处还留多少亮（0=几乎全黑，1=完全不暗）。略留一点可避免地平线死黑断崖。
+ *
+ * 中间这段（near→far）会平滑过渡，不是一刀切。只影响平行光；点光/聚光/追光不受影响。
+ */
+export const SOLID_DIR_GROUND_DISTANCE_FADE = {
+  enabled: true,
+  near: 14, // 全亮半径：离中心这么远以内，地面几乎不压暗
+  far: 42, // 暗到位半径：离中心这么远以外，按 minFactor 压到最暗
+  minFactor: 0.12, // 最远处亮度保留比例（约 12%），避免远景完全死黑
+};
+
 // 光栅模式「大光盘」双灯耦合（方案 B）配置
 // - enabled=false：保持当前单灯行为（可一键回滚）
 // - enabled=true：在光栅模式启用“照明灯+投影灯”双灯
