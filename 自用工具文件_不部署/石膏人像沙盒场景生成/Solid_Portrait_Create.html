@@ -84,7 +84,14 @@
     .solid-create-straight-app-row { display:flex; align-items:center; gap:8px; margin-top:8px; }
     .solid-create-straight-app-row span.label { font-size:14px; color:#f2f2f2; white-space:nowrap; flex-shrink:0; width:72px; font-weight:500; }
     .solid-create-straight-app-row input[type="range"] { flex:1; min-width:0; }
-    .solid-create-straight-app-row span.val { font-size:14px; color:#fff; width:40px; text-align:right; font-variant-numeric:tabular-nums; flex-shrink:0; font-weight:500; }
+    .solid-create-straight-app-row span.val { font-size:14px; color:#fff; min-width:40px; min-height:22px; text-align:right; font-variant-numeric:tabular-nums; flex-shrink:0; font-weight:500; display:inline-flex; align-items:center; justify-content:flex-end; box-sizing:border-box; padding:2px 0; }
+    .solid-create-straight-app-row span.val-editable { cursor:text; user-select:none; pointer-events:auto; }
+    .solid-create-straight-app-row span.val-editable.is-disabled { cursor:default; opacity:0.45; }
+    .solid-create-straight-app-row .solid-create-straight-val-input {
+      width:52px; max-width:56px; box-sizing:border-box; font-size:13px; padding:2px 4px; text-align:right;
+      background:rgba(0,0,0,0.7); color:#fff; border:1px solid rgba(46,204,113,0.7); border-radius:3px;
+      font-variant-numeric:tabular-nums; outline:none; flex:none; z-index:5; position:relative;
+    }
     /* 左右栏宽度拖拽条：默认隐形，悬停/拖动时微亮 */
     .editor-panel-resize-handle {
         position: absolute; top: 0; bottom: 0; width: 6px; z-index: 30;
@@ -230,6 +237,10 @@
     <input id="solid-create-label-circle" type="checkbox" disabled style="accent-color:#2ecc71; transform:scale(1.15); cursor:pointer; margin:0;">
     <span style="font-size:14px; color:#eee; white-space:nowrap; font-weight:500;">圆形</span>
     </label>
+    <label id="solid-create-depth-clip-wrap" style="display:flex; align-items:center; gap:4px; margin:0; min-width:0; cursor:pointer; user-select:none;" title="【深度裁切】仅经典引出线。&#10;&#10;默认关闭（不影响转动性能）。勾选后：停稳约 0.15 秒再判断；贴点被头模挡住时隐藏圆点，引线在遮挡边界处裁断，剩余段改为细点线，标签与可见段透明度约为原来的 90%。&#10;可 Ctrl/Cmd 多选后一并开/关。&#10;存盘写入 depthClip；旧数据无此字段=关闭。">
+    <input id="solid-create-depth-clip" type="checkbox" disabled style="accent-color:#2ecc71; transform:scale(1.15); cursor:pointer; margin:0;">
+    <span style="font-size:14px; color:#eee; white-space:nowrap; font-weight:500;">深度裁切</span>
+    </label>
     <label id="solid-create-occlude-wrap" style="display:flex; align-items:center; gap:4px; margin:0; min-width:0;" title="【侧面淡出】控制当前选中标注「贴面转侧多少后才变半透明」（经典引线 / 贝塞尔均可 Ctrl 多选后一并改）。&#10;&#10;原理：看贴点表面是否朝向相机（不是被别的物体挡住多少）。&#10;越灵敏：稍侧一点就淡；越钝：转过去更多才淡。&#10;&#10;用法：先点选「经典引线」或「贝塞尔曲线」，再改下拉；取消选中后该条仍按此档生效。&#10;存盘写入场景 JSON，消费端 Solid 同样按该档显示。旧数据无此字段=默认。&#10;&#10;本控件仅对经典引线与贝塞尔曲线可用。"> <span style="font-size:14px; color:#eee; white-space:nowrap; font-weight:500;">侧面淡出</span>
     <select id="solid-create-occlude-select" disabled class="editor-select" style="margin:0; width:88px; max-width:45%; padding:4px 6px; font-size:13px; background:#111; color:#0df; border-color:#444;">
     <option value="0.25">很灵敏</option> <option value="0.1">灵敏</option> <option value="-0.05" selected>默认</option> <option value="-0.2">略钝</option> <option value="-0.35">钝</option> <option value="-0.55">很钝</option> <option value="-0.8">极钝</option>
@@ -246,13 +257,13 @@
     <span class="val" style="visibility:hidden;">—</span></div>
     <div class="solid-create-straight-app-row"><span class="label">粗细</span>
     <input type="range" id="solid-create-straight-stroke" min="1" max="6" step="0.5" value="4.5" disabled aria-label="贝塞尔粗细">
-    <span class="val" id="solid-create-straight-stroke-val">4.5</span></div>
+    <span class="val val-editable" id="solid-create-straight-stroke-val" title="双击输入数值">4.5</span></div>
     <div class="solid-create-straight-app-row"><span class="label">透明度</span>
     <input type="range" id="solid-create-straight-opacity" min="15" max="100" step="1" value="90" disabled aria-label="贝塞尔透明度">
-    <span class="val" id="solid-create-straight-opacity-val">90%</span></div>
+    <span class="val val-editable" id="solid-create-straight-opacity-val" title="双击输入数值（单位 %）">90%</span></div>
     <div class="solid-create-straight-app-row"><span class="label">端点直径</span>
     <input type="range" id="solid-create-straight-cap" min="1" max="24" step="1" value="13" disabled aria-label="贝塞尔端点直径">
-    <span class="val" id="solid-create-straight-cap-val">13</span></div>
+    <span class="val val-editable" id="solid-create-straight-cap-val" title="双击输入数值">13</span></div>
     </div>
     </div>
     </div>
@@ -905,7 +916,67 @@
     const SOLID_CREATE_DRAFT_DB = 'SolidCreateDraftDB'; const SOLID_CREATE_DRAFT_STORE = 'drafts'; const SOLID_CREATE_DRAFT_KEY = 'main'; let _draftDirty = false;
     let _draftSaving = false; let _draftLastSavedAt = 0; // 记录“草稿对应的源文件名”，用于恢复后继续覆写同一文件
     window.__solidNoInterModelShadow = false;
-    window._solidCreateDraftFileName = null; function markDraftDirty() { _draftDirty = true; try { if (typeof window.updateAnnotationEyeButtonVisibility === 'function') window.updateAnnotationEyeButtonVisibility(); } catch (_eEye) {} } window.markDraftDirty = markDraftDirty;
+    window._solidCreateDraftFileName = null;
+    window.__solidCreateTextEditFrozen = false;
+    function markDraftDirty() { _draftDirty = true; try { if (typeof window.updateAnnotationEyeButtonVisibility === 'function') window.updateAnnotationEyeButtonVisibility(); } catch (_eEye) {} } window.markDraftDirty = markDraftDirty;
+    /** 文本编辑路径：只标脏，不刷标注小眼睛（避免逐字扫列表） */
+    function markDraftDirtyLight() { _draftDirty = true; } window.markDraftDirtyLight = markDraftDirtyLight;
+    function solidCreateIsTextEditEl(el) {
+        if (!el) return false;
+        if (el.nodeType === 3) el = el.parentElement;
+        if (!el || el.nodeType !== 1) return false;
+        const id = el.id || '';
+        if (id === 'scene-name-input' || id === 'scene-meta-detail-input' || id === 'solid-create-anno-detail') return true;
+        try {
+            if (el.closest) {
+                if (el.closest('#scene-name-input, #scene-meta-detail-input, #solid-create-anno-detail')) return true;
+                const kp = el.closest('#scene-meta-keypoints-root');
+                if (kp) {
+                    if (el.isContentEditable) return true;
+                    let p = el;
+                    while (p && p !== kp) {
+                        if (p.isContentEditable) return true;
+                        p = p.parentElement;
+                    }
+                }
+            }
+        } catch (_e) {}
+        return false;
+    }
+    function solidCreateEnterTextEditFreeze() {
+        if (window.__solidCreateTextEditFrozen) return;
+        window.__solidCreateTextEditFrozen = true;
+        if (portraitAnimRafId) {
+            try { cancelAnimationFrame(portraitAnimRafId); } catch (_e) {}
+            portraitAnimRafId = 0;
+        }
+    }
+    function solidCreateLeaveTextEditFreeze() {
+        if (!window.__solidCreateTextEditFrozen) return;
+        window.__solidCreateTextEditFrozen = false;
+        if (!document.hidden && !portraitAnimRafId) {
+            try { portraitAnimRafId = requestAnimationFrame(animate); } catch (_e) {}
+        }
+        // 打字期间积压的脏草稿在此一次写回（无脏则跳过，避免无谓整景序列化）
+        try { if (_draftDirty) void maybeSaveDraft(true); } catch (_e2) {}
+    }
+    function solidCreateInstallTextEditFreezeGate() {
+        if (window.__solidCreateTextEditFreezeGateInstalled) return;
+        window.__solidCreateTextEditFreezeGateInstalled = true;
+        document.addEventListener('focusin', function (e) {
+            if (solidCreateIsTextEditEl(e.target)) solidCreateEnterTextEditFreeze();
+        }, true);
+        document.addEventListener('focusout', function (e) {
+            if (!solidCreateIsTextEditEl(e.target)) return;
+            if (solidCreateIsTextEditEl(e.relatedTarget)) return;
+            setTimeout(function () {
+                try {
+                    if (solidCreateIsTextEditEl(document.activeElement)) return;
+                    solidCreateLeaveTextEditFreeze();
+                } catch (_e) {}
+            }, 0);
+        }, true);
+    }
     function solidCreateSyncSaveButtonText() { const btn = document.getElementById('btn-save-direct'); if (!btn) return; btn.innerText = window.currentFileHandle ? '💾 覆写选中项' : '💾 保存新场景';
     }
     function solidCreateGetFileListScrollTop() {
@@ -1458,11 +1529,25 @@
         return true;
     }
 
-    async function maybeSaveDraft(force) { if (window.__isPageUnloading) return; if (_draftSaving) return; if (!force && !_draftDirty) return; if (!scene || !camera || !controls || !editorGroup) return; const now = Date.now();
-    if (!force && now - _draftLastSavedAt < 1200) return; _draftSaving = true; try { const data = buildDraftSceneData();
-    await draftPut({ v: 1, savedAt: now, fileName: (window.currentFileHandle && window.currentFileHandle.name) ? window.currentFileHandle.name : null, data }); _draftDirty = false; _draftLastSavedAt = now; } catch (_e) {
-    // ignore: quota/blocked
-    } finally { _draftSaving = false; } }
+    async function maybeSaveDraft(force) {
+        if (window.__isPageUnloading) return;
+        if (_draftSaving) return;
+        // 文本编辑冻帧期间跳过定时整景序列化；force（关页/切后台/失焦）仍写
+        if (!force && window.__solidCreateTextEditFrozen) return;
+        if (!force && !_draftDirty) return;
+        if (!scene || !camera || !controls || !editorGroup) return;
+        const now = Date.now();
+        if (!force && now - _draftLastSavedAt < 1200) return;
+        _draftSaving = true;
+        try {
+            const data = buildDraftSceneData();
+            await draftPut({ v: 1, savedAt: now, fileName: (window.currentFileHandle && window.currentFileHandle.name) ? window.currentFileHandle.name : null, data });
+            _draftDirty = false;
+            _draftLastSavedAt = now;
+        } catch (_e) {
+            // ignore: quota/blocked
+        } finally { _draftSaving = false; }
+    }
     // 分帧清场：先快速 remove，让界面立即恢复响应；真正销毁(dispose)分批做，避免一次性卡死。
     let _pendingDisposeQueue = [];
     let _pendingDisposeRaf = 0;
@@ -3141,6 +3226,7 @@
             const occludeSel = document.getElementById('solid-create-occlude-select');
             const projectBtn = document.getElementById('solid-create-project-straight-btn');
             const labelCircleCb = document.getElementById('solid-create-label-circle');
+            const depthClipCb = document.getElementById('solid-create-depth-clip');
             const strokeSl = document.getElementById('solid-create-straight-stroke');
             const strokeVal = document.getElementById('solid-create-straight-stroke-val');
             const opacitySl = document.getElementById('solid-create-straight-opacity');
@@ -3170,6 +3256,13 @@
                 labelCircleCb.disabled = !list.length;
                 const d = list.length ? list[list.length - 1] : null;
                 labelCircleCb.checked = !!(d && d.labelShape === 'circle');
+            }
+            function syncDepthClipCb() {
+                if (!depthClipCb) return;
+                const list = getSelectedClassicLeaders();
+                depthClipCb.disabled = !list.length;
+                const d = list.length ? list[list.length - 1] : null;
+                depthClipCb.checked = !!(d && d.depthClip === true);
             }
             function nearestOccludeOption(v) {
                 const n = (typeof v === 'number' && isFinite(v)) ? v : DEFAULT_OCCLUDE;
@@ -3234,16 +3327,16 @@
                 } else {
                     app = { strokeWidth: 4.5, opacity: 0.9, capR: 6.5, lineStyle: 'dashed' };
                 }
-                if (strokeSl && document.activeElement !== strokeSl) {
+                if (strokeSl && document.activeElement !== strokeSl && !(strokeVal && strokeVal.__solidValEditing)) {
                     strokeSl.value = String(app.strokeWidth);
                     if (strokeVal) strokeVal.textContent = String(app.strokeWidth);
                 }
-                if (opacitySl && document.activeElement !== opacitySl) {
+                if (opacitySl && document.activeElement !== opacitySl && !(opacityVal && opacityVal.__solidValEditing)) {
                     const pct = Math.round(app.opacity * 100);
                     opacitySl.value = String(pct);
                     if (opacityVal) opacityVal.textContent = pct + '%';
                 }
-                if (capSl && document.activeElement !== capSl) {
+                if (capSl && document.activeElement !== capSl && !(capVal && capVal.__solidValEditing)) {
                     const diam = Math.round(app.capR * 2);
                     capSl.value = String(diam);
                     if (capVal) capVal.textContent = String(diam);
@@ -3251,6 +3344,17 @@
                 if (lineStyleSel && document.activeElement !== lineStyleSel) {
                     lineStyleSel.value = app.lineStyle || 'dashed';
                 }
+                [strokeVal, opacityVal, capVal].forEach(function (el) {
+                    if (!el) return;
+                    el.classList.toggle('is-disabled', !enabled);
+                    if (el.__solidValEditing) return;
+                    if (enabled) {
+                        if (el === opacityVal) el.title = '双击输入数值（单位 %）';
+                        else el.title = '双击输入数值';
+                    } else {
+                        el.title = '请先选中贝塞尔曲线，再双击输入';
+                    }
+                });
                 const appTitle = document.querySelector('#solid-create-straight-appearance > div');
                 if (appTitle && appTitle.textContent && appTitle.textContent.indexOf('贝塞尔外观') === 0) {
                     appTitle.textContent = list.length > 1
@@ -3347,6 +3451,7 @@
                     else occludeSel.value = String(DEFAULT_OCCLUDE);
                 }
                 syncLabelCircleCb();
+                syncDepthClipCb();
                 syncProjectStraightBtn();
                 syncStraightAppearanceSliders();
                 try { if (typeof window.syncSharedAnnoObjColorPickers === 'function') window.syncSharedAnnoObjColorPickers('obj'); } catch (_eCol) {}
@@ -3377,6 +3482,32 @@
                             }
                         } catch (_eShape) {}
                     });
+                    if (typeof needsUpdate !== 'undefined') needsUpdate = true;
+                    try { if (typeof markDraftDirty === 'function') markDraftDirty(); } catch (_e) {}
+                });
+            }
+            if (depthClipCb) {
+                depthClipCb.addEventListener('change', function () {
+                    const list = getSelectedClassicLeaders();
+                    if (!list.length) {
+                        this.checked = false;
+                        this.disabled = true;
+                        return;
+                    }
+                    const want = !!this.checked;
+                    list.forEach(function (d) {
+                        if (want) d.depthClip = true;
+                        else {
+                            delete d.depthClip;
+                            d.depthBlocked = false;
+                            d.depthClipU = null;
+                        }
+                    });
+                    try {
+                        if (window.AnnotationManager && typeof window.AnnotationManager._invalidateDepthOcclusion === 'function') {
+                            window.AnnotationManager._invalidateDepthOcclusion();
+                        }
+                    } catch (_eInv) {}
                     if (typeof needsUpdate !== 'undefined') needsUpdate = true;
                     try { if (typeof markDraftDirty === 'function') markDraftDirty(); } catch (_e) {}
                 });
@@ -3432,6 +3563,102 @@
             if (opacitySl) opacitySl.addEventListener('input', applyStraightFromSliders);
             if (capSl) capSl.addEventListener('input', applyStraightFromSliders);
             if (lineStyleSel) lineStyleSel.addEventListener('change', applyStraightFromSliders);
+            (function bindStraightAppearanceValEditors() {
+                let activeEditor = null;
+                function clampToRange(val, range) {
+                    let n = Number(val);
+                    if (!Number.isFinite(n)) return null;
+                    const min = Number(range.min);
+                    const max = Number(range.max);
+                    const st = Number(range.step) || 1;
+                    n = Math.max(min, Math.min(max, n));
+                    if (Number.isFinite(st) && st > 0) {
+                        const steps = Math.round((n - min) / st);
+                        n = min + steps * st;
+                        n = Math.max(min, Math.min(max, n));
+                        const dec = (String(st).split('.')[1] || '').length;
+                        if (dec > 0) n = Number(n.toFixed(dec));
+                        else n = Math.round(n);
+                    } else n = Math.round(n);
+                    return n;
+                }
+                function bindOne(span, range, parseDisplay) {
+                    if (!span || !range || span.__solidValEditorBound === '1') return;
+                    span.__solidValEditorBound = '1';
+                    span.addEventListener('mousedown', function (e) {
+                        // 避免双击第二下被面板其它逻辑吃掉 / 触发文字选择
+                        if (e.detail >= 2) { e.preventDefault(); e.stopPropagation(); }
+                    });
+                    span.addEventListener('dblclick', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (activeEditor || span.__solidValEditing) return;
+                        if (range.disabled) {
+                            try {
+                                if (window.showToast) window.showToast('请先在画面中点选一条贝塞尔曲线', true);
+                            } catch (_eT) {}
+                            return;
+                        }
+                        const input = document.createElement('input');
+                        input.type = 'number';
+                        input.className = 'solid-create-straight-val-input';
+                        const shown = (typeof parseDisplay === 'function')
+                            ? parseDisplay(span.textContent)
+                            : String(span.textContent || '').replace(/%/g, '').trim();
+                        input.value = shown;
+                        input.min = String(range.min);
+                        input.max = String(range.max);
+                        input.step = String(range.step || 1);
+                        span.style.visibility = 'hidden';
+                        span.parentNode.insertBefore(input, span.nextSibling);
+                        span.__solidValEditing = true;
+                        activeEditor = { span: span, input: input };
+                        let settled = false;
+                        function teardown() {
+                            try { input.remove(); } catch (_eR) {}
+                            span.style.visibility = '';
+                            span.__solidValEditing = false;
+                            if (activeEditor && activeEditor.span === span) activeEditor = null;
+                        }
+                        function cancel() {
+                            if (settled) return;
+                            settled = true;
+                            teardown();
+                        }
+                        function commit() {
+                            if (settled) return;
+                            settled = true;
+                            const n = clampToRange(input.value, range);
+                            teardown();
+                            if (n === null) return;
+                            range.disabled = false;
+                            range.value = String(n);
+                            range.dispatchEvent(new Event('input', { bubbles: true }));
+                            range.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        input.addEventListener('keydown', function (ev) {
+                            ev.stopPropagation();
+                            if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+                            else if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+                        });
+                        input.addEventListener('mousedown', function (ev) { ev.stopPropagation(); });
+                        input.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+                        input.addEventListener('blur', function () {
+                            // 给二次点击/焦点切换一点缓冲，避免刚弹出就被立刻提交关掉
+                            setTimeout(function () { if (!settled) commit(); }, 80);
+                        });
+                        // 双击收尾的 mouseup 可能抢走焦点：延后 focus
+                        setTimeout(function () {
+                            try { input.focus(); input.select(); } catch (_eF) {}
+                        }, 0);
+                    });
+                }
+                bindOne(strokeVal, strokeSl);
+                bindOne(opacityVal, opacitySl, function (t) {
+                    return String(t || '').replace(/%/g, '').trim();
+                });
+                bindOne(capVal, capSl);
+            })();
             if (occludeSel) {
                 occludeSel.addEventListener('change', function () {
                     const targets = getOccludeTargets();
@@ -3485,7 +3712,7 @@
             setInterval(function () {
                 try {
                     const ae = document.activeElement;
-                    if (ae === ta || ae === occludeSel || ae === labelCircleCb || ae === strokeSl || ae === opacitySl || ae === capSl) return;
+                    if (ae === ta || ae === occludeSel || ae === labelCircleCb || ae === depthClipCb || ae === strokeSl || ae === opacitySl || ae === capSl) return;
                     syncPanel();
                 } catch (_e) {}
             }, 2000);
@@ -3498,15 +3725,16 @@
             const nameEl = document.getElementById('scene-name-input');
             const detailEl = document.getElementById('scene-meta-detail-input');
             const catEl = document.getElementById('scene-meta-category-select');
-            if (nameEl) nameEl.addEventListener('input', () => markDraftDirty());
-            if (detailEl) detailEl.addEventListener('input', () => markDraftDirty());
+            if (nameEl) nameEl.addEventListener('input', () => markDraftDirtyLight());
+            if (detailEl) detailEl.addEventListener('input', () => markDraftDirtyLight());
             if (catEl) catEl.addEventListener('change', () => markDraftDirty());
+            try { solidCreateInstallTextEditFreezeGate(); } catch (_eFreezeGate) {}
             try {
                 const kpRoot = document.getElementById('scene-meta-keypoints-root');
                 if (kpRoot && window.SolidSceneKeyPoints && typeof window.SolidSceneKeyPoints.bindProducerEditor === 'function') {
                     window.__solidCreateKeyPointsEditor = window.SolidSceneKeyPoints.bindProducerEditor({
                         rootEl: kpRoot,
-                        onDirty: function () { try { markDraftDirty(); } catch (_e) {} },
+                        onDirty: function () { try { markDraftDirtyLight(); } catch (_e) {} },
                         placeholder: '写本场景要传达的知识（可较长）。列表简介请用左栏「场景说明」。'
                     });
                 }
@@ -3537,7 +3765,7 @@
         if (window.DoFManager) window.DoFManager.init(camera, scene, renderer.domElement);
         const canvasContainerForEvents = document.getElementById('canvas-container');
         // 【优化3核心】：仅将场景控制器挂载到父级 container 上，接收穿透冒泡的拖拽旋转事件！
-        controls = new OrbitControls(camera, canvasContainerForEvents); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; window._orbitInteracting = false;
+        controls = new OrbitControls(camera, canvasContainerForEvents); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; window.controls = controls; window._orbitInteracting = false;
         // 新建场景默认对准世界原点（方案 A）：让(0,0,0)落在取景框中心（屏幕中心）。若后续恢复草稿/加载场景相机数据，会覆盖此默认值。
         try { controls.target.set(0, 0, 0); } catch (_eCt0) {}
         try { camera.lookAt(0, 0, 0); } catch (_eLa0) {}
@@ -3847,7 +4075,7 @@
         try { window._solidGroundShadowDirty = true; } catch (_eGd) {}
         try { if (!window.useAdvancedRender && typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('visibility_visible'); } catch (_eP) {}
         }); });
-        if (!portraitAnimRafId && !document.hidden) portraitAnimRafId = requestAnimationFrame(animate);
+        if (!portraitAnimRafId && !document.hidden && !window.__solidCreateTextEditFrozen) portraitAnimRafId = requestAnimationFrame(animate);
         });
 
         // 与消费端对齐：主光统一走重建路径，避免“复用参数残留”造成两端观感偏差。
@@ -3996,7 +4224,7 @@
         const cachedCrop = localStorage.getItem('solidCropBoxCache'); if(cachedCrop) { const c = JSON.parse(cachedCrop); cropBox.style.left = c.left; cropBox.style.top = c.top; cropBox.style.width = c.width; cropBox.style.height = c.height; }
         }
         function animate() {
-        if (document.hidden) { portraitAnimRafId = 0; return; }
+        if (document.hidden || window.__solidCreateTextEditFrozen) { portraitAnimRafId = 0; return; }
         portraitAnimRafId = requestAnimationFrame(animate);
         try { if (typeof solidCreateSceneLoadUxTickStabilize === 'function') solidCreateSceneLoadUxTickStabilize(); } catch (_eStableTick) {}
         try { const _h = _solidInitFirstFrameHintController(); if (_h && _h.tick) _h.tick({ sceneToken: window._editorSceneLoadGen }); } catch (_eHintTick) {}
@@ -4060,5 +4288,5 @@
         } catch(e) { triggerUnsupported(); } } }
         init(); // 关页避免同步 dispose WebGL。pagehide/visibility 取消 RAF，避免后台仍排队 requestAnimationFrame（旧逻辑每帧先 rAF 再 return），刷新时与 WebGL 回收竞态易整页卡死。
         window.addEventListener('pagehide', function() { try { void maybeSaveDraft(true); } catch(_e) {} window.__isPageUnloading = true; window.useAdvancedRender = false; try { if (typeof window.__solidCreateReleaseCaptureTrack === 'function') window.__solidCreateReleaseCaptureTrack(); } catch(_e2) {} try { if (window.LightIndicatorManager && window.LightIndicatorManager.dispose) window.LightIndicatorManager.dispose(); } catch(_e3) {} if (portraitAnimRafId) { try { cancelAnimationFrame(portraitAnimRafId); } catch(e) {} portraitAnimRafId = 0; } }, { capture: true });
-        window.addEventListener('pageshow', function(ev) { if (ev.persisted && !portraitAnimRafId && !document.hidden) portraitAnimRafId = requestAnimationFrame(animate); });
+        window.addEventListener('pageshow', function(ev) { if (ev.persisted && !portraitAnimRafId && !document.hidden && !window.__solidCreateTextEditFrozen) portraitAnimRafId = requestAnimationFrame(animate); });
         window.addEventListener('beforeunload', function() { try { void maybeSaveDraft(true); } catch(_e) {} window.__isPageUnloading = true; window.useAdvancedRender = false; try { if (typeof window.__solidCreateReleaseCaptureTrack === 'function') window.__solidCreateReleaseCaptureTrack(); } catch(_e2) {} if (portraitAnimRafId) { try { cancelAnimationFrame(portraitAnimRafId); } catch(e) {} portraitAnimRafId = 0; } }); </script> </body> </html>

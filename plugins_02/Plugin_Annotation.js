@@ -3,6 +3,7 @@ window.annoDataList = [];
 window.annoCounter = 0;
 window.AnnotationManager = {
     selectedId: null,
+    selectedIds: [],
     isPlacing: false,
     activeData: null,
     _cachedControls: null,
@@ -87,9 +88,11 @@ window.AnnotationManager = {
         });
         window.annoDataList = [];
         this.selectedId = null;
+        this.selectedIds = [];
         this.isPlacing = false;
         this.activeData = null;
         this._cachedControls = null;
+        try { this._invalidateDepthOcclusion(); } catch (_eInv) {}
         const handlesSvg = document.getElementById('anno-anchor-handles');
         if (handlesSvg) handlesSvg.innerHTML = '';
     },
@@ -105,6 +108,7 @@ window.AnnotationManager = {
             return a;
         });
         if (safeData.length > 0) this.restoreAnnotations(ctx.obj, safeData);
+        try { this._invalidateDepthOcclusion(); } catch (_eInv) {}
     },
     onLoadGround: function (ctx) {
         if (!ctx.sceneData.groundAnnotations) return;
@@ -117,6 +121,7 @@ window.AnnotationManager = {
             return a;
         });
         if (safeData.length > 0) this.restoreAnnotations(ctx.obj, safeData);
+        try { this._invalidateDepthOcclusion(); } catch (_eInv) {}
     },
     onSaveItemData: function (context) {
         const annos = this.extractSaveData(context.obj);
@@ -169,6 +174,7 @@ window.AnnotationManager = {
                 baseScale: aData.baseScale
             };
             if (aData.labelShape === 'circle') entry.labelShape = 'circle';
+            if (aData.depthClip === true) entry.depthClip = true;
             if (typeof aData.occludeDot === 'number' && isFinite(aData.occludeDot)) {
                 entry.occludeDot = parseFloat(aData.occludeDot.toFixed(2));
             }
@@ -475,6 +481,21 @@ window.AnnotationManager = {
             textEl.style.width = '';
             textEl.style.height = '';
         }
+        // 双击编辑中：保持圆形外观类名，但不锁死正圆直径 / flex 铺满，否则 contentEditable 无法输入
+        if (editing) {
+            const cached = (typeof data._labelCircleDiameterPx === 'number' && data._labelCircleDiameterPx > 1)
+                ? data._labelCircleDiameterPx : 28;
+            div.style.width = 'auto';
+            div.style.height = 'auto';
+            div.style.minWidth = Math.max(28, cached) + 'px';
+            div.style.minHeight = Math.max(28, cached) + 'px';
+            if (textEl) {
+                textEl.style.display = 'block';
+                textEl.style.webkitUserSelect = 'text';
+                textEl.style.userSelect = 'text';
+            }
+            return;
+        }
         // 每次重算直径，避免改 padding/字号后仍用旧缓存导致单字不居中
         try { delete data._labelCircleDiameterPx; } catch (_eE) { data._labelCircleDiameterPx = null; }
         let d = 0;
@@ -506,7 +527,7 @@ window.AnnotationManager = {
                 }
             } catch (_ePad) {}
             d = Math.max(18, w, h);
-            if (!editing && d > 1) data._labelCircleDiameterPx = d;
+            if (d > 1) data._labelCircleDiameterPx = d;
         } catch (_eM) {
             d = 18;
         } finally {
@@ -692,6 +713,351 @@ window.AnnotationManager = {
         }
         return false;
     },
+
+    // --- 经典引出线深度裁切（opt-in：depthClip；默认关=转动零开销）---
+    DEPTH_SETTLE_MS: 150,
+    DEPTH_BIAS: 0.05,
+    DEPTH_BIN_ITERS: 9,
+    /** 深度裁切后剩余引线：细点线（接近虚线观感） */
+    DEPTH_CLIP_DASH: '2, 5',
+
+    _annoHasDepthClip: function (data) {
+        return !!(data && data.depthClip === true);
+    },
+    _annoListHasDepthClip: function () {
+        const list = window.annoDataList || [];
+        for (let i = 0; i < list.length; i++) {
+            if (this._annoHasDepthClip(list[i])) return true;
+        }
+        return false;
+    },
+    _clearAllDepthOcclusion: function () {
+        const list = window.annoDataList || [];
+        for (let i = 0; i < list.length; i++) {
+            list[i].depthBlocked = false;
+            list[i].depthClipU = null;
+            list[i].depthVisFlags = null;
+        }
+    },
+    _invalidateDepthOcclusion: function () {
+        this._depthWorkQueue = null;
+        this._depthSettleArmed = false;
+        this._depthShowFullWhileMoving = false;
+        this._depthMeshesByRoot = null;
+        this._clearAllDepthOcclusion();
+    },
+    _isDepthOccluderMesh: function (o) {
+        if (!o || !o.isMesh || !o.visible) return false;
+        if (o.name === 'transformControl' || (o.name && String(o.name).includes('helper'))) return false;
+        if (o.userData && (o.userData.isAnnotationHelper || o.userData.skipAnnoDepthOcclude)) return false;
+        // 地面/阴影接收面：沿线屏幕射线常会打到，导致「空档里也算被挡」提前裁断
+        const n = (o.name && String(o.name).toLowerCase()) || '';
+        if (n.includes('ground') || n.includes('floor') || n.includes('shadow') || n.includes('plane')) return false;
+        if (o.userData && (o.userData.isGround || o.userData.isFloor || o.userData.isShadowCatcher)) return false;
+        return true;
+    },
+    _getDepthMeshesForRoot: function (root) {
+        if (!root) return [];
+        if (!this._depthMeshesByRoot) this._depthMeshesByRoot = Object.create(null);
+        const id = root.uuid || root.id || String(root);
+        if (this._depthMeshesByRoot[id]) return this._depthMeshesByRoot[id];
+        const collect = (node, out) => {
+            if (!node) return;
+            try {
+                node.traverse((o) => {
+                    if (this._isDepthOccluderMesh(o)) out.push(o);
+                });
+            } catch (_e) {}
+        };
+        const list = [];
+        collect(root, list);
+        // 消费端偶发：锚点挂在空 Group 上，需向上或回退到场景组取头模网格
+        if (list.length === 0) {
+            let p = root.parent;
+            for (let i = 0; i < 6 && p && list.length === 0; i++) {
+                collect(p, list);
+                p = p.parent;
+            }
+        }
+        if (list.length === 0) {
+            try {
+                const g = window.__solidHost && window.__solidHost.getSceneGroup && window.__solidHost.getSceneGroup();
+                if (g) collect(g, list);
+            } catch (_e2) {}
+        }
+        this._depthMeshesByRoot[id] = list;
+        return list;
+    },
+    _depthPoseKey: function (camera) {
+        if (!camera || !camera.position) return '';
+        const p = camera.position;
+        const q = camera.quaternion;
+        // 量化偏粗：轨道阻尼微抖不打断「停稳」判定，避免 depthClip 永远算不出来
+        const a = (n) => (Math.round(n * 20) / 20);
+        let tx = 0, ty = 0, tz = 0, hasT = false;
+        try {
+            const c = window.controls || (window.__solidHost && window.__solidHost.getControls && window.__solidHost.getControls());
+            if (c && c.target) {
+                tx = c.target.x; ty = c.target.y; tz = c.target.z; hasT = true;
+            }
+        } catch (_e) {}
+        return hasT
+            ? [a(p.x), a(p.y), a(p.z), a(tx), a(ty), a(tz), a(q.x), a(q.y), a(q.z)].join(',')
+            : [a(p.x), a(p.y), a(p.z), a(q.x), a(q.y), a(q.z)].join(',');
+    },
+    _ensureDepthRayPool: function () {
+        if (this._depthPoolInit) return;
+        this._depthRaycaster = new THREE.Raycaster();
+        this._depthNdc = new THREE.Vector2();
+        this._depthCamPos = new THREE.Vector3();
+        this._depthDir = new THREE.Vector3();
+        this._depthAnchorWorld = new THREE.Vector3();
+        this._depthPoolInit = true;
+    },
+    _depthAnchorBlocked: function (camera, meshes, anchorWorld, anchorDist) {
+        if (!meshes || meshes.length === 0 || !anchorWorld) return false;
+        const dist = Math.max(0, Number(anchorDist) || 0);
+        if (dist < 1e-4) return false;
+        this._depthCamPos.copy(camera.position);
+        this._depthDir.copy(anchorWorld).sub(this._depthCamPos);
+        const len = this._depthDir.length();
+        if (len < 1e-4) return false;
+        this._depthDir.divideScalar(len);
+        const bias = this.DEPTH_BIAS;
+        this._depthRaycaster.near = 0.02;
+        this._depthRaycaster.far = Math.max(0.03, len - bias);
+        this._depthRaycaster.set(this._depthCamPos, this._depthDir);
+        let hits;
+        try {
+            hits = this._depthRaycaster.intersectObjects(meshes, false);
+        } catch (_e) {
+            return false;
+        }
+        for (let i = 0; i < hits.length; i++) {
+            const h = hits[i];
+            if (!h || !h.object || !this._isDepthOccluderMesh(h.object)) continue;
+            if (h.distance < len - bias) return true;
+        }
+        return false;
+    },
+    _depthSampleVisible: function (camera, meshes, sx, sy, thresh) {
+        const vw = Math.max(1, window.innerWidth || 1);
+        const vh = Math.max(1, window.innerHeight || 1);
+        this._depthNdc.set((sx / vw) * 2 - 1, -(sy / vh) * 2 + 1);
+        this._depthRaycaster.setFromCamera(this._depthNdc, camera);
+        this._depthRaycaster.near = 0.02;
+        this._depthRaycaster.far = 1e6;
+        let hits;
+        try {
+            hits = this._depthRaycaster.intersectObjects(meshes, false);
+        } catch (_e) {
+            return true;
+        }
+        for (let i = 0; i < hits.length; i++) {
+            const h = hits[i];
+            if (h && h.object && this._isDepthOccluderMesh(h.object) && Number.isFinite(h.distance)) {
+                return !(h.distance < thresh);
+            }
+        }
+        return true;
+    },
+    /** u=0 贴点，u=0.5 折点，u=1 标签 */
+    _pointOnLeaderPoly: function (x, y, scaledDx, scaledDy, u) {
+        const uu = Math.max(0, Math.min(1, Number(u) || 0));
+        const x0 = x, y0 = y;
+        const x1 = x + scaledDx * 0.5, y1 = y + scaledDy;
+        const x2 = x + scaledDx, y2 = y + scaledDy;
+        if (uu <= 0.5) {
+            const t = uu / 0.5;
+            return { x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t };
+        }
+        const t = (uu - 0.5) / 0.5;
+        return { x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t };
+    },
+    /** 从裁切点画到标签（贴点侧被挡的部分不画） */
+    _depthPathFromClipU: function (x, y, scaledDx, scaledDy, uClip) {
+        const x1 = x + scaledDx;
+        const y1 = y + scaledDy;
+        const midX = x + scaledDx * 0.5;
+        const fullD = 'M ' + x + ' ' + y + ' L ' + midX + ' ' + y1 + ' L ' + x1 + ' ' + y1;
+        if (uClip == null || !isFinite(uClip)) return fullD;
+        if (uClip <= 0) return fullD;
+        if (uClip >= 0.999) return '';
+        const p = this._pointOnLeaderPoly(x, y, scaledDx, scaledDy, uClip);
+        if (uClip < 0.5) {
+            return 'M ' + p.x + ' ' + p.y + ' L ' + midX + ' ' + y1 + ' L ' + x1 + ' ' + y1;
+        }
+        return 'M ' + p.x + ' ' + p.y + ' L ' + x1 + ' ' + y1;
+    },
+    _depthPathFromFlags: function (data, x, y, scaledDx, scaledDy) {
+        if (!this._annoHasDepthClip(data)) {
+            const midX = x + scaledDx * 0.5;
+            return 'M ' + x + ' ' + y + ' L ' + midX + ' ' + (y + scaledDy) + ' L ' + (x + scaledDx) + ' ' + (y + scaledDy);
+        }
+        return this._depthPathFromClipU(x, y, scaledDx, scaledDy, data.depthClipU);
+    },
+    /**
+     * 贴点被挡时：从标签侧往贴点侧找「可见→被挡」边界（二分），在遮挡处裁切。
+     */
+    _computeAnnoDepthOcclusion: function (camera, data) {
+        if (!data || !data.anchorObj || data.isBehind || !this._annoHasDepthClip(data)) {
+            if (data) {
+                data.depthBlocked = false;
+                data.depthClipU = null;
+            }
+            return;
+        }
+        this._ensureDepthRayPool();
+        const root = data.anchorObj.parent;
+        const meshes = this._getDepthMeshesForRoot(root);
+        data.anchorObj.getWorldPosition(this._depthAnchorWorld);
+        const dist = camera.position.distanceTo(this._depthAnchorWorld);
+        const blocked = this._depthAnchorBlocked(camera, meshes, this._depthAnchorWorld, dist);
+        data.depthBlocked = !!blocked;
+        if (!blocked) {
+            data.depthClipU = null;
+            return;
+        }
+        const x = Number(data.screenX) || 0;
+        const y = Number(data.screenY) || 0;
+        const scaledDx = Number(data.scaledDx) || 0;
+        const scaledDy = Number(data.scaledDy) || 0;
+        // 遮挡网已排除地面：沿线「屏幕射线是否打到头模」即剪影裁切（比纯贴点深度更贴轮廓）。
+        // 仍保留贴点深度阈值作兜底，避免远景杂 mesh 误挡。
+        const thresh = Math.max(0.03, dist + Math.max(0.15, dist * 0.08));
+        const isVis = (u) => {
+            const p = this._pointOnLeaderPoly(x, y, scaledDx, scaledDy, u);
+            return this._depthSampleVisible(camera, meshes, p.x, p.y, thresh);
+        };
+        // 粗扫：标签 u=1 → 贴点 u=0，找最后可见与最先被挡
+        let lastVis = 1;
+        let firstOcc = 0;
+        let foundOcc = false;
+        const steps = 12;
+        for (let i = 0; i <= steps; i++) {
+            const u = 1 - i / steps;
+            if (isVis(u)) lastVis = u;
+            else {
+                firstOcc = u;
+                foundOcc = true;
+                break;
+            }
+        }
+        if (!foundOcc) {
+            // 沿线几乎都可见，只藏贴点圆
+            data.depthClipU = null;
+            return;
+        }
+        // 若标签端也被挡：尽量仍露出靠近标签的可见残段
+        if (!isVis(1)) {
+            data.depthClipU = 1;
+            return;
+        }
+        let lo = firstOcc; // occluded（较小 u）
+        let hi = Math.max(lastVis, firstOcc + 1e-4); // visible（较大 u）
+        for (let k = 0; k < this.DEPTH_BIN_ITERS; k++) {
+            const mid = (lo + hi) * 0.5;
+            if (isVis(mid)) hi = mid;
+            else lo = mid;
+        }
+        // 取被挡侧边界，让线贴到剪影（取可见侧会在空档留缝）
+        data.depthClipU = lo;
+    },
+    /** 按当前 depthBlocked / depthClipU 立刻刷 SVG（消费端停稳后无需再等一帧） */
+    _syncDepthClipVisual: function (data) {
+        if (!data || !data.svgPath || !this._annoHasDepthClip(data)) return;
+        if (data.isBehind) return;
+        const x = Number(data.screenX) || 0;
+        const y = Number(data.screenY) || 0;
+        const scaledDx = Number(data.scaledDx) || 0;
+        const scaledDy = Number(data.scaledDy) || 0;
+        const depthBlocked = !!data.depthBlocked;
+        const depthFade = depthBlocked ? 0.9 : 1;
+        const sideFade = !!data.isOccluded;
+        const dStr = this._depthPathFromFlags(data, x, y, scaledDx, scaledDy);
+        const lineVisible = !!(dStr && String(dStr).trim());
+        const lineOp = (sideFade ? 0.25 : 0.8) * depthFade;
+        const glowOp = (sideFade ? 0.08 : 0.2) * depthFade;
+        if (lineVisible) {
+            data.svgPath.setAttribute('d', dStr);
+            data.svgPath.setAttribute('opacity', String(lineOp));
+            if (depthBlocked) data.svgPath.setAttribute('stroke-dasharray', this.DEPTH_CLIP_DASH);
+            else data.svgPath.removeAttribute('stroke-dasharray');
+        } else {
+            data.svgPath.setAttribute('opacity', '0');
+            data.svgPath.removeAttribute('stroke-dasharray');
+        }
+        if (data.svgGlowPath) {
+            if (lineVisible) {
+                data.svgGlowPath.setAttribute('d', dStr);
+                data.svgGlowPath.setAttribute('opacity', String(glowOp));
+                if (depthBlocked) data.svgGlowPath.setAttribute('stroke-dasharray', this.DEPTH_CLIP_DASH);
+                else data.svgGlowPath.removeAttribute('stroke-dasharray');
+            } else {
+                data.svgGlowPath.setAttribute('opacity', '0');
+                data.svgGlowPath.removeAttribute('stroke-dasharray');
+            }
+        }
+        if (data.svgCircle) {
+            data.svgCircle.setAttribute('opacity', (depthBlocked || sideFade) ? '0' : '0.8');
+        }
+        if (data.domEl && !data.isBehind) {
+            const baseOp = sideFade ? 0.2 : 1;
+            data.domEl.style.opacity = String(baseOp * depthFade);
+        }
+    },
+    /**
+     * 无 depthClip 引线：直接返回（转动路径上接近空操作）。
+     * 有开启项：转动中不射线；停稳后每帧最多 1 条。
+     */
+    _tickDepthOcclusionIdle: function (camera) {
+        if (!camera || !window.annoDataList || window.annoDataList.length === 0) return;
+        if (!this._annoListHasDepthClip()) return;
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        const interacting = !!window._orbitInteracting
+            || !!(window._planeXZDrag && window._planeXZDrag.active)
+            || !!(window.transformControl && window.transformControl.dragging);
+        const key = this._depthPoseKey(camera);
+        if (key !== this._depthPoseKeyLive) {
+            this._depthPoseKeyLive = key;
+            this._depthMovedAt = now;
+            this._depthSettleArmed = false;
+            this._depthWorkQueue = null;
+        }
+        if (interacting) {
+            this._depthWorkQueue = null;
+            this._depthSettleArmed = false;
+            if (!this._depthShowFullWhileMoving) {
+                this._clearAllDepthOcclusion();
+                this._depthShowFullWhileMoving = true;
+            }
+            return;
+        }
+        if (this._depthShowFullWhileMoving) this._depthShowFullWhileMoving = false;
+        const idleFor = now - (this._depthMovedAt || 0);
+        if (idleFor < this.DEPTH_SETTLE_MS) return;
+        if (!this._depthSettleArmed) {
+            this._depthSettleArmed = true;
+            this._depthWorkQueue = [];
+            for (let i = 0; i < window.annoDataList.length; i++) {
+                if (this._annoHasDepthClip(window.annoDataList[i])) this._depthWorkQueue.push(i);
+            }
+            this._depthMeshesByRoot = null;
+        }
+        if (!this._depthWorkQueue || !this._depthWorkQueue.length) return;
+        const idx = this._depthWorkQueue.shift();
+        const data = window.annoDataList[idx];
+        try {
+            this._computeAnnoDepthOcclusion(camera, data);
+            this._syncDepthClipVisual(data);
+        } catch (_e) {
+            if (data) {
+                data.depthBlocked = false;
+                data.depthClipU = null;
+            }
+        }
+    },
+
     _worldNormalFromHit: function (hit) {
         return hit.face
             ? hit.face.normal.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize()
@@ -718,6 +1084,68 @@ window.AnnotationManager = {
         if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return false;
         if (e && e.button != null && e.button !== 0) return false;
         if (this.selectedId !== data.id) return false;
+        // 双击第二下落点：不抢拖拽，留给标签编辑（端点与圆形标签重叠时）
+        if (e && typeof e.detail === 'number' && e.detail >= 2) return false;
+        return true;
+    },
+    /**
+     * 进入标签文本编辑（生产端）。端点手柄在标签之上时，可由锚点环 dblclick 转发调用。
+     * @returns {boolean}
+     */
+    beginLabelTextEdit: function (data) {
+        if (window.__SOLID_CONSUMER__ || !data || !data.domEl) return false;
+        const div = data.domEl;
+        const textEl = this.getLabelTextEl(div);
+        if (!textEl) return false;
+        const btn = div.querySelector('.anno-collapse-btn');
+        if (this._anchorDrag) this._cancelAnchorDrag();
+        if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+            window.PluginManager.setExclusiveSelection(this, data.id);
+        } else {
+            this.selectedId = data.id;
+            this.highlightSelected();
+        }
+        this.applyLabelToDOM(div, data);
+        div.classList.add('editing');
+        div.classList.remove('collapsed');
+        textEl.style.width = '';
+        textEl.style.height = '';
+        if (!this.isCircleLabel(data)) {
+            div.style.width = '';
+            div.style.height = '';
+            div.style.minWidth = '';
+            div.style.minHeight = '';
+        } else {
+            this.applyLabelShapeUI(data);
+        }
+        if (btn) btn.style.display = 'none';
+        textEl.contentEditable = 'true';
+        textEl.setAttribute('contenteditable', 'true');
+        textEl.style.cursor = 'text';
+        textEl.style.webkitUserSelect = 'text';
+        textEl.style.userSelect = 'text';
+        div.style.cursor = 'text';
+        // 编辑时暂时关掉锚点环命中，避免叠在文字上抢点击
+        if (data.svgAnchorRing) {
+            data.svgAnchorRing.style.pointerEvents = 'none';
+            data.svgAnchorRing.style.display = 'none';
+        }
+        const focusEdit = () => {
+            try {
+                textEl.focus({ preventScroll: true });
+            } catch (_eF) {
+                try { textEl.focus(); } catch (_eF2) {}
+            }
+            try {
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(textEl);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } catch (_eSel) {}
+        };
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusEdit);
+        else setTimeout(focusEdit, 0);
         return true;
     },
     _applyAnchorFromWorldHit: function (data, worldPoint, worldNormal) {
@@ -747,7 +1175,8 @@ window.AnnotationManager = {
     },
     _syncAnchorHandle: function (data, isSelected) {
         if (!data) return;
-        const canDrag = isSelected && !window.__SOLID_CONSUMER__;
+        const editing = !!(data.domEl && data.domEl.classList.contains('editing'));
+        const canDrag = isSelected && !window.__SOLID_CONSUMER__ && !editing;
         const dragging = !!(this._anchorDrag && this._anchorDrag.dataId === data.id);
         const dotR = canDrag ? this.ANCHOR_DOT_R_SEL : this.ANCHOR_DOT_R;
         if (data.svgCircle) data.svgCircle.setAttribute('r', String(dotR));
@@ -756,6 +1185,7 @@ window.AnnotationManager = {
             data.svgAnchorRing.setAttribute('stroke', data.color);
             data.svgAnchorRing.style.pointerEvents = canDrag ? 'auto' : 'none';
             data.svgAnchorRing.style.cursor = dragging ? 'grabbing' : (canDrag ? 'grab' : 'default');
+            if (editing) data.svgAnchorRing.style.display = 'none';
         }
     },
     _ensureAnchorHandlesSvg: function () {
@@ -784,6 +1214,13 @@ window.AnnotationManager = {
         ring.style.pointerEvents = 'none';
         ring.style.display = 'none';
         ring.addEventListener('pointerdown', e => { mgr._beginAnchorDrag(data, e); }, { passive: false });
+        // 手柄层在标签之上：与圆形标签重叠时，双击环也进入文本编辑
+        ring.addEventListener('dblclick', e => {
+            if (window.__SOLID_CONSUMER__) return;
+            e.preventDefault();
+            e.stopPropagation();
+            mgr.beginLabelTextEdit(data);
+        });
         handlesSvg.appendChild(ring);
         data.svgAnchorRing = ring;
     },
@@ -865,7 +1302,126 @@ window.AnnotationManager = {
         captureEl.addEventListener('pointercancel', onUp);
     },
 
+    _isAnnoSelected: function (id) {
+        if (id == null) return false;
+        if (this.selectedIds && this.selectedIds.indexOf(id) >= 0) return true;
+        return this.selectedId === id;
+    },
+    _normalizeSelectedIds: function () {
+        if (!Array.isArray(this.selectedIds)) this.selectedIds = [];
+        if (this.selectedId == null) {
+            if (this.selectedIds.length) this.selectedIds = [];
+            return;
+        }
+        if (!this.selectedIds.length) this.selectedIds = [this.selectedId];
+    },
+    getSelectedAnnotations: function () {
+        this._normalizeSelectedIds();
+        const ids = (this.selectedIds && this.selectedIds.length)
+            ? this.selectedIds
+            : (this.selectedId != null ? [this.selectedId] : []);
+        const out = [];
+        for (let i = 0; i < ids.length; i++) {
+            const d = window.annoDataList.find(a => a.id === ids[i]);
+            if (d) out.push(d);
+        }
+        return out;
+    },
+    _clearOtherPluginSelections: function () {
+        if (!window.PluginManager || !window.PluginManager.plugins) return;
+        window.PluginManager.plugins.forEach(p => {
+            const inst = p.instance;
+            if (!inst || inst === this || inst.selectedId === undefined) return;
+            if (inst.selectedId !== null || (Array.isArray(inst.selectedIds) && inst.selectedIds.length)) {
+                inst.selectedId = null;
+                if (Array.isArray(inst.selectedIds)) inst.selectedIds = [];
+                if (typeof inst.highlightSelected === 'function') inst.highlightSelected();
+            }
+        });
+    },
+    /** 点选经典引线：普通单击单选；Ctrl/Cmd 多选（批量改色/圆形/侧面淡出） */
+    _selectAnnoFromPointer: function (data, e) {
+        if (!data) return;
+        if (data.domEl && data.domEl.classList.contains('editing')) return;
+        const ctrl = !!(e && (e.ctrlKey || e.metaKey));
+        if (window.__SOLID_CONSUMER__) {
+            if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+                if (this.selectedId === data.id) window.PluginManager.setExclusiveSelection(this, null);
+                else window.PluginManager.setExclusiveSelection(this, data.id);
+            }
+            if (Array.isArray(this.selectedIds)) {
+                this.selectedIds = this.selectedId != null ? [this.selectedId] : [];
+            }
+            return;
+        }
+        if (!Array.isArray(this.selectedIds)) this.selectedIds = [];
+        if (ctrl) {
+            this._clearOtherPluginSelections();
+            const i = this.selectedIds.indexOf(data.id);
+            if (i >= 0) {
+                this.selectedIds.splice(i, 1);
+                this.selectedId = this.selectedIds.length ? this.selectedIds[this.selectedIds.length - 1] : null;
+            } else {
+                this.selectedIds.push(data.id);
+                this.selectedId = data.id;
+            }
+            this.highlightSelected();
+            if (window.needsUpdate !== undefined) window.needsUpdate = true;
+            const primary = window.annoDataList.find(a => a.id === this.selectedId);
+            const picker = document.getElementById('obj-color-picker');
+            if (picker && primary) picker.value = primary.color;
+            try { if (typeof window.syncSharedAnnoObjColorPickers === 'function') window.syncSharedAnnoObjColorPickers('obj'); } catch (_e1) {}
+            try { if (typeof window.solidCreateSyncAnnoDetailPanel === 'function') window.solidCreateSyncAnnoDetailPanel(); } catch (_e2) {}
+            if (window.PluginManager && typeof window.PluginManager._syncSolidConsumerDetail === 'function') {
+                try { window.PluginManager._syncSolidConsumerDetail(this, this.selectedId); } catch (_e3) {}
+            }
+            return;
+        }
+        this.selectedIds = [data.id];
+        if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
+            window.PluginManager.setExclusiveSelection(this, data.id);
+        } else {
+            this.selectedId = data.id;
+            this.highlightSelected();
+        }
+        this.selectedIds = [data.id];
+        const picker = document.getElementById('obj-color-picker');
+        if (picker) picker.value = data.color;
+        try { if (typeof window.syncSharedAnnoObjColorPickers === 'function') window.syncSharedAnnoObjColorPickers('obj'); } catch (_e4) {}
+    },
+    applyColorToAnnotation: function (data, colorHex) {
+        if (!data || !colorHex) return;
+        data.color = colorHex;
+        const div = document.getElementById('dom_' + data.id);
+        if (div) {
+            div.dataset.color = data.color;
+            div.style.backgroundColor = this.getDarkBg(data.color);
+            if (this._isAnnoSelected(data.id) && !div.classList.contains('editing')) {
+                div.style.borderColor = '#fff';
+            } else {
+                div.style.borderColor = data.color;
+            }
+        }
+        if (data.svgPath) data.svgPath.setAttribute('stroke', data.color);
+        if (data.svgGlowPath) data.svgGlowPath.setAttribute('stroke', data.color);
+        if (data.svgCircle) data.svgCircle.setAttribute('fill', data.color);
+        if (data.svgAnchorRing) data.svgAnchorRing.setAttribute('stroke', data.color);
+    },
+    applyColorToSelection: function (colorHex) {
+        const list = this.getSelectedAnnotations();
+        list.forEach(d => this.applyColorToAnnotation(d, colorHex));
+        if (list.length) window.needsUpdate = true;
+        return list.length;
+    },
+
     highlightSelected: function () {
+        if (this.selectedId == null) {
+            this.selectedIds = [];
+        } else if (!Array.isArray(this.selectedIds) || !this.selectedIds.length) {
+            this.selectedIds = [this.selectedId];
+        } else if (this.selectedIds.indexOf(this.selectedId) < 0) {
+            this.selectedIds = [this.selectedId];
+        }
         document.querySelectorAll('.anno-dom').forEach(el => {
             el.style.boxShadow = 'none';
             el.style.borderColor = el.dataset.color || '#00d2ff';
@@ -876,14 +1432,19 @@ window.AnnotationManager = {
             this._syncAnchorHandle(data, false);
         });
         const picker = document.getElementById('obj-color-picker');
-        if (this.selectedId !== null) {
-            const el = document.getElementById('dom_' + this.selectedId);
-            const data = window.annoDataList.find(a => a.id === this.selectedId);
-            if (el) {
+        const ids = (this.selectedIds && this.selectedIds.length)
+            ? this.selectedIds
+            : (this.selectedId != null ? [this.selectedId] : []);
+        ids.forEach(id => {
+            const el = document.getElementById('dom_' + id);
+            if (el && !el.classList.contains('editing')) {
                 el.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.8)';
                 el.style.borderColor = '#fff';
-                el.style.zIndex = '100000';
+                el.style.zIndex = (id === this.selectedId) ? '100000' : '99999';
             }
+        });
+        if (this.selectedId != null) {
+            const data = window.annoDataList.find(a => a.id === this.selectedId);
             if (data) {
                 this._ensureAnchorRing(data);
                 this._syncAnchorHandle(data, true);
@@ -907,8 +1468,9 @@ window.AnnotationManager = {
                     .anno-leader-label.is-circle { border-radius: 50%; padding: 1px; text-align: center; display: inline-flex; align-items: center; justify-content: center; max-width: none; overflow: hidden; line-height: 1; }
                     .anno-leader-label.is-circle .anno-leader-text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; max-width: 100%; margin: 0; padding: 0; box-sizing: border-box; text-align: center; line-height: 1; white-space: pre-wrap; word-break: break-word; }
                     .anno-leader-label.is-circle .anno-collapse-btn { display: none !important; }
-                    .anno-leader-label.is-circle.editing { padding: 2px !important; display: inline-flex !important; align-items: center; justify-content: center; max-height: none; overflow: visible; line-height: 1; }
-                    .anno-leader-label.is-circle.editing .anno-leader-text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; outline: none; }
+                    /* 圆形编辑：勿用 flex 作 contentEditable（Chrome 无法出光标/输入）；放开固定直径便于打字 */
+                    .anno-leader-label.is-circle.editing { padding: 4px 8px !important; display: inline-block !important; align-items: unset; justify-content: unset; max-height: none; overflow: visible; line-height: 1.35; width: auto !important; height: auto !important; min-width: 28px; min-height: 28px; border-radius: 50%; text-align: center; }
+                    .anno-leader-label.is-circle.editing .anno-leader-text { display: block !important; width: auto !important; height: auto !important; max-width: min(88vw, 360px); margin: 0 auto; padding: 0; box-sizing: border-box; text-align: center; line-height: 1.35; white-space: pre-wrap; word-break: break-word; outline: none; -webkit-user-select: text; user-select: text; }
                     .anno-leader-label.has-collapse-btn { /* − 叠右上角，不占独立一列 */ }
                     .anno-leader-text { display: block; white-space: pre-wrap; word-break: break-word; max-width: 100%; box-sizing: border-box; }
                     .anno-leader-label.collapsed { width: fit-content; max-width: min(88vw, 360px); padding-right: 30px; }
@@ -1006,42 +1568,20 @@ window.AnnotationManager = {
         div.addEventListener('dblclick', e => {
             if (window.__SOLID_CONSUMER__) return;
             if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
+            e.preventDefault();
             e.stopPropagation();
-            if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
-                window.PluginManager.setExclusiveSelection(window.AnnotationManager, data.id);
-            } else {
-                window.AnnotationManager.selectedId = data.id;
-                window.AnnotationManager.highlightSelected();
-            }
-            window.AnnotationManager.applyLabelToDOM(div, data);
-            div.classList.add('editing');
-            div.classList.remove('collapsed');
-            textEl.style.width = '';
-            if (!window.AnnotationManager.isCircleLabel(data)) {
-                div.style.width = '';
-                div.style.height = '';
-                div.style.minWidth = '';
-                div.style.minHeight = '';
-            } else {
-                window.AnnotationManager.applyLabelShapeUI(data);
-            }
-            btn.style.display = 'none';
-            textEl.contentEditable = true;
-            textEl.style.cursor = 'text';
-            div.style.cursor = 'text';
-            textEl.focus();
-            const selection = window.getSelection();
-            const range = document.createRange();
-            range.selectNodeContents(textEl);
-            selection.removeAllRanges();
-            selection.addRange(range);
+            window.AnnotationManager.beginLabelTextEdit(data);
         });
         textEl.addEventListener('blur', () => {
             window.AnnotationManager.syncLabelFromDOM(data, div);
             textEl.contentEditable = false;
+            textEl.removeAttribute('contenteditable');
             div.classList.remove('editing');
             div.style.cursor = 'pointer';
             textEl.style.cursor = '';
+            textEl.style.display = '';
+            textEl.style.webkitUserSelect = '';
+            textEl.style.userSelect = '';
             window.AnnotationManager.applyLabelToDOM(div, data);
             window.AnnotationManager.invalidateExpandedWidth(data);
             if (window.AnnotationManager.isCircleLabel(data)) {
@@ -1049,6 +1589,13 @@ window.AnnotationManager = {
             } else {
                 window.AnnotationManager.refreshCollapseButton(data);
             }
+            // 退出编辑后恢复选中态锚点环命中
+            try {
+                window.AnnotationManager._syncAnchorHandle(data, window.AnnotationManager.selectedId === data.id);
+                if (data.svgAnchorRing && window.AnnotationManager.selectedId === data.id && !window.__SOLID_CONSUMER__) {
+                    data.svgAnchorRing.style.display = '';
+                }
+            } catch (_eRing) {}
             window.needsUpdate = true;
         });
         textEl.addEventListener('paste', (e) => {
@@ -1196,12 +1743,7 @@ window.AnnotationManager = {
                 if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
                 e.stopPropagation();
                 if (!textEl.isContentEditable) {
-                    if (window.PluginManager && typeof window.PluginManager.setExclusiveSelection === 'function') {
-                        window.PluginManager.setExclusiveSelection(window.AnnotationManager, data.id);
-                    } else {
-                        window.AnnotationManager.selectedId = data.id;
-                        window.AnnotationManager.highlightSelected();
-                    }
+                    window.AnnotationManager._selectAnnoFromPointer(data, e);
                 }
             });
             div.addEventListener('mousedown', e => {
@@ -1323,44 +1865,74 @@ window.AnnotationManager = {
             // 同步回像素缓存，保证后续拖拽以当前视图为基准
             data.dx = scaledDx;
             data.dy = scaledDy;
+            const useDepthClip = this._annoHasDepthClip(data);
+            const depthBlocked = useDepthClip && !!data.depthBlocked;
+            // 被深度裁切后：整体透明度保留为原来的 90%
+            const depthFade = depthBlocked ? 0.9 : 1;
             if (data.domEl) {
                 data.domEl.style.left = (x + scaledDx) + 'px';
                 data.domEl.style.top = (y + scaledDy) + 'px';
-                data.domEl.style.opacity = opacity;
+                const baseOp = parseFloat(opacity);
+                data.domEl.style.opacity = isBehind ? '0' : String(baseOp * depthFade);
                 data.domEl.style.pointerEvents = pointerEvents;
                 data.domEl.style.transform = `translate(-50%, -50%) scale(${textScale})`;
             }
             if (data.svgPath && data.svgCircle && !isNaN(x)) {
-                if (!isBehind && !data.isOccluded) {
-                    const x1 = x + scaledDx;
-                    const y1 = y + scaledDy;
-                    const midX = x + scaledDx * 0.5;
-                    const dStr = `M ${x} ${y} L ${midX} ${y1} L ${x1} ${y1}`;
-                    if (data.svgGlowPath) {
-                        data.svgGlowPath.setAttribute('d', dStr);
-                        data.svgGlowPath.setAttribute('opacity', '0.2');
+                // 深度裁切开启时：不以侧面淡出整段抹掉引线，改由 depthClipU 在遮挡处切断
+                const hideBySide = !useDepthClip && !!data.isOccluded;
+                if (!isBehind && !hideBySide) {
+                    const dStr = this._depthPathFromFlags(data, x, y, scaledDx, scaledDy);
+                    const lineVisible = !!(dStr && String(dStr).trim());
+                    const sideFade = !!data.isOccluded;
+                    const lineOp = (sideFade ? 0.25 : 0.8) * depthFade;
+                    const glowOp = (sideFade ? 0.08 : 0.2) * depthFade;
+                    if (lineVisible) {
+                        data.svgPath.setAttribute('d', dStr);
+                        data.svgPath.setAttribute('opacity', String(lineOp));
+                        if (depthBlocked) data.svgPath.setAttribute('stroke-dasharray', this.DEPTH_CLIP_DASH);
+                        else data.svgPath.removeAttribute('stroke-dasharray');
+                    } else {
+                        data.svgPath.setAttribute('opacity', '0');
+                        data.svgPath.removeAttribute('stroke-dasharray');
                     }
-                    data.svgPath.setAttribute('d', dStr);
-                    data.svgPath.setAttribute('opacity', '0.8');
+                    if (data.svgGlowPath) {
+                        if (lineVisible) {
+                            data.svgGlowPath.setAttribute('d', dStr);
+                            data.svgGlowPath.setAttribute('opacity', String(glowOp));
+                            if (depthBlocked) data.svgGlowPath.setAttribute('stroke-dasharray', this.DEPTH_CLIP_DASH);
+                            else data.svgGlowPath.removeAttribute('stroke-dasharray');
+                        } else {
+                            data.svgGlowPath.setAttribute('opacity', '0');
+                            data.svgGlowPath.removeAttribute('stroke-dasharray');
+                        }
+                    }
                     data.svgCircle.setAttribute('cx', x);
                     data.svgCircle.setAttribute('cy', y);
-                    data.svgCircle.setAttribute('opacity', '0.8');
+                    data.svgCircle.setAttribute('opacity', (depthBlocked || sideFade) ? '0' : '0.8');
                     if (this.selectedId === data.id || data.svgAnchorRing) this._ensureAnchorRing(data);
                     if (data.svgAnchorRing) {
-                        const canDrag = this.selectedId === data.id && !window.__SOLID_CONSUMER__;
+                        const editing = !!(data.domEl && data.domEl.classList.contains('editing'));
+                        const canDrag = this.selectedId === data.id && !window.__SOLID_CONSUMER__ && !editing && !depthBlocked && !sideFade;
                         data.svgAnchorRing.setAttribute('cx', String(x));
                         data.svgAnchorRing.setAttribute('cy', String(y));
-                        data.svgAnchorRing.setAttribute('opacity', '0.85');
+                        data.svgAnchorRing.setAttribute('opacity', (depthBlocked || sideFade) ? '0' : '0.85');
                         data.svgAnchorRing.style.display = canDrag ? '' : 'none';
+                        data.svgAnchorRing.style.pointerEvents = canDrag ? 'auto' : 'none';
                     }
                 } else {
-                    if (data.svgGlowPath) data.svgGlowPath.setAttribute('opacity', '0');
+                    if (data.svgGlowPath) {
+                        data.svgGlowPath.setAttribute('opacity', '0');
+                        data.svgGlowPath.removeAttribute('stroke-dasharray');
+                    }
                     data.svgPath.setAttribute('opacity', '0');
+                    data.svgPath.removeAttribute('stroke-dasharray');
                     data.svgCircle.setAttribute('opacity', '0');
                     if (data.svgAnchorRing) data.svgAnchorRing.style.display = 'none';
                 }
             }
         });
+        // 位姿更新后再做停稳分帧检测（转动中此函数立即返回且不射线）
+        try { this._tickDepthOcclusionIdle(camera); } catch (_eTick) {}
     },
 
     clearAll: function () {
@@ -1370,6 +1942,7 @@ window.AnnotationManager = {
             if (data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj);
         });
         window.annoDataList = [];
+        try { this._invalidateDepthOcclusion(); } catch (_eInv) {}
         const layer = document.getElementById('anno-layer');
         if (layer) layer.querySelectorAll('.anno-dom').forEach(el => el.remove());
         const svg = document.getElementById('anno-svg');
@@ -1377,6 +1950,7 @@ window.AnnotationManager = {
         const handlesSvg = document.getElementById('anno-anchor-handles');
         if (handlesSvg) handlesSvg.innerHTML = '';
         this.selectedId = null;
+        this.selectedIds = [];
     },
 
     restoreAnnotations: function (obj, annos) {
@@ -1414,6 +1988,7 @@ window.AnnotationManager = {
             };
             if (_loadedRich) annoData.textRich = _loadedRich;
             if (a.labelShape === 'circle') annoData.labelShape = 'circle';
+            if (a.depthClip === true) annoData.depthClip = true;
             if (a.baseDist) annoData.baseDist = a.baseDist;
             if (a.baseScale) annoData.baseScale = a.baseScale;
             if (typeof a.occludeDot === 'number' && isFinite(a.occludeDot)) annoData.occludeDot = a.occludeDot;
@@ -1453,15 +2028,25 @@ window.AnnotationManager._pxPerWorldAtAnchor = function(camera, anchorObj) {
 };
 
 window.addEventListener('keydown', e => {
-    if (e.key !== 'Delete') return;
-    if (document.activeElement && document.activeElement.isContentEditable) return;
-    const id = window.AnnotationManager.selectedId;
-    if (id === null) return;
-    const idx = window.annoDataList.findIndex(a => a.id === id);
-    if (idx > -1) {
+    if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+    if (document.activeElement && (document.activeElement.isContentEditable
+        || document.activeElement.tagName === 'INPUT'
+        || document.activeElement.tagName === 'TEXTAREA')) return;
+    const mgr = window.AnnotationManager;
+    if (!mgr) return;
+    mgr._normalizeSelectedIds();
+    const ids = (mgr.selectedIds && mgr.selectedIds.length)
+        ? mgr.selectedIds.slice()
+        : (mgr.selectedId != null ? [mgr.selectedId] : []);
+    if (!ids.length) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    ids.forEach(id => {
+        const idx = window.annoDataList.findIndex(a => a.id === id);
+        if (idx < 0) return;
         const data = window.annoDataList[idx];
-        if (window.AnnotationManager._anchorDrag && window.AnnotationManager._anchorDrag.dataId === id) {
-            window.AnnotationManager._cancelAnchorDrag();
+        if (mgr._anchorDrag && mgr._anchorDrag.dataId === id) {
+            mgr._cancelAnchorDrag();
         }
         if (data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj);
         const div = document.getElementById('dom_' + id);
@@ -1472,36 +2057,43 @@ window.addEventListener('keydown', e => {
         if (data.svgAnchorRing) data.svgAnchorRing.remove();
         if (data.cleanupEvents) data.cleanupEvents();
         window.annoDataList.splice(idx, 1);
-        window.needsUpdate = true;
-        window.lightMoved = true;
-    }
-    window.AnnotationManager.selectedId = null;
+    });
+    mgr.selectedId = null;
+    mgr.selectedIds = [];
+    window.needsUpdate = true;
+    window.lightMoved = true;
+    try { if (typeof window.markDraftDirty === 'function') window.markDraftDirty(); } catch (_e) {}
+    try { if (typeof window.solidCreateSyncAnnoDetailPanel === 'function') window.solidCreateSyncAnnoDetailPanel(); } catch (_e2) {}
 });
 
 const colorPicker = document.getElementById('obj-color-picker');
 if (colorPicker) {
     colorPicker.addEventListener('input', e => {
-        const id = window.AnnotationManager.selectedId;
-        if (id === null) return;
-        const data = window.annoDataList.find(a => a.id === id);
-        if (!data) return;
-        data.color = e.target.value;
-        const div = document.getElementById('dom_' + id);
-        if (div) {
-            div.dataset.color = data.color;
-            div.style.backgroundColor = window.AnnotationManager.getDarkBg(data.color);
+        const mgr = window.AnnotationManager;
+        if (!mgr || mgr.selectedId == null) return;
+        const colorHex = e.target.value;
+        if (typeof mgr.applyColorToSelection === 'function') {
+            mgr.applyColorToSelection(colorHex);
+        } else {
+            const data = window.annoDataList.find(a => a.id === mgr.selectedId);
+            if (data) mgr.applyColorToAnnotation(data, colorHex);
         }
-        if (data.svgPath) data.svgPath.setAttribute('stroke', data.color);
-        if (data.svgGlowPath) data.svgGlowPath.setAttribute('stroke', data.color);
-        if (data.svgCircle) data.svgCircle.setAttribute('fill', data.color);
-        if (data.svgAnchorRing) data.svgAnchorRing.setAttribute('stroke', data.color);
-        window.needsUpdate = true;
+        try { if (typeof window.markDraftDirty === 'function') window.markDraftDirty(); } catch (_e) {}
     });
 }
 
 window.AnnotationManager.onUpdate = function (context) {
     this._cachedScene = context.scene;
-    if (window.showAnnotations !== false && context.camera) {
+    const show = window.showAnnotations !== false;
+    if (!show) {
+        this._depthWasHidden = true;
+        return;
+    }
+    if (this._depthWasHidden) {
+        this._depthWasHidden = false;
+        try { this._invalidateDepthOcclusion(); } catch (_eInv) {}
+    }
+    if (context.camera) {
         this.updateScreenPositions(context.camera);
     }
 };
