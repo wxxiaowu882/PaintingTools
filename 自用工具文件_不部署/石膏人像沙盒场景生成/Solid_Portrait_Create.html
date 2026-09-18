@@ -228,7 +228,7 @@
     <select id="tool-mode-select" class="editor-select" style="margin:0; flex:1; padding:3px; background:#111; color:#0df; border-color:#444;" onchange="setMode(this.value)" title="选择标注工具后，按提示在模型上操作。">
     <option value="none">未选择标注工具…</option> <option value="annotate">🏷️ 经典引出线 [Alt+Shift+划动]</option> <option value="annotate-color">🎨 屏幕取色引线 [Alt+Shift+划动]</option>
     <option value="dashed-line">📏 连续虚线 [Alt+Shift+划动]</option>
-    <option value="straight-line" title="【贝塞尔曲线】&#10;&#10;新建：选中本模式后，按住 Alt+Shift，左键点起点，再点终点（两点须在同一物体上）。&#10;&#10;编辑（仅未投面）：&#10;· 点选曲线 → 显示锚点&#10;· 单击锚点 → 显示左右控制柄；拖锚点/柄可贴面改形&#10;· Shift 拖柄 → 镜像对侧柄&#10;· 双击曲线 → 插入中间锚点&#10;· 方向键微调（Shift 加速）&#10;· Delete → 先删当前中间锚点；无锚点焦点则删整条&#10;&#10;多选外观：按住 Ctrl（Mac：Cmd）点多条曲线，可一起改线形/粗细/透明度/端点。&#10;&#10;投到面：变成贴面折线（不可编锚点）；「取消投面」还原为可编辑贝塞尔。">📐 贝塞尔曲线 [Alt+Shift+左键点两点]</option>
+    <option value="straight-line" title="【贝塞尔曲线】&#10;&#10;新建：选中本模式后，按住 Alt+Shift，左键点起点，再点终点（两点须在同一物体上）。&#10;&#10;编辑（仅未投面）：&#10;· 点选曲线 → 显示锚点&#10;· 单击锚点 → 显示左右控制柄；拖锚点/柄可贴面改形&#10;· Alt+单击锚点 → 收起/恢复该点控制柄（尖角 ↔ 圆滑）&#10;· Shift 拖柄 → 镜像对侧柄&#10;· 双击曲线 → 插入中间锚点&#10;· 方向键微调（Shift 加速）&#10;· Delete → 先删当前中间锚点；无锚点焦点则删整条&#10;&#10;多选外观：按住 Ctrl（Mac：Cmd）点多条曲线，可一起改线形/粗细/透明度/端点。&#10;&#10;投到面：变成贴面折线（不可编锚点）；「取消投面」还原为可编辑贝塞尔。">📐 贝塞尔曲线 [Alt+Shift+左键点两点]</option>
     <option value="normal-arrow">↗️ 法线箭头 [Alt+左击]</option> <option value="polygon3d">🟩 3D光影面片 [Alt+Shift+悬停滑动]</option> <option value="prober">💡 受光探针 [直接点击]</option> </select></div>
     <div id="solid-create-anno-detail-wrap" style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; gap:8px; flex-wrap:wrap;"> <span id="solid-create-anno-detail-hint" style="font-size:14px; color:#ddd; letter-spacing:0.5px; flex-shrink:0; font-weight:500;">未选中标注</span>
     <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1; justify-content:flex-end; flex-wrap:wrap;">
@@ -2110,7 +2110,27 @@
         const cropW = capRect.width, cropH = capRect.height;
         const snapRect = { left: cropLeft, top: cropTop, width: cropW, height: cropH };
         const cboxEl = document.getElementById('crop-box'); const prevCropVis = cboxEl ? cboxEl.style.visibility : '';
-        if (cboxEl) cboxEl.style.visibility = 'hidden';
+        // 封面截取期间藏 UI，避免 html2canvas / 录屏把面板、取景框打进缩略图
+        const _coverHideUi = [];
+        function solidCreatePushCoverHide(el, prop, hideVal) {
+            if (!el) return;
+            _coverHideUi.push({ el: el, prop: prop, prev: el.style[prop] });
+            el.style[prop] = hideVal;
+        }
+        if (cboxEl) solidCreatePushCoverHide(cboxEl, 'visibility', 'hidden');
+        const _mfOv = document.getElementById('mobile-frame-overlay');
+        if (_mfOv) solidCreatePushCoverHide(_mfOv, 'visibility', 'hidden');
+        const _mainPanel = (typeof getMainControlPanelEl === 'function') ? getMainControlPanelEl() : (document.getElementById('main-panel') || document.querySelector('.control-panel'));
+        if (_mainPanel) solidCreatePushCoverHide(_mainPanel, 'visibility', 'hidden');
+        const _renderToast = document.getElementById('render-toast');
+        if (_renderToast) solidCreatePushCoverHide(_renderToast, 'visibility', 'hidden');
+        function solidCreateRestoreCoverHideUi() {
+            for (let i = _coverHideUi.length - 1; i >= 0; i--) {
+                const it = _coverHideUi[i];
+                try { it.el.style[it.prop] = it.prev; } catch (_eRest) {}
+            }
+            _coverHideUi.length = 0;
+        }
         await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
         /** 源裁切区可能非正方形（录屏/html2canvas/WebGL 映射）；居中取 min 边后等比缩到 out×out，避免球体变椭圆 */
         function solidCreateBlitSquareCover(dstCtx, src, sx, sy, sw, sh, out) {
@@ -2266,8 +2286,13 @@
         x: cropLeft, y: cropTop, width: cropW, height: cropH,
         onclone: function(cloneDoc) {
         try {
-        const cloneCrop = cloneDoc.getElementById('crop-box');
-        if (cloneCrop) cloneCrop.style.visibility = 'hidden';
+        const hideIds = ['crop-box', 'mobile-frame-overlay', 'main-panel', 'render-toast'];
+        for (let hi = 0; hi < hideIds.length; hi++) {
+            const el = cloneDoc.getElementById(hideIds[hi]);
+            if (el) el.style.visibility = 'hidden';
+        }
+        const clonePanel = cloneDoc.querySelector('.control-panel');
+        if (clonePanel) clonePanel.style.visibility = 'hidden';
         const cloneCanvas = cloneDoc.querySelector('[data-solid-capture-canvas="1"]');
         if (cloneCanvas && cloneCanvas.parentNode) {
         const img = cloneDoc.createElement('img');
@@ -2336,7 +2361,7 @@
         solidCreateBlitSquareCover(ctx, canvasEl, sx, sy, sw, sh, 256);
         if (window.PluginManager) window.PluginManager.trigger('onDrawSnapshot', { ctx: ctx, rect: snapRect, camera: camera });
         thumbnail = tCanvas.toDataURL('image/jpeg', 0.85);
-        } finally { if (cboxEl) cboxEl.style.visibility = prevCropVis; }
+        } finally { try { solidCreateRestoreCoverHideUi(); } catch (_eUi) { if (cboxEl) cboxEl.style.visibility = prevCropVis; } }
         } else {
         let keepHandle = window.currentFileHandle || null;
         if (!keepHandle && window._solidCreateDraftFileName && window.workDirHandle) {
@@ -3173,7 +3198,7 @@
         if(mode === 'translate' || mode === 'rotate' || mode === 'scale') { transformControl.setMode(mode);
         if(window.selectedObj) transformControl.attach(window.selectedObj); document.body.style.cursor = 'default'; } else { transformControl.detach(); 
         // 移除 window.selectedObj = null，使得在全不激活的状态下依然能选中模型上色
-        document.body.style.cursor = mode === 'none' ? 'default' : 'crosshair'; if(mode === 'annotate') window.showToast("引线快捷键：按住 Alt+Shift+左键 划动；Ctrl/Cmd 点选可多选后一起改色"); else if(mode === 'annotate-color') window.showToast("取色引线：按住 Alt+Shift+左键 划动（颜色随画面实时变化）"); else if(mode === 'dashed-line') window.showToast("连续虚线：按住 Alt+Shift 在模型表面划动"); else if(mode === 'straight-line') window.showToast("贝塞尔曲线：按住 Alt+Shift，左键点起点，再点终点；选中后可拖锚点/柄、双击插点"); else if(mode === 'normal-arrow') window.showToast("法线快捷键：按住 Alt+左键 点击"); else if(mode === 'prober') window.showToast("受光探针：直接点击模型表面"); }
+        document.body.style.cursor = mode === 'none' ? 'default' : 'crosshair'; if(mode === 'annotate') window.showToast("引线快捷键：按住 Alt+Shift+左键 划动；Ctrl/Cmd 点选可多选后一起改色"); else if(mode === 'annotate-color') window.showToast("取色引线：按住 Alt+Shift+左键 划动（颜色随画面实时变化）"); else if(mode === 'dashed-line') window.showToast("连续虚线：按住 Alt+Shift 在模型表面划动"); else if(mode === 'straight-line') window.showToast("贝塞尔曲线：按住 Alt+Shift，左键点起点，再点终点；选中后可拖锚点/柄、Alt+单击锚点收柄、双击插点"); else if(mode === 'normal-arrow') window.showToast("法线快捷键：按住 Alt+左键 点击"); else if(mode === 'prober') window.showToast("受光探针：直接点击模型表面"); }
         if (typeof window.syncToolModeSelectTip === 'function') window.syncToolModeSelectTip();
         solidCreateSyncTransformSpace();
         ['trans', 'rot', 'scale'].forEach(id => { const btn = document.getElementById('btn-' + id); if (btn) btn.classList.remove('active'); });
@@ -4135,7 +4160,10 @@
         try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('build_environment'); } catch(_eP) {}
         }
         try { window._solidGroundShadowDirty = true; } catch (_eGsb) {} }
-        function updateLightPosition() { const { x, y, z } = computeSolidMainLightCartesianPosition(THREE, state); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) { mainLight.target.position.set(0, 1, 0); mainLight.target.updateMatrixWorld(true); } if (lightType === 'rect') mainLight.lookAt(0, 1, 0); mainLight.updateMatrixWorld();
+        function updateLightPosition() { const { x, y, z } = computeSolidMainLightCartesianPosition(THREE, state); if (mainLight) { mainLight.position.set(x, y, z); if (mainLight.target) {
+        // 平行光：target 原点 → L=normalize(灯位)=球坐标单位向量；其它灯型仍瞄 (0,1,0)
+        mainLight.target.position.set(0, lightType === 'dir' ? 0 : 1, 0);
+        mainLight.target.updateMatrixWorld(true); } if (lightType === 'rect') mainLight.lookAt(0, 1, 0); mainLight.updateMatrixWorld();
         try { __solidRasterLightRig.syncPose(); } catch (_eRigPose) {}
         try { _solidRefreshRasterShadowAfterLightMove(); } catch(_eRf) {}
         try { _solidSyncGroundShadowUniforms(); } catch (_eSyncL) {}
