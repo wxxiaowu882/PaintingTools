@@ -29,6 +29,7 @@ python monitor.py
 | 换号中 | 忽略新 tip，避免连点 |
 | 换号前 | 对 Cursor「全部保存」 |
 | 助手 | 点「刷新 Cursor」；若出现「确认换号」则点 |
+| 打开外部网站弹窗 | 点「取消」后继续（换号重启后新常见） |
 | 打开工程 | 先 `cursor "路径"` / `D:\cursor\Cursor.exe`，失败再点 Recent 里的 PaintingTools |
 | 打开后 | 先清一次 tip → 再开始 2 分钟宽限 |
 
@@ -61,6 +62,8 @@ python monitor.py
 | `btn_confirm_switch.png` | 确认换号 |
 | `btn_editor_window.png` | Editor Window |
 | `btn_paintingtools.png` / `lbl_recent_projects.png` | 欢迎页打开工程 |
+| `dlg_open_external.png` | 「是否要 Cursor 打开外部网站」文案 |
+| `btn_cancel_external.png` | 该弹窗的「取消」按钮 |
 
 分辨率或主题变了导致匹配失败时：从新截图裁出对应小图覆盖同名文件，必要时在 `config.py` 调 `MATCH_THRESHOLD` / `TIP_MATCH_THRESHOLD`。
 

@@ -73,8 +73,8 @@ POST_OPEN_TIP_ROI = (0.50, 0.45, 1.0, 0.96)
 
 # Connection Error 浮层在 chat 输入框上方；有 Review 栏时会略偏上
 CONN_TOAST_Y_BAND = (0.62, 0.92)  # 命中框纵向中心，占整屏高度比例
-# 用量上限 / 恢复会话失败 toast 也在 chat 输入框上方，排除顶栏 Upgrade to Pro
-CHAT_TOAST_Y_BAND = (0.68, 0.90)
+# 用量上限 / 恢复会话失败 toast；与连接错误同区，略放宽以适配新版 tip
+CHAT_TOAST_Y_BAND = (0.60, 0.94)
 # 正文「Get Cursor Pro…」模板阈值
 CONN_BODY_ONLY_THRESHOLD = 0.78
 # 警示图标共现（现多为灰色三角，非黄）

@@ -52,6 +52,7 @@ class Monitor:
         self._resuming_conn = True
         try:
             log("状态 网络续写中")
+            ui_cursor.dismiss_blocking_dialogs(rounds=1)
             try:
                 detect_tip.close_tip()
             except Exception:
@@ -104,7 +105,10 @@ class Monitor:
                 self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
                 return
 
+            # 新版 Cursor 重启后可能弹出「打开外部网站」确认框，先取消再继续
+            ui_cursor.dismiss_blocking_dialogs(rounds=3)
             ui_cursor.click_editor_window_if_any()
+            ui_cursor.dismiss_blocking_dialogs(rounds=1)
             result = ui_cursor.open_paintingtools()
             if result == "失败":
                 log("错误 打开工程失败")
@@ -113,15 +117,18 @@ class Monitor:
 
             # 命令行打开后仍可能停在 Agent 主页，再点一次 Editor Window
             time.sleep(2.0)
+            ui_cursor.dismiss_blocking_dialogs(rounds=2)
             ui_cursor.click_editor_window_if_any(timeout=10)
             # 工程窗必须置前最大化，否则关 tip 会点到被挡住的区域
             time.sleep(0.6)
             ui_cursor.bring_paintingtools_front_max()
+            ui_cursor.dismiss_blocking_dialogs(rounds=2)
             # Connection Error 常晚几秒才弹出：主动等待并走网络续写
             time.sleep(1.5)
             conn_done = False
             deadline = time.time() + getattr(config, "POST_OPEN_CONN_WAIT", 20)
             while time.time() < deadline:
+                ui_cursor.dismiss_blocking_dialogs(rounds=1)
                 hit = detect_tip.detect_tip(threshold=0.70)
                 if hit is not None and hit.kind == "connection_error":
                     log(

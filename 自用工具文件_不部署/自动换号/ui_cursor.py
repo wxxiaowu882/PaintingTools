@@ -54,6 +54,204 @@ def focus_cursor() -> bool:
     return win_util.force_foreground(hwnd)
 
 
+def dismiss_external_site_dialog(timeout: float = 4.0) -> str:
+    """
+    关掉「是否要 Cursor 打开外部网站？」弹窗（点「取消」）。
+    换号重启后偶发，不关会挡住 Editor Window / 续写。
+    优先模板匹配（Electron 对话框 UIA 常扫不到），再 UIA，再 Esc。
+    """
+    deadline = time.time() + timeout
+    hints = (
+        "打开外部网站",
+        "受信任的域",
+        "apps.apple.com",
+        "open an external website",
+        "trusted domains",
+    )
+
+    def _click_cancel_by_template() -> bool:
+        screen, mon_l, mon_t = detect_tip.grab_screen_bgr()
+        h, w = screen.shape[:2]
+        # 对话框在屏幕中部
+        x0, y0 = int(w * 0.15), int(h * 0.15)
+        x1, y1 = int(w * 0.85), int(h * 0.85)
+        roi = screen[y0:y1, x0:x1]
+
+        tpl_cancel = detect_tip._load_template("btn_cancel_external.png")
+        tpl_dlg = detect_tip._load_template("dlg_open_external.png")
+        hit_c = detect_tip._match_scaled(roi, tpl_cancel, 0.78)
+        hit_d = detect_tip._match_scaled(roi, tpl_dlg, 0.72)
+
+        if hit_c is not None:
+            score, lx, ly, tw, th = hit_c
+            # 需对话框文案共现，或取消模板极高分
+            if hit_d is not None or score >= 0.90:
+                cx = mon_l + x0 + lx + tw // 2
+                cy = mon_t + y0 + ly + th // 2
+                detect_tip._click_screen(cx, cy)
+                log(
+                    f"对话框 打开外部网站 结果=已取消 方式=取消模板 "
+                    f"分数={score:.2f} 坐标={cx},{cy}"
+                )
+                time.sleep(0.45)
+                return True
+
+        if hit_d is not None:
+            score, lx, ly, tw, th = hit_d
+            # 文案在中上部；取消约在其右下方
+            if hit_c is not None:
+                sc, clx, cly, ctw, cth = hit_c
+                cx = mon_l + x0 + clx + ctw // 2
+                cy = mon_t + y0 + cly + cth // 2
+                score = max(score, sc)
+            else:
+                cx = mon_l + x0 + lx + tw - 30
+                cy = mon_t + y0 + ly + th + 55
+            detect_tip._click_screen(int(cx), int(cy))
+            log(
+                f"对话框 打开外部网站 结果=已取消 方式=文案定位 "
+                f"分数={score:.2f} 坐标={cx},{cy}"
+            )
+            time.sleep(0.45)
+            return True
+        return False
+
+    while time.time() < deadline:
+        try:
+            if _click_cancel_by_template():
+                return "已取消"
+        except Exception as e:
+            log(f"对话框 打开外部网站 模板异常 {e}")
+
+        try:
+            from pywinauto import Desktop
+
+            desk = Desktop(backend="uia")
+            candidates = []
+            for win in desk.windows():
+                try:
+                    title = (win.window_text() or "").strip()
+                except Exception:
+                    continue
+                if config.ASSIST_TITLE in title or "登录助手" in title:
+                    continue
+                if title != "Cursor" and not title.startswith("Cursor"):
+                    continue
+                try:
+                    rect = win.rectangle()
+                    w = int(rect.right - rect.left)
+                    h = int(rect.bottom - rect.top)
+                except Exception:
+                    continue
+                if w < 260 or h < 100:
+                    continue
+                candidates.append((w * h, win, title))
+
+            candidates.sort(key=lambda it: it[0])
+            for _area, win, title in candidates:
+                try:
+                    texts = []
+                    buttons = []
+                    try:
+                        for ctrl in win.descendants(control_type="Button"):
+                            buttons.append(ctrl)
+                            t = (ctrl.window_text() or "").strip()
+                            if t:
+                                texts.append(t)
+                    except Exception:
+                        pass
+                    try:
+                        for ctrl in win.descendants(control_type="Text"):
+                            t = (ctrl.window_text() or "").strip()
+                            if t:
+                                texts.append(t)
+                    except Exception:
+                        pass
+                    blob = "\n".join(texts)
+                    has_hint = any(h in blob for h in hints)
+                    has_open = any("打开" in t for t in texts)
+                    has_cancel = any(t == "取消" or t.startswith("取消") for t in texts)
+                    has_copy = any("复制" in t for t in texts)
+                    if not has_hint and not (
+                        title == "Cursor"
+                        and has_open
+                        and has_cancel
+                        and has_copy
+                        and _area < 500_000
+                    ):
+                        continue
+
+                    for ctrl in buttons:
+                        try:
+                            t = (ctrl.window_text() or "").strip()
+                        except Exception:
+                            continue
+                        if t != "取消" and not t.startswith("取消"):
+                            continue
+                        try:
+                            rr = ctrl.rectangle()
+                            cx = (rr.left + rr.right) // 2
+                            cy = (rr.top + rr.bottom) // 2
+                            if cx > 0 and cy > 0:
+                                detect_tip._click_screen(cx, cy)
+                                log(
+                                    f"对话框 打开外部网站 结果=已取消 "
+                                    f"方式=控件 坐标={cx},{cy}"
+                                )
+                                time.sleep(0.5)
+                                return "已取消"
+                        except Exception:
+                            try:
+                                ctrl.invoke()
+                                log("对话框 打开外部网站 结果=已取消 方式=invoke")
+                                time.sleep(0.5)
+                                return "已取消"
+                            except Exception:
+                                continue
+                    try:
+                        import pyautogui
+
+                        win_util.force_foreground(int(win.handle))
+                        pyautogui.FAILSAFE = False
+                        pyautogui.press("esc")
+                        log("对话框 打开外部网站 结果=已取消 方式=Esc")
+                        time.sleep(0.5)
+                        return "已取消"
+                    except Exception as e:
+                        log(f"对话框 打开外部网站 结果=失败 原因={e}")
+                except Exception:
+                    continue
+        except Exception as e:
+            log(f"对话框 打开外部网站 扫描异常 {e}")
+
+        # 模板已检出对话框但上面没点成：Esc 兜底
+        try:
+            dlg = detect_tip.match_template_on_screen(
+                "dlg_open_external.png", threshold=0.72
+            )
+            if dlg is not None:
+                import pyautogui
+
+                pyautogui.FAILSAFE = False
+                pyautogui.press("esc")
+                log("对话框 打开外部网站 结果=已取消 方式=Esc模板兜底")
+                time.sleep(0.5)
+                return "已取消"
+        except Exception:
+            pass
+        time.sleep(0.35)
+    return "跳过"
+
+
+def dismiss_blocking_dialogs(rounds: int = 2) -> None:
+    """换号后连续清挡路弹窗（外部网站确认等）。"""
+    for _ in range(max(1, rounds)):
+        r = dismiss_external_site_dialog(timeout=2.5)
+        if r == "跳过":
+            break
+        time.sleep(0.3)
+
+
 def find_paintingtools_hwnd(timeout: float = 12.0):
     """
     找标题含 PaintingTools 的 Cursor 工程窗（排除登录助手）。

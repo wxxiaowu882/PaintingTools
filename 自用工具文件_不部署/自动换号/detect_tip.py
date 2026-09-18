@@ -176,13 +176,13 @@ def _detect_usage_limit(
 ) -> Optional[TipHit]:
     """
     用量上限 toast 在 chat 输入框上方；禁止单独匹配 Upgrade 按钮（易与顶栏 Upgrade to Pro 混淆）。
+    使用多尺度匹配，适配新版 tip 样式。
     """
     band = config.CHAT_TOAST_Y_BAND
     tpl_toast = _load_template("tip_usage_toast.png")
-    hit = _match_in(roi, tpl_toast, max(thr, 0.78))
+    hit = _match_scaled(roi, tpl_toast, max(thr, 0.72))
     if hit:
-        score, lx, ly = hit
-        th, tw = tpl_toast.shape[:2]
+        score, lx, ly, tw, th = hit
         if _match_y_in_band(ly, th, y0, screen_h, band):
             return TipHit(
                 kind="usage_limit",
@@ -195,15 +195,13 @@ def _detect_usage_limit(
 
     tpl_usage = _load_template("tip_usage_limit.png")
     tpl_upgrade = _load_template("tip_upgrade_btn.png")
-    hit_u = _match_in(roi, tpl_usage, max(thr, 0.82))
-    hit_up = _match_in(roi, tpl_upgrade, max(thr, 0.85))
+    hit_u = _match_scaled(roi, tpl_usage, max(thr, 0.78))
+    hit_up = _match_scaled(roi, tpl_upgrade, max(thr, 0.82))
     if hit_u and hit_up:
-        score_u, lx_u, ly_u = hit_u
-        score_up, lx_up, ly_up = hit_up
-        th_u, tw_u = tpl_usage.shape[:2]
-        th_up, tw_up = tpl_upgrade.shape[:2]
-        # Upgrade 按钮在标题行右侧，与用量文案垂直接近
-        if abs(ly_u - ly_up) < 40 and lx_up > lx_u - 20:
+        score_u, lx_u, ly_u, tw_u, th_u = hit_u
+        score_up, lx_up, ly_up, tw_up, th_up = hit_up
+        # Upgrade 按钮在文案右侧，纵向接近
+        if abs(ly_u - ly_up) < 55 and lx_up > lx_u - 40:
             if _match_y_in_band(ly_u, th_u, y0, screen_h, band):
                 score = max(score_u, score_up)
                 l = min(x0 + lx_u, x0 + lx_up)
@@ -218,6 +216,19 @@ def _detect_usage_limit(
                     bottom=mon_t + b,
                     score=score,
                 )
+
+    # 蓝钮 + 位置带：文案模板失效时的兜底（须在 chat toast 带，避开顶栏 Upgrade）
+    if hit_up:
+        score_up, lx_up, ly_up, tw_up, th_up = hit_up
+        if score_up >= 0.90 and _match_y_in_band(ly_up, th_up, y0, screen_h, band):
+            return TipHit(
+                kind="usage_limit",
+                left=mon_l + x0 + lx_up,
+                top=mon_t + y0 + ly_up,
+                right=mon_l + x0 + lx_up + tw_up,
+                bottom=mon_t + y0 + ly_up + th_up,
+                score=score_up,
+            )
     return None
 
 
