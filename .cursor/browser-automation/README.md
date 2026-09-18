@@ -12,6 +12,12 @@
 - `templates/`：给新任务复用的任务描述模板。
 - `runs/`：临时截图、运行产物，只作过程证据，不进版本库。
 
+## Playwright 浏览器路径（勿装 C 盘）
+
+- **优先**：用本机已装浏览器，不另下 Chromium。脚本默认 `PLAYWRIGHT_CHANNEL=msedge`（本机 Chrome 通道可能秒退；可改 `chrome`）。
+- 若必须装 Playwright 自带浏览器：放到 `D:/tools/ms-playwright`（`PLAYWRIGHT_BROWSERS_PATH`），`source env.playwright.sh && npx playwright install chromium`。
+- Node 脚本可先 `require('./_playwright-browsers-path')`（须在 `require('playwright')` 之前）。
+
 ## 已验证经验
 
 1. 打开仓库页面时，优先使用本地 HTTP 服务，不要直接走 `file://`。
