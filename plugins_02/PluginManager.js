@@ -86,9 +86,13 @@ window.PluginManager = { plugins: [], // 【1. 核心状态隔离区 Core.State�
             const inst = p.instance;
             if (!inst || inst.selectedId === undefined || inst === ownerInstance) return;
             inst.selectedId = null;
+            if (Array.isArray(inst.selectedIds)) inst.selectedIds = [];
             if (typeof inst.highlightSelected === 'function') inst.highlightSelected();
         });
         ownerInstance.selectedId = id;
+        if (Array.isArray(ownerInstance.selectedIds)) {
+            ownerInstance.selectedIds = (id != null) ? [id] : [];
+        }
         if (typeof ownerInstance.highlightSelected === 'function') ownerInstance.highlightSelected();
         if (window.needsUpdate !== undefined) window.needsUpdate = true;
         this._syncSolidConsumerDetail(ownerInstance, id);
@@ -100,6 +104,13 @@ window.PluginManager = { plugins: [], // 【1. 核心状态隔离区 Core.State�
         this.plugins.forEach(p => {
             if (p.instance && p.instance.selectedId !== undefined && p.instance.selectedId !== null) {
                 p.instance.selectedId = null;
+                if (Array.isArray(p.instance.selectedIds)) p.instance.selectedIds = [];
+                if (typeof p.instance.highlightSelected === 'function') {
+                    p.instance.highlightSelected();
+                    cleared = true;
+                }
+            } else if (p.instance && Array.isArray(p.instance.selectedIds) && p.instance.selectedIds.length) {
+                p.instance.selectedIds = [];
                 if (typeof p.instance.highlightSelected === 'function') {
                     p.instance.highlightSelected();
                     cleared = true;

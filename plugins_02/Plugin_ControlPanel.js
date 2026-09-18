@@ -13,14 +13,14 @@ window.ControlPanel = {
                 
                 <div class="flex justify-between items-center select-none" style="padding:0px 2px; margin:0px; cursor:pointer;" onclick="window.togglePanel()">
                     <div class="flex gap-2" style="position:relative; z-index:1;"> 
-                        <button id="btn-rerender" style="display:${showRenderButtons ? 'inline-block' : 'none'}; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#fff; padding:3px 6px; border-radius:4px; font-size:10px; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); if(window.forceReRender)window.forceReRender()" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">▷ 开启渲染</button> 
-                        <button id="btn-stoprender" style="display:${showRenderButtons ? 'inline-block' : 'none'}; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#fff; padding:3px 6px; border-radius:4px; font-size:10px; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); if(window.stopRender)window.stopRender()" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">□ 停止渲染</button> 
+                        <button id="btn-rerender" style="display:${showRenderButtons ? 'inline-block' : 'none'}; background:transparent; border:1px solid rgba(255,255,255,0.25); color:#fff; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); if(window.forceReRender)window.forceReRender()" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">▷ 开启渲染</button> 
+                        <button id="btn-stoprender" style="display:${showRenderButtons ? 'inline-block' : 'none'}; background:transparent; border:1px solid rgba(255,255,255,0.25); color:#fff; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); if(window.stopRender)window.stopRender()" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">□ 停止渲染</button> 
                     </div>
                     <div class="flex items-center gap-2 flex-1 justify-end">
                         <div id="render-status" style="display:none;">
                             <span id="render-status-text" style="display:none;">未渲染</span>
                         </div>
-                        <button type="button" id="btn-anno-eye" title="隐藏标注" aria-pressed="true" style="display:${isProducer ? 'none' : 'inline-flex'}; align-items:center; justify-content:center; width:26px; height:26px; margin:0; padding:0; border:none; background:transparent; color:rgba(255,255,255,0.72); cursor:pointer; border-radius:6px; flex-shrink:0; transition:color .15s, background .15s, opacity .15s;" onclick="event.stopPropagation(); if(window.toggleAnnotations) window.toggleAnnotations();" onmouseover="this.style.color='rgba(255,255,255,0.95)'; this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.color='rgba(255,255,255,0.72)'; this.style.background='transparent'">
+                        <button type="button" id="btn-anno-eye" title="隐藏标注" aria-pressed="true" style="display:none; align-items:center; justify-content:center; width:26px; height:26px; margin:0; padding:0; border:none; background:transparent; color:rgba(255,255,255,0.72); cursor:pointer; border-radius:6px; flex-shrink:0; transition:color .15s, background .15s, opacity .15s;" onclick="event.stopPropagation(); if(window.toggleAnnotations) window.toggleAnnotations();" onmouseover="this.style.color='rgba(255,255,255,0.95)'; this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.color='rgba(255,255,255,0.72)'; this.style.background='transparent'">
                             <span class="anno-eye-on" style="display:inline-flex; line-height:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
                             <span class="anno-eye-off" style="display:none; line-height:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></span>
                         </button>
@@ -35,8 +35,8 @@ window.ControlPanel = {
                         /* 真正的无缝文件夹 Tab 融合 */
                         /* 左右负边距 -12px，与外部容器内边距完美抵消，绝对贴边 */
                         .tab-nav { display: flex; position: relative; z-index: 20; padding: 0; margin: 0 -12px; }
-                        .tab-btn { flex: 1; text-align: center; padding: 6px 0; font-size: 11px; color: rgba(255,255,255,0.65); cursor: pointer; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0; position: relative; transition: 0.2s; letter-spacing: 1px; margin-bottom: -1px; }
-                        .tab-btn.active { color: #fff; background: rgba(30,30,30,0.95); border-color: rgba(255,255,255,0.08); border-bottom: 2px solid rgba(30,30,30,0.95); font-weight: 500; }
+                        .tab-btn { flex: 1; text-align: center; padding: 8px 0; font-size: 13px; color: rgba(255,255,255,0.88); cursor: pointer; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0; position: relative; transition: 0.2s; letter-spacing: 0.5px; margin-bottom: -1px; }
+                        .tab-btn.active { color: #fff; background: rgba(30,30,30,0.95); border-color: rgba(255,255,255,0.12); border-bottom: 2px solid rgba(30,30,30,0.95); font-weight: 500; }
                         
                         /* 核心修改：
                            1. margin: 0 -12px -10px -12px; 完美抵消父级 12px 的左右边距和 10px 底部边距，100% 绝对重合外框！
@@ -53,11 +53,11 @@ window.ControlPanel = {
                         .tab-content { display: none; flex-direction: column; gap: 0px; }
                         .tab-content.active { display: flex; }
                         
-                        /* 强制提亮继承自原生 HTML 的暗色文字 */
-                        .slider-label { color: rgba(255,255,255,0.7) !important; }
-                        .slider-val { color: rgba(255,255,255,0.9) !important; }
+                        /* 强制提亮并放大滑条标签（原先 9～11px / 低对比看不清） */
+                        .slider-label { font-size: 13px !important; color: rgba(255,255,255,0.92) !important; font-weight: 400 !important; width: 28px; }
+                        .slider-val { font-size: 12px !important; color: rgba(255,255,255,0.95) !important; font-weight: 400 !important; width: 28px; }
                         .slider-val-editable { cursor: text; user-select: none; }
-                        .slider-val-input { width: 100%; max-width: 40px; box-sizing: border-box; font-size: 9px; padding: 0 2px; text-align: right; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.35); border-radius: 2px; font-variant-numeric: tabular-nums; outline: none; flex: none; }
+                        .slider-val-input { width: 100%; max-width: 48px; box-sizing: border-box; font-size: 12px; padding: 1px 3px; text-align: right; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 2px; font-variant-numeric: tabular-nums; outline: none; flex: none; }
                         
                         /* 压缩滑块占用的纵向高度 */
                         input[type=range] { flex: 1; margin: 0 6px; -webkit-appearance: none; background: transparent; height: 22px; min-width: 0; outline: none; }
@@ -68,7 +68,7 @@ window.ControlPanel = {
                         .module-card { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.03); border-radius: 4px; padding: 4px 6px; margin-bottom: 2px; }
                         .module-card:last-child { margin-bottom: 0; }
                         .module-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-                        .module-title { font-size: 11px; color: rgba(255,255,255,0.8); font-weight: bold; display: flex; align-items: center; cursor: pointer; }
+                        .module-title { font-size: 13px; color: rgba(255,255,255,0.95); font-weight: bold; display: flex; align-items: center; cursor: pointer; }
                         
                         /* 方形大热区取色器 */
                         .color-wrapper { flex: none; width: 32px; height: 32px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.28); border-radius: 6px; overflow: hidden; display: flex; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); }
@@ -105,7 +105,7 @@ window.ControlPanel = {
                                     <div class="custom-select-trigger" onclick="window.toggleCustomSelect(event, 'light-options')" id="light-trigger" style="min-width:66px; max-width:96px;">聚光灯</div>
                                     <label title="显示灯的位置示意（调灯/转动/点击时短暂出现）" style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; margin:0; user-select:none;">
                                         <input id="light-indicator-toggle" type="checkbox" style="accent-color:#2ecc71; width:14px; height:14px; margin:0;">
-                                        <span style="font-size:10px; color:rgba(255,255,255,0.55); letter-spacing:0.4px;">灯位</span>
+                                        <span style="font-size:13px; color:rgba(255,255,255,0.88); letter-spacing:0.4px;">灯位</span>
                                     </label>
                                     <div class="custom-options" id="light-options"> 
                                         <div class="custom-option selected" onclick="window.selectCustomOpt('light', 'spot', '聚光灯', this)">聚光灯</div>
@@ -135,13 +135,13 @@ window.ControlPanel = {
                                 <div style="display:flex; align-items:center; pointer-events:auto;">
                                     <label class="flex items-center cursor-pointer mb-0" style="margin-right:6px;" onmouseenter="const c=document.getElementById('wall-btn-checkbox'); if(c) c.checked=!!window.hasWall;">
                                         <input type="checkbox" id="wall-btn-checkbox" onchange="window.toggleWall()" class="flat-checkbox" style="width:14px; height:14px; margin-right:4px;"> 
-                                        <span style="color:rgba(255,255,255,0.8); font-size:11px; font-weight:bold; white-space:nowrap;">背景墙</span>
+                                        <span style="color:rgba(255,255,255,0.95); font-size:13px; font-weight:bold; white-space:nowrap;">背景墙</span>
                                     </label>
                                     <span id="wall-btn" style="display:none;"></span>
                                     <div class="color-wrapper" style="width:28px; height:28px; flex:none;"><input type="color" id="env-wall-color" value="#cccccc" oninput="window.setEnvColor('wall', this.value)"></div>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:6px; pointer-events:auto;">
-                                    <span style="font-size:11px; color:rgba(255,255,255,0.65); white-space:nowrap;">地面</span>
+                                    <span style="font-size:13px; color:rgba(255,255,255,0.9); white-space:nowrap;">地面</span>
                                     <div class="color-wrapper" style="width:28px; height:28px; flex:none;"><input type="color" id="env-ground-color" value="#cccccc" oninput="window.setEnvColor('ground', this.value)"></div>
                                 </div>
                             </div>
@@ -160,12 +160,12 @@ window.ControlPanel = {
                                     </label>
                                     <div id="fog-extra-controls" style="display:none; gap:6px; align-items:center;">
                                         <div style="position:relative; flex:none; width:88px;">
-                                            <div class="custom-select-trigger" onclick="window.toggleCustomSelect(event, 'fog-type-options')" id="fog-type-trigger" style="padding:2px 6px !important; font-size:11px !important;">基础平流雾</div>
-                                            <div class="custom-options" id="fog-type-options" style="min-width:88px;">
-                                                <div class="custom-option selected" onclick="window.selectFogType('basic', '基础平流雾', this)" style="padding:4px 8px !important; font-size:11px !important;">基础平流雾</div>
-                                                <div class="custom-option" onclick="window.selectFogType('noise', '扰动体积雾', this)" style="padding:4px 8px !important; font-size:11px !important;">扰动体积雾</div>
-                                                <div class="custom-option" onclick="window.selectFogType('height', '高度沉淀雾', this)" style="padding:4px 8px !important; font-size:11px !important;">高度沉淀雾</div>
-                                                <div class="custom-option" onclick="window.selectFogType('animated', '动态流云雾', this)" style="padding:4px 8px !important; font-size:11px !important;">动态流云雾</div>
+                                            <div class="custom-select-trigger" onclick="window.toggleCustomSelect(event, 'fog-type-options')" id="fog-type-trigger" style="padding:4px 8px !important; font-size:13px !important;">基础平流雾</div>
+                                            <div class="custom-options" id="fog-type-options" style="min-width:100px;">
+                                                <div class="custom-option selected" onclick="window.selectFogType('basic', '基础平流雾', this)" style="padding:6px 10px !important; font-size:13px !important;">基础平流雾</div>
+                                                <div class="custom-option" onclick="window.selectFogType('noise', '扰动体积雾', this)" style="padding:6px 10px !important; font-size:13px !important;">扰动体积雾</div>
+                                                <div class="custom-option" onclick="window.selectFogType('height', '高度沉淀雾', this)" style="padding:6px 10px !important; font-size:13px !important;">高度沉淀雾</div>
+                                                <div class="custom-option" onclick="window.selectFogType('animated', '动态流云雾', this)" style="padding:6px 10px !important; font-size:13px !important;">动态流云雾</div>
                                             </div>
                                         </div>
                                         <div class="color-wrapper" style="flex:none; width:22px; height:22px;"><input type="color" id="fogColorPicker" value="#ffffff" onchange="window.updateFogUI()" style="opacity:1; cursor:pointer;" disabled></div>
@@ -220,7 +220,7 @@ window.ControlPanel = {
                                 <div class="slider-row mb-0" style="align-items:center;">
                                     <label class="flex items-center cursor-pointer mb-0" style="width:auto; margin-right:4px;">
                                         <input type="checkbox" id="posterizeEnable" onchange="window.togglePosterize(this.checked)" class="flat-checkbox" style="width:14px; height:14px; margin-right:6px;"> 
-                                        <span style="color:rgba(255,255,255,0.8); font-size:11px; font-weight:bold; white-space:nowrap;">色阶概括</span>
+                                        <span style="color:rgba(255,255,255,0.95); font-size:13px; font-weight:bold; white-space:nowrap;">色阶概括</span>
                                     </label>
                                     <input type="range" id="posterizeSlider" min="0" max="19" step="1" value="0" oninput="window.onPosterizeSliderInput(this)" onchange="window.onPosterizeSliderInput(this)" style="opacity:0.3; margin-left:0;">
                                     <span id="posterizeVal" class="slider-val" style="width:30px;">无</span>

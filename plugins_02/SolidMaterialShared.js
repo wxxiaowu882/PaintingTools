@@ -33,6 +33,49 @@ export function solidMatLabelForType(matType) {
   return SOLID_MAT_LABELS[key] || SOLID_MAT_LABELS.origin;
 }
 
+/**
+ * GLTFLoader 对「无 materials」图元会套 createDefaultMaterial（白、metalness=1、roughness=1）。
+ * 金属无漫反射，光栅 SH 地面反光进不了暗部。仅修正该指纹；带贴图 / 非白 / 非满金属 的真资产不动。
+ * @returns {boolean} 是否改过
+ */
+export function sanitizeSolidGlbLoaderDefaultMaterial(mat) {
+  if (!mat || (!mat.isMeshStandardMaterial && !mat.isMeshPhysicalMaterial)) return false;
+  if (mat.userData && mat.userData.__solidSanitizedLoaderDefault) return false;
+  const metal = Number(mat.metalness);
+  const rough = Number(mat.roughness);
+  if (!(metal >= 0.999) || !(rough >= 0.999)) return false;
+  if (mat.map || mat.metalnessMap || mat.roughnessMap || mat.normalMap || mat.emissiveMap || mat.aoMap) return false;
+  let nearWhite = true;
+  try {
+    if (mat.color && typeof mat.color.getHex === 'function') {
+      const hex = mat.color.getHex();
+      nearWhite = hex >= 0xf0f0f0;
+    }
+  } catch (_e) {
+    nearWhite = true;
+  }
+  if (!nearWhite) return false;
+  mat.metalness = 0;
+  mat.roughness = 0.95;
+  if (!mat.userData) mat.userData = {};
+  mat.userData.__solidSanitizedLoaderDefault = true;
+  mat.needsUpdate = true;
+  return true;
+}
+
+/** 支持单材质或材质数组。 */
+export function sanitizeSolidGlbLoaderDefaultMaterialSlot(slot) {
+  if (!slot) return false;
+  if (Array.isArray(slot)) {
+    let any = false;
+    for (let i = 0; i < slot.length; i++) {
+      if (sanitizeSolidGlbLoaderDefaultMaterial(slot[i])) any = true;
+    }
+    return any;
+  }
+  return sanitizeSolidGlbLoaderDefaultMaterial(slot);
+}
+
 export function syncSolidMatPanelFromType(matType) {
   const targetMat = normalizeSolidMatType(matType);
   const matchedOpt = document.querySelector(`#mat-options .custom-option[onclick*="'${targetMat}'"]`);

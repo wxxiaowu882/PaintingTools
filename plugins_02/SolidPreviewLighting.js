@@ -15,7 +15,7 @@ import {
 import { solidInstallOnBeforeCompilePatch, solidSyncOnBeforeCompileExternalHead } from './SolidShaderCompilePipelineShared.js';
 
 /** 地面 SOLID_SHADOW_SOFT_GROUND 片元补丁修订号：递增可强制清缓存重编译（勿随意改）。 */
-const SOLID_GROUND_SHADOW_PATCH_REVISION = 13;
+const SOLID_GROUND_SHADOW_PATCH_REVISION = 17;
 
 /**
  * 与 Solid.html 中 shouldSkipEnvProbe 条件一致，供消费端与生产端共用，避免各写一套导致行为分叉。
@@ -1123,6 +1123,7 @@ export function createSolidPreviewLightingManager(opts) {
 
   const _dirGroundFadeCenterTmp = new THREE.Vector3();
   const _dirGroundFadeBoxTmp = new THREE.Box3();
+  const _dirGroundFadeSkyTmp = new THREE.Color(0x0d0d0f);
 
   function _ensureDirGroundFadeUniforms(ud) {
     if (!ud) return;
@@ -1130,7 +1131,28 @@ export function createSolidPreviewLightingManager(opts) {
     if (!ud.uSolidDirGroundFadeCenter) ud.uSolidDirGroundFadeCenter = { value: new THREE.Vector3(0, 0, 0) };
     if (!ud.uSolidDirGroundFadeNear) ud.uSolidDirGroundFadeNear = { value: 14.0 };
     if (!ud.uSolidDirGroundFadeFar) ud.uSolidDirGroundFadeFar = { value: 42.0 };
-    if (!ud.uSolidDirGroundFadeMin) ud.uSolidDirGroundFadeMin = { value: 0.12 };
+    if (!ud.uSolidDirGroundFadeMin) ud.uSolidDirGroundFadeMin = { value: 0.05 };
+    if (!ud.uSolidDirGroundFadeSkyColor) ud.uSolidDirGroundFadeSkyColor = { value: new THREE.Color(0x0d0d0f) };
+  }
+
+  function _readDirGroundFadeSkyColor(outColor) {
+    const c = outColor || _dirGroundFadeSkyTmp;
+    try {
+      const scene = typeof getScene === 'function' ? getScene() : null;
+      const bg = scene && scene.background;
+      if (bg && bg.isColor) {
+        c.copy(bg);
+        return c;
+      }
+    } catch (_eBg) {}
+    try {
+      const hex = (typeof window !== 'undefined' && window.envSkyColor) ? String(window.envSkyColor) : '#0d0d0f';
+      c.set(hex);
+      return c;
+    } catch (_eHex) {
+      c.set(0x0d0d0f);
+      return c;
+    }
   }
 
   function _syncDirGroundDistanceFadeUniforms(ud, mainLight, sceneGroup) {
@@ -1138,20 +1160,26 @@ export function createSolidPreviewLightingManager(opts) {
       if (!ud) return;
       _ensureDirGroundFadeUniforms(ud);
       const cfg = _dirGroundFadeCfg();
-      const want = !!(cfg.enabled !== false && mainLight && mainLight.isDirectionalLight);
+      const want = !!(cfg.enabled !== false && mainLight);
       ud.uSolidDirGroundFadeEnable.value = want ? 1.0 : 0.0;
       let near = Number(cfg.near);
       let far = Number(cfg.far);
       let minF = Number(cfg.minFactor);
       if (!Number.isFinite(near)) near = 14;
       if (!Number.isFinite(far)) far = 42;
-      if (!Number.isFinite(minF)) minF = 0.12;
+      if (!Number.isFinite(minF)) minF = 0.05;
       near = Math.max(0.5, near);
       far = Math.max(near + 0.5, far);
       minF = Math.max(0, Math.min(1, minF));
       ud.uSolidDirGroundFadeNear.value = near;
       ud.uSolidDirGroundFadeFar.value = far;
       ud.uSolidDirGroundFadeMin.value = minF;
+      ud.uSolidDirGroundFadeSkyColor.value.copy(_readDirGroundFadeSkyColor(_dirGroundFadeSkyTmp));
+      try {
+        const scene = typeof getScene === 'function' ? getScene() : null;
+        const bi = scene && Number.isFinite(Number(scene.backgroundIntensity)) ? Number(scene.backgroundIntensity) : 1;
+        if (bi !== 1) ud.uSolidDirGroundFadeSkyColor.value.multiplyScalar(bi);
+      } catch (_eBi) {}
 
       const c = _dirGroundFadeCenterTmp.set(0, 0, 0);
       try {
@@ -2189,6 +2217,7 @@ export function createSolidPreviewLightingManager(opts) {
             shader.uniforms.uSolidDirGroundFadeNear = m.userData.uSolidDirGroundFadeNear;
             shader.uniforms.uSolidDirGroundFadeFar = m.userData.uSolidDirGroundFadeFar;
             shader.uniforms.uSolidDirGroundFadeMin = m.userData.uSolidDirGroundFadeMin;
+            shader.uniforms.uSolidDirGroundFadeSkyColor = m.userData.uSolidDirGroundFadeSkyColor;
 
             shader.fragmentShader =
               'varying vec3 vSolidShadowGroundPos;\n' +
@@ -2224,6 +2253,7 @@ export function createSolidPreviewLightingManager(opts) {
               'uniform float uSolidDirGroundFadeNear;\n' +
               'uniform float uSolidDirGroundFadeFar;\n' +
               'uniform float uSolidDirGroundFadeMin;\n' +
+              'uniform vec3 uSolidDirGroundFadeSkyColor;\n' +
               'float solidRaySphereOcc( vec3 ro, vec3 rd, float tMax, vec3 c, float r ) {\n' +
               '  vec3 oc = ro - c;\n' +
               '  float b = dot( oc, rd );\n' +
@@ -2310,43 +2340,48 @@ export function createSolidPreviewLightingManager(opts) {
               }
             } catch (_eDbg) {}
 
-            // Parallel-light ground distance fade: darken distant lighting (smoothstep).
-            // Apply both after lights_fragment_end (reflectedLight) and after opaque (gl_FragColor),
-            // because SH/IBL may dominate and some hosts re-touch lighting after the lights chunk.
+            // Parallel-light ground distance fade: soft horizon mixes toward sky (smoothstep).
+            // lights_fragment_end: light aux only (keep mild — heavy darken makes a dark rim vs sky).
+            // opaque: final mix toward sky color (soft horizon look).
             try {
               if (shader.fragmentShader) {
                 const fadeTag = '#include <lights_fragment_end>';
                 if (shader.fragmentShader.includes(fadeTag) && !shader.fragmentShader.includes('solidDirGroundDistanceFade')) {
                   const fadeCode =
                     '\n{\n' +
-                    '\t// solidDirGroundDistanceFade: dir-only ground falloff vs scene center xz\n' +
-                    '\t// Direct alone is not enough: ground is often SH/IBL-dominated in raster preview.\n' +
+                    '\t// solidDirGroundDistanceFade: mild light-stage darken (aux; soft edge is final mix)\n' +
                     '\tif ( uSolidDirGroundFadeEnable > 0.5 && uSolidMainLightType == 0 ) {\n' +
                     '\t\tfloat dFade = length( vSolidShadowGroundPos.xz - uSolidDirGroundFadeCenter.xz );\n' +
                     '\t\tfloat tFade = smoothstep( uSolidDirGroundFadeNear, uSolidDirGroundFadeFar, dFade );\n' +
-                    '\t\tfloat fFade = mix( 1.0, uSolidDirGroundFadeMin, tFade );\n' +
+                    '\t\tfloat fFade = mix( 1.0, max( uSolidDirGroundFadeMin, 0.55 ), tFade );\n' +
                     '\t\treflectedLight.directDiffuse *= fFade;\n' +
                     '\t\treflectedLight.directSpecular *= fFade;\n' +
-                    '\t\treflectedLight.indirectDiffuse *= mix( 1.0, fFade, 0.92 );\n' +
+                    '\t\treflectedLight.indirectDiffuse *= mix( 1.0, fFade, 0.55 );\n' +
                     '\t}\n' +
                     '}\n';
                   shader.fragmentShader = shader.fragmentShader.replace(fadeTag, fadeTag + fadeCode);
                 }
                 if (!shader.fragmentShader.includes('solidDirGroundDistanceFadeOut')) {
+                  // After tonemap so mix matches scene.background (also tonemapped); before colorspace.
+                  // All main light types: soft horizon (no hard ground/sky silhouette).
                   const fadeOut =
                     '\n{\n' +
-                    '\t// solidDirGroundDistanceFadeOut: final ground color falloff (dir only)\n' +
-                    '\tif ( uSolidDirGroundFadeEnable > 0.5 && uSolidMainLightType == 0 ) {\n' +
+                    '\t// solidDirGroundDistanceFadeOut: final mix toward sky after tonemap (all main lights)\n' +
+                    '\tif ( uSolidDirGroundFadeEnable > 0.5 ) {\n' +
                     '\t\tfloat dFadeOut = length( vSolidShadowGroundPos.xz - uSolidDirGroundFadeCenter.xz );\n' +
                     '\t\tfloat tFadeOut = smoothstep( uSolidDirGroundFadeNear, uSolidDirGroundFadeFar, dFadeOut );\n' +
-                    '\t\tfloat fFadeOut = mix( 1.0, uSolidDirGroundFadeMin, tFadeOut );\n' +
-                    '\t\tgl_FragColor.rgb *= fFadeOut;\n' +
+                    '\t\tfloat skyW = tFadeOut * ( 1.0 - uSolidDirGroundFadeMin );\n' +
+                    '\t\tvec3 skyTM = uSolidDirGroundFadeSkyColor;\n' +
+                    '\t\t#ifdef TONE_MAPPING\n' +
+                    '\t\tskyTM = toneMapping( skyTM );\n' +
+                    '\t\t#endif\n' +
+                    '\t\tgl_FragColor.rgb = mix( gl_FragColor.rgb, skyTM, skyW );\n' +
                     '\t}\n' +
                     '}\n';
                   const outTags = [
+                    '#include <tonemapping_fragment>',
                     '#include <opaque_fragment>',
                     '#include <output_fragment>',
-                    '#include <tonemapping_fragment>',
                   ];
                   let injectedOut = false;
                   for (let oi = 0; oi < outTags.length; oi++) {
