@@ -13,7 +13,7 @@ const { chromium } = require('playwright');
 
 const PORT = process.env.PORT || '18080';
 const BASE = process.env.BASE_URL || `http://127.0.0.1:${PORT}`;
-const MODE = process.env.MODE || 'daben'; // daben | f05sample | f05all
+const MODE = process.env.MODE || 'daben'; // daben | f05sample | f05all | baldasian
 const runsRoot = path.resolve(__dirname, '..', 'runs');
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const outDir = process.env.OUT_DIR
@@ -33,6 +33,7 @@ function slotsForMode() {
   }
   if (MODE === 'daben') return DABEN_SLOTS;
   if (MODE === 'f05sample') return F05_SAMPLE;
+  if (MODE === 'baldasian' || MODE === 'f05all') return DABEN_SLOTS;
   return DABEN_SLOTS;
 }
 
@@ -45,11 +46,20 @@ function isFemaleScene(s) {
   return false;
 }
 
+function isBaldAsianScene(s) {
+  const id = String((s && s.id) || '');
+  const mid = String((s && s.meta && (s.meta.modelId || s.meta.modelLabel)) || '');
+  const url = String((((s && s.items) || [])[0] || {}).url || '');
+  if (/male_bald_asian_01|光头亚裔/i.test(id) || /male_bald_asian_01|光头亚裔/i.test(mid)) return true;
+  if (/光头亚裔|真人头像_男_光头/i.test(url)) return true;
+  return false;
+}
+
 function isDabenScene(s) {
   const url = String((((s && s.items) || [])[0] || {}).url || '');
   if (/大本|蝙蝠侠|布鲁斯/i.test(url)) return true;
-  // 无女05迹象且非 female → 视为大本
-  return !isFemaleScene(s);
+  if (isFemaleScene(s) || isBaldAsianScene(s)) return false;
+  return !isFemaleScene(s) && !isBaldAsianScene(s);
 }
 
 async function waitLoaderGone(page) {
@@ -126,7 +136,7 @@ async function shotCropOrFull(page, filePath) {
 }
 
 async function main() {
-  const wantFemale = MODE !== 'daben';
+  const targetKind = MODE === 'baldasian' ? 'bald' : MODE === 'daben' ? 'daben' : 'female';
   const slots = slotsForMode();
   const manifest = { mode: MODE, outDir, slots, shots: [] };
 
@@ -162,7 +172,7 @@ async function main() {
 
   for (const slot of slots) {
     const idx = await page.evaluate(
-      ({ slot, wantFemale }) => {
+      ({ slot, targetKind }) => {
         const scenes = window.customScenes || [];
         const isF = (s) => {
           const id = String((s && s.id) || '');
@@ -170,10 +180,21 @@ async function main() {
           const url = String((((s && s.items) || [])[0] || {}).url || '');
           return /female_05|女05/i.test(id) || /female_05|女05/i.test(mid) || /女中青年_05|女05/i.test(url);
         };
+        const isB = (s) => {
+          const id = String((s && s.id) || '');
+          const mid = String((s && s.meta && (s.meta.modelId || s.meta.modelLabel)) || '');
+          const url = String((((s && s.items) || [])[0] || {}).url || '');
+          return /male_bald_asian_01|光头亚裔/i.test(id) || /male_bald_asian_01|光头亚裔/i.test(mid) || /光头亚裔|真人头像_男_光头/i.test(url);
+        };
         const isD = (s) => {
           const url = String((((s && s.items) || [])[0] || {}).url || '');
           if (/大本|蝙蝠侠|布鲁斯/i.test(url)) return true;
-          return !isF(s);
+          return !isF(s) && !isB(s);
+        };
+        const match = (s) => {
+          if (targetKind === 'female') return isF(s);
+          if (targetKind === 'bald') return isB(s);
+          return isD(s);
         };
         const cands = [];
         for (let i = 0; i < scenes.length; i++) {
@@ -181,17 +202,16 @@ async function main() {
           if (!s) continue;
           const sl = String((s.meta && s.meta.slot) || '');
           if (sl !== slot) continue;
-          if (wantFemale ? isF(s) : isD(s)) cands.push(i);
+          if (match(s)) cands.push(i);
         }
-        // 兜底：按文件名前缀语义——同 slot 多个时 prefer url
         if (cands.length === 1) return cands[0];
         if (cands.length > 1) {
-          // 大本优先 URL 含大本；女05 优先 URL 含女
           const scored = cands.map((i) => {
             const url = String((((scenes[i].items || [])[0] || {}).url) || '');
             let score = 0;
-            if (wantFemale && /女中青年_05/.test(url)) score += 10;
-            if (!wantFemale && /大本|蝙蝠侠/.test(url)) score += 10;
+            if (targetKind === 'female' && /女中青年_05/.test(url)) score += 10;
+            if (targetKind === 'bald' && /光头亚裔|真人头像_男_光头/.test(url)) score += 10;
+            if (targetKind === 'daben' && /大本|蝙蝠侠/.test(url)) score += 10;
             return { i, score };
           });
           scored.sort((a, b) => b.score - a.score);
@@ -199,7 +219,7 @@ async function main() {
         }
         return -1;
       },
-      { slot, wantFemale }
+      { slot, targetKind }
     );
 
     if (idx < 0) {
