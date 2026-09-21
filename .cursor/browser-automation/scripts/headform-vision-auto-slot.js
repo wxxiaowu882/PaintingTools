@@ -45,8 +45,9 @@ async function rayPlaceNudge(page, u, v) {
 async function runSlot(page, slot) {
   const outDir = path.join(runsRoot, slot);
   fs.mkdirSync(outDir, { recursive: true });
-  const hit = lib.findScene(slot, 'male_bald_asian_01');
-  if (!hit) throw new Error('bald missing ' + slot);
+  const MODEL_ID = process.env.MODEL_ID || 'male_bald_asian_01';
+  const hit = lib.findScene(slot, MODEL_ID);
+  if (!hit) throw new Error(MODEL_ID + ' missing ' + slot);
   const ref = lib.findScene(slot, 'reference');
   const scenePath = path.join(lib.jsonDir, hit.f);
   const sceneId = hit.d.id;
@@ -137,11 +138,15 @@ async function runSlot(page, slot) {
   // status
   const data = JSON.parse(fs.readFileSync(scenePath, 'utf8'));
   const fail = log.placed.filter((p) => !p.ok);
+  const mid = process.env.MODEL_ID || 'male_bald_asian_01';
+  const label =
+    process.env.MODEL_LABEL ||
+    (mid === 'male_ipman_01' ? '叶问' : mid === 'male_bald_asian_01' ? '光头亚裔' : mid);
   data.meta = Object.assign({}, data.meta || {}, {
     status: fail.length ? 'vision_place_partial' : 'vision_place_pending_qa',
-    modelId: 'male_bald_asian_01',
+    modelId: mid,
     modelRole: 'contrast',
-    modelLabel: '光头亚裔'
+    modelLabel: label
   });
   fs.writeFileSync(scenePath, JSON.stringify(data));
   lib.rebuildAggregate();

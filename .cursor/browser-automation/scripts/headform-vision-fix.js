@@ -44,8 +44,9 @@ async function rayPlaceNudge(page, u, v) {
     timeout: 180000
   });
 
-  const hit = lib.findScene(SLOT, 'male_bald_asian_01');
-  if (!hit) throw new Error('missing ' + SLOT);
+  const MODEL_ID = process.env.MODEL_ID || 'male_bald_asian_01';
+  const hit = lib.findScene(SLOT, MODEL_ID);
+  if (!hit) throw new Error('missing ' + MODEL_ID + ' ' + SLOT);
   const ref = lib.findScene(SLOT, 'reference');
   const scenePath = path.join(lib.jsonDir, hit.f);
   const landmarks = ONLY.length ? ONLY : lib.listLandmarks(SLOT);

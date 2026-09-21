@@ -35,8 +35,9 @@ fs.mkdirSync(outDir, { recursive: true });
     timeout: 120000
   });
 
-  const hit = lib.findScene(SLOT, 'male_bald_asian_01');
-  if (!hit) throw new Error('bald scene missing ' + SLOT);
+  const MODEL_ID = process.env.MODEL_ID || 'male_bald_asian_01';
+  const hit = lib.findScene(SLOT, MODEL_ID);
+  if (!hit) throw new Error(MODEL_ID + ' scene missing ' + SLOT);
   const sceneId = hit.d.id;
   const scenePath = path.join(lib.jsonDir, hit.f);
   const cam = (((hit.d.items || [])[0] || {}).camera) || hit.d.camera || null;

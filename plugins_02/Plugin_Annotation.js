@@ -1523,6 +1523,16 @@ window.AnnotationManager = {
                 id, targetUUID: targetObj.uuid, anchorObj: anchor,
                 text: '引线 ' + window.annoCounter, detailText: '', collapsed: false, color, dx: 0, dy: 0, dxN: 0, dyN: 0, dxW: 0, dyW: 0, isOccluded: false
             };
+            // 生产端「圆形」：优先读当前勾选（与面板所见一致）；否则读 SolidCreate_LabelCircleDefault_v1
+            try {
+                if (!window.__SOLID_CONSUMER__) {
+                    const cb = document.getElementById('solid-create-label-circle');
+                    let wantCircle = false;
+                    if (cb) wantCircle = !!cb.checked;
+                    else wantCircle = localStorage.getItem('SolidCreate_LabelCircleDefault_v1') === '1';
+                    if (wantCircle) annoData.labelShape = 'circle';
+                }
+            } catch (_eCircDef) {}
             window.annoDataList.push(annoData);
             this.buildDOM(annoData);
             window.needsUpdate = true;

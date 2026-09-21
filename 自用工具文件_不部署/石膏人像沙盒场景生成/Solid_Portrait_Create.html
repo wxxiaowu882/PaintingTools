@@ -233,8 +233,8 @@
     <div id="solid-create-anno-detail-wrap" style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; gap:8px; flex-wrap:wrap;"> <span id="solid-create-anno-detail-hint" style="font-size:14px; color:#ddd; letter-spacing:0.5px; flex-shrink:0; font-weight:500;">未选中标注</span>
     <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1; justify-content:flex-end; flex-wrap:wrap;">
     <button type="button" id="solid-create-project-straight-btn" class="editor-btn" disabled style="margin:0; padding:4px 10px; font-size:13px; width:auto; flex-shrink:0;" title="">投到面</button>
-    <label id="solid-create-label-circle-wrap" style="display:flex; align-items:center; gap:4px; margin:0; min-width:0; cursor:pointer; user-select:none;" title="【圆形标签】作用于当前选中的经典引线（可 Ctrl/Cmd 多选后一并改）。&#10;&#10;勾选后标签变为正圆、内边距更小，适合单字/短标签；文字变长时圆会变大。&#10;圆形时不显示收起按钮。取消勾选恢复矩形。&#10;存盘写入 labelShape，消费端同样显示。">
-    <input id="solid-create-label-circle" type="checkbox" disabled style="accent-color:#2ecc71; transform:scale(1.15); cursor:pointer; margin:0;">
+    <label id="solid-create-label-circle-wrap" style="display:flex; align-items:center; gap:4px; margin:0; min-width:0; cursor:pointer; user-select:none;" title="【圆形标签】&#10;&#10;· 有选中经典引线时：改当前选中（可 Ctrl/Cmd 多选一并改）。&#10;· 无选中时：改「下次新建」默认（会记住，刷新仍有效）。&#10;&#10;勾选后标签为正圆、内边距更小，适合单字/短标签；文字变长时圆会变大。&#10;圆形时不显示收起按钮。取消勾选恢复矩形。&#10;存盘写入 labelShape，消费端同样显示。">
+    <input id="solid-create-label-circle" type="checkbox" style="accent-color:#2ecc71; transform:scale(1.15); cursor:pointer; margin:0;">
     <span style="font-size:14px; color:#eee; white-space:nowrap; font-weight:500;">圆形</span>
     </label>
     <label id="solid-create-depth-clip-wrap" style="display:flex; align-items:center; gap:4px; margin:0; min-width:0; cursor:pointer; user-select:none;" title="【深度裁切】仅经典引出线。&#10;&#10;默认关闭（不影响转动性能）。勾选后：停稳约 0.15 秒再判断；贴点被头模挡住时隐藏圆点，引线在遮挡边界处裁断，剩余段改为细点线，标签与可见段透明度约为原来的 90%。&#10;可 Ctrl/Cmd 多选后一并开/关。&#10;存盘写入 depthClip；旧数据无此字段=关闭。">
@@ -3275,12 +3275,23 @@
                 const list = getSelectedClassicLeaders();
                 return list.length ? list[list.length - 1] : null;
             }
+            const LABEL_CIRCLE_DEFAULT_KEY = 'SolidCreate_LabelCircleDefault_v1';
+            function readLabelCircleDefault() {
+                try { return localStorage.getItem(LABEL_CIRCLE_DEFAULT_KEY) === '1'; } catch (_e) { return false; }
+            }
+            function writeLabelCircleDefault(on) {
+                try { localStorage.setItem(LABEL_CIRCLE_DEFAULT_KEY, on ? '1' : '0'); } catch (_e) {}
+            }
             function syncLabelCircleCb() {
                 if (!labelCircleCb) return;
+                labelCircleCb.disabled = false;
                 const list = getSelectedClassicLeaders();
-                labelCircleCb.disabled = !list.length;
-                const d = list.length ? list[list.length - 1] : null;
-                labelCircleCb.checked = !!(d && d.labelShape === 'circle');
+                if (list.length) {
+                    const d = list[list.length - 1];
+                    labelCircleCb.checked = !!(d && d.labelShape === 'circle');
+                } else {
+                    labelCircleCb.checked = readLabelCircleDefault();
+                }
             }
             function syncDepthClipCb() {
                 if (!depthClipCb) return;
@@ -3483,14 +3494,13 @@
             }
             window.solidCreateSyncAnnoDetailPanel = syncPanel;
             if (labelCircleCb) {
+                // 启动：无选中时显示上次「新建默认」
+                try { if (!getSelectedClassicLeaders().length) labelCircleCb.checked = readLabelCircleDefault(); } catch (_eInitCirc) {}
                 labelCircleCb.addEventListener('change', function () {
-                    const list = getSelectedClassicLeaders();
-                    if (!list.length) {
-                        this.checked = false;
-                        this.disabled = true;
-                        return;
-                    }
                     const wantCircle = !!this.checked;
+                    writeLabelCircleDefault(wantCircle);
+                    const list = getSelectedClassicLeaders();
+                    if (!list.length) return;
                     list.forEach(function (d) {
                         if (wantCircle) d.labelShape = 'circle';
                         else delete d.labelShape;

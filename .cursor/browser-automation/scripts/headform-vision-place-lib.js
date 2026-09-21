@@ -61,20 +61,38 @@ function rebuildAggregate() {
 
 function findScene(slot, modelId) {
   const want = cards.normalizeSlot(slot);
+  const midWant = modelId || process.env.MODEL_ID || 'male_bald_asian_01';
   for (const f of fs.readdirSync(jsonDir).filter((n) => RE.test(n))) {
     const d = JSON.parse(fs.readFileSync(path.join(jsonDir, f), 'utf8'));
     const got = cards.normalizeSlot((d.meta && d.meta.slot) || '');
     if (got !== want) continue;
     const mid = (d.meta && d.meta.modelId) || '';
     const url = String((((d.items || [])[0] || {}).url) || '');
-    if (modelId === 'male_bald_asian_01') {
-      if (mid === modelId || f.includes('光头亚裔') || /光头亚裔|真人头像_男_光头/.test(url)) {
+    if (midWant === 'reference') {
+      if (d.meta && d.meta.modelRole === 'reference') return { f, d };
+      if (
+        /大本|蝙蝠侠/.test(url) &&
+        !f.includes('女05') &&
+        !f.includes('光头') &&
+        !f.includes('叶问')
+      ) {
         return { f, d };
       }
-    } else if (modelId === 'reference') {
-      if (d.meta && d.meta.modelRole === 'reference') return { f, d };
-      if (/大本|蝙蝠侠/.test(url) && !f.includes('女05') && !f.includes('光头')) return { f, d };
+      continue;
     }
+    if (midWant === 'male_bald_asian_01') {
+      if (mid === midWant || f.includes('光头亚裔') || /光头亚裔|真人头像_男_光头/.test(url)) {
+        return { f, d };
+      }
+      continue;
+    }
+    if (midWant === 'male_ipman_01') {
+      if (mid === midWant || f.includes('叶问') || /IpMan2V|叶问/.test(url)) {
+        return { f, d };
+      }
+      continue;
+    }
+    if (mid === midWant) return { f, d };
   }
   return null;
 }
@@ -355,16 +373,17 @@ async function proposeCandidates(page, landmark, slot) {
           if (!band.allowBack && !band.requireBack && p.z < -0.05) continue;
           if (band.preferFaceZ && p.z < 0.0) continue;
           if (band.ignoreEar && p.z < 0.012) continue;
-          best = {
-            u,
-            v,
-            hit: h,
-            x: p.x,
-            y: p.y,
-            z: p.z,
-            _s: band.requireBack ? -p.z * 3 + (fromRight ? p.x : -p.x) : fromRight ? p.x : -p.x
-          };
-          break;
+          if (typeof band.minZ === 'number' && p.z < band.minZ) continue;
+          if (typeof band.maxZ === 'number' && p.z > band.maxZ) continue;
+          // preferFront：本行取最高 z（鼻头），勿停在颊侧最左缘
+          let _s;
+          if (band.preferFront) _s = p.z * 5 - Math.abs(p.x) * 0.4;
+          else if (band.requireBack) _s = -p.z * 3 + (fromRight ? p.x : -p.x);
+          else _s = fromRight ? p.x : -p.x;
+          const cand = { u, v, hit: h, x: p.x, y: p.y, z: p.z, _s };
+          if (!best || cand._s > best._s) best = cand;
+          // 非 preferFront 时仍取首个剪影缘即可
+          if (!band.preferFront && !band.requireBack) break;
         }
         if (best) out.push(best);
       }
@@ -400,17 +419,18 @@ async function proposeCandidates(page, landmark, slot) {
     } else {
       for (let v = band.v0; v <= band.v1; v += step) {
         if (band.side === 'chinC') {
-          // 颏底：必须在颏前突面（高 z），禁止因「低 localY」误落到喉结
+          // 颏底：高 z 前突 + 偏低 localY（口下颏缘），禁止误落到唇/喉
           let best = null;
           for (let u = 0.46; u <= 0.54; u += 0.004) {
             const h = hitAt(u, v);
             if (!h) continue;
             const p = lp(h);
-            if (p.z < 0.045) continue;
+            if (p.z < 0.05) continue;
             if (Math.abs(p.x) > 0.035) continue;
             if (h.point.y < boxW.min.y + sizeYW * 0.28) continue;
-            // 前突优先，其次略偏低（颏底缘），勿压过低进颈
-            const score = p.z * 5 + Math.min(p.y, 0.14) * 0.8;
+            if (p.y > 0.11) continue; // 拒唇区
+            // 前突优先，其次更低（颏底）
+            const score = p.z * 5 - p.y * 3;
             if (!best || score > best._s) best = { u, v, hit: h, x: p.x, y: p.y, z: p.z, _s: score };
           }
           if (best) out.push(best);
@@ -420,10 +440,11 @@ async function proposeCandidates(page, landmark, slot) {
             const h = hitAt(u, v);
             if (!h) continue;
             const p = lp(h);
-            if (p.z < 0.04) continue;
+            if (p.z < 0.045) continue;
             if (p.x > -0.005 || p.x < -0.06) continue;
             if (h.point.y < boxW.min.y + sizeYW * 0.28) continue;
-            const score = p.z * 2 - p.x;
+            if (p.y > 0.115) continue; // 拒口角高度
+            const score = p.z * 2 - p.x - p.y * 2.5;
             if (!best || score > best._s) {
               best = { u, v, hit: h, x: p.x, y: p.y, z: p.z, _s: score };
             }
@@ -793,11 +814,16 @@ function writeLandmark(scenePath, landmark, placed, templateFromMale, slot) {
   if (idx >= 0) annos[idx] = next;
   else annos.push(next);
   item.annotations = annos;
+  const mid = process.env.MODEL_ID || (data.meta && data.meta.modelId) || 'male_bald_asian_01';
+  const label =
+    process.env.MODEL_LABEL ||
+    (data.meta && data.meta.modelLabel) ||
+    (mid === 'male_ipman_01' ? '叶问' : mid === 'male_bald_asian_01' ? '光头亚裔' : mid);
   data.meta = Object.assign({}, data.meta || {}, {
     status: 'vision_place_in_progress',
-    modelId: 'male_bald_asian_01',
+    modelId: mid,
     modelRole: 'contrast',
-    modelLabel: '光头亚裔'
+    modelLabel: label
   });
   fs.writeFileSync(scenePath, JSON.stringify(data));
   rebuildAggregate();

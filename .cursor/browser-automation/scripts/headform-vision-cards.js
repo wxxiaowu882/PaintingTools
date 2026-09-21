@@ -25,35 +25,49 @@ const V02 = {
     where: '外眼角高度颧弓最外，忽略耳后',
     forbid: '耳、耳垂',
     pickHint: '前脸最左缘',
-    band: { v0: 0.32, v1: 0.42, side: 'left', ignoreEar: true, preferFaceZ: true }
+    band: { v0: 0.32, v1: 0.42, side: 'left', ignoreEar: true, preferFaceZ: true, minZ: 0.02, maxZ: 0.055 }
   },
   4: {
     name: '颊转角',
     kind: '凸起',
     where: '口角高度咬肌上颊转角',
     forbid: '下颌角、颈、肩',
-    band: { v0: 0.4, v1: 0.48, side: 'left', jawFace: true }
+    band: { v0: 0.4, v1: 0.48, side: 'left', jawFace: true },
+    preferBetween: true,
+    between: ['3', '5'],
+    betweenBias: 0.55,
+    betweenXNudge: -0.008,
+    betweenYNudge: -0.01,
+    betweenZNudge: 0.004,
+    betweenMinDist: 0.008
   },
   5: {
     name: '颏结节',
     kind: '凸起',
-    where: '颏左结节',
-    forbid: '颈前、肩',
-    band: { v0: 0.48, v1: 0.58, side: 'chinL' }
+    where: '颏左结节（须在口下颏底，勿落唇）',
+    forbid: '颈前、肩、口唇',
+    band: { v0: 0.54, v1: 0.68, side: 'chinL' }
   },
   6: {
     name: '颏底',
     kind: '凸起',
-    where: '颏底最低近中线',
-    forbid: '喉结、胸窝',
-    band: { v0: 0.52, v1: 0.58, side: 'chinC' }
+    where: '颏底最低近中线（须在口下，勿落唇缝）',
+    forbid: '喉结、胸窝、口唇',
+    band: { v0: 0.56, v1: 0.7, side: 'chinC' }
   },
   A: {
     name: '角前切迹',
     kind: '凹陷',
     where: '咬肌前切迹，4与5之间',
     forbid: '颈侧、肩',
-    band: { v0: 0.46, v1: 0.54, side: 'left', jawFace: true }
+    band: { v0: 0.46, v1: 0.54, side: 'left', jawFace: true },
+    preferBetween: true,
+    between: ['4', '5'],
+    betweenBias: 0.5,
+    betweenXNudge: -0.006,
+    betweenYNudge: -0.004,
+    betweenZNudge: 0.004,
+    betweenMinDist: 0.006
   }
 };
 
@@ -133,8 +147,8 @@ const V03 = {
   A: sil('眉弓上缘', '凹陷', '眉弓上缘', null, 0.22, 0.3),
   B: sil('眼裂', '凹陷', '眼裂', null, 0.32, 0.4),
   C: sil('鼻唇角', '凹陷', '鼻唇角', null, 0.4, 0.48, { preferFront: true }),
-  D: sil('唇缝', '凹陷', '唇缝', null, 0.46, 0.52, { preferFront: true }),
-  E: sil('颏唇沟', '凹陷', '颏唇沟', null, 0.5, 0.56, { preferFront: true }),
+  D:Object.assign(sil('唇缝', '凹陷', '唇缝（介于上下唇白脊）', null, 0.46, 0.52, { preferFront: true }),{preferBetween:true,between:['5','6'],betweenBias:0.35,betweenZNudge:0.006,betweenMinDist:0.01}),
+  E:Object.assign(sil('颏唇沟', '凹陷', '颏唇沟（介于颏肌与颏底）', null, 0.5, 0.56, { preferFront: true }),{preferBetween:true,between:['6','7'],betweenBias:0.45,betweenZNudge:0.004,betweenYNudge:-0.006,betweenMinDist:0.01}),
   F: sil('颈点', '凹陷', '颈点（勿落肩）', '肩', 0.6, 0.72)
 };
 
@@ -167,7 +181,7 @@ const V04 = {
 const V05a = {
   1: sil('额结节', '凸起', '侧后见鼻·额结节', null, 0.16, 0.26),
   2: sil('眉弓', '凸起', '眉弓', null, 0.26, 0.34),
-  3: sil('鼻头', '凸起', '见鼻：鼻头进轮廓', null, 0.34, 0.44, { preferFront: true }),
+  3: sil('鼻头', '凸起', '见鼻：鼻头进轮廓（须最高 z 前突）', null, 0.34, 0.44, { preferFront: true, preferFaceZ: true, minZ: 0.07 }),
   4:Object.assign(sil('口轮匝肌', '凸起', '口轮匝肌', null, 0.44, 0.52, { preferFront: true }),{preferBetween:true,between:['3','5'],betweenBias:0.4,betweenZNudge:0.008}),
   5:Object.assign(sil('颏结节', '凸起', '颏结节（勿落喉）', '喉、肩', 0.5, 0.58, { preferFront: true }),{preferBetween:true,between:['4','D'],betweenBias:0.55,betweenZNudge:0.01,betweenYNudge:-0.004}),
   A: sil('眉弓上缘', '凹陷', '眉弓上缘', null, 0.22, 0.3),
