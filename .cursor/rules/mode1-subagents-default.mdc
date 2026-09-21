@@ -25,6 +25,14 @@ alwaysApply: true
 4. **清理**  
    - 与 verifier 一起：及时删除无用截图与过程文件（不影响后续即可删）。
 
+5. **Skills**  
+   - 开本地页/截图 → 加载 `.cursor/skills/local-http-browser-qa`  
+   - 标注/轮廓/交界视觉验收 → 加载 `.cursor/skills/annotation-vision-qa`  
+
+6. **Hooks**（已启用，无需用户点名）  
+   - 禁止手改 `docs/json`（Write/Shell 拦截）  
+   - 结束时若有疑似临时截图，自动提醒清理（见 `.cursor/hooks/README.md`）  
+
 ## 用户一句话即可
 
 用户只需说业务目标（例如「修某某」「做某某场景」）。主 Agent 自行规划 → 实现 → 验收循环，并中途汇报。

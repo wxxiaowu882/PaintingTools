@@ -471,10 +471,18 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
         if (window.__SOLID_CONSUMER__) return false;
         if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return false;
         if (e && e.button != null && e.button !== 0) return false;
-        if (window.currentEditorMode === 'annotate' || window.currentEditorMode === 'annotate-color' || window.currentEditorMode === 'normal-arrow') return false;
+        // 方案 A：annotate / annotate-color / normal-arrow 下也允许编辑已有贝塞尔；新建仍受 straight-line 门闩约束
         if (window.currentEditorMode === 'dashed-line' && this.isDrawing) return false;
         if (window.currentEditorMode === 'straight-line' && this._straightPending) return false;
         return true;
+    },
+    /** 1A：靠近引线标签/贴面端点时让路给引线 */
+    _tryYieldToLeader: function(e) {
+        if (window.__SOLID_CONSUMER__ || !e) return false;
+        if (!window.AnnotationManager || typeof window.AnnotationManager.preferLeaderOverBezierPointer !== 'function') return false;
+        if (typeof window.AnnotationManager.findLeaderPreferOverBezierAt !== 'function') return false;
+        if (!window.AnnotationManager.findLeaderPreferOverBezierAt(e.clientX, e.clientY)) return false;
+        return !!window.AnnotationManager.preferLeaderOverBezierPointer(e);
     },
     _pauseOrbitForEndpointDrag: function() {
         if (this._straightEndpointOrbitWasEnabled !== null) return;
@@ -581,6 +589,7 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
             c.style.display = 'none';
             c.addEventListener('pointerdown', e => {
                 if (!this._canInteractStraightEndpoint(e)) return;
+                if (this._tryYieldToLeader(e)) return;
                 if (this.selectedId !== data.id) return;
                 this._beginBezierHandleDrag(data, side, e);
             }, { passive: false });
@@ -618,6 +627,7 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
             c.style.cursor = 'grab';
             c.addEventListener('pointerdown', e => {
                 if (!this._canInteractStraightEndpoint(e)) return;
+                if (this._tryYieldToLeader(e)) return;
                 if (this.selectedId !== data.id) return;
                 const altOnly = !!(e.altKey || (typeof e.getModifierState === 'function' && e.getModifierState('Alt')))
                     && !(e.shiftKey || (typeof e.getModifierState === 'function' && e.getModifierState('Shift')))
@@ -857,6 +867,7 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
     },
     _beginBezierAnchorDrag: function(data, index, e) {
         if (!this._canInteractStraightEndpoint(e)) return;
+        if (this._tryYieldToLeader(e)) return;
         if (!data || !this.isEditableBezier(data) || !data.points[index]) return;
         // Alt（无 Shift）单击锚点：收起控制柄，不进入拖拽
         const altOnly = e && (e.altKey || (typeof e.getModifierState === 'function' && e.getModifierState('Alt')))
@@ -899,6 +910,7 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
     },
     _beginBezierHandleDrag: function(data, side, e) {
         if (!this._canInteractStraightEndpoint(e)) return;
+        if (this._tryYieldToLeader(e)) return;
         if (!data || !this.isEditableBezier(data)) return;
         const index = this.selectedAnchorIndex;
         if (index == null || !data.points[index]) return;
@@ -977,6 +989,7 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
     },
     _beginStraightEndpointDrag: function(data, endIndex, e) {
         if (!this._canInteractStraightEndpoint(e)) return;
+        if (this._tryYieldToLeader(e)) return;
         if (!data || !this._isBezierKind(data) || !data.anchorObj || !data.points || data.points.length < 2) return;
         if (this._straightEndpointDrag) this._endStraightEndpointDrag(e);
         if (this._bezierDrag) this._endBezierDrag(e);
@@ -1447,10 +1460,11 @@ import * as THREE from 'three'; window.dashedLineList = []; window.dashedLineCou
     hitPath.setAttribute("stroke-width", String(hitW)); hitPath.style.pointerEvents = "auto"; hitPath.style.cursor = "pointer";
     hitPath.addEventListener('pointerdown', e => {
     if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return;
-    e.stopPropagation();
-    if (window.currentEditorMode === 'annotate' || window.currentEditorMode === 'annotate-color' || window.currentEditorMode === 'normal-arrow') return;
     if (window.currentEditorMode === 'dashed-line' && this.isDrawing) return;
     if (window.currentEditorMode === 'straight-line' && this._straightPending) return;
+    // 1A：近引线标签/贴面端点时让路（先判定，勿先 stopPropagation）
+    if (this._tryYieldToLeader(e)) return;
+    e.stopPropagation();
     this._selectLineFromPointer(data, e);
     });
     if (isBezier && !window.__SOLID_CONSUMER__) {

@@ -3,8 +3,8 @@
  *
  * 知识库（贰·大面交界）：
  * - 光源在正上方时，「光照边际」=「顶面与纵面」转换处
- * - 顶纵三点：额结节、颅侧结节、枕后突隆（定高、定宽、定后界）
- * - 侧面观：枕后突隆最低，颅侧结节略高于额结节
+ * - 顶纵三点：额结节、脑颅侧方最宽点、枕后突隆（定高、定宽、定后界）
+ * - 侧面观：枕后突隆最低，脑颅侧方最宽点略高于额结节
  *
  * 经验（对齐 205）：
  * - 本关研究交界线本身，不写「柔亮少影」类观感命名
@@ -143,7 +143,7 @@ function seed206(data) {
     line: 'light',
     slot: 'L06',
     status: 'seeded',
-    detail: '正顶光：顶面与纵面转换的明暗交界。大半侧取景，钉额结节—颅侧结节—枕后突隆。',
+    detail: '正顶光：顶面与纵面转换的明暗交界。大半侧取景，钉额结节—脑颅侧方最宽点—枕后突隆。',
     keyPoints: '【打底中】'
   };
   return data;
@@ -259,7 +259,7 @@ async function openL06(page) {
   await page.waitForTimeout(1800);
 }
 
-/** 解剖锚：在网格上搜额结节 / 颅侧结节 / 枕后突隆 */
+/** 解剖锚：在网格上搜额结节 / 脑颅侧方最宽点 / 枕后突隆 */
 async function pickAnatomy(page) {
   return page.evaluate(() => {
     const host = window.__solidHost;
@@ -329,7 +329,7 @@ async function pickAnatomy(page) {
 
     // ① 额结节：前额高点偏前（+z），略侧
     const p1 = best((s) => s.z * 3.2 + s.y * 1.5 - Math.abs(s.x + 0.03) * 0.8 + (s.z > 0.02 ? 1 : 0));
-    // ② 颅侧结节：最宽（-|x|），中后
+    // ② 脑颅侧方最宽点：最宽（-|x|），中后
     const p2 = best((s) => -s.x * 4.5 + s.y * 0.8 - Math.abs(s.z + 0.04) * 0.6);
     // ③ 枕后突隆：最后（-z），高度低于颅侧
     const p3 = best((s) => -s.z * 4.2 + s.y * 0.5 - Math.abs(s.x + 0.05) * 0.5 + (s.y < 0.24 ? 0.8 : 0));
@@ -348,7 +348,7 @@ async function pickAnatomy(page) {
       sampleCount: samples.length,
       anchors: [
         { id: '1', name: '额结节', ...toHit(p1) },
-        { id: '2', name: '颅侧结节', ...toHit(p2) },
+        { id: '2', name: '脑颅侧方最宽点', ...toHit(p2) },
         { id: '3', name: '枕后突隆', ...toHit(p3) }
       ]
     };
@@ -599,12 +599,12 @@ async function main() {
     '本关只看光：正顶光——光线几乎从头顶正上方下来。本场景研究的是「顶面与纵面」交界，而不是脸侧剪影或阴阳对半那种左右交界。',
     '交界主要跟「光线和头的夹角」有关：请转动场景，换角度看这条交界。请不要在操作面板中改变光线相关的设置；若不小心改了，点「重置」恢复即可。',
     '',
-    '知识库说：光源在正上方时，「光照边际」就是顶面与纵面转换的位置。顶纵交界可先抓三个关键点：额结节定高、颅侧结节定宽、枕后突隆定后界。',
-    '大半侧取景，是为了把这条交界脊看清楚。侧面观里，枕后突隆往往最低，颅侧结节略高于额结节。',
+    '知识库说：光源在正上方时，「光照边际」就是顶面与纵面转换的位置。顶纵交界可先抓三个关键点：额结节定高、脑颅侧方最宽点定宽、枕后突隆定后界。',
+    '大半侧取景，是为了把这条交界脊看清楚。侧面观里，枕后突隆往往最低，脑颅侧方最宽点略高于额结节。',
     '',
     '【交界 · 顶纵三点】',
     '①.额结节',
-    '②.颅侧结节',
+    '②.脑颅侧方最宽点',
     '③.枕后突隆',
     '',
     '圆标钉在交界缘经过的关键转折上；虚线串起主走向。可点击眼睛图标隐藏标注，更干净地观察明暗交界。'
@@ -615,7 +615,7 @@ async function main() {
   fresh.data.items[0].dashedLines = dashedLines;
   fresh.data.meta.status = 'seeded';
   fresh.data.meta.detail =
-    '正顶光：顶面与纵面转换的明暗交界。大半侧取景，钉额结节—颅侧结节—枕后突隆（知识库顶纵三点）。';
+    '正顶光：顶面与纵面转换的明暗交界。大半侧取景，钉额结节—脑颅侧方最宽点—枕后突隆（知识库顶纵三点）。';
   fresh.data.meta.keyPoints = keyPoints;
   fresh.data.meta.keyPointsRich = plainToRich(keyPoints);
   fs.writeFileSync(fresh.full, JSON.stringify(fresh.data) + '\n');

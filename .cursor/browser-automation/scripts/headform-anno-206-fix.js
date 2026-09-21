@@ -195,7 +195,7 @@ async function main() {
       sampleCount: samples.length,
       annos: [
         pack('1', '额结节', p1, 72, -22),
-        pack('2', '颅侧结节', p2, 90, 2),
+        pack('2', '脑颅侧方最宽点', p2, 90, 2),
         pack('3', '枕后突隆', p3, 70, 28)
       ]
     };

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "node .cursor/hooks/protect-docs-json.js",
+        "matcher": "Write|StrReplace|Delete|EditNotebook",
+        "failClosed": false,
+        "timeout": 10
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "node .cursor/hooks/protect-docs-json-shell.js",
+        "failClosed": false,
+        "timeout": 10
+      }
+    ],
+    "stop": [
+      {
+        "command": "node .cursor/hooks/stop-cleanup-remind.js",
+        "loop_limit": 1,
+        "timeout": 10
+      }
+    ]
+  }
+}

@@ -264,7 +264,7 @@ async function pick(page) {
     const annotations = [];
     const placed = [];
     const convex = [
-      { id: '1', name: '颅顶结节', s: c1, dx: -96, dy: -30 },
+      { id: '1', name: '颅顶点', s: c1, dx: -96, dy: -30 },
       { id: '2', name: '枕后突隆', s: c2, dx: -108, dy: -6 },
       { id: '3', name: '耳后转折', s: c3, dx: -112, dy: 12 },
       { id: '4', name: '下颌角后缘', s: c4, dx: -108, dy: 28 },
@@ -332,7 +332,7 @@ async function main() {
     '实际中每个人凹凸强弱不同，创作时先有这些点位的框架，再按个体强化、弱化或省略。',
     '',
     '点位名称如下：',
-    '1.颅顶结节',
+    '1.颅顶点',
     '2.枕后突隆',
     '3.耳后转折',
     '4.下颌角后缘',

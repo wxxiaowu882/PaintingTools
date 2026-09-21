@@ -10,9 +10,202 @@ window.AnnotationManager = {
     _cachedScene: null,
     _anchorDrag: null,
     _anchorDragOrbitWasEnabled: null,
+    _labelDrag: null,
     ANCHOR_DOT_R: 3,
     ANCHOR_DOT_R_SEL: 4,
     ANCHOR_RING_R: 6,
+    /** 贝塞尔让路：靠近引线标签/贴面端点的屏幕像素阈值（引出线中段不抢） */
+    LEADER_HIT_PRIORITY_PX: 16,
+
+    /** Alt 且无 Shift（避免与 Alt+Shift 新建引线冲突） */
+    _isAltDragWithoutShift: function (e) {
+        if (!e) return false;
+        const alt = !!(e.altKey || (typeof e.getModifierState === 'function' && e.getModifierState('Alt')));
+        const shift = !!(e.shiftKey || (typeof e.getModifierState === 'function' && e.getModifierState('Shift')));
+        return alt && !shift;
+    },
+
+    /** 屏幕点是否在标签矩形内（pad 外扩，单位 px） */
+    isClientInLeaderLabel: function (data, clientX, clientY, pad) {
+        const el = data && data.domEl;
+        if (!el) return false;
+        if (el.style.display === 'none' || el.style.visibility === 'hidden') return false;
+        if (el.style.pointerEvents === 'none') return false;
+        const p = (typeof pad === 'number') ? pad : 0;
+        let r;
+        try { r = el.getBoundingClientRect(); } catch (_e) { return false; }
+        if (!r || r.width <= 0 || r.height <= 0) return false;
+        return clientX >= (r.left - p) && clientX <= (r.right + p) && clientY >= (r.top - p) && clientY <= (r.bottom + p);
+    },
+
+    /** 贴面端点屏幕坐标；不可用则 null */
+    getLeaderAnchorClientPos: function (data) {
+        const c = data && data.svgCircle;
+        if (!c) return null;
+        const op = c.getAttribute('opacity');
+        if (op === '0') return null;
+        try {
+            const svg = c.ownerSVGElement;
+            if (!svg || typeof c.getScreenCTM !== 'function') {
+                const cx = parseFloat(c.getAttribute('cx'));
+                const cy = parseFloat(c.getAttribute('cy'));
+                if (!isFinite(cx) || !isFinite(cy)) return null;
+                return { x: cx, y: cy };
+            }
+            const ctm = c.getScreenCTM();
+            if (!ctm) return null;
+            const pt = svg.createSVGPoint();
+            pt.x = parseFloat(c.getAttribute('cx')) || 0;
+            pt.y = parseFloat(c.getAttribute('cy')) || 0;
+            const sp = pt.matrixTransform(ctm);
+            return { x: sp.x, y: sp.y };
+        } catch (_e2) { return null; }
+    },
+
+    leaderAnchorScreenDist: function (data, clientX, clientY) {
+        const p = this.getLeaderAnchorClientPos(data);
+        if (!p) return Infinity;
+        const dx = clientX - p.x;
+        const dy = clientY - p.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    },
+
+    /**
+     * 1A：点击是否应优先经典引线（仅标签 / 贴面端点近距；引出线中段不判定）。
+     * @returns {{ data: object, preferLabel: boolean } | null}
+     */
+    findLeaderPreferOverBezierAt: function (clientX, clientY) {
+        if (window.__SOLID_CONSUMER__) return null;
+        const list = window.annoDataList;
+        if (!list || !list.length) return null;
+        const pad = this.LEADER_HIT_PRIORITY_PX;
+        const anchR = pad + (this.ANCHOR_RING_R || 6);
+        let best = null;
+        let bestScore = Infinity;
+        for (let i = 0; i < list.length; i++) {
+            const data = list[i];
+            if (!data) continue;
+            const inLabel = this.isClientInLeaderLabel(data, clientX, clientY, pad);
+            const dAnch = this.leaderAnchorScreenDist(data, clientX, clientY);
+            const nearAnch = dAnch <= anchR;
+            if (!inLabel && !nearAnch) continue;
+            // 标签优先于贴点；同档取更近贴点
+            const score = inLabel ? (dAnch * 0.01) : (1000 + dAnch);
+            if (score < bestScore) {
+                bestScore = score;
+                best = { data: data, preferLabel: inLabel };
+            }
+        }
+        return best;
+    },
+
+    _cleanupLabelDragListeners: function () {
+        const st = this._labelDrag;
+        if (!st) return;
+        if (st.onMove) {
+            try { window.removeEventListener('pointermove', st.onMove, { passive: false }); } catch (_e0) {
+                try { window.removeEventListener('pointermove', st.onMove); } catch (_e0b) {}
+            }
+            try { window.removeEventListener('mousemove', st.onMove); } catch (_e1) {}
+        }
+        if (st.onUp) {
+            try { window.removeEventListener('pointerup', st.onUp); } catch (_e2) {}
+            try { window.removeEventListener('pointercancel', st.onUp); } catch (_e3) {}
+            try { window.removeEventListener('mouseup', st.onUp); } catch (_e4) {}
+        }
+    },
+
+    _endLabelDrag: function () {
+        if (!this._labelDrag) return;
+        this._cleanupLabelDragListeners();
+        this._labelDrag = null;
+    },
+
+    /** 生产端：只改标签偏移 dx/dy（不挪吸附点） */
+    _beginLabelDrag: function (data, e) {
+        if (window.__SOLID_CONSUMER__ || !data || !e) return false;
+        if (data.domEl && data.domEl.classList.contains('editing')) return false;
+        if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return false;
+        if (e.button != null && e.button !== 0) return false;
+        if (this._anchorDrag) this._cancelAnchorDrag();
+        if (this._labelDrag) this._endLabelDrag();
+        this._selectAnnoFromPointer(data, e);
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startDx = data.dx || 0;
+        const startDy = data.dy || 0;
+        let moved = false;
+        const onMove = (ev) => {
+            if (!this._labelDrag || this._labelDrag.dataId !== data.id) return;
+            if (this._labelDrag.pointerId != null && ev.pointerId != null && ev.pointerId !== this._labelDrag.pointerId) return;
+            if (Math.abs(ev.clientX - startX) > 3 || Math.abs(ev.clientY - startY) > 3) {
+                if (!moved) {
+                    moved = true;
+                    this._labelDrag.moved = true;
+                    try {
+                        if (!data.collapsed) this.applyExpandedWidthStyle(data);
+                    } catch (_eLock) {}
+                }
+            }
+            if (!moved) return;
+            const vw = Math.max(1, window.__solidAnnoViewportW || window.innerWidth || 1);
+            const vh = Math.max(1, window.__solidAnnoViewportH || window.innerHeight || 1);
+            data.dx = startDx + (ev.clientX - startX);
+            data.dy = startDy + (ev.clientY - startY);
+            data.dxN = data.dx / vw;
+            data.dyN = data.dy / vh;
+            try {
+                const cam = this._cachedCamera;
+                if (cam && data.anchorObj) {
+                    const px = this._pxPerWorldAtAnchor(cam, data.anchorObj);
+                    if (px && px.pxPerWorldX > 1e-6 && px.pxPerWorldY > 1e-6) {
+                        data.dxW = data.dx / px.pxPerWorldX;
+                        data.dyW = data.dy / px.pxPerWorldY;
+                    }
+                }
+            } catch (_eW) {}
+            window.needsUpdate = true;
+            try { if (ev.cancelable) ev.preventDefault(); } catch (_ePrevM) {}
+        };
+        const onUp = (ev) => {
+            if (this._labelDrag && this._labelDrag.pointerId != null && ev && ev.pointerId != null
+                && ev.pointerId !== this._labelDrag.pointerId) return;
+            this._endLabelDrag();
+        };
+        this._labelDrag = { dataId: data.id, pointerId: e.pointerId, onMove: onMove, onUp: onUp, moved: false };
+        window.addEventListener('pointermove', onMove, { passive: false });
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        try { e.stopPropagation(); } catch (_eSp) {}
+        try { if (e.cancelable) e.preventDefault(); } catch (_ePrev) {}
+        return true;
+    },
+
+    /**
+     * 贝塞尔命中让路：选中引线，并按 2A 开始拖标签或 Alt 拖吸附点。
+     * @returns {boolean} 已让路处理
+     */
+    preferLeaderOverBezierPointer: function (e) {
+        if (!e || window.__SOLID_CONSUMER__) return false;
+        const hit = this.findLeaderPreferOverBezierAt(e.clientX, e.clientY);
+        if (!hit || !hit.data) return false;
+        const data = hit.data;
+        if (this._isAltDragWithoutShift(e)) {
+            this._selectAnnoFromPointer(data, e);
+            this._beginAnchorDrag(data, e);
+            return true;
+        }
+        if (hit.preferLabel) {
+            this._beginLabelDrag(data, e);
+            return true;
+        }
+        // 仅近贴点：选中引线，不抢贝塞尔后续（由调用方 return）；松手后可用 Alt 拖贴点
+        this._selectAnnoFromPointer(data, e);
+        try { e.stopPropagation(); } catch (_eSp2) {}
+        return true;
+    },
 
     onSceneHit: function (context) {
         if (window.currentEditorMode !== 'annotate') return;
@@ -1213,7 +1406,20 @@ window.AnnotationManager = {
         ring.setAttribute('opacity', '0.85');
         ring.style.pointerEvents = 'none';
         ring.style.display = 'none';
-        ring.addEventListener('pointerdown', e => { mgr._beginAnchorDrag(data, e); }, { passive: false });
+        // 2A：环在标签之上时——无 Alt 且落在标签内 → 拖标签；Alt（无 Shift）→ 拖吸附点；无重叠仍可直接拖环
+        ring.addEventListener('pointerdown', e => {
+            if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return;
+            if (e.button != null && e.button !== 0) return;
+            if (mgr._isAltDragWithoutShift(e)) {
+                mgr._beginAnchorDrag(data, e);
+                return;
+            }
+            if (mgr.isClientInLeaderLabel(data, e.clientX, e.clientY, 0)) {
+                mgr._beginLabelDrag(data, e);
+                return;
+            }
+            mgr._beginAnchorDrag(data, e);
+        }, { passive: false });
         // 手柄层在标签之上：与圆形标签重叠时，双击环也进入文本编辑
         ring.addEventListener('dblclick', e => {
             if (window.__SOLID_CONSUMER__) return;
@@ -1287,10 +1493,15 @@ window.AnnotationManager = {
     },
     _beginAnchorDrag: function (data, e) {
         if (!this._canInteractAnchorDrag(data, e)) return;
+        // 2A：指针落在标签上时，必须 Alt（无 Shift）才挪吸附点，避免与拖文本框打架
+        if (e && this.isClientInLeaderLabel(data, e.clientX, e.clientY, 0) && !this._isAltDragWithoutShift(e)) {
+            return;
+        }
+        if (this._labelDrag) this._endLabelDrag();
         if (this._anchorDrag) this._endAnchorDrag(e);
         e.stopPropagation();
         e.preventDefault();
-        const captureEl = e.currentTarget;
+        const captureEl = e.currentTarget || (data && data.svgAnchorRing) || (data && data.domEl);
         const onMove = ev => this._moveAnchorDrag(ev);
         const onUp = ev => this._endAnchorDrag(ev);
         this._anchorDrag = { dataId: data.id, pointerId: e.pointerId, captureEl: captureEl, onMove: onMove, onUp: onUp, moved: false };
@@ -1748,42 +1959,22 @@ window.AnnotationManager = {
                 solidAnnoUnlockLabelWidth();
             };
         } else {
+            // 2A：默认拖标签偏移；Alt（无 Shift）→ 挪吸附点。统一 pointerdown，便于环/标签与贝塞尔让路共用
             div.addEventListener('pointerdown', e => {
                 if (window.PluginManager && window.PluginManager.shouldBlockAnnoSelection(e)) return;
                 if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
+                if (e.button != null && e.button !== 0) return;
                 e.stopPropagation();
-                if (!textEl.isContentEditable) {
+                if (textEl.isContentEditable) return;
+                if (window.AnnotationManager._isAltDragWithoutShift(e)) {
                     window.AnnotationManager._selectAnnoFromPointer(data, e);
+                    window.AnnotationManager._beginAnchorDrag(data, e);
+                    return;
                 }
-            });
-            div.addEventListener('mousedown', e => {
-                if (e.target === btn || (btn.contains && btn.contains(e.target))) return;
-                if (textEl.isContentEditable) { e.stopPropagation(); return; }
-                isDragging = true;
-                isMoved = false;
-                startX = e.clientX;
-                startY = e.clientY;
-                startDx = data.dx;
-                startDy = data.dy;
-                e.stopPropagation();
-            });
-            const onMouseMove = e => {
-                if (!isDragging) return;
-                if (Math.abs(e.clientX - startX) > 3 || Math.abs(e.clientY - startY) > 3) {
-                    if (!isMoved) {
-                        isMoved = true;
-                        solidAnnoLockLabelWidth();
-                    }
-                }
-                if (!isMoved) return;
-                solidAnnoApplyLabelDrag(e.clientX, e.clientY);
-            };
-            const onMouseUp = () => { isDragging = false; };
-            window.addEventListener('mousemove', onMouseMove);
-            window.addEventListener('mouseup', onMouseUp);
+                window.AnnotationManager._beginLabelDrag(data, e);
+            }, { passive: false });
             data.cleanupEvents = () => {
-                window.removeEventListener('mousemove', onMouseMove);
-                window.removeEventListener('mouseup', onMouseUp);
+                try { window.AnnotationManager._endLabelDrag(); } catch (_eLd) {}
             };
         }
         layer.appendChild(div);
@@ -1947,6 +2138,7 @@ window.AnnotationManager = {
 
     clearAll: function () {
         this._cancelAnchorDrag();
+        this._endLabelDrag();
         window.annoDataList.forEach(data => {
             if (data.cleanupEvents) data.cleanupEvents();
             if (data.anchorObj && data.anchorObj.parent) data.anchorObj.parent.remove(data.anchorObj);

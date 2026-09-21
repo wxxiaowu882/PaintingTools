@@ -4,6 +4,23 @@
 
 **默认自动执行**：见 `.cursor/rules/mode1-subagents-default.mdc`（`alwaysApply`）。你只需说业务目标，不必另写「先规划 / 再验收」类提示语。
 
+## Skills（按需剧本）
+
+| Skill | 路径 | 何时用 |
+|-------|------|--------|
+| `local-http-browser-qa` | `.cursor/skills/local-http-browser-qa/` | 开本地页、截图、禁止 file:// |
+| `annotation-vision-qa` | `.cursor/skills/annotation-vision-qa/` | 3D 标注 / headform 等 AI 视觉验收 |
+
+主 Agent / verifier 遇到匹配任务应**自动加载**；一般不必你手写 skill 名。
+
+## Hooks（机器强制）
+
+配置见仓库根 `.cursor/hooks.json`，说明见 `.cursor/hooks/README.md`。
+
+- 拦 Agent 手改 `docs/json`
+- 拦疑似手改 JSON 的 Shell 重定向
+- 会话结束时若 `runs/` 有临时文件，自动提醒清理一次
+
 ## 角色
 
 | 角色 | 文件 | 职责 |

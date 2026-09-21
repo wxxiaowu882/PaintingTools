@@ -227,8 +227,8 @@ async function waitReady(page) {
 
     // 高度带：对齐大本正面「W」自上而下（头区取景）
     const specs = [
-      { text: '1', name: '颅顶结节', v: 0.28, mode: 'raw', color: '#00e8e8' },
-      { text: '2', name: '颅侧结节', v: 0.36, mode: 'raw', color: '#00e8e8' },
+      { text: '1', name: '颅顶点', v: 0.28, mode: 'raw', color: '#00e8e8' },
+      { text: '2', name: '脑颅侧方最宽点', v: 0.36, mode: 'raw', color: '#00e8e8' },
       { text: '3', name: '颧骨弓隆起', v: 0.44, mode: 'noear', color: '#00e8e8' },
       { text: '4', name: '颊转角', v: 0.56, mode: 'noear', color: '#00e8e8' },
       { text: 'A', name: '角前切迹', v: 0.68, mode: 'noear', color: '#bfbfbf' },

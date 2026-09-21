@@ -207,8 +207,8 @@ async function main() {
       .replace(/沿用大半侧[^\n]*/, '') ;
   }
   // ensure keyPoints mentions defer cranial
-  if (!(file.data.meta.keyPoints || '').includes('颅顶结节')) {
-    file.data.meta.keyPoints += '\n（备忘：颅顶结节、枕骨等非脸部点位，等脸部主线做完后再补。）\n';
+  if (!(file.data.meta.keyPoints || '').includes('颅顶点')) {
+    file.data.meta.keyPoints += '\n（备忘：颅顶点、枕骨等非脸部点位，等脸部主线做完后再补。）\n';
   }
   file.data.meta.detail =
     '全侧面·外轮廓。正侧面平视；柔光；点位种子来自 103 手调，贴全侧剪影；颅顶/枕骨延后补；不连虚线。';

@@ -226,9 +226,11 @@
     </div>
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; background:rgba(0,0,0,0.5); padding:6px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.2);"> <span style="font-size:14px; color:#eee; white-space:nowrap; font-weight:500;">标注模式：</span>
     <select id="tool-mode-select" class="editor-select" style="margin:0; flex:1; padding:3px; background:#111; color:#0df; border-color:#444;" onchange="setMode(this.value)" title="选择标注工具后，按提示在模型上操作。">
-    <option value="none">未选择标注工具…</option> <option value="annotate">🏷️ 经典引出线 [Alt+Shift+划动]</option> <option value="annotate-color">🎨 屏幕取色引线 [Alt+Shift+划动]</option>
+    <option value="none">未选择标注工具…</option>
+    <option value="annotate" title="【经典引出线】&#10;&#10;新建：Alt+Shift+划动。&#10;&#10;编辑：&#10;· 拖标签 → 只挪文字位置&#10;· Alt+拖标签（或重叠时的吸附环）→ 挪贴面吸附点，文字跟着走&#10;· 无重叠时可直接拖吸附环挪贴点&#10;· 双击标签进文字编辑">🏷️ 经典引出线 [Alt+Shift+划动]</option>
+    <option value="annotate-color">🎨 屏幕取色引线 [Alt+Shift+划动]</option>
     <option value="dashed-line">📏 连续虚线 [Alt+Shift+划动]</option>
-    <option value="straight-line" title="【贝塞尔曲线】&#10;&#10;新建：选中本模式后，按住 Alt+Shift，左键点起点，再点终点（两点须在同一物体上）。&#10;&#10;编辑（仅未投面）：&#10;· 点选曲线 → 显示锚点&#10;· 单击锚点 → 显示左右控制柄；拖锚点/柄可贴面改形&#10;· Alt+单击锚点 → 收起/恢复该点控制柄（尖角 ↔ 圆滑）&#10;· Shift 拖柄 → 镜像对侧柄&#10;· 双击曲线 → 插入中间锚点&#10;· 方向键微调（Shift 加速）&#10;· Delete → 先删当前中间锚点；无锚点焦点则删整条&#10;&#10;多选外观：按住 Ctrl（Mac：Cmd）点多条曲线，可一起改线形/粗细/透明度/端点。&#10;&#10;投到面：变成贴面折线（不可编锚点）；「取消投面」还原为可编辑贝塞尔。">📐 贝塞尔曲线 [Alt+Shift+左键点两点]</option>
+    <option value="straight-line" title="【贝塞尔曲线】&#10;&#10;新建：须选中本模式后，按住 Alt+Shift，左键点起点，再点终点（两点须在同一物体上）。&#10;&#10;编辑（仅未投面；其它标注模式下也可点选编辑）：&#10;· 点选曲线 → 显示锚点&#10;· 单击锚点 → 显示左右控制柄；拖锚点/柄可贴面改形&#10;· Alt+单击锚点 → 收起/恢复该点控制柄（尖角 ↔ 圆滑）&#10;· Shift 拖柄 → 镜像对侧柄&#10;· 双击曲线 → 插入中间锚点&#10;· 方向键微调（Shift 加速）&#10;· Delete → 先删当前中间锚点；无锚点焦点则删整条&#10;&#10;与引线重叠：靠近引线标签或贴面端点时优先操作引线。&#10;&#10;多选外观：按住 Ctrl（Mac：Cmd）点多条曲线，可一起改线形/粗细/透明度/端点。&#10;&#10;投到面：变成贴面折线（不可编锚点）；「取消投面」还原为可编辑贝塞尔。">📐 贝塞尔曲线 [Alt+Shift+左键点两点]</option>
     <option value="normal-arrow">↗️ 法线箭头 [Alt+左击]</option> <option value="polygon3d">🟩 3D光影面片 [Alt+Shift+悬停滑动]</option> <option value="prober">💡 受光探针 [直接点击]</option> </select></div>
     <div id="solid-create-anno-detail-wrap" style="margin-bottom:8px; padding:8px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:6px;"> <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; gap:8px; flex-wrap:wrap;"> <span id="solid-create-anno-detail-hint" style="font-size:14px; color:#ddd; letter-spacing:0.5px; flex-shrink:0; font-weight:500;">未选中标注</span>
     <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1; justify-content:flex-end; flex-wrap:wrap;">
