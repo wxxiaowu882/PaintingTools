@@ -72,15 +72,17 @@ def dismiss_external_site_dialog(timeout: float = 4.0) -> str:
     def _click_cancel_by_template() -> bool:
         screen, mon_l, mon_t = detect_tip.grab_screen_bgr()
         h, w = screen.shape[:2]
-        # 对话框在屏幕中部
-        x0, y0 = int(w * 0.15), int(h * 0.15)
-        x1, y1 = int(w * 0.85), int(h * 0.85)
+        # 对话框在屏幕中部（略收 ROI，降低 matchTemplate 分配）
+        x0, y0 = int(w * 0.25), int(h * 0.25)
+        x1, y1 = int(w * 0.75), int(h * 0.75)
         roi = screen[y0:y1, x0:x1]
 
         tpl_cancel = detect_tip._load_template("btn_cancel_external.png")
         tpl_dlg = detect_tip._load_template("dlg_open_external.png")
-        hit_c = detect_tip._match_scaled(roi, tpl_cancel, 0.78)
-        hit_d = detect_tip._match_scaled(roi, tpl_dlg, 0.72)
+        dlg_scales = getattr(config, "DIALOG_MATCH_SCALES", (1.0, 0.93))
+        hit_c = detect_tip._match_scaled(roi, tpl_cancel, 0.78, scales=dlg_scales)
+        hit_d = detect_tip._match_scaled(roi, tpl_dlg, 0.72, scales=dlg_scales)
+        del screen, roi
 
         if hit_c is not None:
             score, lx, ly, tw, th = hit_c
@@ -243,11 +245,570 @@ def dismiss_external_site_dialog(timeout: float = 4.0) -> str:
     return "跳过"
 
 
+def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
+    """
+    关掉 Cursor 更新提示（非用量 tip）：
+    - 「Update recommended」中央/条带（Close / ×）
+    - 「Update Available」右下角 toast（×；有 Download Update 蓝钮）
+    只点 Close / × / Esc；绝不点 Update / Download Update / Install / Restart。
+    与用量上限 tip 严格分离：不用 tip_usage_* / tip_upgrade_btn 作证据，不触发换号。
+    """
+    deadline = time.time() + timeout
+    # 文案共现关键字（UIA）；禁止把 Upgrade / usage limit 当更新提示
+    text_hints = (
+        "Update recommended",
+        "Update Available",
+        "newer version of Cursor",
+        "recommend updating",
+        "very old version of Cursor",
+        "Download Update",
+        "提示更新",
+        "建议更新",
+        "有新版本",
+        "发现更新",
+    )
+    # 永不点击的按钮文案（黑名单）
+    never_click = (
+        "update",
+        "download update",
+        "download",
+        "install",
+        "restart and update",
+        "restart to update",
+        "更新并重启",
+        "立即更新",
+        "安装更新",
+        "下载更新",
+    )
+    # 允许点击的关闭侧文案（白名单）
+    dismiss_labels = (
+        "close",
+        "not now",
+        "later",
+        "remind me later",
+        "dismiss",
+        "以后再说",
+        "稍后",
+        "关闭",
+        "取消",
+    )
+
+    def _is_never_label(t: str) -> bool:
+        low = (t or "").strip().lower()
+        if not low:
+            return False
+        # 精确「Update」/「Download Update」等；避免误伤无关按钮
+        if low == "update" or low.startswith("update "):
+            return True
+        if "download" in low and "update" in low:
+            return True
+        return any(k in low for k in never_click if k not in ("update", "download"))
+
+    def _is_dismiss_label(t: str) -> bool:
+        low = (t or "").strip().lower()
+        if not low or _is_never_label(low):
+            return False
+        return low in dismiss_labels or any(low == d or low.startswith(d) for d in dismiss_labels)
+
+    def _cursor_scan_rois(
+        screen_h: int, screen_w: int, mon_l: int, mon_t: int
+    ) -> list:
+        """
+        仅在 Cursor 主窗内取子 ROI（相对窗口比例）。
+        无 Cursor 窗则空：避免在 Chrome/其它应用上误点。
+        """
+        rels = getattr(
+            config,
+            "UPDATE_DIALOG_ROIS",
+            ((0.15, 0.02, 0.85, 0.55), (0.40, 0.50, 1.0, 0.98)),
+        )
+        rois = []
+        for hwnd, _title in find_cursor_hwnds():
+            if not win_util.is_onscreen(hwnd):
+                continue
+            rect = win_util.get_rect(hwnd)
+            if not rect:
+                continue
+            wl, wt, wr, wb = rect
+            ww, wh = wr - wl, wb - wt
+            # 过小窗跳过；中等窗整窗扫（避免漏掉独立弹层）
+            if ww < 280 or wh < 120:
+                continue
+            if ww < 700 or wh < 420:
+                x0 = max(0, min(screen_w, wl - mon_l))
+                y0 = max(0, min(screen_h, wt - mon_t))
+                x1 = max(0, min(screen_w, wr - mon_l))
+                y1 = max(0, min(screen_h, wb - mon_t))
+                if x1 - x0 >= 80 and y1 - y0 >= 40:
+                    rois.append((x0, y0, x1, y1))
+                continue
+            for rel in rels:
+                ax0 = wl + int(ww * rel[0])
+                ay0 = wt + int(wh * rel[1])
+                ax1 = wl + int(ww * rel[2])
+                ay1 = wt + int(wh * rel[3])
+                # 转成相对主屏截图坐标
+                x0 = max(0, min(screen_w, ax0 - mon_l))
+                y0 = max(0, min(screen_h, ay0 - mon_t))
+                x1 = max(0, min(screen_w, ax1 - mon_l))
+                y1 = max(0, min(screen_h, ay1 - mon_t))
+                if x1 - x0 < 80 or y1 - y0 < 40:
+                    continue
+                rois.append((x0, y0, x1, y1))
+        return rois
+
+    def _available_fast_rois(
+        screen_h: int, screen_w: int, mon_l: int, mon_t: int
+    ) -> list:
+        """右下角 Update Available：只扫 Cursor 窗底部 chat 带，少算匹配。"""
+        rel = getattr(config, "UPDATE_AVAILABLE_ROI", (0.48, 0.62, 1.0, 0.99))
+        rois = []
+        for hwnd, _title in find_cursor_hwnds():
+            if not win_util.is_onscreen(hwnd):
+                continue
+            rect = win_util.get_rect(hwnd)
+            if not rect:
+                continue
+            wl, wt, wr, wb = rect
+            ww, wh = wr - wl, wb - wt
+            if ww < 400 or wh < 300:
+                continue
+            ax0 = wl + int(ww * rel[0])
+            ay0 = wt + int(wh * rel[1])
+            ax1 = wl + int(ww * rel[2])
+            ay1 = wt + int(wh * rel[3])
+            x0 = max(0, min(screen_w, ax0 - mon_l))
+            y0 = max(0, min(screen_h, ay0 - mon_t))
+            x1 = max(0, min(screen_w, ax1 - mon_l))
+            y1 = max(0, min(screen_h, ay1 - mon_t))
+            if x1 - x0 >= 80 and y1 - y0 >= 40:
+                rois.append((x0, y0, x1, y1))
+        return rois
+
+    def _dismiss_available_fast(screen, mon_l: int, mon_t: int) -> bool:
+        """
+        专关右下「Update Available」：少尺度 + 小 ROI。
+        标题高分即点右上 ×，不点 Download Update。
+        按 Cursor 窗宽估算优先尺度（模板来自约 1024 宽截图）。
+        """
+        h, w = screen.shape[:2]
+        base_scales = getattr(
+            config,
+            "UPDATE_AVAILABLE_FAST_SCALES",
+            (1.7, 1.6, 1.8, 1.5, 2.0, 2.15, 1.0),
+        )
+        thr = float(getattr(config, "UPDATE_AVAILABLE_TITLE_MIN", 0.86))
+        tpl = detect_tip._load_template("dlg_update_available.png")
+        if tpl is None:
+            return False
+        for x0, y0, x1, y1 in _available_fast_rois(h, w, mon_l, mon_t):
+            # 用 ROI 宽度反推窗宽比例，优先试最接近的尺度
+            est = max(0.9, min(2.5, (x1 - x0) / max(1, int(w * 0.52))))
+            # ROI 约为窗宽 52%；更稳：直接用 Cursor 窗宽
+            prefer = []
+            for hwnd, _t in find_cursor_hwnds():
+                rect = win_util.get_rect(hwnd) if win_util.is_onscreen(hwnd) else None
+                if not rect:
+                    continue
+                ww = rect[2] - rect[0]
+                if ww >= 400:
+                    prefer.append(round(ww / 1024.0, 2))
+                    break
+            if not prefer:
+                prefer = [round(est, 2)]
+            # 优先尺度 + 邻近档 + 配置表（去重）
+            ordered: list[float] = []
+            for s in (prefer[0], prefer[0] - 0.1, prefer[0] + 0.1, *base_scales):
+                s = round(float(s), 2)
+                if s < 0.85 or s > 2.6:
+                    continue
+                if s not in ordered:
+                    ordered.append(s)
+            fast_scales = tuple(ordered)
+
+            roi = screen[y0:y1, x0:x1]
+            hit = detect_tip._match_scaled(roi, tpl, thr, scales=fast_scales)
+            if hit is None:
+                # 近失日志，便于下次对照窗宽/尺度
+                soft = detect_tip._match_scaled(
+                    roi, tpl, 0.60, scales=fast_scales[:5]
+                )
+                if soft is not None and soft[0] >= 0.70:
+                    log(
+                        f"对话框 更新提示 近失 available 最高={soft[0]:.2f} "
+                        f"阈值={thr:.2f} 优先尺度={prefer[0]}"
+                    )
+                del roi
+                continue
+            score, lx, ly, tw, th = hit
+            # ×：按 toast 约 3×标题宽估右上角；避开下方 Download Update
+            toast_w = max(int(tw * 3.1), int(tw + 280 * (tw / max(tw, 146))))
+            cx = mon_l + x0 + lx + toast_w - 22
+            cy = mon_t + y0 + ly + max(8, th // 2)
+            cx = min(max(cx, mon_l + x0 + lx + tw + 40), mon_l + x1 - 10)
+            cy = min(max(cy, mon_t + y0 + 6), mon_t + y1 - 12)
+            detect_tip._click_screen(int(cx), int(cy))
+            log(
+                f"对话框 更新提示 结果=已关闭 方式=快路径X "
+                f"样式=available 分数={score:.2f} 坐标={cx},{cy}"
+            )
+            del roi
+            time.sleep(0.35)
+            return True
+        return False
+
+    def _click_dismiss_by_template() -> bool:
+        screen, mon_l, mon_t = detect_tip.grab_screen_bgr()
+        # 先快关右下 Update Available（主循环超时内必须能跑完）
+        try:
+            if _dismiss_available_fast(screen, mon_l, mon_t):
+                del screen
+                return True
+        except Exception as e:
+            log(f"对话框 更新提示 快路径异常 {e}")
+
+        h, w = screen.shape[:2]
+        thr_t = float(getattr(config, "UPDATE_TITLE_THRESHOLD", 0.86))
+        thr_b = float(getattr(config, "UPDATE_BODY_THRESHOLD", 0.84))
+        dual_min = float(getattr(config, "UPDATE_DUAL_MIN_SCORE", 0.78))
+        single_hi = float(getattr(config, "UPDATE_SINGLE_HIGH_SCORE", 0.92))
+        thr_close = float(getattr(config, "UPDATE_CLOSE_THRESHOLD", 0.78))
+
+        scan_rois = _cursor_scan_rois(h, w, mon_l, mon_t)
+        if not scan_rois:
+            del screen
+            return False
+
+        # available 已由快路径处理；此处只扫中央 Update recommended
+        evidence_packs = (
+            (
+                "dlg_update_recommended.png",
+                "dlg_update_body.png",
+                "btn_close_update.png",
+                "btn_dismiss_update_x.png",
+                "recommended",
+            ),
+        )
+        # recommended 也限尺度，避免每轮拖死 tip 检测
+        rec_scales = getattr(
+            config,
+            "UPDATE_RECOMMENDED_SCALES",
+            (2.15, 2.0, 1.5, 1.0),
+        )
+
+        for x0, y0, x1, y1 in scan_rois:
+            if time.time() >= deadline - 0.15:
+                break
+            roi = screen[y0:y1, x0:x1]
+            for title_n, body_n, close_n, x_n, style in evidence_packs:
+                use_scales = rec_scales
+                tpl_title = detect_tip._load_template(title_n)
+                tpl_body = detect_tip._load_template(body_n)
+                hit_t = detect_tip._match_scaled(
+                    roi, tpl_title, dual_min, scales=use_scales
+                )
+                hit_b = detect_tip._match_scaled(
+                    roi, tpl_body, dual_min, scales=use_scales
+                )
+                hit_c = None
+                if close_n:
+                    hit_c = detect_tip._match_scaled(
+                        roi,
+                        detect_tip._load_template(close_n),
+                        thr_close,
+                        scales=use_scales,
+                    )
+
+                if hit_t is None and hit_b is None:
+                    continue
+
+                dual_ok = False
+                single_ok = False
+                # 双证 A：标题 + 正文邻近
+                if hit_t is not None and hit_b is not None:
+                    _st, lx_t, ly_t, tw_t, th_t = hit_t
+                    _sb, lx_b, ly_b, tw_b, th_b = hit_b
+                    near = (ly_b + 8 >= ly_t) and (ly_b <= ly_t + th_t + 80)
+                    near = near and (abs(lx_t - lx_b) < 220)
+                    if near and hit_t[0] >= dual_min and hit_b[0] >= dual_min:
+                        if hit_t[0] >= thr_t or hit_b[0] >= thr_b:
+                            dual_ok = True
+                # 双证 B：标题 + Close（正文尺度失败时的稳妥路径，Close≠Update）
+                if (
+                    not dual_ok
+                    and hit_t is not None
+                    and hit_c is not None
+                    and hit_t[0] >= dual_min
+                    and hit_c[0] >= thr_close
+                ):
+                    _st, lx_t, ly_t, tw_t, th_t = hit_t
+                    sc, clx, cly, ctw, cth = hit_c
+                    near_c = (abs(cly - ly_t) < 140) and (clx > lx_t - 20)
+                    if near_c and (hit_t[0] >= thr_t or sc >= 0.88):
+                        dual_ok = True
+
+                if not dual_ok:
+                    if hit_t is not None and hit_t[0] >= single_hi:
+                        single_ok = True
+                    elif hit_b is not None and hit_b[0] >= single_hi:
+                        single_ok = True
+                if not dual_ok and not single_ok:
+                    continue
+
+                title_or_body = hit_t if hit_t is not None else hit_b
+                if dual_ok and hit_t is not None:
+                    title_or_body = hit_t
+                score_tb, lx, ly, tw, th = title_or_body
+                from_title = hit_t is not None
+
+                # 优先点 Close（已共现则直接点；禁止点 Update）
+                if hit_c is not None:
+                    sc, clx, cly, ctw, cth = hit_c
+                    near = (abs(cly - ly) < 140) and (clx + ctw // 2 > lx - 40)
+                    if near and sc >= thr_close:
+                        cx = mon_l + x0 + clx + ctw // 2
+                        cy = mon_t + y0 + cly + cth // 2
+                        detect_tip._click_screen(int(cx), int(cy))
+                        log(
+                            f"对话框 更新提示 结果=已关闭 方式=Close模板 "
+                            f"样式={style} 分数={max(score_tb, sc):.2f} "
+                            f"坐标={cx},{cy}"
+                        )
+                        del screen, roi
+                        time.sleep(0.4)
+                        return True
+
+                # 其次点右上角 × 模板
+                if x_n:
+                    hit_x = detect_tip._match_scaled(
+                        roi,
+                        detect_tip._load_template(x_n),
+                        thr_close,
+                        scales=use_scales,
+                    )
+                    if hit_x is not None:
+                        sc, xl, yl, xw, xh = hit_x
+                        if abs(yl - ly) < 50 and xl > lx and sc >= thr_close:
+                            cx = mon_l + x0 + xl + xw // 2
+                            cy = mon_t + y0 + yl + xh // 2
+                            detect_tip._click_screen(int(cx), int(cy))
+                            log(
+                                f"对话框 更新提示 结果=已关闭 方式=关闭X模板 "
+                                f"样式={style} 分数={max(score_tb, sc):.2f} "
+                                f"坐标={cx},{cy}"
+                            )
+                            del screen, roi
+                            time.sleep(0.4)
+                            return True
+
+                # 几何点 × / Close：
+                # - recommended：须双证（防 Chrome 误点）
+                # - available：标题「Update Available」足够独特；高分标题即可点右上 ×
+                #   （高分屏上正文常略低于阈值，否则永远关不掉右下角 toast）
+                allow_geo = dual_ok
+                if (
+                    not allow_geo
+                    and style == "available"
+                    and hit_t is not None
+                    and hit_t[0] >= thr_t
+                ):
+                    allow_geo = True
+                if not allow_geo:
+                    continue
+                if style == "available":
+                    # × 在标题行最右侧；绝不点下方 Download Update 蓝钮
+                    x_off = max(280, int(tw * 1.6))
+                    if from_title:
+                        cx = mon_l + x0 + lx + tw + x_off
+                        cy = mon_t + y0 + ly + max(8, th // 2)
+                    else:
+                        cx = mon_l + x0 + lx + tw + 80
+                        cy = mon_t + y0 + ly - 14
+                else:
+                    # Close 约在标题右下方（勿点更右侧的 Update 蓝钮）
+                    cx = mon_l + x0 + lx + tw + 90
+                    cy = mon_t + y0 + ly + th + 28
+                cx = min(max(cx, mon_l + x0 + 10), mon_l + x1 - 16)
+                cy = min(max(cy, mon_t + y0 + 8), mon_t + y1 - 16)
+                detect_tip._click_screen(int(cx), int(cy))
+                ft = f"{hit_t[0]:.2f}" if hit_t else "-"
+                fb = f"{hit_b[0]:.2f}" if hit_b else "-"
+                log(
+                    f"对话框 更新提示 结果=已关闭 方式=几何点X "
+                    f"样式={style} 分数={score_tb:.2f} "
+                    f"双证={ft}/{fb} 坐标={cx},{cy}"
+                )
+                del screen, roi
+                time.sleep(0.4)
+                return True
+            del roi
+        del screen
+        return False
+
+    while time.time() < deadline:
+        try:
+            if _click_dismiss_by_template():
+                return "已关闭"
+        except Exception as e:
+            log(f"对话框 更新提示 模板异常 {e}")
+
+        try:
+            from pywinauto import Desktop
+
+            desk = Desktop(backend="uia")
+            for win in desk.windows():
+                try:
+                    title = (win.window_text() or "").strip()
+                except Exception:
+                    continue
+                if config.ASSIST_TITLE in title or "登录助手" in title:
+                    continue
+                if title != "Cursor" and not title.startswith("Cursor"):
+                    continue
+                try:
+                    texts = []
+                    buttons = []
+                    for ctrl in win.descendants(control_type="Button"):
+                        buttons.append(ctrl)
+                        t = (ctrl.window_text() or "").strip()
+                        if t:
+                            texts.append(t)
+                    for ctrl in win.descendants(control_type="Text"):
+                        t = (ctrl.window_text() or "").strip()
+                        if t:
+                            texts.append(t)
+                    blob = "\n".join(texts)
+                    if not any(h in blob for h in text_hints):
+                        continue
+                    # 窗口客户区：禁止点标题栏「关闭」（曾误点 y≈21 顶栏）
+                    try:
+                        wr = win.rectangle()
+                        win_top = int(wr.top)
+                    except Exception:
+                        win_top = 0
+                    title_bar_y = win_top + 48
+
+                    # 优先 Close（英文弹窗）；「关闭」须不在顶栏且宜靠近 Update 蓝钮
+                    has_update_btn = any(
+                        _is_never_label((b.window_text() or "").strip())
+                        for b in buttons
+                    )
+                    candidates = []
+                    for ctrl in buttons:
+                        try:
+                            t = (ctrl.window_text() or "").strip()
+                        except Exception:
+                            continue
+                        if _is_never_label(t):
+                            continue
+                        if not _is_dismiss_label(t):
+                            continue
+                        try:
+                            rr = ctrl.rectangle()
+                            cx = (rr.left + rr.right) // 2
+                            cy = (rr.top + rr.bottom) // 2
+                        except Exception:
+                            continue
+                        if cx <= 0 or cy <= 0:
+                            continue
+                        if cy < title_bar_y:
+                            continue  # 标题栏
+                        # 「关闭」若无 Update 类按钮共现，且贴窗顶，易误伤
+                        if t == "关闭" and not has_update_btn and cy < win_top + 120:
+                            continue
+                        prio = 0 if t.lower() == "close" else 1
+                        candidates.append((prio, cy, cx, t, ctrl))
+                    candidates.sort()
+                    for _prio, cy, cx, t, ctrl in candidates:
+                        try:
+                            detect_tip._click_screen(cx, cy)
+                            log(
+                                f"对话框 更新提示 结果=已关闭 "
+                                f"方式=控件 label={t} 坐标={cx},{cy}"
+                            )
+                            time.sleep(0.45)
+                            return "已关闭"
+                        except Exception:
+                            continue
+                    # Esc 兜底（有更新文案时）
+                    try:
+                        import pyautogui
+
+                        win_util.force_foreground(int(win.handle))
+                        pyautogui.FAILSAFE = False
+                        pyautogui.press("esc")
+                        log("对话框 更新提示 结果=已关闭 方式=Esc")
+                        time.sleep(0.4)
+                        return "已关闭"
+                    except Exception as e:
+                        log(f"对话框 更新提示 结果=失败 原因={e}")
+                except Exception:
+                    continue
+        except Exception as e:
+            log(f"对话框 更新提示 扫描异常 {e}")
+
+        # Esc 兜底：须在 Cursor 窗内、标题+正文双证（避免 Chrome 弱匹配乱按 Esc）
+        try:
+            screen, mon_l, mon_t = detect_tip.grab_screen_bgr()
+            sh, sw = screen.shape[:2]
+            rois = _cursor_scan_rois(sh, sw, mon_l, mon_t)
+            dlg_scales = getattr(
+                config,
+                "UPDATE_DIALOG_MATCH_SCALES",
+                (1.0, 0.93),
+            )
+            dual_min = float(getattr(config, "UPDATE_DUAL_MIN_SCORE", 0.80))
+            thr_t = float(getattr(config, "UPDATE_TITLE_THRESHOLD", 0.86))
+            thr_b = float(getattr(config, "UPDATE_BODY_THRESHOLD", 0.84))
+            pairs = (
+                ("dlg_update_recommended.png", "dlg_update_body.png"),
+                ("dlg_update_available.png", "dlg_update_available_body.png"),
+            )
+            esc_ok = False
+            for x0, y0, x1, y1 in rois:
+                roi = screen[y0:y1, x0:x1]
+                for tn, bn in pairs:
+                    ht = detect_tip._match_scaled(
+                        roi, detect_tip._load_template(tn), dual_min, scales=dlg_scales
+                    )
+                    hb = detect_tip._match_scaled(
+                        roi, detect_tip._load_template(bn), dual_min, scales=dlg_scales
+                    )
+                    if ht is None or hb is None:
+                        continue
+                    if ht[0] < dual_min or hb[0] < dual_min:
+                        continue
+                    if ht[0] < thr_t and hb[0] < thr_b:
+                        continue
+                    # 纵向邻近
+                    if not (hb[2] + 8 >= ht[2] and hb[2] <= ht[2] + ht[4] + 80):
+                        continue
+                    esc_ok = True
+                    break
+                if esc_ok:
+                    break
+            del screen
+            if esc_ok:
+                import pyautogui
+
+                pyautogui.FAILSAFE = False
+                pyautogui.press("esc")
+                log("对话框 更新提示 结果=已关闭 方式=Esc双证兜底")
+                time.sleep(0.4)
+                return "已关闭"
+        except Exception:
+            pass
+        time.sleep(0.3)
+    return "跳过"
+
+
 def dismiss_blocking_dialogs(rounds: int = 2) -> None:
-    """换号后连续清挡路弹窗（外部网站确认等）。"""
+    """换号后连续清挡路弹窗（更新提示、外部网站确认等）。"""
     for _ in range(max(1, rounds)):
-        r = dismiss_external_site_dialog(timeout=2.5)
-        if r == "跳过":
+        # 重启后更新广告常晚几秒出现；单轮多给一点时间与尺度尝试
+        r_upd = dismiss_update_recommended_dialog(timeout=3.5)
+        r_ext = dismiss_external_site_dialog(timeout=2.5)
+        if r_upd == "跳过" and r_ext == "跳过":
             break
         time.sleep(0.3)
 

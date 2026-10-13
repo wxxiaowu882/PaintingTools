@@ -36,13 +36,16 @@ async function rayPlaceNudge(page, u, v) {
 (async () => {
   const browser = await lib.launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  await page.goto(`http://127.0.0.1:${port}/Solid?sandbox=headform`, {
+  await page.goto(`http://127.0.0.1:${port}/Solid?sandbox=headform&skipPerf=1`, {
     waitUntil: 'domcontentloaded',
     timeout: 120000
   });
-  await page.waitForFunction(() => Array.isArray(window.customScenes) && window.customScenes.length > 0, null, {
-    timeout: 180000
-  });
+  await page.waitForFunction(
+    () => !!(window.__solidHost && typeof window.switchScene === 'function'),
+    null,
+    { timeout: 180000 }
+  );
+  await page.waitForTimeout(1000);
 
   const MODEL_ID = process.env.MODEL_ID || 'male_bald_asian_01';
   const hit = lib.findScene(SLOT, MODEL_ID);
@@ -52,7 +55,8 @@ async function rayPlaceNudge(page, u, v) {
   const landmarks = ONLY.length ? ONLY : lib.listLandmarks(SLOT);
   const cam = (((hit.d.items || [])[0] || {}).camera) || hit.d.camera || null;
 
-  await lib.openScene(page, hit.d.id);
+  let live = JSON.parse(fs.readFileSync(scenePath, 'utf8'));
+  await lib.openSceneData(page, live);
   await lib.applyCamera(page, cam);
   await lib.setAnnosVisible(page, false);
 
@@ -171,14 +175,16 @@ async function rayPlaceNudge(page, u, v) {
     console.log('fix', lm, placed.localPos);
   }
 
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => Array.isArray(window.customScenes) && window.customScenes.length > 0, null, {
-    timeout: 180000
-  });
-  await lib.openScene(page, hit.d.id);
+  // 单关注入验收，勿整页 reload（100+ 聚合索引会卡死）
+  live = JSON.parse(fs.readFileSync(scenePath, 'utf8'));
+  await lib.openSceneData(page, live);
   await lib.applyCamera(page, cam);
   await lib.setAnnosVisible(page, true);
-  await page.screenshot({ path: path.join(outDir, 'verify.png') });
+  try {
+    await page.screenshot({ path: path.join(outDir, 'verify.png'), timeout: 60000 });
+  } catch (e) {
+    console.warn('verify shot', String(e && e.message ? e.message : e));
+  }
 
   const data = JSON.parse(fs.readFileSync(scenePath, 'utf8'));
   data.meta.status = log.every((x) => x.ok) ? 'vision_place_pending_qa' : 'vision_place_partial';
@@ -187,6 +193,7 @@ async function rayPlaceNudge(page, u, v) {
   fs.writeFileSync(path.join(outDir, 'log.json'), JSON.stringify(log, null, 2));
   console.log(JSON.stringify({ ok: true, outDir, log }, null, 2));
   await browser.close();
+  process.exit(log.every((x) => x.ok) ? 0 : 1);
 })().catch((e) => {
   console.error(e);
   process.exit(1);

@@ -28,7 +28,7 @@ POLL_INTERVAL = 2.0
 # 换号成功并续写后的静默期
 GRACE_SECONDS = 120
 # 宽限结束后仍须连续 N 次检出同一 tip 才换号，过滤单次误匹配
-TIP_CONFIRM_POLLS = 5
+TIP_CONFIRM_POLLS = 2
 CONFIRM_WAIT_SECONDS = 20
 # 点「刷新」后，Cursor 窗口须先消失再出现才算重启成功
 CURSOR_GONE_TIMEOUT = 45
@@ -61,11 +61,13 @@ CONN_RESUME_COOLDOWN = 45
 CHAT_INPUT_REL = (0.64, 0.96)
 
 # Tip 类型中文名
+# 注意：update_prompt（更新提示）不是 tip，不进换号；仅日志/文档对照用
 TIP_TYPE_CN = {
     "usage_limit": "用量上限",
     "error_resume": "恢复会话失败",
     "connection_error": "连接错误",
     "chat_toast": "聊天提示",
+    "update_prompt": "更新提示",
 }
 
 # 打开工程后清 tip：右下角 chat 区相对比例
@@ -80,6 +82,37 @@ CONN_BODY_ONLY_THRESHOLD = 0.78
 # 警示图标共现（现多为灰色三角，非黄）
 CONN_ICON_MIN_SCORE = 0.60
 # 模板来自截图放大，实机 DPI 可能略偏，做多尺度匹配
-MATCH_SCALES = (0.78, 0.86, 0.93, 1.0, 1.08, 1.16)
+# 常态只跑前 3 档；接近阈值时再补跑其余（省内存、加速无 tip 轮询）
+MATCH_SCALES = (1.0, 0.93, 1.08, 0.86, 0.78, 1.16)
+MATCH_SCALES_PRIMARY = 3
+# 1.0 尺度已明显高于阈值时早退，少做其它尺度
+MATCH_EARLY_EXIT_MARGIN = 0.04
+# 主档最高分距阈值这么近时，再试其余尺度
+MATCH_NEAR_MISS = 0.06
+# 外部网站弹窗用更少尺度（ROI 更大，易 OOM）
+DIALOG_MATCH_SCALES = (1.0, 0.93)
+# 更新提示：仅在 Cursor 窗口内扫；相对「该窗口」的子 ROI（避免 Chrome 误点）
+UPDATE_DIALOG_ROIS = (
+    (0.15, 0.02, 0.85, 0.55),  # 窗内上中（Update recommended）
+    (0.40, 0.50, 1.0, 0.98),  # 窗内右下（Update Available）
+)
+# 右下角 Update Available 专用：更贴 chat 底栏，缩小 ROI 加速
+UPDATE_AVAILABLE_ROI = (0.48, 0.62, 1.0, 0.99)
+# 模板来自约 1024 宽压缩图；实机 Cursor 常 ~2000+ 宽，须含 2.1～2.3 档
+UPDATE_DIALOG_MATCH_SCALES = (2.15, 2.0, 2.3, 1.8, 1.5, 1.0, 1.25, 0.93)
+# Available 快路径：覆盖常见窗宽（约 1600～2178）
+# 实机曾用 ~1742 宽，仅 2.15/2.0/1.0 会全部低于阈值 → 永远关不掉
+UPDATE_AVAILABLE_FAST_SCALES = (1.7, 1.6, 1.8, 1.5, 2.0, 2.15, 1.0)
+# recommended 主循环限尺度（available 已走快路径）
+UPDATE_RECOMMENDED_SCALES = (2.15, 2.0, 1.5, 1.0)
+# 防误报：须标题+正文（或标题+Close）共现；0.74 级禁止几何点 ×
+UPDATE_TITLE_THRESHOLD = 0.86
+UPDATE_BODY_THRESHOLD = 0.84
+UPDATE_DUAL_MIN_SCORE = 0.78  # 双模板共现时各自下限
+UPDATE_SINGLE_HIGH_SCORE = 0.92  # 仅一侧时须极高分且有 Close/×
+UPDATE_CLOSE_THRESHOLD = 0.78
+UPDATE_AVAILABLE_TITLE_MIN = 0.86  # 快路径：标题够高即可点 ×
+# 主循环约每 N 轮主动回收一次（2s×120≈4 分钟）
+GC_EVERY_POLLS = 120
 # 换号后等待 Connection Error 出现再网络续写（秒）
 POST_OPEN_CONN_WAIT = 20

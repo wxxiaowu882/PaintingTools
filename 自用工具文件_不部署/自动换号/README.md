@@ -8,6 +8,7 @@ Windows 常驻脚本：发现 Cursor 右下角限额 tip 后，驱动「Cursor �
 
 1. 安装 Python 3，并确保 `python` 在 PATH 中。
 2. 首次可双击 `启动_自动换号监控.bat`（会提权；缺依赖时自动 `pip install -r requirements.txt`）。
+   若已有旧监控在跑，**会自动结束旧进程并接管**，不必再手动关 `python monitor.py`。
 3. 或手动：
 
 ```bat
@@ -23,9 +24,10 @@ python monitor.py
 | 阶段 | 行为 |
 |------|------|
 | 监控 | 约 2 秒一轮；用量上限 / 恢复会话失败 → 换号 |
+| **更新提示** | **Update recommended / Update Available 一律只关闭（Close / × / Esc），绝不点 Update 或 Download Update，不换号**；与用量 tip 严格区分；**仅在 Cursor 窗口内**扫，且须标题+正文双证（防 Chrome/其它页误点） |
 | Connection Error | 关 tip → 输入「刚才网络断了，现在请继续」并 Ctrl+Enter（不换号） |
 | 换号打开工程后 | 最多等约 20 秒 Connection Error；命中则网络续写，否则清 tip 后发「请继续你的工作」 |
-| 宽限内（打开工程后 2 分钟） | 用量 tip 忽略；Connection Error 仍走网络续写 |
+| 宽限内（打开工程后 2 分钟） | 用量 tip 忽略；Connection Error 仍走网络续写；更新提示仍关闭 |
 | 换号中 | 忽略新 tip，避免连点 |
 | 换号前 | 对 Cursor「全部保存」 |
 | 助手 | 点「刷新 Cursor」；若出现「确认换号」则点 |
@@ -64,10 +66,22 @@ python monitor.py
 | `btn_paintingtools.png` / `lbl_recent_projects.png` | 欢迎页打开工程 |
 | `dlg_open_external.png` | 「是否要 Cursor 打开外部网站」文案 |
 | `btn_cancel_external.png` | 该弹窗的「取消」按钮 |
+| `dlg_update_recommended.png` | 「Update recommended」标题（更新提示，非用量） |
+| `dlg_update_body.png` | 「A newer version of Cursor…」正文 |
+| `btn_close_update.png` | Update recommended 的 Close（禁止用 Update 按钮模板） |
+| `btn_dismiss_update_x.png` | Update recommended 右上角 × |
+| `dlg_update_available.png` | 「Update Available」标题（右下角 toast，非用量） |
+| `dlg_update_available_body.png` | 「very old version of Cursor…」正文 |
 
 分辨率或主题变了导致匹配失败时：从新截图裁出对应小图覆盖同名文件，必要时在 `config.py` 调 `MATCH_THRESHOLD` / `TIP_MATCH_THRESHOLD`。
 
 暗色主题未做第二套模板；若你常用暗色，另补一套再说。
+
+## 内存与稳定性
+
+- 模板会缓存在内存；替换 `templates/` 后请**重启监控**才生效。
+- 主循环遇 OpenCV 内存不足会自动 GC 并短暂退避，避免连环报错瘫痪。
+- 换号后「打开外部网站」扫描已降频、缩 ROI，减轻截屏匹配峰值。
 
 ## 验收建议
 

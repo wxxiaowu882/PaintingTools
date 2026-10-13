@@ -10,12 +10,17 @@ from typing import Optional, Tuple
 import cv2
 import mss
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageGrab
 
 import config
 from logutil import log
 
 TipKind = str  # usage_limit | error_resume
+
+# 模板内存缓存（路径含中文，避免每轮 Pillow/解码）
+_TEMPLATE_CACHE: dict[str, Optional[np.ndarray]] = {}
+# 复用 mss 实例，减少反复创建
+_MSS = None
 
 
 @dataclass
@@ -33,24 +38,89 @@ def _imread_unicode(path: Path) -> Optional[np.ndarray]:
     """OpenCV 无法直接读中文路径，经 Pillow 转 BGR。"""
     try:
         im = Image.open(path).convert("RGB")
-        return cv2.cvtColor(np.array(im), cv2.COLOR_RGB2BGR)
+        arr = np.asarray(im, dtype=np.uint8)
+        return cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
     except Exception:
         return None
 
 
 def _load_template(name: str) -> Optional[np.ndarray]:
-    return _imread_unicode(config.TEMPLATES_DIR / name)
+    if name in _TEMPLATE_CACHE:
+        return _TEMPLATE_CACHE[name]
+    img = _imread_unicode(config.TEMPLATES_DIR / name)
+    _TEMPLATE_CACHE[name] = img
+    return img
+
+
+def clear_template_cache() -> None:
+    """热更新 templates 后可调用；正常监控不必。"""
+    _TEMPLATE_CACHE.clear()
 
 
 def grab_screen_bgr() -> Tuple[np.ndarray, int, int]:
-    """抓主屏，返回 BGR 图与虚拟屏左上偏移。"""
-    with mss.mss() as sct:
-        mon = sct.monitors[1]  # 主显示器
-        shot = sct.grab(mon)
-        # mss: BGRA
-        bgra = np.array(shot, dtype=np.uint8)
-        bgr = bgra[:, :, :3].copy()
+    """抓主屏，返回 BGR 图与虚拟屏左上偏移。BitBlt 失败时重建 mss / 回退 PIL。"""
+    global _MSS
+
+    def _from_mss() -> Tuple[np.ndarray, int, int]:
+        global _MSS
+        if _MSS is None:
+            _MSS = mss.mss()
+        mon = _MSS.monitors[1]  # 主显示器
+        shot = _MSS.grab(mon)
+        bgra = np.asarray(shot, dtype=np.uint8)
+        bgr = np.ascontiguousarray(bgra[:, :, :3])
         return bgr, int(mon["left"]), int(mon["top"])
+
+    def _reset_mss() -> None:
+        global _MSS
+        try:
+            if _MSS is not None:
+                _MSS.close()
+        except Exception:
+            pass
+        _MSS = None
+
+    def _from_pil() -> Tuple[np.ndarray, int, int]:
+        # 与 mss 主屏对齐：优先 monitors[1] 区域
+        left = top = 0
+        try:
+            with mss.mss() as sct:
+                mon = sct.monitors[1]
+                left, top = int(mon["left"]), int(mon["top"])
+                box = (
+                    left,
+                    top,
+                    left + int(mon["width"]),
+                    top + int(mon["height"]),
+                )
+                im = ImageGrab.grab(bbox=box) if left or top else ImageGrab.grab()
+        except Exception:
+            im = ImageGrab.grab()
+        rgb = np.asarray(im.convert("RGB"), dtype=np.uint8)
+        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+        return bgr, left, top
+
+    last_err: Optional[Exception] = None
+    for attempt in range(3):
+        try:
+            return _from_mss()
+        except Exception as e:
+            last_err = e
+            _reset_mss()
+            time.sleep(0.15 + attempt * 0.1)
+            try:
+                return _from_mss()
+            except Exception as e2:
+                last_err = e2
+                _reset_mss()
+                time.sleep(0.2)
+    # mss 连续失败：PIL 回退（日志由调用方可见异常信息时再记）
+    try:
+        return _from_pil()
+    except Exception:
+        if last_err is not None:
+            raise last_err
+        raise
 
 
 def _roi_rect(h: int, w: int) -> Tuple[int, int, int, int]:
@@ -243,9 +313,12 @@ def _match_in(
         return None
     res = cv2.matchTemplate(hay, needle, cv2.TM_CCOEFF_NORMED)
     _min_v, max_v, _min_l, max_l = cv2.minMaxLoc(res)
-    if max_v < threshold:
+    score = float(max_v)
+    lx, ly = int(max_l[0]), int(max_l[1])
+    del res
+    if score < threshold:
         return None
-    return float(max_v), int(max_l[0]), int(max_l[1])
+    return score, lx, ly
 
 
 def _match_scaled(
@@ -256,37 +329,83 @@ def _match_scaled(
 ) -> Optional[Tuple[float, int, int, int, int]]:
     """
     多尺度模板匹配。返回 (score, lx, ly, tw, th)，tw/th 为实际匹配用的模板尺寸。
+    默认先跑主档尺度；高分早退；接近阈值才补跑其余尺度。
     """
     if needle is None or hay is None:
         return None
-    best = None  # score, lx, ly, tw, th
     use_scales = scales if scales is not None else getattr(
         config, "MATCH_SCALES", (1.0,)
     )
-    for scale in use_scales:
-        if abs(scale - 1.0) < 1e-6:
-            scaled = needle
+    margin = float(getattr(config, "MATCH_EARLY_EXIT_MARGIN", 0.04))
+    near = float(getattr(config, "MATCH_NEAR_MISS", 0.06))
+    primary_n = int(getattr(config, "MATCH_SCALES_PRIMARY", 3))
+
+    # 去重；未显式传 scales 时 1.0 优先；显式传则保留调用方顺序（高分屏可先跑 2.15）
+    ordered: list[float] = []
+    for s in use_scales:
+        if s not in ordered:
+            ordered.append(s)
+    if scales is None:
+        if 1.0 in ordered:
+            ordered.remove(1.0)
+            ordered.insert(0, 1.0)
+        if primary_n > 0 and len(ordered) > primary_n:
+            primary = ordered[:primary_n]
+            rest = ordered[primary_n:]
         else:
-            nw = max(8, int(round(needle.shape[1] * scale)))
-            nh = max(8, int(round(needle.shape[0] * scale)))
-            if nh >= hay.shape[0] or nw >= hay.shape[1]:
+            primary = ordered
+            rest = []
+    else:
+        primary = ordered
+        rest = []
+
+    def _run(scale_list: list[float], best_in):
+        best = best_in
+        best_any = -1.0  # 含低于阈值的最高分，用于 near-miss
+        for scale in scale_list:
+            owned = False
+            if abs(scale - 1.0) < 1e-6:
+                scaled = needle
+            else:
+                nw = max(8, int(round(needle.shape[1] * scale)))
+                nh = max(8, int(round(needle.shape[0] * scale)))
+                if nh >= hay.shape[0] or nw >= hay.shape[1]:
+                    continue
+                scaled = cv2.resize(needle, (nw, nh), interpolation=cv2.INTER_AREA)
+                owned = True
+            if scaled.shape[0] >= hay.shape[0] or scaled.shape[1] >= hay.shape[1]:
+                if owned:
+                    del scaled
                 continue
-            scaled = cv2.resize(needle, (nw, nh), interpolation=cv2.INTER_AREA)
-        if scaled.shape[0] >= hay.shape[0] or scaled.shape[1] >= hay.shape[1]:
-            continue
-        res = cv2.matchTemplate(hay, scaled, cv2.TM_CCOEFF_NORMED)
-        _min_v, max_v, _min_l, max_l = cv2.minMaxLoc(res)
-        if max_v < threshold:
-            continue
-        cand = (
-            float(max_v),
-            int(max_l[0]),
-            int(max_l[1]),
-            int(scaled.shape[1]),
-            int(scaled.shape[0]),
-        )
-        if best is None or cand[0] > best[0]:
-            best = cand
+            res = cv2.matchTemplate(hay, scaled, cv2.TM_CCOEFF_NORMED)
+            _min_v, max_v, _min_l, max_l = cv2.minMaxLoc(res)
+            score = float(max_v)
+            lx, ly = int(max_l[0]), int(max_l[1])
+            tw, th = int(scaled.shape[1]), int(scaled.shape[0])
+            del res
+            if owned:
+                del scaled
+            if score > best_any:
+                best_any = score
+            if score < threshold:
+                continue
+            cand = (score, lx, ly, tw, th)
+            if best is None or cand[0] > best[0]:
+                best = cand
+            # 已足够高则早退（任意尺度），避免高分屏扫完全部尺度超时
+            if score >= max(threshold + margin, 0.90):
+                return best, best_any, True  # early
+        return best, best_any, False
+
+    best, best_any, early = _run(primary, None)
+    if early:
+        return best
+    if best is not None:
+        return best
+    # 主档接近阈值：补跑其余尺度
+    if rest and best_any >= threshold - near:
+        best, _ba, _e = _run(rest, best)
+        return best
     return best
 
 
@@ -294,6 +413,8 @@ def detect_tip(threshold: Optional[float] = None) -> Optional[TipHit]:
     """
     在主屏右下 ROI 检测 tip。
     顺序：恢复会话失败 → Connection Error → 用量上限。
+    不含更新提示（Update recommended / Update Available；由
+    ui_cursor.dismiss_update_recommended_dialog 处理，只关不换号）。
     """
     thr = threshold if threshold is not None else config.TIP_MATCH_THRESHOLD
     screen, mon_l, mon_t = grab_screen_bgr()
@@ -484,9 +605,13 @@ def close_post_open_tips(max_rounds: int = 5) -> str:
             cn = config.TIP_TYPE_CN.get(tip_kind, tip_kind)
             results.append(f"已关闭_{cn}")
             log(f"打开后清提示 点击关闭 坐标={cx},{cy}")
-            # tip 已消失则结束；仍在则继续下一轮
-            still = detect_tip(threshold=0.70)
-            if still is None:
+            # 轻量复检：同 ROI 再找 tip，避免完整 detect_tip 再跑一遍多尺度风暴
+            screen2, _ml2, _mt2 = grab_screen_bgr()
+            h2, w2 = screen2.shape[:2]
+            roi2 = screen2[y0:y1, x0:x1]
+            still_box = _find_post_open_tip_box(roi2, x0, y0, h2)
+            del screen2, roi2
+            if still_box is None:
                 break
         except Exception as e:
             log(f"错误 打开后关提示失败 {e}")

@@ -29,6 +29,6 @@ if %errorlevel% neq 0 (
 )
 
 echo 启动自动换号监控（日志见 logs 目录）...
-echo 若提示已有进程在运行，请先关掉旧的监控窗口或任务管理器里的 python monitor.py
+echo 若已有旧监控在跑，将自动结束旧进程并接管，无需手动关闭。
 python "%~dp0monitor.py"
 pause

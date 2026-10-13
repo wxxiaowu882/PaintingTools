@@ -74,7 +74,9 @@ function findScene(slot, modelId) {
         /大本|蝙蝠侠/.test(url) &&
         !f.includes('女05') &&
         !f.includes('光头') &&
-        !f.includes('叶问')
+        !f.includes('叶问') &&
+        !f.includes('欧女') &&
+        !f.includes('欧男')
       ) {
         return { f, d };
       }
@@ -92,46 +94,108 @@ function findScene(slot, modelId) {
       }
       continue;
     }
+    if (midWant === 'female_euro_02') {
+      if (mid === midWant || f.includes('欧女') || /女中青年_02/.test(url)) {
+        return { f, d };
+      }
+      continue;
+    }
+    if (midWant === 'male_euro_aaron_01') {
+      if (mid === midWant || f.includes('欧男') || /AARON|AARON%20PAUL|AARON PAUL/.test(url)) {
+        return { f, d };
+      }
+      continue;
+    }
     if (mid === midWant) return { f, d };
   }
   return null;
 }
 
-async function waitReady(page) {
+async function waitReady(page, wantSceneId) {
   await page
-    .waitForFunction(() => {
-      const el = document.getElementById('scene-loader');
-      if (!el) return true;
-      const st = getComputedStyle(el);
-      return st.display === 'none' || Number(st.opacity || 1) < 0.05;
-    }, null, { timeout: 420000 })
+    .waitForFunction(() => Array.isArray(window.customScenes) && window.customScenes.length > 0, null, {
+      timeout: 180000
+    })
     .catch(() => {});
-  await page.waitForTimeout(2000);
   await page.evaluate(() => {
-    const el = document.getElementById('scene-loader');
-    if (el) el.style.display = 'none';
+    // 批量自动化：跳过/强关首次性能审计遮罩，避免截图与射线被挡住
+    window.perfTestDone = true;
+    window.isTestingPerformance = false;
+    window.isLoadingScene = false;
+    const pto = document.getElementById('perf-test-overlay');
+    if (pto) {
+      pto.style.display = 'none';
+      pto.style.opacity = '0';
+    }
     const m = document.getElementById('scene-grid-modal');
     if (m) m.style.display = 'none';
   });
-  await page.waitForFunction(() => {
-    const host = window.__solidHost;
-    if (!host || !host.getSceneGroup) return false;
-    let n = 0;
-    host.getSceneGroup().traverse((o) => {
-      if (o.isMesh) n++;
-    });
-    return n > 0;
-  }, null, { timeout: 120000 });
+  const want = wantSceneId != null ? String(wantSceneId) : null;
+  await page.waitForFunction(
+    (wantId) => {
+      const host = window.__solidHost;
+      if (!host || !host.getSceneGroup) return false;
+      if (wantId) {
+        const s = (window.customScenes || [])[window.currentSceneIndex];
+        if (!s || String(s.id) !== String(wantId)) return false;
+      }
+      let n = 0;
+      host.getSceneGroup().traverse((o) => {
+        if (o.isMesh) n++;
+      });
+      return n > 0;
+    },
+    want,
+    { timeout: 300000 }
+  );
+  await page.evaluate(() => {
+    const el = document.getElementById('scene-loader');
+    if (el) {
+      el.style.display = 'none';
+      el.style.opacity = '0';
+    }
+    const pto = document.getElementById('perf-test-overlay');
+    if (pto) {
+      pto.style.display = 'none';
+      pto.style.opacity = '0';
+    }
+    const m = document.getElementById('scene-grid-modal');
+    if (m) m.style.display = 'none';
+    window.perfTestDone = true;
+    window.isTestingPerformance = false;
+    window.isLoadingScene = false;
+  });
+  await page.waitForTimeout(1500);
 }
 
 async function openScene(page, id) {
   const idx = await page.evaluate((sid) => (window.customScenes || []).findIndex((s) => s && String(s.id) === sid), id);
   if (idx < 0) throw new Error('scene missing ' + id);
   await page.evaluate((i) => {
-    window.currentSceneIndex = -1;
+    // 卡死的加载锁会让 switchScene 直接 return
+    window.isLoadingScene = false;
+    window.__solidSceneLoadToken = (window.__solidSceneLoadToken || 0) + 1;
+    if (window.currentSceneIndex === i) window.currentSceneIndex = -1;
     window.switchScene(i);
   }, idx);
-  await waitReady(page);
+  await waitReady(page, id);
+}
+
+/** 单关注入：不依赖 100+ 聚合索引切关，适合批量视觉定点 */
+async function openSceneData(page, sceneData) {
+  if (!sceneData || !sceneData.id) throw new Error('openSceneData: missing scene');
+  await page.evaluate((data) => {
+    window.isLoadingScene = false;
+    window.__solidSceneLoadToken = (window.__solidSceneLoadToken || 0) + 1;
+    window.customScenes = [data];
+    window.currentSceneIndex = -1;
+    try {
+      const m = document.getElementById('scene-grid-modal');
+      if (m) m.style.display = 'none';
+    } catch (_e) {}
+    window.switchScene(0);
+  }, sceneData);
+  await waitReady(page, sceneData.id);
 }
 
 async function applyCamera(page, cam) {
@@ -170,7 +234,10 @@ async function setAnnosVisible(page, on) {
 async function proposeCandidates(page, landmark, slot) {
   const card = cards.getCard(slot || 'V02', landmark) || V02_CARDS[landmark];
   if (!card) throw new Error('no card ' + (slot || 'V02') + '/' + landmark);
-  return page.evaluate((card) => {
+  // FAST=1：步长约放大 2×，粗扫+原有二分细化，批量流水线用
+  const fast = process.env.FAST === '1';
+  return page.evaluate(
+    ({ card, fast }) => {
     const host = window.__solidHost;
     const THREE = host.getTHREE();
     const cam = host.getCamera();
@@ -189,6 +256,10 @@ async function proposeCandidates(page, landmark, slot) {
     const sizeYW = boxW.max.y - boxW.min.y;
     const shoulderY = boxW.min.y + sizeYW * 0.22;
     const chinMinY = boxW.min.y + sizeYW * 0.26;
+    const uFine = fast ? 0.004 : 0.002;
+    const uMid = fast ? 0.008 : 0.004;
+    const vStep = fast ? 0.018 : 0.01;
+    const vFine = fast ? 0.01 : 0.006;
 
     function hitAt(u, v) {
       raycaster.setFromCamera(new THREE.Vector2(u * 2 - 1, -(v * 2 - 1)), cam);
@@ -200,7 +271,7 @@ async function proposeCandidates(page, landmark, slot) {
 
     // 额高测头左缘，肩更左则剔除
     let browL = 0.42;
-    for (let u = 0.12; u < 0.55; u += 0.002) {
+    for (let u = 0.12; u < 0.55; u += uFine) {
       const h = hitAt(u, 0.28);
       if (!h || h.point.y < shoulderY) continue;
       const p = lp(h);
@@ -222,7 +293,7 @@ async function proposeCandidates(page, landmark, slot) {
       // jawFace：咬肌前切迹等在颊侧，勿从过左肩扫起；背侧光时 z 阈值放宽
       const uStart = jawFace ? Math.max(0.28, uFloor - 0.06) : Math.max(0.08, uFloor - 0.04);
       const uEnd = jawFace ? 0.56 : 0.58;
-      for (let u = uStart; u <= uEnd; u += 0.002) {
+      for (let u = uStart; u <= uEnd; u += uFine) {
         const h = hitAt(u, v);
         if (!h || h.point.y < yMin) continue;
         const p = lp(h);
@@ -290,8 +361,8 @@ async function proposeCandidates(page, landmark, slot) {
       const uLo = typeof band.u0 === 'number' ? band.u0 : 0.44;
       const uHi = typeof band.u1 === 'number' ? band.u1 : 0.56;
       const maxAbsX = typeof band.maxAbsX === 'number' ? band.maxAbsX : 0.08;
-      for (let v = band.v0; v <= band.v1; v += 0.006) {
-        for (let u = uLo; u <= uHi; u += 0.004) {
+      for (let v = band.v0; v <= band.v1; v += vFine) {
+        for (let u = uLo; u <= uHi; u += uMid) {
           const h = hitAt(u, v);
           if (!h || h.point.y < shoulderY) continue;
           const p = lp(h);
@@ -306,22 +377,22 @@ async function proposeCandidates(page, landmark, slot) {
 
     const band = card.band;
     let out = [];
-    const step = 0.01;
+    const step = vStep;
 
     if (band.side === 'apexHighest') {
       out = apexHighest();
     } else if (band.side === 'farCheekInset') {
-      // 鼻抢左缘时：在屏中左颊带密扫（不贴最左缘）
+      // 鼻抢左缘时：在屏中左颊带密扫（不贴最左缘）；窄头放宽 x/z
       const chinY = boxW.min.y + sizeYW * 0.36;
       for (let v = band.v0; v <= band.v1; v += step) {
         let best = null;
-        for (let u = 0.35; u <= 0.58; u += 0.004) {
+        for (let u = 0.32; u <= 0.58; u += uMid) {
           const h = hitAt(u, v);
           if (!h || h.point.y < chinY) continue;
           const p = lp(h);
-          if (p.x > -0.015 || p.x < -0.08) continue;
-          if (p.z < 0.012 || p.z > 0.07) continue;
-          if (p.z > 0.055 && p.x > -0.035) continue; // 鼻翼
+          if (p.x > -0.008 || p.x < -0.1) continue;
+          if (p.z < 0.005 || p.z > 0.08) continue;
+          if (p.z > 0.06 && p.x > -0.03) continue; // 鼻翼
           if (p.y < boxW.min.y + sizeYW * 0.34) continue;
           const score = -p.x * 2.4 + (0.045 - Math.abs(p.z - 0.045)) * 1.2;
           if (!best || score > best._s) {
@@ -333,21 +404,23 @@ async function proposeCandidates(page, landmark, slot) {
     } else if (band.side === 'farCheek') {
       // 四分之三远端颊：屏左扫，丢掉鼻尖，取颊区最负 x
       // 下半脸（颊凹/口轮）更靠前、略偏中，鼻翼闸必须比上半脸松，否则候选全空
+      // 窄头（欧女等）localX 不如宽头负，x 闸放宽，否则额/颏带全空
       const chinY = boxW.min.y + sizeYW * (band.v0 >= 0.42 ? 0.32 : 0.30);
       for (let v = band.v0; v <= band.v1; v += step) {
         let best = null;
-        for (let u = 0.08; u <= 0.55; u += 0.003) {
+        for (let u = 0.08; u <= 0.55; u += fast ? 0.006 : 0.003) {
           const h = hitAt(u, v);
           if (!h || h.point.y < chinY) continue;
           const p = lp(h);
           const lower = v >= 0.38;
-          if (p.x > (lower ? -0.022 : -0.03)) continue;
-          const zHi = v < 0.3 ? 0.07 : v < 0.38 ? 0.058 : 0.068;
-          const zLo = v < 0.3 ? -0.01 : v < 0.38 ? -0.005 : -0.012;
+          if (p.x > (lower ? -0.012 : -0.018)) continue;
+          if (p.x < -0.12) continue;
+          const zHi = v < 0.3 ? 0.085 : v < 0.38 ? 0.065 : 0.075;
+          const zLo = v < 0.3 ? -0.02 : v < 0.38 ? -0.01 : -0.015;
           if (p.z < zLo || p.z > zHi) continue;
           // 鼻翼：上半脸严；下半脸只剔「又前又中」的鼻翼/口角
-          if (!lower && p.z > 0.048 && p.x > -0.045) continue;
-          if (lower && p.z > 0.058 && p.x > -0.032) continue;
+          if (!lower && p.z > 0.055 && p.x > -0.038) continue;
+          if (lower && p.z > 0.062 && p.x > -0.028) continue;
           if (v >= 0.42 && p.y < boxW.min.y + sizeYW * 0.36) continue;
           const zTarget = v < 0.38 ? 0.03 : 0.042;
           const score = -p.x * 3.2 + (0.028 - Math.abs(p.z - zTarget)) * 0.8;
@@ -421,7 +494,7 @@ async function proposeCandidates(page, landmark, slot) {
         if (band.side === 'chinC') {
           // 颏底：高 z 前突 + 偏低 localY（口下颏缘），禁止误落到唇/喉
           let best = null;
-          for (let u = 0.46; u <= 0.54; u += 0.004) {
+          for (let u = 0.46; u <= 0.54; u += uMid) {
             const h = hitAt(u, v);
             if (!h) continue;
             const p = lp(h);
@@ -436,7 +509,7 @@ async function proposeCandidates(page, landmark, slot) {
           if (best) out.push(best);
         } else if (band.side === 'chinL') {
           let best = null;
-          for (let u = 0.38; u <= 0.5; u += 0.004) {
+          for (let u = 0.38; u <= 0.5; u += uMid) {
             const h = hitAt(u, v);
             if (!h) continue;
             const p = lp(h);
@@ -526,6 +599,38 @@ async function proposeCandidates(page, landmark, slot) {
       }
     }
 
+    // farCheek / farCheekInset 空候选：退回剪影左缘（远端外轮廓），避免窄头全灭
+    if (!picked.length && (band.side === 'farCheek' || band.side === 'farCheekInset')) {
+      const fb = [];
+      for (let v = band.v0; v <= band.v1; v += step) {
+        for (let u = 0.08; u <= 0.58; u += uFine) {
+          const h = hitAt(u, v);
+          if (!h || h.point.y < shoulderY) continue;
+          const p = lp(h);
+          if (p.z < -0.03) continue;
+          if (p.x > 0.02) continue;
+          fb.push({ u, v, hit: h, x: p.x, y: p.y, z: p.z, _s: -p.x * 2.5 + p.z * 0.4 });
+          break; // 本行首个左缘
+        }
+      }
+      fb.sort((a, b) => b._s - a._s);
+      picked = [];
+      for (let i = 0; i < fb.length && picked.length < 8; i++) {
+        const c = fb[i];
+        if (picked.some((d) => Math.hypot(d.u - c.u, d.v - c.v) < 0.012)) continue;
+        picked.push({
+          i: picked.length + 1,
+          u: +c.u.toFixed(4),
+          v: +c.v.toFixed(4),
+          z: +c.z.toFixed(4),
+          x: +c.x.toFixed(4),
+          y: +c.y.toFixed(4),
+          score: +c._s.toFixed(4),
+          recommend: picked.length === 0
+        });
+      }
+    }
+
     // 颏区兜底：band 空时在颏屏区密扫前突面（高 z，禁喉）
     if (!picked.length && (band.side === 'chinC' || band.side === 'chinL')) {
       const fb = [];
@@ -568,7 +673,9 @@ async function proposeCandidates(page, landmark, slot) {
       pickHint: card.pickHint || '',
       recommended: picked.find((c) => c.recommend) || null
     };
-  }, card);
+  },
+    { card, fast }
+  );
 }
 
 /** 叠加候选编号十字（DOM overlay，不改 JSON） */
@@ -818,7 +925,17 @@ function writeLandmark(scenePath, landmark, placed, templateFromMale, slot) {
   const label =
     process.env.MODEL_LABEL ||
     (data.meta && data.meta.modelLabel) ||
-    (mid === 'male_ipman_01' ? '叶问' : mid === 'male_bald_asian_01' ? '光头亚裔' : mid);
+    (mid === 'male_ipman_01'
+      ? '叶问'
+      : mid === 'male_bald_asian_01'
+        ? '光头亚裔'
+        : mid === 'female_euro_02'
+          ? '欧女'
+          : mid === 'male_euro_aaron_01'
+            ? '欧男'
+            : mid === 'female_05'
+              ? '女05'
+              : mid);
   data.meta = Object.assign({}, data.meta || {}, {
     status: 'vision_place_in_progress',
     modelId: mid,
@@ -843,6 +960,7 @@ module.exports = {
   findScene,
   waitReady,
   openScene,
+  openSceneData,
   applyCamera,
   setAnnosVisible,
   proposeCandidates,

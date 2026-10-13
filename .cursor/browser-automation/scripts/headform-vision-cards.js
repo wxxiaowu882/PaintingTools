@@ -99,8 +99,8 @@ const V01 = {
   1: silFar('额结节', '凸起', '远端额结节外轮廓', '近侧耳颞', 0.16, 0.26),
   2: silFar('眉弓', '凸起', '远端眉弓外缘', null, 0.26, 0.34),
   3: silFar('颧突隆', '凸起', '远端颧突隆（主课）', '近侧、鼻', 0.34, 0.46),
-  A:Object.assign(silFar('眉弓上缘', '凹陷', '眉弓上缘凹（远端剪影，介于1–2）', null, 0.2, 0.28),{between:['1','2'],betweenBias:0.45,betweenXNudge:-0.004,betweenMinDist:0.006}),
-  B:Object.assign(silFar('外眼角后收处', '凹陷', '外眼角后收（远端剪影，介于2–3）', '鼻翼', 0.3, 0.38),{between:['2','3'],betweenBias:0.55,betweenXNudge:-0.008,betweenZNudge:-0.006,betweenMinDist:0.008}),
+  A:Object.assign(silFar('眉弓上缘', '凹陷', '眉弓上缘凹（远端剪影，介于1–2）', null, 0.2, 0.28),{preferBetween:true,between:['1','2'],betweenBias:0.45,betweenXNudge:-0.004,betweenMinDist:0.006}),
+  B:Object.assign(silFar('外眼角后收处', '凹陷', '外眼角后收（远端剪影，介于2–3）', '鼻翼', 0.3, 0.38),{preferBetween:true,between:['2','3'],betweenBias:0.55,betweenXNudge:-0.008,betweenZNudge:-0.006,betweenMinDist:0.008}),
   // 下半脸：5 可 preferBetween；其余 propose 优先，空/撞点再 between
   5:Object.assign(silFar('颏肌', '凸起', '颏肌外轮廓（勿落颈）', '颈、肩', 0.48, 0.56),{preferBetween:true,between:['3','3'],betweenBias:0,betweenXNudge:-0.012,betweenYNudge:-0.055,betweenZNudge:-0.01,betweenMinDist:0.014}),
   4:Object.assign(silFar('口轮匝肌', '凸起', '口轮匝肌侧缘外轮廓', null, 0.42, 0.5),{between:['3','5'],betweenBias:0.45,betweenXNudge:-0.01,betweenYNudge:-0.004,betweenZNudge:-0.008,betweenMinDist:0.01}),
@@ -428,7 +428,7 @@ const L08={
   3:Lpt('眶外角','交界点','眶外角',0.34,0.42),
   4:Lpt('颧突隆','交界点','颧突隆',0.4,0.5),
   5:Lpt('咬肌','交界点','咬肌',0.44,0.54),
-  6:{name:'咬肌前切迹',kind:'交界点',where:'咬肌前切迹（5与7之间颊侧）',forbid:'颈肩、喉、颏下',band:{v0:0.44,v1:0.52,side:'left',jawFace:true},between:['5','7'],betweenBias:0.32,betweenZNudge:0.002,betweenXNudge:-0.004,betweenYNudge:0.004},
+  6:{name:'咬肌前切迹',kind:'交界点',where:'咬肌前切迹（5与7之间颊侧）',forbid:'颈肩、喉、颏下',band:{v0:0.44,v1:0.52,side:'left',jawFace:true},preferBetween:true,between:['5','7'],betweenBias:0.32,betweenZNudge:0.002,betweenXNudge:-0.004,betweenYNudge:0.004,betweenMinDist:0.006},
   7:Lpt('颏转角','交界点','颏转角',0.52,0.62),
   8:Lpt('胸锁乳突肌','交界点','胸锁乳突肌',0.55,0.7,{allowBack:true,preferFaceZ:false})
 };
@@ -488,7 +488,9 @@ function listLandmarks(slot) {
   const ORDER = {
     V01: ['1', '2', '3', 'A', 'B', '5', '4', 'C', 'D'],
     L05: ['1', '2', '7', '8', '9', '3', '4', '6', '5'],
-    L01: ['1', '2', '3', '4', '5', '6', '8', '7', '9', 'A', 'B']
+    L01: ['1', '2', '3', '4', '5', '6', '8', '7', '9', 'A', 'B'],
+    // L08：6 依赖 5–7 邻点，须先钉 7
+    L08: ['1', '2', '3', '4', '5', '7', '6', '8']
   };
   if (ORDER[s]) return ORDER[s].filter((k) => pack[k] != null);
   return Object.keys(pack);

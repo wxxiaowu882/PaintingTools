@@ -27,7 +27,7 @@ fs.mkdirSync(outDir, { recursive: true });
 (async () => {
   const browser = await lib.launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  await page.goto(`http://127.0.0.1:${port}/Solid?sandbox=headform`, {
+  await page.goto(`http://127.0.0.1:${port}/Solid?sandbox=headform&skipPerf=1`, {
     waitUntil: 'domcontentloaded',
     timeout: 120000
   });

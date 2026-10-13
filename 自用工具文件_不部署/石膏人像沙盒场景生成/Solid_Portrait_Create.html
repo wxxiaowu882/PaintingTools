@@ -1004,6 +1004,7 @@
         try { setTimeout(apply, 320); } catch (_e2) {}
     }
     function solidCreateHighlightFileInList(fileName) { const c = document.getElementById('file-list-container'); if (!c) return; Array.from(c.children).forEach(el => { try {
+    if (el && el.getAttribute && el.getAttribute('data-file-list-sep') === '1') return;
     const span = el.querySelector('span'); const name = span ? span.innerText : '';
     el.style.borderLeft = (fileName && name === fileName) ? '3px solid #2ecc71' : 'none'; } catch(_e) {} }); }
     async function solidCreateTryBindCurrentFileHandleByName(fileName) { const fn = fileName ? String(fileName) : ''; if (!fn) return false; if (!window.workDirHandle) return false; try {
@@ -1731,6 +1732,40 @@
     function solidCreateIsNumericSceneFileName(name) { return /^\d{1,10}[A-Za-z]?_/.test(String(name || '')); }
     function solidCreateIsValidNumericSceneFileName(name) { return /^\d{1,10}[A-Za-z]?_.+\.json$/i.test(String(name || '')); }
     function solidCreateIsNonNumericMasterFileName(name) { return name && !/^\d/.test(String(name)); }
+    // headform 列表：关号 key（含 105A/105B）与已知个体 token（无个体段视为大本）
+    const SOLID_CREATE_HEADFORM_MODEL_TOKENS = ['光头亚裔', '女05', '欧男', '欧女', '叶问'];
+    const SOLID_CREATE_HEADFORM_MODEL_COLORS = {
+        '大本': '#FFE0B2',
+        '光头亚裔': '#64B5F6',
+        '女05': '#80CBC4',
+        '欧男': '#FFD54F',
+        '欧女': '#F48FB1',
+        '叶问': '#CE93D8'
+    };
+    function solidCreateParseHeadformLessonKey(name) {
+        const m = String(name || '').match(/^(\d{1,10}[A-Za-z]?)_/);
+        return m ? m[1] : '';
+    }
+    function solidCreateParseHeadformModelKey(name) {
+        const s = String(name || '');
+        const m = s.match(/^\d{1,10}[A-Za-z]?_(.+)$/);
+        if (!m) return '';
+        const rest = m[1];
+        for (let i = 0; i < SOLID_CREATE_HEADFORM_MODEL_TOKENS.length; i++) {
+            const tok = SOLID_CREATE_HEADFORM_MODEL_TOKENS[i];
+            if (rest.indexOf(tok + '_') === 0) return tok;
+        }
+        return '大本';
+    }
+    function solidCreateHeadformModelColor(modelKey) {
+        return SOLID_CREATE_HEADFORM_MODEL_COLORS[modelKey] || '#ddd';
+    }
+    async function solidCreateIsHeadformListMode() {
+        try {
+            const hH = await getDirHandle('headform');
+            return await handlesSameDirEntry(window.workDirHandle, hH);
+        } catch (_e) { return false; }
+    }
     function solidCreateNormalizeJsonFileName(input) { let s = String(input || '').trim(); // Windows 下常见：用户复制粘贴带引号
     s = s.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
     if (s === '') return ''; if (!/\.json$/i.test(s)) s = s + '.json'; return s; }
@@ -1887,10 +1922,42 @@
         const _fileListScrollY = solidCreateGetFileListScrollTop();
         container.innerHTML = '';
         let files = []; for await (const entry of window.workDirHandle.values()) { if(entry.kind === 'file' && entry.name.endsWith('.json')) files.push(entry); }
-        files.sort((a,b) => a.name.localeCompare(b.name, 'zh-CN', {numeric: true})); if(files.length===0){ container.innerHTML = '<div style="color:#aaa; text-align:center;">无JSON文件</div>'; await window.syncQuickDirButtons(); solidCreateRestoreFileListScrollTop(_fileListScrollY); return; }
+        const headformListMode = await solidCreateIsHeadformListMode();
+        if (headformListMode) {
+            files.sort((a, b) => {
+                const aNum = solidCreateIsNumericSceneFileName(a.name);
+                const bNum = solidCreateIsNumericSceneFileName(b.name);
+                if (!aNum && bNum) return -1;
+                if (aNum && !bNum) return 1;
+                if (aNum && bNum) {
+                    const lessonCmp = solidCreateParseHeadformLessonKey(a.name).localeCompare(solidCreateParseHeadformLessonKey(b.name), 'zh-CN', { numeric: true });
+                    if (lessonCmp !== 0) return lessonCmp;
+                }
+                return a.name.localeCompare(b.name, 'zh-CN', { numeric: true });
+            });
+        } else {
+            files.sort((a,b) => a.name.localeCompare(b.name, 'zh-CN', {numeric: true}));
+        }
+        if(files.length===0){ container.innerHTML = '<div style="color:#aaa; text-align:center;">无JSON文件</div>'; await window.syncQuickDirButtons(); solidCreateRestoreFileListScrollTop(_fileListScrollY); return; }
         if(!window.targetMasterFilename) { const nonNumbered = files.filter(f => !/^\d+/.test(f.name)); if(nonNumbered.length > 0) window.targetMasterFilename = nonNumbered[0].name; }
-        container.innerHTML = '<div style="display:flex; justify-content:space-between; color:#a0a0a0; font-size:10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:4px;"><span>📝 场景文件 (点击读取)</span><span title="指定哪个文件为合并目标">🎯 统合目标</span></div>'; files.forEach(fileHandle => { const item = document.createElement('div'); item.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:4px 6px; margin-bottom:2px; background:rgba(255,255,255,0.05); border-radius:3px; transition:0.2s; color:#ddd;';
-        const nameSpan = document.createElement('span'); nameSpan.style.cssText = 'cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;'; nameSpan.innerText = fileHandle.name;
+        container.innerHTML = '<div style="display:flex; justify-content:space-between; color:#a0a0a0; font-size:10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:4px;"><span>📝 场景文件 (点击读取)</span><span title="指定哪个文件为合并目标">🎯 统合目标</span></div>';
+        let _prevHeadformLessonKey = null;
+        files.forEach(fileHandle => {
+        if (headformListMode && solidCreateIsNumericSceneFileName(fileHandle.name)) {
+            const lessonKey = solidCreateParseHeadformLessonKey(fileHandle.name);
+            if (_prevHeadformLessonKey !== null && lessonKey !== _prevHeadformLessonKey) {
+                const sep = document.createElement('div');
+                sep.setAttribute('data-file-list-sep', '1');
+                sep.style.cssText = 'height:0; margin:8px 2px 6px; border:none; border-top:1px solid rgba(180,180,180,0.55); padding:0; pointer-events:none;';
+                container.appendChild(sep);
+            }
+            _prevHeadformLessonKey = lessonKey;
+        }
+        const _hfModelKey = (headformListMode && solidCreateIsNumericSceneFileName(fileHandle.name)) ? solidCreateParseHeadformModelKey(fileHandle.name) : '';
+        const _rowTextColor = _hfModelKey ? solidCreateHeadformModelColor(_hfModelKey) : '#ddd';
+        const item = document.createElement('div'); item.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:4px 6px; margin-bottom:2px; background:rgba(255,255,255,0.05); border-radius:3px; transition:0.2s; color:' + _rowTextColor + ';';
+        if (_hfModelKey) { try { item.title = '模型：' + _hfModelKey; } catch (_eTit) {} }
+        const nameSpan = document.createElement('span'); nameSpan.style.cssText = 'cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; color:inherit;'; nameSpan.innerText = fileHandle.name;
         nameSpan.addEventListener('mouseenter', () => { nameSpan.title = nameSpan.scrollWidth > nameSpan.clientWidth ? fileHandle.name : ''; });
         // 双击文件名：安全重命名（数字开头场景文件 / 非数字统合文件）
         nameSpan.ondblclick = async (ev) => {
@@ -2004,7 +2071,7 @@
                 window.loadJSONFromFileHandle(fileHandle);
             }, 220);
         };
-        item.onmouseover = () => { item.style.background='rgba(255,255,255,0.2)'; item.style.color='#fff'; }; item.onmouseout = () => { item.style.background='rgba(255,255,255,0.05)'; item.style.color='#ddd'; };
+        item.onmouseover = () => { item.style.background='rgba(255,255,255,0.2)'; item.style.color='#fff'; }; item.onmouseout = () => { item.style.background='rgba(255,255,255,0.05)'; item.style.color=_rowTextColor; };
         item.appendChild(nameSpan); if (!/^\d+/.test(fileHandle.name)) {
         const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'masterFileSelect'; radio.style.cssText = 'margin-left:8px; cursor:pointer; accent-color:#2ecc71; transform:scale(1.1); flex-shrink:0;';
         if(window.targetMasterFilename === fileHandle.name) radio.checked = true; radio.onchange = () => { window.targetMasterFilename = fileHandle.name; window.hwLog("已指定统合JSON: " + fileHandle.name); }; item.appendChild(radio);
@@ -2018,7 +2085,7 @@
         delBtn.onclick = async (e) => { e.stopPropagation(); try { await window.workDirHandle.removeEntry(fileHandle.name); window.showToast(`已删除场景: ${fileHandle.name}`); if(window.currentFileHandle && window.currentFileHandle.name === fileHandle.name) { window.createNewScene(); } await window.refreshFileList(); } catch(err) { window.showToast('删除失败: ' + err.message, true); } };
         item.appendChild(delBtn); }
         container.appendChild(item); });
-        if(window.currentFileHandle) { Array.from(container.children).forEach(el => { const span = el.querySelector('span'); if(span && span.innerText === window.currentFileHandle.name) el.style.borderLeft = '3px solid #2ecc71'; }); }
+        if(window.currentFileHandle) { Array.from(container.children).forEach(el => { if (el.getAttribute && el.getAttribute('data-file-list-sep') === '1') return; const span = el.querySelector('span'); if(span && span.innerText === window.currentFileHandle.name) el.style.borderLeft = '3px solid #2ecc71'; }); }
         await window.syncQuickDirButtons();
         solidCreateRestoreFileListScrollTop(_fileListScrollY);
         };
@@ -2031,7 +2098,7 @@
         try {
             await applySceneDataToEditor(data, '已加载场景: ' + (fileHandle && fileHandle.name ? fileHandle.name : ''));
             try { document.getElementById('btn-save-direct').innerText = '💾 覆写选中项'; } catch(_e) {}
-            try { Array.from(document.getElementById('file-list-container').children).forEach(el => { el.style.borderLeft = (el.querySelector('span') && el.querySelector('span').innerText === fileHandle.name) ? '3px solid #2ecc71' : 'none'; }); } catch(_e) {}
+            try { Array.from(document.getElementById('file-list-container').children).forEach(el => { if (el.getAttribute && el.getAttribute('data-file-list-sep') === '1') { el.style.borderLeft = 'none'; return; } el.style.borderLeft = (el.querySelector('span') && el.querySelector('span').innerText === fileHandle.name) ? '3px solid #2ecc71' : 'none'; }); } catch(_e) {}
             solidCreateRestoreFileListScrollTop(_fileListScrollY);
             setTimeout(() => { try { window.setMode(window.currentEditorMode); } catch(_e) {} solidCreateRestoreFileListScrollTop(_fileListScrollY); }, 100);
         } catch(err2) { console.error(err2); window.showToast("读取或解析失败！", true); solidCreateRestoreFileListScrollTop(_fileListScrollY); }

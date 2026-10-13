@@ -106,7 +106,7 @@ class Monitor:
                 return
 
             # 新版 Cursor 重启后可能弹出「打开外部网站」确认框，先取消再继续
-            ui_cursor.dismiss_blocking_dialogs(rounds=3)
+            ui_cursor.dismiss_blocking_dialogs(rounds=2)
             ui_cursor.click_editor_window_if_any()
             ui_cursor.dismiss_blocking_dialogs(rounds=1)
             result = ui_cursor.open_paintingtools()
@@ -117,18 +117,24 @@ class Monitor:
 
             # 命令行打开后仍可能停在 Agent 主页，再点一次 Editor Window
             time.sleep(2.0)
-            ui_cursor.dismiss_blocking_dialogs(rounds=2)
+            ui_cursor.dismiss_blocking_dialogs(rounds=1)
             ui_cursor.click_editor_window_if_any(timeout=10)
             # 工程窗必须置前最大化，否则关 tip 会点到被挡住的区域
             time.sleep(0.6)
             ui_cursor.bring_paintingtools_front_max()
-            ui_cursor.dismiss_blocking_dialogs(rounds=2)
+            ui_cursor.dismiss_blocking_dialogs(rounds=1)
+            # 更新广告常在最大化后再冒出来，多清一轮
+            time.sleep(2.0)
+            ui_cursor.dismiss_update_recommended_dialog(timeout=3.5)
             # Connection Error 常晚几秒才弹出：主动等待并走网络续写
             time.sleep(1.5)
             conn_done = False
             deadline = time.time() + getattr(config, "POST_OPEN_CONN_WAIT", 20)
+            tick = 0
             while time.time() < deadline:
-                ui_cursor.dismiss_blocking_dialogs(rounds=1)
+                # 外部网站弹窗扫描较重，改为约每 3 秒一次
+                if tick % 3 == 0:
+                    ui_cursor.dismiss_blocking_dialogs(rounds=1)
                 hit = detect_tip.detect_tip(threshold=0.70)
                 if hit is not None and hit.kind == "connection_error":
                     log(
@@ -155,6 +161,7 @@ class Monitor:
                         detect_tip.close_tip()
                     except Exception:
                         pass
+                tick += 1
                 time.sleep(1.0)
 
             if not conn_done:
@@ -175,6 +182,16 @@ class Monitor:
         cn = config.TIP_TYPE_CN.get(hit.kind, hit.kind)
         if self._switching or self.state == "换号中" or self._resuming_conn:
             log(f"提示 {cn} 动作=忽略 原因=流程中")
+            return
+
+        # 防御：更新提示绝不能走换号（正常由 dismiss_update_recommended_dialog 处理）
+        if hit.kind == "update_prompt":
+            log(f"提示 {cn} 动作=仅关闭 原因=非用量提示")
+            try:
+                ui_cursor.dismiss_update_recommended_dialog(timeout=2.0)
+            except Exception:
+                pass
+            self._reset_tip_streak()
             return
 
         # Connection Error：网络中断 → 续写，不换号（宽限内也处理）
@@ -237,52 +254,188 @@ class Monitor:
             f"配置 工程={config.PROJECT_PATH} 轮询={config.POLL_INTERVAL}秒 "
             f"宽限={config.GRACE_SECONDS}秒 连续确认={config.TIP_CONFIRM_POLLS}次"
         )
+        poll_n = 0
+        gc_every = int(getattr(config, "GC_EVERY_POLLS", 120))
         while True:
             try:
                 if self._switching or self._resuming_conn:
                     time.sleep(config.POLL_INTERVAL)
                     continue
+                # 更新提示 ≠ 用量 tip：只关闭、不换号、不点 Update
+                # 含右下 Update Available 快路径；超时略放宽以免高分屏扫不完
+                try:
+                    ui_cursor.dismiss_update_recommended_dialog(timeout=3.5)
+                except Exception as e:
+                    log(f"对话框 更新提示 主循环异常 {e}")
                 hit = detect_tip.detect_tip()
                 if hit is not None:
                     self.on_tip(hit)
                 else:
                     self._reset_tip_streak()
+                poll_n += 1
+                if gc_every > 0 and poll_n % gc_every == 0:
+                    import gc
+
+                    gc.collect()
                 time.sleep(config.POLL_INTERVAL)
             except KeyboardInterrupt:
                 log("状态 已停止 用户中断")
                 break
             except Exception as e:
+                msg = str(e)
                 log(f"错误 主循环 {e}")
-                time.sleep(config.POLL_INTERVAL)
+                if (
+                    "OutOfMemory" in msg
+                    or "Unable to allocate" in msg
+                    or "Insufficient memory" in msg
+                ):
+                    import gc
+
+                    gc.collect()
+                    log("内存 已触发GC回收")
+                    time.sleep(max(config.POLL_INTERVAL, 5.0))
+                else:
+                    time.sleep(config.POLL_INTERVAL)
+
+
+def _pid_alive(pid: int) -> bool:
+    """tasklist 粗查 PID 是否仍在。"""
+    import subprocess
+
+    try:
+        r = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        out = ((r.stdout or "") + (r.stderr or "")).lower()
+        return str(pid) in out and "python" in out
+    except Exception:
+        return False
+
+
+def _kill_pid(pid: int) -> bool:
+    import subprocess
+
+    try:
+        r = subprocess.run(
+            ["taskkill", "/PID", str(pid), "/F"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def _find_monitor_pids() -> list[int]:
+    """找出命令行含 monitor.py 的其它 python 进程（排除自己）。"""
+    import subprocess
+
+    me = os.getpid()
+    ps = (
+        "Get-CimInstance Win32_Process -Filter "
+        "\"Name = 'python.exe' OR Name = 'pythonw.exe'\" | "
+        "Where-Object { $_.CommandLine -match 'monitor\\.py' } | "
+        "Select-Object -ExpandProperty ProcessId"
+    )
+    try:
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        pids = []
+        for line in (r.stdout or "").splitlines():
+            s = line.strip()
+            if s.isdigit():
+                pid = int(s)
+                if pid != me:
+                    pids.append(pid)
+        return pids
+    except Exception:
+        return []
 
 
 def _acquire_single_instance() -> None:
-    """同一机器只允许一个 monitor.py 进程，避免重复换号。"""
+    """
+    同一机器只允许一个 monitor.py。
+    若已有旧实例：自动结束旧进程并接管，无需用户手动关。
+    """
     config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
     lock_path = config.LOGS_DIR / "monitor.lock"
+    import atexit
     import msvcrt
 
-    try:
-        lock_f = open(lock_path, "w", encoding="utf-8")
-        lock_f.write(str(os.getpid()))
-        lock_f.flush()
-        msvcrt.locking(lock_f.fileno(), msvcrt.LK_NBLCK, 1)
-    except OSError:
-        old_pid = ""
+    lock_f = None
+
+    def _read_lock_pid() -> str:
         try:
-            old_pid = lock_path.read_text(encoding="utf-8").strip()
+            return lock_path.read_text(encoding="utf-8").strip().split()[0]
         except Exception:
-            pass
-        if old_pid:
-            log(f"错误 已有监控进程在运行 pid={old_pid} 请勿重复启动")
-        else:
-            log("错误 已有监控进程在运行，请勿重复启动")
+            return ""
+
+    def _try_lock():
+        """先加锁再写入 PID，避免抢锁失败时冲掉旧 PID。"""
+        nonlocal lock_f
+        f = open(lock_path, "a+", encoding="utf-8")
+        try:
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError:
+            f.close()
+            raise
+        f.seek(0)
+        f.truncate()
+        f.write(str(os.getpid()))
+        f.flush()
+        lock_f = f
+        return f
+
+    def _stop_old_monitors() -> None:
+        targets: list[int] = []
+        old_pid = _read_lock_pid()
+        if old_pid.isdigit():
+            pid = int(old_pid)
+            if pid != os.getpid() and _pid_alive(pid):
+                targets.append(pid)
+        for pid in _find_monitor_pids():
+            if pid not in targets:
+                targets.append(pid)
+        if not targets:
+            log("启动 未发现存活旧监控，将重试加锁")
+            return
+        for pid in targets:
+            ok = _kill_pid(pid)
+            log(
+                f"启动 结束旧监控 pid={pid} 结果={'成功' if ok else '失败'}"
+            )
+        time.sleep(0.9)
+
+    for attempt in range(4):
+        try:
+            _try_lock()
+            break
+        except OSError:
+            if attempt >= 3:
+                log("错误 无法取得监控独占锁（旧进程结束失败）")
+                sys.exit(1)
+            log(f"启动 检测到已有监控，自动接管 第{attempt + 1}次")
+            _stop_old_monitors()
+            time.sleep(0.35)
+    else:
+        log("错误 无法取得监控独占锁")
         sys.exit(1)
-    # 进程退出时释放锁
-    import atexit
 
     def _release() -> None:
         try:
+            if lock_f is None:
+                return
             lock_f.seek(0)
             msvcrt.locking(lock_f.fileno(), msvcrt.LK_UNLCK, 1)
             lock_f.close()
@@ -290,6 +443,7 @@ def _acquire_single_instance() -> None:
             pass
 
     atexit.register(_release)
+    log(f"启动 监控独占锁已取得 pid={os.getpid()}")
 
 
 def main() -> None:
