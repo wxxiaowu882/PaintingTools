@@ -68,10 +68,12 @@ python monitor.py
 | `btn_cancel_external.png` | 该弹窗的「取消」按钮 |
 | `dlg_update_recommended.png` | 「Update recommended」标题（更新提示，非用量） |
 | `dlg_update_body.png` | 「A newer version of Cursor…」正文 |
+| `dlg_update_eol_body.png` | 「stops working on October…」到期强制更新正文 |
 | `btn_close_update.png` | Update recommended 的 Close（禁止用 Update 按钮模板） |
 | `btn_dismiss_update_x.png` | Update recommended 右上角 × |
 | `dlg_update_available.png` | 「Update Available」标题（右下角 toast，非用量） |
-| `dlg_update_available_body.png` | 「very old version of Cursor…」正文 |
+| `dlg_update_available_body.png` | Available 正文（含 EOL「stops working on…」短截） |
+| `dlg_update_available_eol_body.png` | Available EOL 正文加宽截图（快路径正文兜底） |
 
 分辨率或主题变了导致匹配失败时：从新截图裁出对应小图覆盖同名文件，必要时在 `config.py` 调 `MATCH_THRESHOLD` / `TIP_MATCH_THRESHOLD`。
 

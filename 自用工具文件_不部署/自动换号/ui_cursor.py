@@ -261,6 +261,8 @@ def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
         "newer version of Cursor",
         "recommend updating",
         "very old version of Cursor",
+        "stops working on",
+        "please update to the latest version",
         "Download Update",
         "提示更新",
         "建议更新",
@@ -388,18 +390,30 @@ def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
     def _dismiss_available_fast(screen, mon_l: int, mon_t: int) -> bool:
         """
         专关右下「Update Available」：少尺度 + 小 ROI。
-        标题高分即点右上 ×，不点 Download Update。
+        标题或 EOL 正文命中后优先点 × 模板，再几何估右上角；不点 Download Update。
         按 Cursor 窗宽估算优先尺度（模板来自约 1024 宽截图）。
         """
         h, w = screen.shape[:2]
         base_scales = getattr(
             config,
             "UPDATE_AVAILABLE_FAST_SCALES",
-            (1.7, 1.6, 1.8, 1.5, 2.0, 2.15, 1.0),
+            (1.7, 1.6, 1.8, 1.5, 2.0, 2.15, 2.3, 1.0),
         )
-        thr = float(getattr(config, "UPDATE_AVAILABLE_TITLE_MIN", 0.86))
+        thr = float(getattr(config, "UPDATE_AVAILABLE_TITLE_MIN", 0.78))
+        thr_body = float(getattr(config, "UPDATE_AVAILABLE_BODY_MIN", 0.78))
+        thr_x = float(getattr(config, "UPDATE_AVAILABLE_X_MIN", 0.72))
         tpl = detect_tip._load_template("dlg_update_available.png")
-        if tpl is None:
+        body_tpls = [
+            detect_tip._load_template(n)
+            for n in (
+                "dlg_update_available_eol_body.png",
+                "dlg_update_available_body.png",
+                "dlg_update_eol_body.png",
+            )
+        ]
+        body_tpls = [t for t in body_tpls if t is not None]
+        tpl_x = detect_tip._load_template("btn_dismiss_update_x.png")
+        if tpl is None and not body_tpls:
             return False
         for x0, y0, x1, y1 in _available_fast_rois(h, w, mon_l, mon_t):
             # 用 ROI 宽度反推窗宽比例，优先试最接近的尺度
@@ -418,7 +432,14 @@ def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
                 prefer = [round(est, 2)]
             # 优先尺度 + 邻近档 + 配置表（去重）
             ordered: list[float] = []
-            for s in (prefer[0], prefer[0] - 0.1, prefer[0] + 0.1, *base_scales):
+            for s in (
+                prefer[0],
+                prefer[0] - 0.1,
+                prefer[0] + 0.1,
+                prefer[0] - 0.05,
+                prefer[0] + 0.05,
+                *base_scales,
+            ):
                 s = round(float(s), 2)
                 if s < 0.85 or s > 2.6:
                     continue
@@ -427,12 +448,25 @@ def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
             fast_scales = tuple(ordered)
 
             roi = screen[y0:y1, x0:x1]
-            hit = detect_tip._match_scaled(roi, tpl, thr, scales=fast_scales)
+            hit = None
+            how = "标题"
+            if tpl is not None:
+                hit = detect_tip._match_scaled(roi, tpl, thr, scales=fast_scales)
+            if hit is None:
+                for bt in body_tpls:
+                    hit = detect_tip._match_scaled(
+                        roi, bt, thr_body, scales=fast_scales
+                    )
+                    if hit is not None:
+                        how = "正文"
+                        break
             if hit is None:
                 # 近失日志，便于下次对照窗宽/尺度
-                soft = detect_tip._match_scaled(
-                    roi, tpl, 0.60, scales=fast_scales[:5]
-                )
+                soft = None
+                if tpl is not None:
+                    soft = detect_tip._match_scaled(
+                        roi, tpl, 0.60, scales=fast_scales[:6]
+                    )
                 if soft is not None and soft[0] >= 0.70:
                     log(
                         f"对话框 更新提示 近失 available 最高={soft[0]:.2f} "
@@ -441,16 +475,42 @@ def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
                 del roi
                 continue
             score, lx, ly, tw, th = hit
-            # ×：按 toast 约 3×标题宽估右上角；避开下方 Download Update
-            toast_w = max(int(tw * 3.1), int(tw + 280 * (tw / max(tw, 146))))
-            cx = mon_l + x0 + lx + toast_w - 22
-            cy = mon_t + y0 + ly + max(8, th // 2)
-            cx = min(max(cx, mon_l + x0 + lx + tw + 40), mon_l + x1 - 10)
-            cy = min(max(cy, mon_t + y0 + 6), mon_t + y1 - 12)
+            # 优先用 × 模板精点（几何估在高分屏易偏）
+            cx = cy = None
+            way = "快路径X"
+            if tpl_x is not None:
+                # 只在标题/正文右侧搜 ×，避免点到别处
+                sx0 = max(0, lx + (tw if how == "标题" else 0))
+                sy0 = max(0, ly - 12)
+                sx1 = min(roi.shape[1], lx + max(tw * 4, tw + 360))
+                sy1 = min(roi.shape[0], ly + max(th + 40, 70))
+                if sx1 - sx0 >= 24 and sy1 - sy0 >= 16:
+                    sub = roi[sy0:sy1, sx0:sx1]
+                    hit_x = detect_tip._match_scaled(
+                        sub, tpl_x, thr_x, scales=fast_scales
+                    )
+                    if hit_x is not None:
+                        xs, xx, xy, xw, xh = hit_x
+                        cx = mon_l + x0 + sx0 + xx + xw // 2
+                        cy = mon_t + y0 + sy0 + xy + xh // 2
+                        way = "快路径X模板"
+                        score = max(score, xs)
+            if cx is None:
+                # ×：按 toast 约 3×标题宽估右上角；正文命中则略上移到标题行
+                toast_w = max(int(tw * 3.1), int(tw + 280 * (tw / max(tw, 146))))
+                if how == "正文":
+                    toast_w = max(int(tw * 1.15), tw + 40)
+                    cx = mon_l + x0 + lx + toast_w - 18
+                    cy = mon_t + y0 + ly - max(10, th // 4)
+                else:
+                    cx = mon_l + x0 + lx + toast_w - 22
+                    cy = mon_t + y0 + ly + max(8, th // 2)
+                cx = min(max(cx, mon_l + x0 + lx + tw + 40), mon_l + x1 - 10)
+                cy = min(max(cy, mon_t + y0 + 6), mon_t + y1 - 12)
             detect_tip._click_screen(int(cx), int(cy))
             log(
-                f"对话框 更新提示 结果=已关闭 方式=快路径X "
-                f"样式=available 分数={score:.2f} 坐标={cx},{cy}"
+                f"对话框 更新提示 结果=已关闭 方式={way} "
+                f"样式=available 依据={how} 分数={score:.2f} 坐标={cx},{cy}"
             )
             del roi
             time.sleep(0.35)
@@ -479,37 +539,61 @@ def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
             del screen
             return False
 
-        # available 已由快路径处理；此处只扫中央 Update recommended
+        # available 已由快路径处理；此处扫中央 Update recommended（含到期 EOL 文案）
+        # body 可为旧「newer version」或新「stops working」任选一命中
         evidence_packs = (
             (
                 "dlg_update_recommended.png",
-                "dlg_update_body.png",
+                ("dlg_update_eol_body.png", "dlg_update_body.png"),
                 "btn_close_update.png",
                 "btn_dismiss_update_x.png",
                 "recommended",
             ),
         )
-        # recommended 也限尺度，避免每轮拖死 tip 检测
         rec_scales = getattr(
             config,
             "UPDATE_RECOMMENDED_SCALES",
-            (2.15, 2.0, 1.5, 1.0),
+            (1.7, 1.6, 1.8, 1.5, 2.0, 2.15, 1.0),
         )
+        # 按窗宽优先尺度
+        prefer_s = None
+        for hwnd, _t in find_cursor_hwnds():
+            rect = win_util.get_rect(hwnd) if win_util.is_onscreen(hwnd) else None
+            if rect and rect[2] - rect[0] >= 400:
+                prefer_s = round((rect[2] - rect[0]) / 1024.0, 2)
+                break
+        if prefer_s:
+            ordered_s: list[float] = []
+            for s in (prefer_s, prefer_s - 0.1, prefer_s + 0.1, *rec_scales):
+                s = round(float(s), 2)
+                if 0.85 <= s <= 2.6 and s not in ordered_s:
+                    ordered_s.append(s)
+            rec_scales = tuple(ordered_s)
 
         for x0, y0, x1, y1 in scan_rois:
             if time.time() >= deadline - 0.15:
                 break
             roi = screen[y0:y1, x0:x1]
-            for title_n, body_n, close_n, x_n, style in evidence_packs:
+            for title_n, body_names, close_n, x_n, style in evidence_packs:
                 use_scales = rec_scales
                 tpl_title = detect_tip._load_template(title_n)
-                tpl_body = detect_tip._load_template(body_n)
+                if isinstance(body_names, str):
+                    body_names = (body_names,)
                 hit_t = detect_tip._match_scaled(
                     roi, tpl_title, dual_min, scales=use_scales
                 )
-                hit_b = detect_tip._match_scaled(
-                    roi, tpl_body, dual_min, scales=use_scales
-                )
+                hit_b = None
+                for body_n in body_names:
+                    cand = detect_tip._match_scaled(
+                        roi,
+                        detect_tip._load_template(body_n),
+                        dual_min,
+                        scales=use_scales,
+                    )
+                    if cand is None:
+                        continue
+                    if hit_b is None or cand[0] > hit_b[0]:
+                        hit_b = cand
                 hit_c = None
                 if close_n:
                     hit_c = detect_tip._match_scaled(
@@ -680,18 +764,46 @@ def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
                     blob = "\n".join(texts)
                     if not any(h in blob for h in text_hints):
                         continue
-                    # 窗口客户区：禁止点标题栏「关闭」（曾误点 y≈21 顶栏）
+                    # 窗口客户区：禁止点标题栏「关闭」（曾误点 y≈21 / y≈212 顶栏旁控件）
                     try:
                         wr = win.rectangle()
                         win_top = int(wr.top)
+                        win_bottom = int(wr.bottom)
+                        win_h = max(1, win_bottom - win_top)
                     except Exception:
                         win_top = 0
+                        win_h = 1000
                     title_bar_y = win_top + 48
+                    # Available toast 的 × 多在窗下半；上半 Close 常是面板/标签关闭
+                    toast_band_y = win_top + int(win_h * 0.45)
 
-                    # 优先 Close（英文弹窗）；「关闭」须不在顶栏且宜靠近 Update 蓝钮
-                    has_update_btn = any(
-                        _is_never_label((b.window_text() or "").strip())
-                        for b in buttons
+                    # 优先 Close（英文弹窗）；须靠近 Update 蓝钮或落在 toast 带
+                    update_btns = []
+                    for b in buttons:
+                        try:
+                            bt = (b.window_text() or "").strip()
+                        except Exception:
+                            continue
+                        if _is_never_label(bt):
+                            try:
+                                br = b.rectangle()
+                                update_btns.append(
+                                    (
+                                        (br.left + br.right) // 2,
+                                        (br.top + br.bottom) // 2,
+                                    )
+                                )
+                            except Exception:
+                                pass
+                    has_update_btn = bool(update_btns)
+                    available_hint = any(
+                        h in blob
+                        for h in (
+                            "Update Available",
+                            "Download Update",
+                            "stops working on",
+                            "very old version of Cursor",
+                        )
                     )
                     candidates = []
                     for ctrl in buttons:
@@ -713,10 +825,26 @@ def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
                             continue
                         if cy < title_bar_y:
                             continue  # 标题栏
+                        near_update = False
+                        for ux, uy in update_btns:
+                            if abs(cx - ux) < 420 and abs(cy - uy) < 160:
+                                near_update = True
+                                break
+                        # Available 右下 toast：无邻近 Update 钮的上半 Close 一律跳过
+                        if available_hint and not near_update and cy < toast_band_y:
+                            continue
                         # 「关闭」若无 Update 类按钮共现，且贴窗顶，易误伤
                         if t == "关闭" and not has_update_btn and cy < win_top + 120:
                             continue
-                        prio = 0 if t.lower() == "close" else 1
+                        # 无邻近 Update 时，上半 Close 也不点（防误关面板）
+                        if not near_update and cy < win_top + 220:
+                            continue
+                        # 优先：靠近 Update 钮 > Close 文案 > 越靠下越好（toast）
+                        prio = (
+                            0 if near_update else 2,
+                            0 if t.lower() == "close" else 1,
+                            -cy,
+                        )
                         candidates.append((prio, cy, cx, t, ctrl))
                     candidates.sort()
                     for _prio, cy, cx, t, ctrl in candidates:
@@ -761,7 +889,9 @@ def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
             thr_t = float(getattr(config, "UPDATE_TITLE_THRESHOLD", 0.86))
             thr_b = float(getattr(config, "UPDATE_BODY_THRESHOLD", 0.84))
             pairs = (
+                ("dlg_update_recommended.png", "dlg_update_eol_body.png"),
                 ("dlg_update_recommended.png", "dlg_update_body.png"),
+                ("dlg_update_available.png", "dlg_update_available_eol_body.png"),
                 ("dlg_update_available.png", "dlg_update_available_body.png"),
             )
             esc_ok = False

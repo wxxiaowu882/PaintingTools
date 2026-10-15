@@ -96,22 +96,25 @@ UPDATE_DIALOG_ROIS = (
     (0.15, 0.02, 0.85, 0.55),  # 窗内上中（Update recommended）
     (0.40, 0.50, 1.0, 0.98),  # 窗内右下（Update Available）
 )
-# 右下角 Update Available 专用：更贴 chat 底栏，缩小 ROI 加速
-UPDATE_AVAILABLE_ROI = (0.48, 0.62, 1.0, 0.99)
+# 右下角 Update Available 专用：略抬高以覆盖 EOL toast（曾贴在终端上方）
+UPDATE_AVAILABLE_ROI = (0.45, 0.55, 1.0, 0.99)
 # 模板来自约 1024 宽压缩图；实机 Cursor 常 ~2000+ 宽，须含 2.1～2.3 档
 UPDATE_DIALOG_MATCH_SCALES = (2.15, 2.0, 2.3, 1.8, 1.5, 1.0, 1.25, 0.93)
 # Available 快路径：覆盖常见窗宽（约 1600～2178）
 # 实机曾用 ~1742 宽，仅 2.15/2.0/1.0 会全部低于阈值 → 永远关不掉
-UPDATE_AVAILABLE_FAST_SCALES = (1.7, 1.6, 1.8, 1.5, 2.0, 2.15, 1.0)
-# recommended 主循环限尺度（available 已走快路径）
-UPDATE_RECOMMENDED_SCALES = (2.15, 2.0, 1.5, 1.0)
+UPDATE_AVAILABLE_FAST_SCALES = (1.7, 1.6, 1.8, 1.5, 2.0, 2.15, 2.3, 1.0)
+# recommended 主循环限尺度（含 ~1742 宽常见档；available 已走快路径）
+UPDATE_RECOMMENDED_SCALES = (1.7, 1.6, 1.8, 1.5, 2.0, 2.15, 1.0)
 # 防误报：须标题+正文（或标题+Close）共现；0.74 级禁止几何点 ×
 UPDATE_TITLE_THRESHOLD = 0.86
 UPDATE_BODY_THRESHOLD = 0.84
 UPDATE_DUAL_MIN_SCORE = 0.78  # 双模板共现时各自下限
 UPDATE_SINGLE_HIGH_SCORE = 0.92  # 仅一侧时须极高分且有 Close/×
 UPDATE_CLOSE_THRESHOLD = 0.78
-UPDATE_AVAILABLE_TITLE_MIN = 0.86  # 快路径：标题够高即可点 ×
+# 快路径：实机 EOL toast 标题曾只到 0.78（旧模板）；新模板应更高，仍留余量
+UPDATE_AVAILABLE_TITLE_MIN = 0.78
+UPDATE_AVAILABLE_BODY_MIN = 0.78  # EOL/旧正文兜底
+UPDATE_AVAILABLE_X_MIN = 0.72  # toast 内 × 模板
 # 主循环约每 N 轮主动回收一次（2s×120≈4 分钟）
 GC_EVERY_POLLS = 120
 # 换号后等待 Connection Error 出现再网络续写（秒）
