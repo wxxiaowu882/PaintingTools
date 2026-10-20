@@ -1289,8 +1289,18 @@
     try { showSolidSketchModeToast(); } catch (_e) {} } };
     document.addEventListener('click', () => { document.querySelectorAll('.custom-options').forEach(el => el.classList.remove('show')); });
     window.solidPathTraceUiBlocksSample = function() { const m = document.getElementById('scene-grid-modal'); const modalOpen = m && (m.style.display === 'flex' || (typeof getComputedStyle === 'function' && getComputedStyle(m).display === 'flex')); const go = document.getElementById('global-menu-overlay'); const menuOpen = (typeof location !== 'undefined' && location.hash === '#menu') || (go && go.classList.contains('active')); return !!(modalOpen || menuOpen); };
-    window.closeSceneGridModal = function() { // 若尚未选择场景，也允许关闭：用户仍可从左上角“学习场景”再次打开
-    document.getElementById('scene-grid-modal').style.display='none'; };
+    window.closeSceneGridModal = function() {
+    const noScene = (window.currentSceneIndex == null) || Number(window.currentSceneIndex) < 0;
+    // 头部造型规律 / 肖像光影沙盒：未选课就关列表时，回到全局菜单，不落到空舞台
+    const sk = window.__solidSandboxKey || '';
+    if ((sk === 'headform' || sk === 'portrait') && noScene) {
+        const overlay = document.getElementById('global-menu-overlay');
+        if (overlay && !overlay.classList.contains('active') && typeof window.toggleMenu === 'function') window.toggleMenu();
+        return;
+    }
+    const modal = document.getElementById('scene-grid-modal');
+    if (modal) modal.style.display = 'none';
+    };
 
     // 场景列表自适应换行：已改为纯 CSS Grid（auto-fit/minmax），不再需要 JS 判定/切 class
     window.togglePanel = function() { const panel = document.getElementById('main-panel'); panel.classList.toggle('minimized'); document.getElementById('toggle-icon').innerText = panel.classList.contains('minimized') ? '▲' : '✕'; };
@@ -1801,7 +1811,7 @@
         }
         window.customScenes = data; buildSceneGridUI(data); if(data.length > 0) { // [拦截点] 不再自动进入场景0，而是关掉加载提示，强制弹出场景选择网格
         document.getElementById('scene-loader').style.display = 'none'; document.getElementById('scene-grid-modal').style.display = 'flex';
-        // 关闭按钮始终可见；若未选择场景则 closeSceneGridModal 会拦截，避免黑屏
+        // 关闭按钮始终可见；headform / portrait 未选课时关闭会回到全局菜单
         document.querySelector('.modal-close').style.display = 'inline-flex'; } else { setLoaderText("场景库为空..."); window.isUnsupported=true; }
         }).catch(err => { addHwLog("JSON请求或解析失败: " + err.message); document.getElementById('scene-loader').style.display='none'; }); };
         const SOLID_FAV_LEGACY_KEY = 'SolidConsumer_Favorites_v1';
