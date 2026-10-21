@@ -1732,15 +1732,15 @@
     function solidCreateIsNumericSceneFileName(name) { return /^\d{1,10}[A-Za-z]?_/.test(String(name || '')); }
     function solidCreateIsValidNumericSceneFileName(name) { return /^\d{1,10}[A-Za-z]?_.+\.json$/i.test(String(name || '')); }
     function solidCreateIsNonNumericMasterFileName(name) { return name && !/^\d/.test(String(name)); }
-    // headform 列表：关号 key（含 105A/105B）与已知个体 token（无个体段视为大本）
-    const SOLID_CREATE_HEADFORM_MODEL_TOKENS = ['光头亚裔', '女05', '欧男', '欧女', '叶问'];
+    // headform 列表：关号 key（含 105A/105B）与已知个体 token（长 token 优先；各头模平等）
+    const SOLID_CREATE_HEADFORM_MODEL_TOKENS = ['欧男大本', '亚男叶问', '欧男亚伦', '亚男A', '亚女A', '欧女A'];
     const SOLID_CREATE_HEADFORM_MODEL_COLORS = {
-        '大本': '#FFE0B2',
-        '光头亚裔': '#64B5F6',
-        '女05': '#80CBC4',
-        '欧男': '#FFD54F',
-        '欧女': '#F48FB1',
-        '叶问': '#CE93D8'
+        '欧男大本': '#FFE0B2',
+        '亚男A': '#64B5F6',
+        '亚女A': '#80CBC4',
+        '欧男亚伦': '#FFD54F',
+        '欧女A': '#F48FB1',
+        '亚男叶问': '#CE93D8'
     };
     function solidCreateParseHeadformLessonKey(name) {
         const m = String(name || '').match(/^(\d{1,10}[A-Za-z]?)_/);
@@ -1755,7 +1755,7 @@
             const tok = SOLID_CREATE_HEADFORM_MODEL_TOKENS[i];
             if (rest.indexOf(tok + '_') === 0) return tok;
         }
-        return '大本';
+        return '欧男大本';
     }
     function solidCreateHeadformModelColor(modelKey) {
         return SOLID_CREATE_HEADFORM_MODEL_COLORS[modelKey] || '#ddd';

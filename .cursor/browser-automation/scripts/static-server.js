@@ -533,14 +533,14 @@ try {
   Add-Type -AssemblyName System.Windows.Forms
   $form = New-Object System.Windows.Forms.Form
   $form.TopMost = $true
-  $form.Opacity = 0
-  $form.ShowInTaskbar = $false
-  $form.FormBorderStyle = 'None'
-  $form.StartPosition = 'Manual'
-  $form.Location = New-Object System.Drawing.Point(-10000, -10000)
-  $form.Size = New-Object System.Drawing.Size(1, 1)
+  $form.ShowInTaskbar = $true
+  $form.Text = 'GLB选文件夹'
+  $form.FormBorderStyle = 'FixedToolWindow'
+  $form.StartPosition = 'CenterScreen'
+  $form.Size = New-Object System.Drawing.Size(320, 80)
   $form.Show()
   $form.Activate()
+  $form.BringToFront()
   $d = New-Object System.Windows.Forms.FolderBrowserDialog
   $d.Description = '选择 GLB 模型文件夹（将记住完整路径）'
   $d.ShowNewFolderButton = $true
@@ -565,10 +565,10 @@ try {
       resolve({ ok: false, error: e.message || String(e) });
       return;
     }
-    // start /wait 保证在交互桌面弹出，而不是挂在最小化的 node 服务窗口后
+    // start 第一个引号参数是窗口标题；空标题 + /wait，避免中文 title 拆参导致对话框不弹、请求挂死
     const child = spawn(
       'cmd.exe',
-      ['/c', 'start', 'GLB选文件夹', '/wait', 'powershell.exe', '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', psPath],
+      ['/c', 'start', '""', '/wait', 'powershell.exe', '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', psPath],
       {
         windowsHide: false,
         detached: false,

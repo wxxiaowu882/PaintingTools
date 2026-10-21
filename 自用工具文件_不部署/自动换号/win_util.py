@@ -109,15 +109,75 @@ def is_zoomed(hwnd: int) -> bool:
     return bool(user32.IsZoomed(hwnd))
 
 
-def force_foreground(hwnd: int) -> bool:
+class WINDOWPLACEMENT(ctypes.Structure):
+    _fields_ = [
+        ("length", ctypes.c_uint),
+        ("flags", ctypes.c_uint),
+        ("showCmd", ctypes.c_uint),
+        ("ptMinPosition", wintypes.POINT),
+        ("ptMaxPosition", wintypes.POINT),
+        ("rcNormalPosition", wintypes.RECT),
+    ]
+
+
+def restore_window_onscreen(hwnd: int) -> bool:
     """
-    置前。仅在最小化时还原，避免把已最大化窗口 SW_RESTORE 回去。
+    把最小化/托盘隐藏（-25600）的窗口拉回屏幕。
+    优先 ShowWindow(SW_RESTORE)；仍屏外则用 GetWindowPlacement 的正常矩形。
     """
     if not hwnd or not user32.IsWindow(hwnd):
         return False
     try:
-        if is_iconic(hwnd):
+        if is_iconic(hwnd) or not is_onscreen(hwnd):
             user32.ShowWindow(hwnd, SW_RESTORE)
+            user32.ShowWindow(hwnd, SW_SHOW)
+        if is_onscreen(hwnd):
+            return True
+        place = WINDOWPLACEMENT()
+        place.length = ctypes.sizeof(WINDOWPLACEMENT)
+        if user32.GetWindowPlacement(hwnd, ctypes.byref(place)):
+            rc = place.rcNormalPosition
+            w = max(200, int(rc.right - rc.left))
+            h = max(160, int(rc.bottom - rc.top))
+            x = int(rc.left)
+            y = int(rc.top)
+            # 正常矩形也可能是屏外占位，落到主屏左上附近
+            if x < -200 or y < -200 or x > 8000 or y > 5000:
+                x, y = 80, 60
+            user32.SetWindowPos(
+                hwnd,
+                HWND_TOPMOST,
+                x,
+                y,
+                w,
+                h,
+                SWP_SHOWWINDOW,
+            )
+            user32.SetWindowPos(
+                hwnd,
+                HWND_NOTOPMOST,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+            )
+            user32.ShowWindow(hwnd, SW_SHOW)
+        return is_onscreen(hwnd)
+    except Exception:
+        return False
+
+
+def force_foreground(hwnd: int) -> bool:
+    """
+    置前。最小化或托盘/屏外（坐标约 -25600）时先还原，
+    避免把已在屏上最大化的窗口 SW_RESTORE 回去。
+    """
+    if not hwnd or not user32.IsWindow(hwnd):
+        return False
+    try:
+        if is_iconic(hwnd) or not is_onscreen(hwnd):
+            restore_window_onscreen(hwnd)
         user32.ShowWindow(hwnd, SW_SHOW)
         # 模拟一下 Alt，放松 Windows 对前台切换的限制
         user32.keybd_event(0x12, 0, 0, 0)

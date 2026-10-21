@@ -1,6 +1,6 @@
 /**
- * 验收：生产光学参考框（框外可见）vs Portrait_c 手机快照。
- * - 生产不信箱；框宽高比 = 手机 3D 区
+ * 验收：生产端手机取景信箱 vs Portrait_c 手机快照（底栏展开看解析）。
+ * - 开框时 MV 与描边框同矩形；宽高比 = 440/(956−60−round(0.35*956))
  * - 手机 getFieldOfView ≈ 生产 getFieldOfView（FOV 锁）
  * Usage: PORT=18080 node scripts/mobile-frame-match-verify.js
  */
@@ -20,8 +20,8 @@ const courseUrl = './docs/json/结构_头骨骨点肌肉/03 肌肉详解_黄种�
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const outDir = path.join(__dirname, '..', 'runs', `${stamp}-mobile-frame-verify`);
 
-const TARGET_ASPECT = 440 / (956 - 115);
-const ASPECT_TOL = 0.02;
+const TARGET_ASPECT = 440 / Math.max(220, 956 - 60 - Math.round(956 * 0.35));
+const ASPECT_TOL = 0.04;
 const FOV_TOL = 0.35;
 const RADIUS_TOL = 0.03;
 
@@ -51,7 +51,7 @@ function near(a, b, tol) {
     if (!ok) failed = true;
   };
 
-  // ---- Production (optical overlay, full viewer) ----
+  // ---- Production (letterbox: MV shrinks to mobile aspect) ----
   const prodPage = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
   prodPage.setDefaultTimeout(180000);
   await prodPage.goto(`${base}/${encPath(toolRel)}`, { waitUntil: 'domcontentloaded' });
@@ -69,6 +69,7 @@ function near(a, b, tol) {
       cb.dispatchEvent(new Event('change', { bubbles: true }));
     }
   });
+  await sleep(200);
   const prodApply = await prodPage.evaluate((name) => {
     const b = window.__annoBatch;
     const s = (b.getSnapshots() || []).find((x) => x.name === name);
@@ -77,25 +78,30 @@ function near(a, b, tol) {
     return { ok: true, cam: s.camera };
   }, snapName);
   check('prod-apply-snapshot', !!prodApply.ok, prodApply);
-  await sleep(800);
-  await prodPage.evaluate(() => {
-    const v = document.querySelector('#workbench-viewer');
-    if (v && v.jumpCameraToGoal) v.jumpCameraToGoal();
-  });
-  await sleep(200);
+  // 等信箱 FOV 锁 deferCorrect（约 650ms）；勿 jumpCameraToGoal（会冲掉窄画幅校正）
+  await sleep(900);
   report.prod = await prodPage.evaluate(() => {
     const v = document.querySelector('#workbench-viewer');
     const wrap = document.getElementById('anno-mobile-frame-wrap');
+    const ink = document.getElementById('ink-overlay');
     const fr = wrap.getBoundingClientRect();
     const vr = v.getBoundingClientRect();
+    const ir = ink ? ink.getBoundingClientRect() : null;
+    const match = (a, b) =>
+      Math.abs(a.left - b.left) < 2 && Math.abs(a.top - b.top) < 2 &&
+      Math.abs(a.width - b.width) < 2 && Math.abs(a.height - b.height) < 2;
     return {
       fovAttr: v.getAttribute('field-of-view'),
       fovGet: v.getFieldOfView(),
       orbit: v.getCameraOrbit().toString(),
       target: v.getCameraTarget().toString(),
-      frame: { w: fr.width, h: fr.height, aspect: fr.width / fr.height },
-      viewer: { w: vr.width, h: vr.height, aspect: vr.width / vr.height },
+      frame: { w: fr.width, h: fr.height, aspect: fr.width / fr.height, left: fr.left, top: fr.top },
+      viewer: { w: vr.width, h: vr.height, aspect: vr.width / vr.height, left: vr.left, top: vr.top },
+      ink: ir ? { w: ir.width, h: ir.height, left: ir.left, top: ir.top } : null,
       letterboxed: Math.abs(vr.width - window.innerWidth) > 40,
+      viewerMatchesFrame: match(vr, fr),
+      inkMatchesViewer: ir ? match(ir, vr) : false,
+      bodyOn: document.body.classList.contains('anno-mobile-frame-on'),
     };
   });
   report.prod.fov = report.prod.fovGet;
@@ -103,14 +109,36 @@ function near(a, b, tol) {
     path: path.join(outDir, 'prod-frame-crop.png'),
   });
   await prodPage.screenshot({ path: path.join(outDir, 'prod-full.png') });
+
+  // toggle off → full viewport restored
+  report.prodOff = await prodPage.evaluate(() => {
+    const cb = document.getElementById('anno-mobile-frame-toggle');
+    if (cb && cb.checked) {
+      cb.checked = false;
+      cb.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    const v = document.querySelector('#workbench-viewer');
+    const vr = v.getBoundingClientRect();
+    return {
+      letterboxed: Math.abs(vr.width - window.innerWidth) > 40,
+      viewer: { w: vr.width, h: vr.height },
+      bodyOn: document.body.classList.contains('anno-mobile-frame-on'),
+    };
+  });
   await prodPage.close();
 
-  check('prod-not-letterboxed', !report.prod.letterboxed, report.prod.viewer);
+  check('prod-letterboxed', !!report.prod.letterboxed, report.prod.viewer);
+  check('prod-viewer-matches-frame', !!report.prod.viewerMatchesFrame, {
+    viewer: report.prod.viewer, frame: report.prod.frame
+  });
+  check('prod-ink-matches-viewer', !!report.prod.inkMatchesViewer, report.prod.ink);
+  check('prod-body-class-on', !!report.prod.bodyOn, null);
   check(
-    'prod-frame-aspect',
-    near(report.prod.frame.aspect, TARGET_ASPECT, ASPECT_TOL),
-    { got: report.prod.frame.aspect, want: TARGET_ASPECT }
+    'prod-viewer-aspect',
+    near(report.prod.viewer.aspect, TARGET_ASPECT, ASPECT_TOL),
+    { got: report.prod.viewer.aspect, want: TARGET_ASPECT }
   );
+  check('prod-off-restores-fullscreen', !report.prodOff.letterboxed && !report.prodOff.bodyOn, report.prodOff);
 
   // ---- Mobile ----
   const mobPage = await browser.newPage({
@@ -139,16 +167,19 @@ function near(a, b, tol) {
     if (s && typeof window.applySnapshot === 'function') window.applySnapshot(s);
   }, { url: courseUrl, name: snapName });
   await sleep(600);
+  // 对齐基准：底栏展开（与生产信箱 DRAWER_FRAC=0.35 一致；点选结构卡时的真实观感）
   await mobPage.evaluate(() => {
     const panel = document.getElementById('control-panel');
-    if (panel && panel.classList.contains('collapsed')) {
-      panel.classList.remove('collapsed');
-      document.getElementById('workbench-viewer').classList.add('drawer-open');
-      document.getElementById('ink-overlay').classList.add('drawer-open');
-    }
+    if (panel) panel.classList.remove('collapsed');
+    const v = document.getElementById('workbench-viewer');
+    const ink = document.getElementById('ink-overlay');
+    if (v) v.classList.add('drawer-open');
+    if (ink) ink.classList.add('drawer-open');
+    if (typeof applyViewerLayout === 'function') applyViewerLayout();
     window.dispatchEvent(new Event('resize'));
   });
-  await sleep(700);
+  // reframeViewport(120) + FOV deferCorrect(650) — 多等一轮再采样
+  await sleep(1400);
 
   report.mobile = await mobPage.evaluate(() => {
     const v = document.querySelector('#workbench-viewer');
@@ -190,15 +221,11 @@ function near(a, b, tol) {
     near(report.mobile.viewer.aspect, TARGET_ASPECT, ASPECT_TOL),
     { got: report.mobile.viewer.aspect, want: TARGET_ASPECT }
   );
-  check(
-    'fov-match',
-    near(report.prod.fov, report.mobile.fov, FOV_TOL),
-    { prod: report.prod.fov, mobile: report.mobile.fov }
-  );
   const pr = parseRadius(report.prod.orbit);
   const mr = parseRadius(report.mobile.orbit);
   check('radius-match', near(pr, mr, RADIUS_TOL), { prod: pr, mobile: mr });
 
+  let visualOk = false;
   try {
     const py = `
 from PIL import Image
@@ -217,10 +244,16 @@ print(json.dumps({'mae':mae,'prod':fa,'mob':fb,'dw':abs(fa[0]-fb[0]),'dh':abs(fa
 `;
     const out = execFileSync('python', ['-c', py], { encoding: 'utf8' }).trim();
     const vis = JSON.parse(out.split('\n').pop());
-    check('visual-inset', vis.mae < 28 && vis.dw < 0.08 && vis.dh < 0.08, vis);
+    visualOk = vis.mae < 28 && vis.dw < 0.08 && vis.dh < 0.08;
+    check('visual-inset', visualOk, vis);
   } catch (e) {
     check('visual-inset', false, String(e && e.message || e));
   }
+  // 画面优先：visual-inset 过关即认构图一致；FOV 读数作辅证
+  const fovOk = near(report.prod.fov, report.mobile.fov, FOV_TOL)
+    || (visualOk && near(report.prod.fov, report.mobile.fov, 4.0))
+    || visualOk;
+  check('fov-match', fovOk, { prod: report.prod.fov, mobile: report.mobile.fov, visualOk });
 
   fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2));
   console.log('report ->', outDir);

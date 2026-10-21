@@ -37,7 +37,7 @@
     - **V02 采样坑（已修）**：①颅顶须 `apexHighest`（近中线 maxY），旧 `leftish` 未实现会采成顶弧左缘；②颅侧允许略负 z、按最宽择优；③颧弓 `ignoreEar` 须在二分细化也生效。绿点=语义分推荐，仍须读图确认。
 12. **肌肉色块硬对齐（推荐最终）**：欧版与 V8 的 Deform **UV 岛共享**但配色不同、顶点索引不共享。正确做法：`uv-muscle-remap-v8-nongap.py`——原版点→最近 Deform 顶点取 UV→V8 同 UV 候选（左右各一）按原版左右选侧→避开灰缝/头皮色吸附到肌腹；再用 `fixed-view-muscle-qa.js` / `dual-muscle-qa.js` 固定视角验收（勿只靠列表法线聚焦）。须先 `@gltf-transform/cli@4 copy` 解压 GLB。
 
-13. **肌肉快照手机取景对齐**：生产端参考框用**光学裁切**（不缩视口，框外模型仍可见）。`model-viewer` 竖屏会自动拉大 FOV，消费端 `applySnapshot` 用 FOV 锁把 `getFieldOfView` 拉回生产真实视角。验收：`PORT=18080 node scripts/mobile-frame-match-verify.js`。
+13. **肌肉快照手机取景对齐**：生产端「手机取景框」开启后为**信箱缩视口**，宽高比对齐 Portrait_c 手机**底栏展开**有效区 `440/(956−60−round(0.35×956))`（点选结构卡看解析时的真实画幅）。旧光学/收起态拍的快照需开框后覆写。`model-viewer` 窄画幅会拉大 FOV，双端用 FOV 锁拉回作者视角。验收：`PORT=18080 node scripts/mobile-frame-match-verify.js`。滚轮放大会同时改 `orbit.radius` 与 live FOV；复写快照须捕获 **live FOV**（并回写 authored），勿只写 stale authored，否则切回快照会丢放大感。验收：`PORT=18080 ZOOM_TICKS=6 node scripts/diag-snap-zoom-capture.js`。
 
 14. **五官局部模表面点位标注**：入口是 `自用工具文件_不部署/模型标注生产工具.html`（坐标拾取系统 Pro），工具模式默认 `表面点位 [Alt+左击]`，档案在 `docs/json/结构_五官/`。流程：`facial-features-capture-views.js` 多视角截图 → 对照 `docs/美术知识库/五官造型规律.md` 只标模型上看得见的部位 → `facial-features-annotate.js`（`ONLY=eye` / `SKIP_SHOT=1`）按模型屏幕包围盒 uv 射线写 `pointsData`（`type:point`，`desc` 可空）。同路径反复 `setInputFiles` 可能不触发 change；验收截图优先**每场景新开 page**。鼻孔等凹陷部位要用仰视再拾，避免与鼻中隔叠点。
 

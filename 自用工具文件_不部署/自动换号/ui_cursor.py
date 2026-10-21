@@ -13,13 +13,23 @@ import win_util
 from logutil import log
 
 
+def _is_non_editor_cursor_title(title: str) -> bool:
+    """登录助手 / 续杯管家等标题含 Cursor，但不是编辑器。"""
+    t = title or ""
+    if config.ASSIST_TITLE in t or "登录助手" in t:
+        return True
+    mgr = getattr(config, "MANAGER_TITLE", "Cursor续杯管家")
+    short = getattr(config, "MANAGER_TITLE_SHORT", "续杯管家")
+    if mgr in t or short in t:
+        return True
+    return False
+
+
 def find_cursor_hwnds():
-    """标题含 Cursor、排除登录助手。"""
+    """标题含 Cursor、排除登录助手与续杯管家。"""
     found = []
     for hwnd, title in win_util.find_hwnds_by_title(config.CURSOR_TITLE, visible_only=False):
-        if config.ASSIST_TITLE in title:
-            continue
-        if "登录助手" in title:
+        if _is_non_editor_cursor_title(title):
             continue
         found.append((hwnd, title))
     return found
@@ -135,7 +145,7 @@ def dismiss_external_site_dialog(timeout: float = 4.0) -> str:
                     title = (win.window_text() or "").strip()
                 except Exception:
                     continue
-                if config.ASSIST_TITLE in title or "登录助手" in title:
+                if _is_non_editor_cursor_title(title):
                     continue
                 if title != "Cursor" and not title.startswith("Cursor"):
                     continue
@@ -745,7 +755,7 @@ def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
                     title = (win.window_text() or "").strip()
                 except Exception:
                     continue
-                if config.ASSIST_TITLE in title or "登录助手" in title:
+                if _is_non_editor_cursor_title(title):
                     continue
                 if title != "Cursor" and not title.startswith("Cursor"):
                     continue

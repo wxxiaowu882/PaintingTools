@@ -19,25 +19,33 @@ CURSOR_EXE_CANDIDATES = [
 ]
 
 # 窗口标题关键字
-ASSIST_TITLE = "Cursor 登录助手"
+ASSIST_TITLE = "Cursor 登录助手"  # 旧工具；新流程已改用续杯管家，仅作排除/兼容
+MANAGER_TITLE = "Cursor续杯管家"
+MANAGER_TITLE_SHORT = "续杯管家"
 CURSOR_TITLE = "Cursor"
 CONFIRM_TITLE_HINTS = ("确认换号", "确认换号登录")
+# 无感换号按钮文案（WebView 无 UIA，实际靠 templates/btn_seamless_switch.png）
+SEAMLESS_SWITCH_LABEL = "无感换号"
+SEAMLESS_SWITCH_THRESHOLD = 0.74
+# 主阈值未过但分数够高时仍点（实机曾模板漂移导致「未匹配」）
+SEAMLESS_SWITCH_SOFT_OK = 0.68
+# 点无感换号后等待账号切换生效再续写（秒）；不重启 Cursor
+SEAMLESS_SWITCH_WAIT = 5.0
 
 # 轮询与超时（秒）
 POLL_INTERVAL = 2.0
 # 换号成功并续写后的静默期
 GRACE_SECONDS = 120
-# 宽限结束后仍须连续 N 次检出同一 tip 才换号，过滤单次误匹配
-TIP_CONFIRM_POLLS = 2
+# 用量 tip：检出即换号（1=立刻；曾用 2 防误匹配，现按业务要求立即执行）
+TIP_CONFIRM_POLLS = 1
 CONFIRM_WAIT_SECONDS = 20
-# 点「刷新」后，Cursor 窗口须先消失再出现才算重启成功
+# 以下为旧「登录助手刷新→重启 Cursor」路径保留；新无感换号流程不再依赖
 CURSOR_GONE_TIMEOUT = 45
 CURSOR_RESTART_TIMEOUT = 90
-# 重启后主界面（含 Editor Window）可能晚几秒才画出来
 EDITOR_WINDOW_WAIT = 25
 OPEN_PROJECT_TIMEOUT = 25
 CURSOR_UI_READY_WAIT = 12
-# 换号失败后冷却，避免狂点助手
+# 换号失败后冷却，避免狂点管家
 SWITCH_FAIL_COOLDOWN = 15
 
 # 模板匹配
@@ -56,6 +64,12 @@ NETWORK_RESUME_PROMPT = "刚才网络断了，现在请继续"
 CONN_RESUME_CONFIRM_POLLS = 2
 # 网络续写成功后冷却，避免同一 tip 连发
 CONN_RESUME_COOLDOWN = 45
+# Too many free trials → 重置机器码（会强制关 Cursor 并重启）
+TOO_MANY_FREE_THRESHOLD = 0.72
+RESET_MACHINE_THRESHOLD = 0.75
+MGR_DIALOG_THRESHOLD = 0.72
+MGR_CONFIRM_WAIT = 12.0  # 等「确认重置 / 强制关闭」弹窗
+RESET_MACHINE_COOLDOWN = 90  # 重置流程后冷却，防连点
 # chat 输入框安全点击点（相对工程窗口）：
 # x 略靠中右，y 贴近底部，避免误点右侧 Files 列表
 CHAT_INPUT_REL = (0.64, 0.96)
@@ -66,6 +80,7 @@ TIP_TYPE_CN = {
     "usage_limit": "用量上限",
     "error_resume": "恢复会话失败",
     "connection_error": "连接错误",
+    "too_many_free": "机器码限制",
     "chat_toast": "聊天提示",
     "update_prompt": "更新提示",
 }

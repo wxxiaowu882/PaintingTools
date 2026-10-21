@@ -442,17 +442,55 @@ def detect_tip(threshold: Optional[float] = None) -> Optional[TipHit]:
                     score=score,
                 )
 
-    # 2) Connection Error（位置带 + 整卡/标题正文共现，避免 chat 历史误报）
+    # 2) Too many free trials（Connection Error 特例，须先于普通连接错误）
+    too_hit = _detect_too_many_free(roi, mon_l, mon_t, x0, y0, h)
+    if too_hit is not None:
+        return too_hit
+
+    # 3) Connection Error（位置带 + 整卡/标题正文共现，避免 chat 历史误报）
     conn_thr = min(thr, 0.72)
     conn_hit = _detect_connection_error(roi, mon_l, mon_t, x0, y0, h, conn_thr)
     if conn_hit is not None:
         return conn_hit
 
-    # 3) 用量上限（禁止单独 Upgrade 按钮）
+    # 4) 用量上限（禁止单独 Upgrade 按钮）
     usage_hit = _detect_usage_limit(roi, mon_l, mon_t, x0, y0, h, thr)
     if usage_hit is not None:
         return usage_hit
     return None
+
+
+def _detect_too_many_free(
+    roi: np.ndarray,
+    mon_l: int,
+    mon_t: int,
+    x0: int,
+    y0: int,
+    screen_h: int,
+) -> Optional[TipHit]:
+    """
+    「Too many free trial accounts used on this machine…」
+    走重置机器码流程，与普通 Connection Error（网络续写）分离。
+    """
+    thr = float(getattr(config, "TOO_MANY_FREE_THRESHOLD", 0.72))
+    band = config.CONN_TOAST_Y_BAND
+    tpl = _load_template("tip_too_many_free.png")
+    if tpl is None:
+        return None
+    hit = _match_scaled(roi, tpl, thr)
+    if hit is None:
+        return None
+    score, lx, ly, tw, th = hit
+    if not _match_y_in_band(ly, th, y0, screen_h, band):
+        return None
+    return TipHit(
+        kind="too_many_free",
+        left=mon_l + x0 + lx,
+        top=mon_t + y0 + ly,
+        right=mon_l + x0 + lx + tw,
+        bottom=mon_t + y0 + ly + th,
+        score=score,
+    )
 
 
 def _tip_close_xy_from_box(

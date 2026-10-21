@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 自动换号后台监控：状态机主循环。
-状态：监控中 → 换号中 → 打开后清提示 → 宽限 → 监控中
+状态：监控中 → 换号中（无感换号 + 续写）→ 宽限 → 监控中
 """
 from __future__ import annotations
 
@@ -16,8 +16,8 @@ if _HERE not in sys.path:
 
 import config
 import detect_tip
-import ui_assist
 import ui_cursor
+import ui_manager
 from logutil import log
 
 
@@ -73,103 +73,112 @@ class Monitor:
             self._resuming_conn = False
             log("状态 监控中")
 
+    def do_reset_machine(self) -> None:
+        """
+        Too many free trials：点重置机器码 → 确认重置确定 → 强制关闭确定
+        → 等 Cursor 重启 → 打开工程 → 发继续语 → 宽限。
+        """
+        if self._switching or self._resuming_conn:
+            return
+        self._switching = True
+        self.state = "换号中"
+        try:
+            log("状态 换号中 触发=机器码限制 方式=重置机器码")
+            try:
+                detect_tip.close_tip()
+            except Exception:
+                pass
+            ui_cursor.save_all()
+            if not ui_manager.click_reset_machine():
+                log("错误 重置流程中断 重置机器码点击失败")
+                self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
+                return
+            if not ui_manager.run_reset_machine_confirms():
+                log("错误 重置流程中断 确认弹窗未点到")
+                self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
+                return
+
+            log("换号 已确认强制关闭 等待Cursor重启")
+            restarted = ui_cursor.wait_cursor_restart()
+            if not restarted:
+                log("错误 重置后未观察到Cursor重启 不进入宽限")
+                self._fail_cooldown_until = time.time() + getattr(
+                    config, "RESET_MACHINE_COOLDOWN", 90
+                )
+                return
+
+            ui_cursor.dismiss_blocking_dialogs(rounds=2)
+            ui_cursor.click_editor_window_if_any()
+            result = ui_cursor.open_paintingtools()
+            if result == "失败":
+                log("错误 重置后打开工程失败")
+                self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
+                return
+            time.sleep(1.5)
+            ui_cursor.bring_paintingtools_front_max()
+            ui_cursor.dismiss_update_recommended_dialog(timeout=3.0)
+            try:
+                detect_tip.close_tip()
+            except Exception:
+                pass
+            time.sleep(0.5)
+            ok = ui_cursor.send_continue_in_chat()
+            if ok:
+                log(f"续写 结果=成功 内容={config.CONTINUE_PROMPT}")
+                self.start_grace()
+                self._conn_resume_until = time.time() + getattr(
+                    config, "RESET_MACHINE_COOLDOWN", 90
+                )
+            else:
+                log("错误 重置后续写失败 不进入宽限")
+                self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
+        except Exception as e:
+            log(f"错误 重置机器码异常 {e}")
+            self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
+        finally:
+            self._switching = False
+            self.state = "监控中"
+            log("状态 监控中")
+
     def do_switch(self, tip_kind: str) -> None:
-        """完整换号流程（互斥）。重启未发生则中止，不进入宽限。"""
+        """无感换号：点续杯管家「无感换号」→ 不重启 Cursor → 发继续语 → 宽限。"""
         if self._switching:
             return
         self._switching = True
         self.state = "换号中"
         cn = config.TIP_TYPE_CN.get(tip_kind, tip_kind)
         try:
-            log(f"状态 换号中 触发={cn}")
+            log(f"状态 换号中 触发={cn} 方式=无感换号")
             try:
                 detect_tip.close_tip()
             except Exception:
                 pass
 
             ui_cursor.save_all()
-            if not ui_assist.refresh_and_confirm():
-                log("错误 换号流程中断 助手刷新失败")
+            if not ui_manager.click_seamless_switch():
+                log("错误 换号流程中断 无感换号点击失败")
                 self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
                 return
 
-            restarted = ui_cursor.wait_cursor_restart()
-            if not restarted:
-                # 常见原因：确认换号没点到 → Cursor 根本没关
-                log("换号 未观察到Cursor关闭 尝试再次刷新并确认")
-                if ui_assist.refresh_confirm_retry_once():
-                    restarted = ui_cursor.wait_cursor_restart()
+            wait_s = float(getattr(config, "SEAMLESS_SWITCH_WAIT", 5.0))
+            log(f"换号 无感换号已点击 等待生效={wait_s:.1f}秒（不重启Cursor）")
+            time.sleep(max(0.5, wait_s))
 
-            if not restarted:
-                log("错误 换号未成功 Cursor未真正重启 不进入宽限")
-                self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
-                return
-
-            # 新版 Cursor 重启后可能弹出「打开外部网站」确认框，先取消再继续
-            ui_cursor.dismiss_blocking_dialogs(rounds=2)
-            ui_cursor.click_editor_window_if_any()
-            ui_cursor.dismiss_blocking_dialogs(rounds=1)
-            result = ui_cursor.open_paintingtools()
-            if result == "失败":
-                log("错误 打开工程失败")
-                self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
-                return
-
-            # 命令行打开后仍可能停在 Agent 主页，再点一次 Editor Window
-            time.sleep(2.0)
-            ui_cursor.dismiss_blocking_dialogs(rounds=1)
-            ui_cursor.click_editor_window_if_any(timeout=10)
-            # 工程窗必须置前最大化，否则关 tip 会点到被挡住的区域
-            time.sleep(0.6)
+            # 回到工程窗；清挡路更新提示后发继续语
             ui_cursor.bring_paintingtools_front_max()
-            ui_cursor.dismiss_blocking_dialogs(rounds=1)
-            # 更新广告常在最大化后再冒出来，多清一轮
-            time.sleep(2.0)
-            ui_cursor.dismiss_update_recommended_dialog(timeout=3.5)
-            # Connection Error 常晚几秒才弹出：主动等待并走网络续写
-            time.sleep(1.5)
-            conn_done = False
-            deadline = time.time() + getattr(config, "POST_OPEN_CONN_WAIT", 20)
-            tick = 0
-            while time.time() < deadline:
-                # 外部网站弹窗扫描较重，改为约每 3 秒一次
-                if tick % 3 == 0:
-                    ui_cursor.dismiss_blocking_dialogs(rounds=1)
-                hit = detect_tip.detect_tip(threshold=0.70)
-                if hit is not None and hit.kind == "connection_error":
-                    log(
-                        f"打开后检出连接错误 分数={hit.score:.2f} "
-                        f"位置={hit.left},{hit.top} → 网络续写"
-                    )
-                    try:
-                        detect_tip.close_tip()
-                    except Exception:
-                        pass
-                    time.sleep(0.4)
-                    ok = ui_cursor.send_continue_in_chat(config.NETWORK_RESUME_PROMPT)
-                    if ok:
-                        self._conn_resume_until = (
-                            time.time() + config.CONN_RESUME_COOLDOWN
-                        )
-                        log("打开后网络续写 结果=成功")
-                    else:
-                        log("打开后网络续写 结果=失败")
-                    conn_done = True
-                    break
-                if hit is not None and hit.kind in ("usage_limit", "error_resume", "chat_toast"):
-                    try:
-                        detect_tip.close_tip()
-                    except Exception:
-                        pass
-                tick += 1
-                time.sleep(1.0)
-
-            if not conn_done:
-                cleared = detect_tip.close_post_open_tips(max_rounds=5)
-                log(f"打开后清提示 结果={cleared}")
-                time.sleep(0.6)
-                ui_cursor.send_continue_in_chat()
-            self.start_grace()
+            ui_cursor.dismiss_update_recommended_dialog(timeout=2.5)
+            try:
+                detect_tip.close_tip()
+            except Exception:
+                pass
+            time.sleep(0.4)
+            ok = ui_cursor.send_continue_in_chat()
+            if ok:
+                log(f"续写 结果=成功 内容={config.CONTINUE_PROMPT}")
+                self.start_grace()
+            else:
+                log("错误 换号后续写失败 不进入宽限")
+                self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
         except Exception as e:
             log(f"错误 换号异常 {e}")
             self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
@@ -192,6 +201,21 @@ class Monitor:
             except Exception:
                 pass
             self._reset_tip_streak()
+            return
+
+        # Too many free trials：重置机器码（会重启 Cursor）；检出即执行
+        if hit.kind == "too_many_free":
+            if self.in_grace() or time.time() < self._fail_cooldown_until:
+                log(f"提示 {cn} 动作=暂缓 原因=宽限或冷却中 分数={hit.score:.2f}")
+                self._reset_tip_streak()
+                return
+            if time.time() < self._conn_resume_until:
+                log(f"提示 {cn} 动作=忽略 原因=重置冷却中 分数={hit.score:.2f}")
+                self._reset_tip_streak()
+                return
+            self._reset_tip_streak()
+            log(f"提示 {cn} 动作=重置机器码 分数={hit.score:.2f}")
+            self.do_reset_machine()
             return
 
         # Connection Error：网络中断 → 续写，不换号（宽限内也处理）
@@ -248,6 +272,17 @@ class Monitor:
         log(f"提示 {cn} 动作=换号 宽限中=否 连续确认={need} 分数={hit.score:.2f}")
         self.do_switch(hit.kind)
 
+    @staticmethod
+    def _is_capture_glitch(msg: str) -> bool:
+        """UAC/安全桌面/会话切换时 BitBlt 会短暂失败，属可恢复。"""
+        m = (msg or "").lower()
+        return (
+            "bitblt" in m
+            or "graphics function failed" in m
+            or "screen grab" in m
+            or "access is denied" in m
+        )
+
     def loop(self) -> None:
         log("状态 监控中")
         log(
@@ -256,6 +291,7 @@ class Monitor:
         )
         poll_n = 0
         gc_every = int(getattr(config, "GC_EVERY_POLLS", 120))
+        _capture_warn_at = 0.0
         while True:
             try:
                 if self._switching or self._resuming_conn:
@@ -266,6 +302,15 @@ class Monitor:
                 try:
                     ui_cursor.dismiss_update_recommended_dialog(timeout=3.5)
                 except Exception as e:
+                    if self._is_capture_glitch(str(e)):
+                        now = time.time()
+                        if now - _capture_warn_at > 20:
+                            log(
+                                "截屏 暂时失败（常见于UAC提权框/锁屏），稍后自动重试"
+                            )
+                            _capture_warn_at = now
+                        time.sleep(3.0)
+                        continue
                     log(f"对话框 更新提示 主循环异常 {e}")
                 hit = detect_tip.detect_tip()
                 if hit is not None:
@@ -283,6 +328,13 @@ class Monitor:
                 break
             except Exception as e:
                 msg = str(e)
+                if self._is_capture_glitch(msg):
+                    now = time.time()
+                    if now - _capture_warn_at > 20:
+                        log("截屏 暂时失败（常见于UAC提权框/锁屏），稍后自动重试")
+                        _capture_warn_at = now
+                    time.sleep(3.0)
+                    continue
                 log(f"错误 主循环 {e}")
                 if (
                     "OutOfMemory" in msg

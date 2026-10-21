@@ -29,6 +29,8 @@ if %errorlevel% neq 0 (
 )
 
 echo 启动自动换号监控（日志见 logs 目录）...
+echo 请先打开「Cursor续杯管家」并保持窗口可见（不要缩到托盘）。
+echo 用量 tip 时会点「无感换号」，不重启 Cursor，再发「请继续你的工作」。
 echo 若已有旧监控在跑，将自动结束旧进程并接管，无需手动关闭。
 python "%~dp0monitor.py"
 pause

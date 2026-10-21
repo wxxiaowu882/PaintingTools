@@ -802,32 +802,49 @@ const getEntryAbsRoot = (entry) => {
     if (entry.path && isWindowsAbsPath(entry.path)) return normalizeDirPath(entry.path);
     return '';
 };
-const callJsonApi = async (urls, payload) => {
+const callJsonApi = async (urls, payload, opts) => {
     let lastErr = null;
+    const timeoutMs = opts && opts.timeoutMs > 0 ? opts.timeoutMs : 0;
     for (const url of urls) {
+        const ac = timeoutMs ? new AbortController() : null;
+        let timer = null;
         try {
+            if (ac) timer = setTimeout(() => { try { ac.abort(); } catch (_) {} }, timeoutMs);
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload || {}),
+                signal: ac ? ac.signal : undefined,
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok && data.ok !== true) throw new Error((data && data.error) || `HTTP ${res.status}`);
             return data;
         } catch (e) {
             lastErr = e;
+        } finally {
+            if (timer) clearTimeout(timer);
         }
     }
     throw lastErr || new Error('API unavailable');
 };
 const callPickFolderApi = async () => {
     try {
-        const data = await callJsonApi(PICK_FOLDER_API_URLS, {});
+        // 选目录对话框可能被挡住：90s 超时后交给上层回退浏览器选目录
+        const data = await callJsonApi(PICK_FOLDER_API_URLS, {}, { timeoutMs: 90000 });
         if (data.cancelled) return null;
-        if (data.ok && data.path && isWindowsAbsPath(data.path)) return normalizeDirPath(data.path);
+        if (data.ok && data.path) {
+            const normalized = normalizeDirPath(data.path);
+            if (isWindowsAbsPath(normalized)) return normalized;
+            // 勿当成「取消」：否则按钮秒回、用户以为没反应
+            throw new Error('本机返回了路径，但格式无法识别: ' + String(data.path));
+        }
+        if (data && data.error && !data.cancelled) throw new Error(String(data.error));
         return null;
-    } catch (_) {
-        return undefined; // undefined = API 不可用；null = 用户取消
+    } catch (e) {
+        if (e && (e.name === 'AbortError' || /aborted/i.test(String(e && e.message)))) {
+            throw new Error('选目录超时（对话框可能被挡住）。将改用浏览器选目录。');
+        }
+        throw e; // 交给 onclick：可提示并回退 showDirectoryPicker
     }
 };
 let localFsApiReady = false;
@@ -984,11 +1001,13 @@ const ensureCurrentAbsRoot = async (opts = {}) => {
     // 浏览器能读文件内容，但故意不把 E:\ 盘符告诉网页；只能靠本机 18080 记一次
     if (st) st.innerText = `浏览器不提供盘符路径。请选中【${folderName}】一次，之后不再问…`;
     logDebug(`📂 缺少完整路径（浏览器安全限制），弹出系统选目录以绑定「${folderName}」…`);
-    const picked = await callPickFolderApi();
-    if (picked === undefined) {
+    let picked = null;
+    try {
+        picked = await callPickFolderApi();
+    } catch (bindErr) {
         alert(
-            '打不开资源管理器定位：网页本身拿不到文件的盘符路径（浏览器安全限制）。\n'
-            + '请确认 Portal「01_Glb管理器.bat」/ 18080 在运行，以便本机帮你记住路径。'
+            '打不开资源管理器定位：' + (bindErr && bindErr.message ? bindErr.message : String(bindErr)) + '\n'
+            + '请确认 Portal「01_Glb管理器.bat」/ 18080 在运行，并留意任务栏「GLB选文件夹」是否被挡住。'
         );
         return null;
     }
@@ -1366,7 +1385,8 @@ const updateLightMode = () => {
         if (!studioEnvMap) studioEnvMap = createStudioEnv();
         mainViewer.setAttribute('environment-image', studioEnvMap);
         mainViewer.setAttribute('exposure', slideExposure.value); 
-        mainViewer.setAttribute('shadow-intensity', '2'); 
+        // 硬阴影 intensity=2 会在多层/高模曲面上打出平行条纹（影痤疮）；压到 0.6 仍保留立体感
+        mainViewer.setAttribute('shadow-intensity', '0.6'); 
         toggleLightBtn.innerText = "💡 当前: 摄影棚聚光 (硬朗)";
         toggleLightBtn.style.color = "#d4af37"; toggleLightBtn.style.borderColor = "#d4af37";
         exposureControl.style.display = 'flex';
@@ -3330,25 +3350,42 @@ if (btn) { btn.disabled = true; btn.innerText = '选择中…'; }
 logDebug("📂 尝试选择文件夹...");
 try {
     await probeLocalFsApi();
-    // 有 18080：只弹一次系统选目录（本机知道盘符），网页侧用服务读写 —— 不再逼用户选两遍
+    // 有 18080：优先本机选目录（可记住盘符）；失败/超时再回退浏览器选目录
     if (localFsApiReady) {
         if (st) st.innerText = '请选择文件夹（选一次即可记住盘符路径）…';
         logDebug('📂 18080 可用：一次系统选目录并记住路径');
-        const picked = await callPickFolderApi();
-        if (picked === undefined) {
-            alert('本机选目录失败。请确认 Portal bat / 18080 在运行。');
+        let picked = null;
+        let nativeFailed = false;
+        try {
+            picked = await callPickFolderApi();
+        } catch (pickErr) {
+            nativeFailed = true;
+            logDebug('⚠️ 本机选目录失败，将回退浏览器选目录', pickErr);
+            if (st) st.innerText = '本机选目录失败，改用浏览器选目录…';
+        }
+        if (!nativeFailed) {
+            if (!picked) {
+                if (st) st.innerText = '已取消选择文件夹';
+                logDebug('ℹ️ 用户取消了选目录');
+                return;
+            }
+            const serverHandle = makeServerDirHandle(picked);
+            await connectDirectory(serverHandle);
+            await attachAbsPathToCurrent(picked);
+            if (st) st.innerText = `共 ${modelFiles.length} 个模型 · 已记住 ${picked}`;
+            logDebug(`✅ 文件夹已连接并记住路径: ${picked}`);
             return;
         }
-        if (!picked) {
-            if (st) st.innerText = '已取消选择文件夹';
-            logDebug('ℹ️ 用户取消了选目录');
+        // 回退：仍可预览，但可能无盘符
+        if (!window.showDirectoryPicker) {
+            alert('本机选目录失败，且当前浏览器不支持选目录。请重启 Portal「01_Glb管理器.bat」后再试。');
             return;
         }
-        const serverHandle = makeServerDirHandle(picked);
-        await connectDirectory(serverHandle);
-        await attachAbsPathToCurrent(picked);
-        if (st) st.innerText = `共 ${modelFiles.length} 个模型 · 已记住 ${picked}`;
-        logDebug(`✅ 文件夹已连接并记住路径: ${picked}`);
+        const browserHandle = await window.showDirectoryPicker({ id: 'glb_manager_repo', mode: 'readwrite' });
+        await connectDirectory(browserHandle);
+        logDebug(`✅ 浏览器已连接文件夹: ${browserHandle.name}（本机选目录失败后的回退）`);
+        if (st) st.innerText = `已连接「${browserHandle.name}」· 本机选目录未成功，盘符可能未记住`;
+        alert('已用浏览器选目录连上文件夹。\n若任务栏曾闪过「GLB选文件夹」被挡住，关掉后重试「新文件夹」可记住盘符并「打开所在文件夹」。');
         return;
     }
     // 无 18080：只能用浏览器选目录（能预览，但永远拿不到 E:\，无法「打开所在文件夹」）

@@ -11,7 +11,8 @@
     .menu-line{height:1.5px;background-color:rgba(255,255,255,0.72);transition:all 0.3s ease;margin:3px 0;border-radius:1px;} .line-1{width:22px;transform-origin:right center;}.line-2{width:14px;}.line-3{width:22px;transform-origin:right center;}
     .menu-open .line-1{transform:rotate(45deg) translateY(-2px);background-color:rgba(255,255,255,0.72);} .menu-open .line-2{opacity:0;} .menu-open .line-3{transform:rotate(-45deg) translateY(2px);background-color:rgba(255,255,255,0.72);}
     /* 顶栏按钮（左上场景选择 + 右上菜单）：弱化亮度 + 上移，兼容刘海安全区；左边贴边 */
-    #top-left-scene-btn{top:20px !important; left:max(6px, env(safe-area-inset-left, 0px)) !important; opacity:0.82; transform:translateY(calc(env(safe-area-inset-top, 0px) - 16px)); z-index:7001 !important;}
+    /* z-index 须低于 #scene-loader(6000)，避免菜单进入后的加载画面上仍露出「场景：」控件 */
+    #top-left-scene-btn{top:20px !important; left:max(6px, env(safe-area-inset-left, 0px)) !important; opacity:0.82; transform:translateY(calc(env(safe-area-inset-top, 0px) - 16px)); z-index:5000 !important;}
     /* 防回归：模型画布区域保持固定铺满，不受顶栏位移影响 */
     #canvas-container{top:0 !important; right:0 !important; bottom:0 !important; left:0 !important;}
     #top-left-scene-btn span{color:rgba(255,255,255,0.78) !important;}
@@ -66,7 +67,6 @@
     .scene-tab { flex:none; display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.55); font-size:11px; cursor:pointer; user-select:none; white-space:nowrap; -webkit-tap-highlight-color: transparent; }
     .scene-tab:hover { background:rgba(255,255,255,0.08); } .scene-tab.active { background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.90); border-color:rgba(255,255,255,0.16); }
     .scene-empty { padding:18px 10px; color:rgba(255,255,255,0.45); font-size:11px; line-height:1.6; text-align:center; border:1px dashed rgba(255,255,255,0.10); border-radius:12px; }
-    .scene-model-ref { flex:none; margin-left:6px; padding:2px 7px; border-radius:999px; border:1px solid rgba(46,204,113,0.35); background:rgba(46,204,113,0.14); color:rgba(46,204,113,0.95); font-size:10px; white-space:nowrap; }
     .scene-subtabbar { display:flex; flex-wrap:nowrap; gap:6px; margin: 0 0 12px 0; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; -ms-overflow-style:none; padding:1px 2px 6px; }
     .scene-subtabbar::-webkit-scrollbar { display:none; width:0; height:0; }
     .scene-subtab { flex:none; display:inline-flex; align-items:center; justify-content:center; padding:5px 9px; border-radius:999px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03); color:rgba(255,255,255,0.50); font-size:10.5px; cursor:pointer; user-select:none; white-space:nowrap; -webkit-tap-highlight-color: transparent; }
@@ -137,12 +137,12 @@
     <div id="persistent-warning" style="display:none;position:fixed;top:0;left:0;width:100%;background:rgba(0,0,0,0.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);text-align:center;padding:6px 10px;font-size:9px;z-index:6000;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;">未能开启高级渲染。需要时可点「开启渲染」再试</div>
     <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">暂时无法开启高级渲染</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">本次未能开启高级渲染，仍可正常观察模型与标注。关闭提示后，可随时点「开启渲染」再试。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
     <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div id="scene-loader-inner"> <div id="scene-load-pct">0%</div> <div class="scene-load-bar-track" aria-hidden="true"><div id="scene-load-bar-fill" class="scene-load-bar-fill"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">系统环境初始化中...</div> <div id="loader-subtext"></div> </div> </div>
-    <div id="perf-test-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:5550; flex-direction:column; align-items:center; justify-content:center;"> <div class="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin mb-4"></div> <div class="font-hairline text-[10px] tracking-[0.2em] text-white/80">正在测试设备渲染性能...</div> <div class="text-[8px] text-white/40 mt-2">首次进入时安全审计，即将完成</div> </div>
+    <div id="perf-test-overlay" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9100;pointer-events:none;background:rgba(0,0,0,0.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:8px 14px;align-items:center;justify-content:center;gap:10px;flex-direction:row;border-bottom:1px solid rgba(255,255,255,0.06);"> <div class="w-3.5 h-3.5 rounded-full border-2 border-white/20 border-t-white animate-spin shrink-0"></div> <div style="min-width:0;text-align:left;"> <div class="font-hairline text-[10px] tracking-[0.14em] text-white/80">首次进入：后台检测设备渲染…</div> <div id="perf-test-phase" class="text-[8px] text-white/40 mt-0.5">可先浏览课程列表</div> </div> </div>
     <div id="top-left-scene-btn" style="position:fixed; top:20px; left:max(6px, env(safe-area-inset-left, 0px)); z-index:5000; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:4px 5px 4px 4px; border-radius:10px; display:flex; align-items:center; gap:4px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="openSceneGridModal()"> <span class="solid-scene-label" style="color:#fff; font-weight:400; letter-spacing:0;">场景：</span>
     <span id="scene-trigger-top" style="color:#fff; font-weight:normal; max-width:min(72vw, 320px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">点击选择...</span> <span style="color:#666; font-size:10px;">▼</span> </div>
     <div id="menu-trigger-overlay" onclick="toggleMenu()"><span class="menu-line line-1"></span><span class="menu-line line-2"></span><span class="menu-line line-3"></span></div>
     <div id="scene-grid-modal">
-    <div class="modal-header"> <span class="modal-title">学习场景</span> <span class="modal-close" aria-label="关闭" title="关闭" onclick="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()" ontouchstart="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()">×</span> </div>
+    <div class="modal-header"> <span class="modal-title">几何体&静物学习地图</span> <span class="modal-close" aria-label="关闭" title="关闭" onclick="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()" ontouchstart="event.preventDefault(); event.stopPropagation(); closeSceneGridModal()">×</span> </div>
     <div class="scene-grid" id="scene-grid-container"></div> </div> <div id="canvas-container" class="fixed inset-0 z-0"></div> <script type="module">
     import './plugins_02/PluginManager.js'; import './plugins_02/Plugin_SkyEnvLight.js'; import './plugins_02/Plugin_ControlPanel.js'; import './plugins_02/Plugin_LightIndicator.js'; import * as THREE from 'three'; import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'; import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer'; import './plugins_02/Plugin_PerfTest.js';
@@ -305,6 +305,8 @@
     window.useAdvancedRender = false;
     window._solidUserStoppedRender = true;
     window.perfTestDone = false; window.isTestingPerformance = true; window.isLoadingScene = false; window._solidHardwareUnsupported = false; window._solidPerfSoftFail = false; window._solidSampleTimeout = false; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
+    window.__solidJsonLoadStarted = false; window.__solidPendingSwitchSceneIndex = null; window.__solidPerfBgActive = false;
+    window.__solidInitRenderReady = false; window.__solidPerfKickStarted = false; window.__solidPerfWantBackground = false;
     window.__solidNoInterModelShadow = false;
     window.updateDoFUIFromRaycaster = function(focusDist) { const slider = document.getElementById('dofFocusSlider'); if(slider) { slider.value = focusDist; if(window.updateDoFUI) window.updateDoFUI(); } };
     if (window.PosterizeShared && typeof window.PosterizeShared.init === 'function') {
@@ -1233,10 +1235,10 @@
         return true;
     }
     window._solidPerfHardwareT0 = 0; window._solidPerfHardwareLastP = 0; window._solidPerfHardwareIsMobile = false; window._solidPerfStageLo = 0; window._solidPerfStageHi = 10; window._solidPerfStageT0 = 0; window._solidPerfStageTau = 800;
-    function startSolidPerfHardwareProgress(isMobile) { window._solidPerfHardwareT0 = performance.now(); window._solidPerfHardwareLastP = 0; window._solidPerfHardwareIsMobile = !!isMobile; window._solidPerfStageLo = 0; window._solidPerfStageHi = 12; window._solidPerfStageTau = 700; window._solidPerfStageT0 = performance.now(); setLoaderProgress(2); }
-    function resetSolidPerfHardwareProgress() { window._solidPerfHardwareT0 = 0; window._solidPerfHardwareLastP = 0; window._solidPerfStageLo = 0; window._solidPerfStageHi = 0; window._solidPerfStageT0 = 0; window._solidPerfStageTau = 800; if (window.PerfTester) window.PerfTester.onProgress = null; }
-    function applySolidPerfHardwarePhase(phase) { const mo = window._solidPerfHardwareIsMobile ? 1.14 : 1; const M = { scene_connect: { lo: 6, hi: 16, tau: 1000 }, ui_buffer: { lo: 16, hi: 22, tau: 700 }, gpu_dispatch: { lo: 22, hi: 30, tau: 550 }, shader_compile: { lo: 30, hi: 76, tau: 12800 }, sample_1: { lo: 76, hi: 88, tau: 2200 }, sample_2: { lo: 88, hi: 94, tau: 900 } }; const c = M[phase]; if (!c) return; window._solidPerfStageLo = c.lo; window._solidPerfStageHi = c.hi; window._solidPerfStageTau = c.tau * mo; window._solidPerfStageT0 = performance.now(); window._solidPerfHardwareLastP = Math.max(window._solidPerfHardwareLastP, c.lo); setLoaderProgress(window._solidPerfHardwareLastP); const txt = { scene_connect: '接入测试场景…', ui_buffer: '界面缓冲…', gpu_dispatch: '调度 GPU 渲染…', shader_compile: '编译着色器（可能较久）…', sample_1: '首帧渲染采样…', sample_2: '二次采样校验…' }; if (txt[phase]) setLoaderText(txt[phase]); }
-    function tickSolidPerfHardwareProgress() { if (!window._solidPerfHardwareT0 || !window.PerfTester || !window.PerfTester.isTesting) return; const lo = window._solidPerfStageLo, hi = window._solidPerfStageHi; if (hi <= lo) return; const t = performance.now() - window._solidPerfStageT0; const span = hi - lo; const tau = Math.max(200, window._solidPerfStageTau || 2000); const eased = 1 - Math.exp(-t / tau); const target = lo + span * Math.min(0.96, eased); const capped = Math.min(hi - 0.02, target); const p = Math.floor(Math.max(window._solidPerfHardwareLastP, capped)); if (p !== window._solidPerfHardwareLastP) { window._solidPerfHardwareLastP = p; setLoaderProgress(p); } }
+    function startSolidPerfHardwareProgress(isMobile) { window._solidPerfHardwareT0 = performance.now(); window._solidPerfHardwareLastP = 0; window._solidPerfHardwareIsMobile = !!isMobile; window._solidPerfStageLo = 0; window._solidPerfStageHi = 12; window._solidPerfStageTau = 700; window._solidPerfStageT0 = performance.now(); if (!window.__solidPerfBgActive) setLoaderProgress(2); }
+    function resetSolidPerfHardwareProgress() { window._solidPerfHardwareT0 = 0; window._solidPerfHardwareLastP = 0; window._solidPerfStageLo = 0; window._solidPerfStageHi = 0; window._solidPerfStageT0 = 0; window._solidPerfStageTau = 800; window.__solidPerfBgActive = false; if (window.PerfTester) window.PerfTester.onProgress = null; }
+    function applySolidPerfHardwarePhase(phase) { const mo = window._solidPerfHardwareIsMobile ? 1.14 : 1; const M = { scene_connect: { lo: 6, hi: 16, tau: 1000 }, ui_buffer: { lo: 16, hi: 22, tau: 700 }, gpu_dispatch: { lo: 22, hi: 30, tau: 550 }, shader_compile: { lo: 30, hi: 76, tau: 12800 }, sample_1: { lo: 76, hi: 88, tau: 2200 }, sample_2: { lo: 88, hi: 94, tau: 900 } }; const c = M[phase]; if (!c) return; window._solidPerfStageLo = c.lo; window._solidPerfStageHi = c.hi; window._solidPerfStageTau = c.tau * mo; window._solidPerfStageT0 = performance.now(); window._solidPerfHardwareLastP = Math.max(window._solidPerfHardwareLastP, c.lo); const txt = { scene_connect: '接入测试场景…', ui_buffer: '界面缓冲…', gpu_dispatch: '调度 GPU 渲染…', shader_compile: '编译着色器（可能较久）…', sample_1: '首帧渲染采样…', sample_2: '二次采样校验…' }; const waitingEnter = (window.__solidPendingSwitchSceneIndex != null); if (window.__solidPerfBgActive && !waitingEnter) { try { const ph = document.getElementById('perf-test-phase'); if (ph && txt[phase]) ph.textContent = txt[phase] + '（可先浏览列表）'; } catch (_ePh) {} return; } setLoaderProgress(window._solidPerfHardwareLastP); if (txt[phase]) setLoaderText(waitingEnter ? ('设备检测中：' + txt[phase]) : txt[phase]); }
+    function tickSolidPerfHardwareProgress() { if (!window._solidPerfHardwareT0 || !window.PerfTester || !window.PerfTester.isTesting) return; const waitingEnter = (window.__solidPendingSwitchSceneIndex != null); if (window.__solidPerfBgActive && !waitingEnter) return; const lo = window._solidPerfStageLo, hi = window._solidPerfStageHi; if (hi <= lo) return; const t = performance.now() - window._solidPerfStageT0; const span = hi - lo; const tau = Math.max(200, window._solidPerfStageTau || 2000); const eased = 1 - Math.exp(-t / tau); const target = lo + span * Math.min(0.96, eased); const capped = Math.min(hi - 0.02, target); const p = Math.floor(Math.max(window._solidPerfHardwareLastP, capped)); if (p !== window._solidPerfHardwareLastP) { window._solidPerfHardwareLastP = p; setLoaderProgress(p); } }
     window.toggleCustomSelect = function(e, id) { e.stopPropagation(); document.querySelectorAll('.custom-options').forEach(el => { if (el.id !== id) el.classList.remove('show'); }); document.getElementById(id).classList.toggle('show'); };
     // window.toggleWall 由 SolidEnvControlShared 注入
     // 消费端标记：插件在该标记下禁用编辑/显隐切换
@@ -1291,9 +1293,8 @@
     window.solidPathTraceUiBlocksSample = function() { const m = document.getElementById('scene-grid-modal'); const modalOpen = m && (m.style.display === 'flex' || (typeof getComputedStyle === 'function' && getComputedStyle(m).display === 'flex')); const go = document.getElementById('global-menu-overlay'); const menuOpen = (typeof location !== 'undefined' && location.hash === '#menu') || (go && go.classList.contains('active')); return !!(modalOpen || menuOpen); };
     window.closeSceneGridModal = function() {
     const noScene = (window.currentSceneIndex == null) || Number(window.currentSceneIndex) < 0;
-    // 头部造型规律 / 肖像光影沙盒：未选课就关列表时，回到全局菜单，不落到空舞台
-    const sk = window.__solidSandboxKey || '';
-    if ((sk === 'headform' || sk === 'portrait') && noScene) {
+    // 未选课就关列表：回全局菜单，不落到空舞台（几何体/肖像/头部造型等一致）
+    if (noScene) {
         const overlay = document.getElementById('global-menu-overlay');
         if (overlay && !overlay.classList.contains('active') && typeof window.toggleMenu === 'function') window.toggleMenu();
         return;
@@ -1566,6 +1567,21 @@
     window.switchScene = function(index) {
     if (window.isLoadingScene) return;
     if(index === window.currentSceneIndex) return;
+    // 【列表优先】后台 PerfTest 未结束时不可清场：排队，检测完再进课
+    const _perfBusy = !!(window.PerfTester && window.PerfTester.isTesting) || (!!window.isTestingPerformance && !window.perfTestDone);
+    if (_perfBusy) {
+        window.__solidPendingSwitchSceneIndex = index;
+        try {
+            document.getElementById('scene-grid-modal').style.display = 'none';
+            const ld = document.getElementById('scene-loader');
+            if (ld) { ld.style.display = 'flex'; ld.style.opacity = '1'; }
+            setLoaderText('设备检测中，即将进入场景…', true);
+            setLoaderSubtext('首次进入需编译着色器，完成后自动进入', true);
+            setLoaderProgress(Math.max(8, window._solidPerfHardwareLastP || 8));
+        } catch (_eGate) {}
+        try { window.hwLog('[switchScene] 设备检测未完成，已排队 index=' + index); } catch (_eGateLog) {}
+        return;
+    }
     const _token = ++window.__solidSceneLoadToken;
     try { const _h = _solidInitFirstFrameHintController(); if (_h && _h.disarm) _h.disarm(); } catch (_eHintDis) {}
     window.__solidSceneVersion = Number(window.__solidSceneVersion || 0) + 1;
@@ -1776,9 +1792,9 @@
             if (sk !== 'geometry' && sk !== 'portrait' && sk !== 'headform') sk = 'geometry';
             window.__solidSandboxKey = sk;
             const metaBySandbox = {
-                geometry: { title: '几何光影观察 · 视觉维度', description: '专为绘画初学者设计的3D几何体光影观察工具，实时调节光源位置、强度，模拟真实石膏素描明暗调子。' },
-                portrait: { title: '肖像光影沙盒 · 视觉维度', description: '在3D光影画室里观察肖像明暗与体块，实时调节光源，练就写生眼力。' },
-                headform: { title: '头部造型规律 · 视觉维度', description: '用光影看头部体块与造型规律。' }
+                geometry: { title: '几何光影观察 · 视觉维度', description: '专为绘画初学者设计的3D几何体光影观察工具，实时调节光源位置、强度，模拟真实石膏素描明暗调子。', modalTitle: '几何体&静物学习地图' },
+                portrait: { title: '肖像光影沙盒 · 视觉维度', description: '在3D光影画室里观察肖像明暗与体块，实时调节光源，练就写生眼力。', modalTitle: '肖像光影沙盒' },
+                headform: { title: '头部造型规律 · 视觉维度', description: '用光影看头部体块与造型规律。', modalTitle: '头部造型规律' }
             };
             const m = metaBySandbox[sk] || metaBySandbox.geometry;
             try { document.title = m.title; } catch (_eT) {}
@@ -1787,8 +1803,15 @@
                 if (!el) { el = document.createElement('meta'); el.setAttribute('name', 'description'); document.head.appendChild(el); }
                 el.setAttribute('content', m.description);
             } catch (_eD) {}
+            try {
+                const mt = document.querySelector('#scene-grid-modal .modal-title');
+                if (mt) mt.textContent = m.modalTitle || '学习场景';
+            } catch (_eMt) {}
         })();
-        window.loadJSONData = function() { setLoaderText("获取场景配置数据...");
+        window.loadJSONData = function() {
+        if (window.__solidJsonLoadStarted) return;
+        window.__solidJsonLoadStarted = true;
+        setLoaderText("获取场景配置数据...");
         document.getElementById('scene-loader').style.display = 'flex'; document.getElementById('scene-loader').style.opacity = '1';
         const _qs = new URLSearchParams(window.location.search || '');
         // 默认启用 v2（demo）列表样式；如需回退旧网格：?sceneListV2=0
@@ -1811,8 +1834,11 @@
         }
         window.customScenes = data; buildSceneGridUI(data); if(data.length > 0) { // [拦截点] 不再自动进入场景0，而是关掉加载提示，强制弹出场景选择网格
         document.getElementById('scene-loader').style.display = 'none'; document.getElementById('scene-grid-modal').style.display = 'flex';
-        // 关闭按钮始终可见；headform / portrait 未选课时关闭会回到全局菜单
-        document.querySelector('.modal-close').style.display = 'inline-flex'; } else { setLoaderText("场景库为空..."); window.isUnsupported=true; }
+        // 关闭按钮始终可见；未选课时关闭会回到全局菜单
+        document.querySelector('.modal-close').style.display = 'inline-flex';
+        // 课表已可见：再启动延后的 PathTracer / 后台 PerfTest
+        try { if (typeof window._solidMaybeStartBackgroundPerf === 'function') window._solidMaybeStartBackgroundPerf(); } catch (_eKick) {}
+        } else { setLoaderText("场景库为空..."); window.isUnsupported=true; }
         }).catch(err => { addHwLog("JSON请求或解析失败: " + err.message); document.getElementById('scene-loader').style.display='none'; }); };
         const SOLID_FAV_LEGACY_KEY = 'SolidConsumer_Favorites_v1';
         const SOLID_FAV_VIEW_LEGACY_KEY = 'SolidConsumer_FavoritesView_v1';
@@ -1836,16 +1862,111 @@
             } catch (_eMig) {}
         }
         solidMaybeMigrateFavKeys();
+        // 【列表优先】尽早拉课表 JSON，与后续 WebGL / PathTracer init 并行；init 内调用有幂等 guard
+        try { window.loadJSONData(); } catch (_eEarlyList) {}
         const SOLID_SCENE_CATEGORIES_DEFAULT = ['几何体', '色彩', '氛围', '构图', '几何体写生', '静物写生'];
         const SOLID_HEADFORM_LINE_CATS = ['外轮廓规律', '交界线规律'];
+        const SOLID_PORTRAIT_MATERIAL_CATS = ['石膏', '真人'];
+        const SOLID_PORTRAIT_GENDER = ['男', '女'];
+        const SOLID_PORTRAIT_AGE = ['儿童', '中青年', '老年'];
+        const SOLID_PORTRAIT_REGION = ['东方', '西方'];
         function solidIsHeadformSandbox() {
             return (window.__solidSandboxKey || '') === 'headform';
+        }
+        function solidIsPortraitSandbox() {
+            return (window.__solidSandboxKey || '') === 'portrait';
         }
         function solidSceneCategories() {
             const sk = window.__solidSandboxKey || 'geometry';
             if (sk === 'headform') return SOLID_HEADFORM_LINE_CATS.slice();
-            if (sk === 'portrait') return [];
+            if (sk === 'portrait') return SOLID_PORTRAIT_MATERIAL_CATS.slice();
             return SOLID_SCENE_CATEGORIES_DEFAULT;
+        }
+        function solidPortraitPrimaryGlbBase(sceneData) {
+            try {
+                const items = sceneData && sceneData.items;
+                if (!Array.isArray(items)) return '';
+                for (let i = 0; i < items.length; i++) {
+                    const it = items[i];
+                    if (it && it.type === 'glb' && it.url) {
+                        const u = String(it.url).split('?')[0].replace(/\\/g, '/');
+                        const slash = u.lastIndexOf('/');
+                        return slash >= 0 ? u.slice(slash + 1) : u;
+                    }
+                }
+            } catch (_e) {}
+            return '';
+        }
+        function solidPortraitMaterialOf(sceneData) {
+            try {
+                const m = sceneData && sceneData.meta ? sceneData.meta : {};
+                if (m.material === '石膏' || m.material === '真人') return m.material;
+                if (m.category === '石膏' || m.category === '真人') return m.category;
+                const bn = solidPortraitPrimaryGlbBase(sceneData);
+                if (/真人/.test(bn)) return '真人';
+                if (/石膏|David|Caesar|Homer/i.test(bn)) return '石膏';
+            } catch (_e) {}
+            return '';
+        }
+        function solidPortraitGenderOf(sceneData) {
+            try {
+                const m = sceneData && sceneData.meta ? sceneData.meta : {};
+                if (m.gender === '男' || m.gender === '女') return m.gender;
+                const bn = solidPortraitPrimaryGlbBase(sceneData);
+                if (/女童|女中青年|女老年|女_|女0|Woman|Female|girl|Hera|Minerva|Nefertiti/i.test(bn) || (/女/.test(bn) && !/男/.test(bn))) return '女';
+                if (/男童|男中青年|男老年|男_|男0|Male|Boy|David|Caesar|Homer/i.test(bn) || /男/.test(bn)) return '男';
+            } catch (_e) {}
+            return '';
+        }
+        function solidPortraitAgeOf(sceneData) {
+            try {
+                const m = sceneData && sceneData.meta ? sceneData.meta : {};
+                if (m.age === '儿童' || m.age === '中青年' || m.age === '老年') return m.age;
+                const bn = solidPortraitPrimaryGlbBase(sceneData);
+                if (/女童|男童|儿童|Baby|child|幼儿/i.test(bn)) return '儿童';
+                if (/老年|老人|Homer|Seneca|Socrates|Goethe|长须|白须/i.test(bn)) return '老年';
+                if (/中青年|青年|中年/.test(bn)) return '中青年';
+            } catch (_e) {}
+            return '';
+        }
+        function solidPortraitRegionOf(sceneData) {
+            try {
+                const m = sceneData && sceneData.meta ? sceneData.meta : {};
+                if (m.region === '东方' || m.region === '西方') return m.region;
+                const bn = solidPortraitPrimaryGlbBase(sceneData);
+                if (/欧|AARON|Paul|David|Caesar|Homer|Seneca|Socrates|Goethe|Jackson|Schwarzenegger|Phoenix|Joker|Apollo|Hercules|Michelangelo|glyptotek|thorvaldsen|smithsonian|Nefertiti|Minerva|Hera|Leeds|Jason|Statham|Tommy/i.test(bn)) return '西方';
+                if (/亚|东方|叶问|IpMan|光头|大本|桌上|军装|短袖|老农|胡须长者|女0|男中|男老|女中|女老/.test(bn)) return '东方';
+            } catch (_e) {}
+            return '';
+        }
+        // 扁平互斥单选：男/女/儿童/中青年/老年/东方/西方，彼此不与不或；再点取消
+        const SOLID_PORTRAIT_FLAT_TAGS = SOLID_PORTRAIT_GENDER.concat(SOLID_PORTRAIT_AGE, SOLID_PORTRAIT_REGION);
+        function solidPortraitFilterMemKey() { return 'SolidConsumer_PortraitFilter_v2'; }
+        function solidLoadPortraitFilterMem() {
+            try {
+                const raw = localStorage.getItem(solidPortraitFilterMemKey());
+                if (!raw) return { tag: '' };
+                const o = JSON.parse(raw);
+                const tag = (o && o.tag) ? String(o.tag) : '';
+                return { tag: (SOLID_PORTRAIT_FLAT_TAGS.indexOf(tag) >= 0) ? tag : '' };
+            } catch (_e) { return { tag: '' }; }
+        }
+        function solidSavePortraitFilterMem(mem) {
+            try {
+                const tag = (mem && mem.tag && SOLID_PORTRAIT_FLAT_TAGS.indexOf(mem.tag) >= 0) ? String(mem.tag) : '';
+                localStorage.setItem(solidPortraitFilterMemKey(), JSON.stringify({ tag: tag }));
+            } catch (_e) {}
+        }
+        function solidPortraitTagOf(sceneData, tag) {
+            if (!tag) return true;
+            if (SOLID_PORTRAIT_GENDER.indexOf(tag) >= 0) return solidPortraitGenderOf(sceneData) === tag;
+            if (SOLID_PORTRAIT_AGE.indexOf(tag) >= 0) return solidPortraitAgeOf(sceneData) === tag;
+            if (SOLID_PORTRAIT_REGION.indexOf(tag) >= 0) return solidPortraitRegionOf(sceneData) === tag;
+            return true;
+        }
+        function solidPortraitPassFilters(sceneData, filt) {
+            if (!filt || !filt.tag) return true;
+            return solidPortraitTagOf(sceneData, filt.tag);
         }
         function solidHeadformLineCategoryOf(sceneData) {
             try {
@@ -1865,6 +1986,7 @@
         function solidSceneCategoryOf(sceneData) {
             try {
                 if (solidIsHeadformSandbox()) return solidHeadformLineCategoryOf(sceneData);
+                if (solidIsPortraitSandbox()) return solidPortraitMaterialOf(sceneData);
                 const cats = solidSceneCategories();
                 const c = sceneData && sceneData.meta ? sceneData.meta.category : '';
                 const s = String(c == null ? '' : c).trim();
@@ -1944,13 +2066,11 @@
                     order.push(slot);
                 }
                 const g = map[slot];
-                const role = it.sceneData && it.sceneData.meta ? it.sceneData.meta.modelRole : '';
-                if (role === 'reference') g.ref = it;
-                else if (!g.any) g.any = it;
+                if (!g.any) g.any = it;
             }
             return order.map(function (slot) {
                 const g = map[slot];
-                const primary = g.ref || g.any;
+                const primary = g.any;
                 return {
                     slot: slot,
                     label: solidDeriveLessonTabLabel(primary.sceneData)
@@ -2041,9 +2161,6 @@
             const curIdx = Number(window.currentSceneIndex);
             item.className = 'scene-item' + ((curIdx >= 0 && i === curIdx) ? ' active' : '');
             solidBindSceneItemActivate(item, i);
-            const refBadge = (isHeadform && meta.modelRole === 'reference')
-                ? '<span class="scene-model-ref">参考</span>'
-                : '';
             const titleTitle = isHeadform
                 ? (escapeHtml(title) + ((sceneData && sceneData.name) ? (' · ' + escapeHtml(String(sceneData.name))) : ''))
                 : escapeHtml(title);
@@ -2051,7 +2168,7 @@
             `<img src="${escapeHtml(thumb)}" class="scene-thumb" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Crect width=\\'100%25\\' height=\\'100%25\\' fill=\\'%23111\\'/%3E%3C/svg%3E'">` +
             `<div class="scene-meta">` +
               `<div class="scene-title" title="${titleTitle}" style="display:flex;align-items:center;gap:4px;white-space:normal;">` +
-                `<span style="min-width:0;flex:1;">${escapeHtml(title)}</span>${refBadge}` +
+                `<span style="min-width:0;flex:1;">${escapeHtml(title)}</span>` +
               `</div>` +
               (detailSafe ? `<div class="scene-detail">${detailSafe}</div>` : ``) +
             `</div>` +
@@ -2236,11 +2353,7 @@
                     if (curSlot === '__all__') return true;
                     return solidSceneSlotOf(it.sceneData) === curSlot;
                 }).slice().sort(function (a, b) {
-                    // 全量时按统合顺序；单课时 reference 优先
-                    if (curSlot === '__all__') return a.i - b.i;
-                    const ra = (a.sceneData && a.sceneData.meta && a.sceneData.meta.modelRole === 'reference') ? 0 : 1;
-                    const rb = (b.sceneData && b.sceneData.meta && b.sceneData.meta.modelRole === 'reference') ? 0 : 1;
-                    if (ra !== rb) return ra - rb;
+                    // 保持统合/列表原有顺序；各头模平等，不再把某一模提前
                     return a.i - b.i;
                 });
                 if (models.length === 0) {
@@ -2266,7 +2379,29 @@
             return;
         }
 
-        if (subTab) {
+        const isPortrait = solidIsPortraitSandbox();
+        if (isPortrait && mode !== 'fav') {
+            const filt = solidLoadPortraitFilterMem();
+            if (subTab) {
+                subTab.style.display = 'flex';
+                let subHtml = '';
+                SOLID_PORTRAIT_FLAT_TAGS.forEach(function (tag) {
+                    const active = (filt.tag || '') === tag;
+                    subHtml += `<button type="button" class="scene-subtab ${active ? 'active' : ''}" data-ptag="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`;
+                });
+                subTab.innerHTML = subHtml;
+                Array.from(subTab.querySelectorAll('.scene-subtab')).forEach(function (btn) {
+                    btn.onclick = function (e) {
+                        e.preventDefault(); e.stopPropagation();
+                        const tag = this.getAttribute('data-ptag') || '';
+                        const cur = solidLoadPortraitFilterMem();
+                        // 再点同一芯片取消；点其它芯片则互斥替换
+                        solidSavePortraitFilterMem({ tag: (cur.tag === tag) ? '' : tag });
+                        buildSceneGridUI(dataArr);
+                    };
+                });
+            }
+        } else if (subTab) {
             subTab.style.display = 'none';
             subTab.innerHTML = '';
         }
@@ -2277,16 +2412,22 @@
         } else if (mode === 'all') {
             list = all; // 全部：保持原顺序（含未分类）
         } else {
-            // 类别视图：几何沙盒匹配 meta.category
+            // 类别视图：几何沙盒匹配 meta.category；肖像匹配材质（石膏/真人）
             list = all.filter(it => solidSceneCategoryOf(it.sceneData) === mode);
         }
-    
-        if (mode === 'fav' && list.length === 0) {
-            container.innerHTML = `<div class="scene-empty">这里是你的收藏夹。<br>在“全部”里点右侧的 ★ 收藏场景。</div>`;
-            return;
+        if (isPortrait && mode !== 'fav') {
+            const filt = solidLoadPortraitFilterMem();
+            list = list.filter(it => solidPortraitPassFilters(it.sceneData, filt));
         }
-        if (mode !== 'all' && mode !== 'fav' && list.length === 0) {
-            container.innerHTML = `<div class="scene-empty">「${escapeHtml(mode)}」暂无场景。<br>未填类别的场景只在「全部」中显示。</div>`;
+    
+        if (list.length === 0) {
+            if (mode === 'fav') {
+                container.innerHTML = `<div class="scene-empty">这里是你的收藏夹。<br>在“全部”里点右侧的 ★ 收藏场景。</div>`;
+            } else if (isPortrait) {
+                container.innerHTML = `<div class="scene-empty">当前筛选无场景。<br>可再点已选芯片取消，或切回一级「全部」。</div>`;
+            } else if (mode !== 'all') {
+                container.innerHTML = `<div class="scene-empty">「${escapeHtml(mode)}」暂无场景。<br>未填类别的场景只在「全部」中显示。</div>`;
+            }
             return;
         }
     
@@ -2362,10 +2503,8 @@
         requestAnimationFrame(() => { try { window.hwLog("[Init] 推迟一帧再启动渲染（先让加载层绘制，略缩短首屏等待）");
         if (_degradeGuard) { window.useAdvancedRender = false; window.isUnsupported = false; window.isTestingPerformance = false; window.perfTestDone = true; try { const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none'; } catch(_ePto) {} try { const pw = document.getElementById('persistent-warning'); if (pw) { pw.textContent = '上次高级渲染异常，本次先正常进入。需要时可点「开启渲染」重试'; pw.style.display = 'block'; } } catch(_ePw) {} try { syncRenderButtons(); } catch(_eBtn) {} window.loadJSONData(); animate(); return; }
         if (window._solidHardwareUnsupported) { window.hwLog("[Init] 静态检测不通过，跳过 PathTracer 实例化"); }
-        else { try { window.hwLog("[Init] 准备实例化 WebGLPathTracer...");
-        pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = _solidPtCfg.multipleImportanceSampling !== false; pathTracer.bounces = Number(_solidPtCfg.bounces || 3); pathTracer.renderScale = _solidPathTracerRenderScale();
-        if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; window.hwLog("[Init] WebGLPathTracer 实例化完成"); } catch (ptErr) { window.hwLog("[Init] WebGLPathTracer 拒绝启动: " + ptErr.message);
-        triggerUnsupported('init_path_tracer_reject', ptErr.message); return; } } if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
+        else { window.hwLog("[Init] PathTracer 延后到课表可见后再创建（列表优先）"); }
+        if (window.AtmosphereManager) window.AtmosphereManager.init(renderer, camera, scene);
         if (window.DoFManager) window.DoFManager.init(camera, scene, renderer.domElement);
         controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 0, 0); camera.lookAt(0, 0, 0); controls.update(); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.enablePan = true; controls.enabled = false; window.controls = controls; window._orbitInteracting = false; window._solidLastInteractAt = 0;
         // 自动化 / 自测只读宿主（不改交互）；标注脚本用射线定点
@@ -2437,28 +2576,46 @@
         });
         buildEnvironment(); window.syncEnvColorPickers();
         solidInitLightIndicator();
-        setupUIControls(); window.addEventListener('resize', function() { onWindowResize(); if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); }); setLoaderText("首次加载，硬件检测中…");
+        setupUIControls(); window.addEventListener('resize', function() { onWindowResize(); if (typeof window.__solidSyncAnnoViewport === 'function') window.__solidSyncAnnoViewport(); });
         try { window.hwLog('[Init] ready'); } catch (_eRdy) {}
         try { syncRenderButtons(); } catch (_eBtn0) {}
-        startSolidPerfHardwareProgress(isMobile); window.PerfTester.onProgress = function (ph) { applySolidPerfHardwarePhase(ph); };
         const skipPerfTest = new URLSearchParams(window.location.search).get('skipPerf') === '1';
         // 【性能测试缓存】：检查 localStorage 中是否有上次通过的记录
         let _perfCacheHit = false;
         if (!skipPerfTest) { try { const _raw = localStorage.getItem('SolidPerfResult_v1'); if (_raw) { const _c = JSON.parse(_raw);
         if (_c && _c.passed === true && _c.ua === navigator.userAgent && (Date.now() - (_c.ts || 0)) < 30 * 86400000) { _perfCacheHit = true; window.hwLog('[Init] 性能测试缓存命中（上次通过），跳过测试'); } }
         } catch(_e) { /* localStorage 不可用或数据损坏，静默回退 */ } }
+        function _solidHidePerfBgTip() {
+            try { const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none'; } catch (_eTip) {}
+        }
+        function _solidShowPerfBgTip() {
+            try {
+                const ptOverlay = document.getElementById('perf-test-overlay');
+                if (!ptOverlay) return;
+                const ph = document.getElementById('perf-test-phase');
+                if (ph) ph.textContent = '可先浏览课程列表';
+                ptOverlay.style.display = 'flex';
+            } catch (_eTip2) {}
+        }
+        function _solidDrainPendingSwitchScene() {
+            const idx = window.__solidPendingSwitchSceneIndex;
+            if (idx == null) return;
+            window.__solidPendingSwitchSceneIndex = null;
+            try { setLoaderSubtext('', true); } catch (_eSub) {}
+            try { window.hwLog('[Init] 设备检测结束，继续进入排队场景 index=' + idx); } catch (_eDrainLog) {}
+            try { if (typeof window.switchScene === 'function') window.switchScene(idx); } catch (_eDrain) { try { window.hwLog('[Init] 排队进场景失败: ' + _eDrain.message); } catch (_e2) {} }
+        }
         function _solidPerfTestPassActions() {
-            resetSolidPerfHardwareProgress(); setLoaderProgress(100);
-            const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none';
+            resetSolidPerfHardwareProgress(); _solidHidePerfBgTip();
             try { syncRenderButtons(); } catch (_eBtnP) {}
             window.perfTestDone = true; window.isTestingPerformance = false;
             try { localStorage.setItem('SolidPerfResult_v1', JSON.stringify({ passed: true, ts: Date.now(), ua: navigator.userAgent })); } catch(_e) {}
-            window.loadJSONData();
+            // 列表已提前加载；此处只收尾并放行排队中的进课
+            _solidDrainPendingSwitchScene();
         }
         // 【软降级】：PerfTest 失败不判死刑，先走光栅，12 秒后静默重试
         function _solidPerfTestSoftFail() {
-            resetSolidPerfHardwareProgress();
-            const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none';
+            resetSolidPerfHardwareProgress(); _solidHidePerfBgTip();
             window._solidPerfSoftFail = true; window.useAdvancedRender = false; window.isTestingPerformance = false; window.perfTestDone = true;
             if (pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch(_e) {} }, 0); }
             try { _solidCommitStandardRasterFallback('perf_soft_fail'); } catch (_eRf) {}
@@ -2467,25 +2624,69 @@
             window.hwLog('[Init] 性能测试未通过，软降级到光栅模式，12 秒后将静默重试');
             (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '本次未能开启高级渲染，可稍后点「开启渲染」再试'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 4000); } })();
             const pw = document.getElementById('persistent-warning'); if (pw) { pw.textContent = '未能开启高级渲染。需要时可点「开启渲染」再试'; pw.style.display = 'block'; }
-            window.loadJSONData();
+            _solidDrainPendingSwitchScene();
             setTimeout(function() { if (window._solidPerfSoftFail && !window.isUnsupported && !document.hidden) {
             window.hwLog('[Init] 软降级后静默重试渲染...'); const ok = window.__solidTryRecoverPathTracer('perf_soft_retry');
             if (ok) { window._solidPerfSoftFail = false; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
             try { localStorage.setItem('SolidPerfResult_v1', JSON.stringify({ passed: true, ts: Date.now(), ua: navigator.userAgent })); } catch(_e) {}
             } else { window.hwLog('[Init] 静默重试失败，保持降级模式'); } } }, 12000);
         }
+        // 【列表优先】课表 JSON 已尽早拉取；PathTracer / PerfTest 等课表 modal 可见后再启动
+        window.loadJSONData();
+        window._solidEnsurePathTracerForPerf = function () {
+            if (pathTracer) return true;
+            if (window._solidHardwareUnsupported || !renderer) return false;
+            try {
+                window.hwLog("[Init] 准备实例化 WebGLPathTracer...");
+                pathTracer = new WebGLPathTracer(renderer);
+                pathTracer.multipleImportanceSampling = _solidPtCfg.multipleImportanceSampling !== false;
+                pathTracer.bounces = Number(_solidPtCfg.bounces || 3);
+                pathTracer.renderScale = _solidPathTracerRenderScale();
+                if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor;
+                window.hwLog("[Init] WebGLPathTracer 实例化完成");
+                return true;
+            } catch (ptErr) {
+                window.hwLog("[Init] WebGLPathTracer 拒绝启动: " + (ptErr && ptErr.message ? ptErr.message : ptErr));
+                return false;
+            }
+        };
+        window._solidMaybeStartBackgroundPerf = function () {
+            if (window.__solidPerfKickStarted) return;
+            if (!window.__solidInitRenderReady) return;
+            if (!window.__solidPerfWantBackground) return;
+            try {
+                const modal = document.getElementById('scene-grid-modal');
+                const open = modal && (modal.style.display === 'flex' || (typeof getComputedStyle === 'function' && getComputedStyle(modal).display === 'flex'));
+                if (!open) return;
+            } catch (_eModal) { return; }
+            window.__solidPerfKickStarted = true;
+            window.__solidPerfWantBackground = false;
+            if (!window._solidEnsurePathTracerForPerf()) {
+                try { _solidPerfTestSoftFail(); } catch (_eSf) {}
+                return;
+            }
+            window.__solidPerfBgActive = true;
+            window.isTestingPerformance = true;
+            _solidShowPerfBgTip();
+            startSolidPerfHardwareProgress(isMobile);
+            window.PerfTester.onProgress = function (ph) { applySolidPerfHardwarePhase(ph); };
+            window.PerfTester.start(scene, camera, pathTracer, isMobile, function () { _solidPerfTestPassActions(); }, function () { _solidPerfTestSoftFail(); });
+        };
+        window.__solidInitRenderReady = true;
         // Host-specific (consumer): 首次进入性能测试与软降级策略保留在消费端，不抽到共享模块。
         if (window._solidHardwareUnsupported) {
-            resetSolidPerfHardwareProgress();
-            const ptOverlay = document.getElementById('perf-test-overlay'); if (ptOverlay) ptOverlay.style.display = 'none';
+            resetSolidPerfHardwareProgress(); _solidHidePerfBgTip();
             window.perfTestDone = true; window.isTestingPerformance = false;
-            triggerUnsupported('init_static_gpu_unsupported'); window.loadJSONData(); animate();
+            triggerUnsupported('init_static_gpu_unsupported'); animate();
         } else if (skipPerfTest || _perfCacheHit) {
             if (skipPerfTest) window.hwLog("[Init] 通过URL参数跳过性能测试");
             _solidPerfTestPassActions(); animate();
         } else {
-            document.getElementById('perf-test-overlay').style.display = 'flex';
-            window.PerfTester.start(scene, camera, pathTracer, isMobile, () => { _solidPerfTestPassActions(); }, () => { _solidPerfTestSoftFail(); } ); animate();
+            window.__solidPerfWantBackground = true;
+            window.isTestingPerformance = true;
+            _solidShowPerfBgTip();
+            try { window._solidMaybeStartBackgroundPerf(); } catch (_eKick2) {}
+            animate();
         } } catch (e) { window.hwLog("[Init] 渲染/后续初始化异常: " + e.message); triggerUnsupported('init_post_path_tracer', e.message); } }); }
         document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {

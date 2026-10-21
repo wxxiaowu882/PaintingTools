@@ -74,11 +74,12 @@
     .preview-hotspot.show-text .HotspotAnnotation, .ink-mid.show-text .HotspotAnnotation { pointer-events: auto !important; cursor: text; }
     .HotspotAnnotation[contenteditable="true"] { outline:1px solid #0df; background:rgba(0,0,0,0.55); padding:1px 4px; border-radius:3px; cursor:text; min-width:2em; }
     #debug-log-panel { display: none !important; }
-    /* 手机端屏幕取景参考框：淡灰描边，不挡操作 */
+    /* 手机端取景视口：开框时 MV+ink 缩进框内（信箱），框外无投影区 */
     #anno-mobile-frame-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
     #anno-mobile-frame-overlay[hidden] { display: none !important; }
-    #anno-mobile-frame-wrap { position: fixed; box-sizing: border-box; border: 1.5px solid rgba(190, 195, 205, 0.7); border-radius: 0; /* 半透明遮罩：框外模型仍可见 */ box-shadow: 0 0 0 9999px rgba(5,6,10,0.28); pointer-events: none; }
+    #anno-mobile-frame-wrap { position: fixed; box-sizing: border-box; border: 1.5px solid rgba(190, 195, 205, 0.7); border-radius: 0; box-shadow: 0 0 0 9999px rgba(5,6,10,0.45); pointer-events: none; }
     #anno-mobile-frame-label { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; color: rgba(180,185,195,0.8); letter-spacing: 0.5px; white-space: nowrap; font-family: sans-serif; }
+    body.anno-mobile-frame-on { background: #05060a; }
     .log-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #555; padding-bottom: 5px; } 
     /* 【阶段 2 优化】: Glb管理器 模态弹窗样式 */
     #glb-manager-modal { display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); z-index:99999; justify-content:center; align-items:center; opacity:0; transition:opacity 0.3s; }
@@ -332,8 +333,8 @@
       </div>
     </div>
     <!-- 课程封面截取框（参考 SolidCreate）：默认隐藏 -->
-    <div id="anno-crop-box" style="display:none; position:fixed; border:2px dashed #2ecc71; width:384px; height:216px; top:calc(50% - 108px); left:calc(50% - 192px); z-index:8; pointer-events:none; outline:9999px solid rgba(0,0,0,0.55); box-sizing:border-box;">
-      <div id="anno-crop-drag" style="position:absolute; top:0; left:0; width:100%; height:24px; background:rgba(46,204,113,0.85); pointer-events:auto; cursor:move; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold; user-select:none;">拖拽移动 · 封面 16:9</div>
+    <div id="anno-crop-box" style="display:none; position:fixed; border:2px dashed #2ecc71; width:216px; height:288px; top:calc(50% - 144px); left:calc(50% - 108px); z-index:8; pointer-events:none; outline:9999px solid rgba(0,0,0,0.55); box-sizing:border-box;">
+      <div id="anno-crop-drag" style="position:absolute; top:0; left:0; width:100%; height:24px; background:rgba(46,204,113,0.85); pointer-events:auto; cursor:move; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold; user-select:none;">拖拽移动 · 封面竖向 3:4</div>
       <div id="anno-crop-resize" style="position:absolute; right:-7px; bottom:-7px; width:14px; height:14px; background:#fff; border:2px solid #2ecc71; border-radius:50%; pointer-events:auto; cursor:nwse-resize; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>
     </div>
     <div id="snapshot-panel">
@@ -356,7 +357,7 @@
         <div id="snapshot-section" style="flex: 1;">
             <div class="panel-title" style="flex-shrink: 0;"><span>组合快照 (视角+光照+显隐)</span><span style="font-size:14px;color:#ccc;font-weight:normal;">拖行排序</span></div>
             <div id="anno-cover-bar" style="display:flex; align-items:center; gap:8px; flex-shrink:0; margin-bottom:6px; padding:6px; background:rgba(0,0,0,0.35); border:1px solid #333; border-radius:4px;">
-                <img id="anno-cover-preview" alt="封面" title="课程封面预览（16:9）" src="" style="width:80px; height:45px; object-fit:cover; border-radius:3px; border:1px solid #555; background:#111; flex-shrink:0;">
+                <img id="anno-cover-preview" alt="封面" title="课程封面预览（竖向 3:4）" src="" style="width:45px; height:60px; object-fit:cover; border-radius:3px; border:1px solid #555; background:#111; flex-shrink:0;">
                 <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:4px;">
                     <div style="font-size:14px; color:#eee;">课程封面 <span id="anno-cover-status" style="color:#ccc;">（未截取，导出时回退首张快照）</span></div>
                     <div style="display:flex; gap:4px; flex-wrap:wrap;">
@@ -369,7 +370,7 @@
             <div style="display: flex; gap: 6px; flex-shrink: 0; margin-bottom: 5px;">
                 <input type="text" id="snap-name" placeholder="输入快照描述..." style="flex:1; background:#111; border:1px solid #666; color:#fff; border-radius:3px; padding:6px 8px; font-size:14px;">
                 <button class="action-btn" id="add-snap-btn" style="flex:none; width:60px; padding:4px; border-color:#088; background:#044; color:#0ff;">+ 捕获</button>
-                <button class="action-btn" id="overwrite-snap-btn" type="button" disabled style="flex:none; width:52px; padding:4px; border-color:#864; background:#332200; color:#fc6;" title="覆盖当前选中快照的视图数据，保留名称与详细知识">复写</button>
+                <button class="action-btn" id="overwrite-snap-btn" type="button" disabled style="flex:none; width:52px; padding:4px; border-color:#864; background:#332200; color:#fc6;" title="覆盖当前选中快照的视图，并立刻覆写到已挂载的当前档案（等同右下角「覆写当前档案」）">复写</button>
             </div> 
             <div id="snap-list" style="flex: 1; overflow-y: auto; padding-right: 4px;"><div style="padding: 10px; text-align: center; color: #ccc; font-size: 14px;">暂无保存的快照</div></div>
         </div>
@@ -425,9 +426,9 @@
     <input type="range" id="anno-persp-slider" min="5" max="60" step="1" value="34" style="flex:1; margin-left:15px; cursor:pointer;" aria-label="透视强弱">
     <span id="anno-persp-val" style="width: 32px; text-align: right; color: #888; font-family: monospace; flex-shrink:0;">34</span>
     </div>
-    <div class="ctrl-row" title="叠加 390×844 手机比例淡灰框（半透明，框外模型仍可见），便于兼顾手机端构图。"><span>手机取景框：</span>
+    <div class="ctrl-row" title="开启后将 3D 视口缩为 Portrait_c 手机「底栏展开看解析」时的有效区（宽÷(高−顶栏−约35%底栏)），框内所见即手机构图。"><span>手机取景框：</span>
     <label style="display:flex;align-items:center;gap:6px;margin-left:15px;cursor:pointer;color:#eee;font-size:14px;">
-      <input type="checkbox" id="anno-mobile-frame-toggle" style="accent-color:#88a; cursor:pointer;">显示淡灰参考框
+      <input type="checkbox" id="anno-mobile-frame-toggle" style="accent-color:#88a; cursor:pointer;">启用手机取景视口
     </label>
     </div>
     <div class="ctrl-row"><span>经典光影预设：</span> <select id="preset-light" style="flex:1; margin-left:15px; background:#111; color:#fff; border:1px solid #666; padding:4px 6px; font-size:14px; outline:none; cursor:pointer;"> <option value="">-- 选择光影 --</option>
@@ -636,6 +637,11 @@
         } catch (_eFov) {
             viewer.setAttribute('field-of-view', clamped + 'deg');
         }
+        if (window.__annoMobileFrame && window.__annoMobileFrame.isOn()) {
+            window.__annoMobileFrame.applyFovLock(clamped, { deferCorrect: true });
+        } else if (window.__annoMobileFrame) {
+            window.__annoMobileFrame.noteAuthoredFov(clamped);
+        }
         try { if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal(); } catch (_eJump) {}
         _baseCamRadius = null;
         annoSyncPerspectiveSlider();
@@ -826,7 +832,9 @@
     function performUpdateSVG(activePts = null) {
     _isSvgUpdating = true;
     const svg = document.querySelector('#ink-overlay'); if (!svg) { _isSvgUpdating = false; return; }
-    svg.setAttribute('viewBox', `0 0 ${svg.clientWidth} ${svg.clientHeight}`); let html = ''; // 实时计算摄像机视线向量 (用于完美背面剔除)
+    /* 信箱缩视口后 left/top≠0：viewBox 须用叠层屏幕矩形，才能与 hotspot getBoundingClientRect 对齐（对齐 Portrait_c） */
+    const ov = svg.getBoundingClientRect();
+    svg.setAttribute('viewBox', `${ov.left} ${ov.top} ${ov.width} ${ov.height}`); let html = ''; // 实时计算摄像机视线向量 (用于完美背面剔除)
     let camVec = {x:0, y:0, z:1}; if (viewer.getCameraOrbit) { const o = viewer.getCameraOrbit(); camVec.x = Math.sin(o.phi) * Math.sin(o.theta); camVec.y = Math.cos(o.phi); camVec.z = Math.sin(o.phi) * Math.cos(o.theta); }
     const isBackFace = (normStr) => { if (!normStr) return false; const [nx, ny, nz] = normStr.replace(/m/g, '').split(' ').map(Number); return (nx * camVec.x + ny * camVec.y + nz * camVec.z) < -0.05; };
     // --- 读写分离管线 (终极完全解耦) ---
@@ -858,11 +866,13 @@
     const initSlider = (selector, defaultVal, updateFn) => { const el = document.querySelector(selector); if(el) { const disp = el.nextElementSibling; const triggerUpdate = (v) => { if(disp && disp.classList.contains('val-disp')) disp.innerText = v; updateFn(v); }; el.value = defaultVal; triggerUpdate(defaultVal); el.addEventListener('input', (e) => triggerUpdate(e.target.value)); } return el; };
     initSlider('#global-color-picker', defaultColor, v => { defaultColor=v; localStorage.setItem('picker_default_color', v); updateSVG(); });
     installAnnoPerspectiveUI();
-    // 手机取景框：仅叠加 390×844 比例淡灰框（半透明遮罩），不裁切 3D 视口，框外模型仍可见。
+    // 手机取景框：开框时信箱缩视口 + 与 Portrait_c 同口径 FOV 锁；关框恢复全屏与作者 FOV。
     (function initAnnoMobileFrame() {
         const STORAGE_KEY = 'picker_mobile_frame';
-        /* 与 Portrait_c 手机快照画幅同宽高比；只画光学参考框，不缩视口，框外模型仍可见 */
-        const BASE_W = 440, BASE_H = 956, MOBILE_CHROME = 60 + 55;
+        /* 对齐 Portrait_c 手机「底栏展开」有效 3D 区：top=60，高=H−60−max(面板,0.35H) */
+        const BASE_W = 440, BASE_H = 956, MOBILE_TOP = 60, DRAWER_FRAC = 0.35;
+        const FRAME_H = Math.max(220, BASE_H - MOBILE_TOP - Math.round(BASE_H * DRAWER_FRAC));
+        const FRAME_ASPECT = BASE_W / FRAME_H;
         const ov = document.getElementById('anno-mobile-frame-overlay');
         const wrap = document.getElementById('anno-mobile-frame-wrap');
         const cb = document.getElementById('anno-mobile-frame-toggle');
@@ -870,33 +880,113 @@
         const mv = document.getElementById('workbench-viewer');
         const ink = document.getElementById('ink-overlay');
         if (!ov || !wrap || !cb) return;
-        if (label) label.textContent = '手机快照取景参考';
+        if (label) label.textContent = '手机取景（底栏展开）';
 
-        // 清掉信箱残留
-        if (mv && ink) {
-            [mv, ink].forEach((el) => {
-                el.style.top = ''; el.style.left = ''; el.style.width = '';
-                el.style.height = ''; el.style.right = ''; el.style.bottom = '';
-                el.style.position = '';
-            });
+        let authoredFovWant = null;
+        let fovLockTimer = null;
+
+        function parseFovDeg(s) {
+            if (s == null) return NaN;
+            if (typeof s === 'number') return s;
+            const m = String(s).trim().match(/^([-\d.]+)\s*(deg|rad)?$/i);
+            if (!m) return NaN;
+            const v = parseFloat(m[1]);
+            if (!Number.isFinite(v)) return NaN;
+            return (m[2] && m[2].toLowerCase() === 'rad') ? (v * 180 / Math.PI) : v;
         }
-        document.body.classList.remove('anno-mobile-frame-on');
+        function readCurrentWantFov() {
+            if (authoredFovWant != null && Number.isFinite(authoredFovWant)) return authoredFovWant;
+            const a = mv.getAttribute('field-of-view');
+            if (a && a !== 'auto') {
+                const d = parseFovDeg(a);
+                if (Number.isFinite(d) && d > 0) return d;
+            }
+            try { if (mv.getFieldOfView) return mv.getFieldOfView(); } catch (_e) {}
+            return NaN;
+        }
+        /** 窄画幅下 MV 会按 idealAspect 放大垂直 FOV；写入更小 attr 使 getFieldOfView≈作者值（对齐 Portrait_c） */
+        function goalFovForWanted(wantDeg) {
+            const want = Number(wantDeg);
+            if (!Number.isFinite(want) || want <= 0) return want;
+            const aspect = mv.clientWidth / Math.max(1, mv.clientHeight);
+            let ideal = aspect;
+            try { if (typeof mv.getIdealAspect === 'function') ideal = mv.getIdealAspect() || aspect; } catch (_e) {}
+            if (!(ideal > aspect + 1e-4)) return want;
+            const halfWant = want * Math.PI / 360;
+            const halfGoal = Math.atan(Math.tan(halfWant) * aspect / ideal);
+            return Math.max(5.05, Math.min(60, halfGoal * 360 / Math.PI));
+        }
+        function applyFovLock(wantDeg, opts) {
+            if (!document.body.classList.contains('anno-mobile-frame-on') || !mv) return;
+            const want = parseFovDeg(wantDeg);
+            if (!Number.isFinite(want) || want <= 0) return;
+            authoredFovWant = want;
+            const goal = goalFovForWanted(want);
+            const nextStr = goal + 'deg';
+            if ((mv.getAttribute('field-of-view') || '') !== nextStr) {
+                mv.setAttribute('min-field-of-view', '5deg');
+                mv.setAttribute('max-field-of-view', '60deg');
+                mv.setAttribute('field-of-view', nextStr);
+            }
+            if (opts && opts.deferCorrect) {
+                clearTimeout(fovLockTimer);
+                fovLockTimer = setTimeout(() => {
+                    if (!document.body.classList.contains('anno-mobile-frame-on') || authoredFovWant == null) return;
+                    let got = authoredFovWant;
+                    try { got = mv.getFieldOfView(); } catch (_e2) {}
+                    if (Math.abs(got - authoredFovWant) <= 0.35) return;
+                    /* 与 Portrait_c 一致：重算 goal，避免乘算过冲 */
+                    const again = goalFovForWanted(authoredFovWant);
+                    mv.setAttribute('field-of-view', again + 'deg');
+                }, 650);
+            }
+        }
+        function restoreAuthoredFovAttr() {
+            clearTimeout(fovLockTimer);
+            if (authoredFovWant != null && mv) {
+                mv.setAttribute('field-of-view', authoredFovWant + 'deg');
+            }
+        }
 
-        /** 光学裁切框：画布仍全屏，框内=手机快照区；框外半透明可见 */
+        function clearLetterbox() {
+            restoreAuthoredFovAttr();
+            if (mv && ink) {
+                [mv, ink].forEach((el) => {
+                    el.style.top = ''; el.style.left = ''; el.style.width = '';
+                    el.style.height = ''; el.style.right = ''; el.style.bottom = '';
+                    el.style.position = '';
+                });
+            }
+            document.body.classList.remove('anno-mobile-frame-on');
+        }
+
+        /** 按窗口最大内接矩形缩 MV+ink+描边框；必须用 window 尺寸，避免观察自身矩形时反馈收缩 */
         function layout() {
-            if (!mv) return;
-            const vr = mv.getBoundingClientRect();
-            if (vr.width < 32 || vr.height < 32) return;
-            const Am = BASE_W / Math.max(1, BASE_H - MOBILE_CHROME);
-            let h = vr.height;
+            if (!mv || !ink) return;
+            const availW = window.innerWidth;
+            const availH = window.innerHeight;
+            if (availW < 32 || availH < 32) return;
+            const Am = FRAME_ASPECT;
+            let h = availH;
             let w = h * Am;
-            if (w > vr.width) { w = vr.width; h = w / Am; }
-            const left = vr.left + (vr.width - w) / 2;
-            const top = vr.top + (vr.height - h) / 2;
-            wrap.style.left = Math.round(left) + 'px';
-            wrap.style.top = Math.round(top) + 'px';
-            wrap.style.width = Math.round(w) + 'px';
-            wrap.style.height = Math.round(h) + 'px';
+            if (w > availW) { w = availW; h = w / Am; }
+            const left = (availW - w) / 2;
+            const top = (availH - h) / 2;
+            const L = Math.round(left) + 'px';
+            const T = Math.round(top) + 'px';
+            const W = Math.round(w) + 'px';
+            const H = Math.round(h) + 'px';
+            [mv, ink].forEach((el) => {
+                el.style.position = 'fixed';
+                el.style.left = L; el.style.top = T;
+                el.style.width = W; el.style.height = H;
+                el.style.right = 'auto'; el.style.bottom = 'auto';
+            });
+            wrap.style.left = L; wrap.style.top = T;
+            wrap.style.width = W; wrap.style.height = H;
+            document.body.classList.add('anno-mobile-frame-on');
+            const want = readCurrentWantFov();
+            if (Number.isFinite(want) && want > 0) applyFovLock(want, { deferCorrect: true });
         }
 
         function setEnabled(on) {
@@ -904,8 +994,20 @@
             cb.checked = !!on;
             try { localStorage.setItem(STORAGE_KEY, on ? '1' : '0'); } catch (_e) {}
             if (on) layout();
+            else clearLetterbox();
         }
 
+        window.__annoMobileFrame = {
+            isOn: () => document.body.classList.contains('anno-mobile-frame-on'),
+            applyFovLock,
+            getAuthoredFov: () => authoredFovWant,
+            noteAuthoredFov: (d) => {
+                const n = parseFovDeg(d);
+                if (Number.isFinite(n) && n > 0) authoredFovWant = n;
+            }
+        };
+
+        clearLetterbox();
         let enabled = true;
         try {
             const v = localStorage.getItem(STORAGE_KEY);
@@ -914,10 +1016,6 @@
         setEnabled(enabled);
         cb.addEventListener('change', () => setEnabled(cb.checked));
         window.addEventListener('resize', () => { if (!ov.hidden) layout(); });
-        if (window.ResizeObserver && mv) {
-            const ro = new ResizeObserver(() => { if (!ov.hidden) layout(); });
-            ro.observe(mv);
-        }
     })();
     viewer.addEventListener('load', () => { setTimeout(() => annoSyncPerspectiveSlider(), 100); });
     document.querySelector('#preset-cam').addEventListener('change', (e) => { if(!e.target.value) return; _baseCamRadius = null;
@@ -1249,6 +1347,13 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
     window.addEventListener('pointercancel', () => { endPointMoveSession(); }, { capture: true });
     viewer.addEventListener('camera-change', () => { requestAnimationFrame(() => { requestAnimationFrame(() => { updateSVG(); }); }); if (isUserDragging && !pointMoveSession && viewer.getCameraOrbit) { const currentTheta = viewer.getCameraOrbit().theta; const delta = currentTheta - lastCameraTheta;
     lastCameraTheta = currentTheta; if (!isDraggingOnModel) { envRotOffset += delta; viewer.setAttribute('environment-rotation', `0rad ${envRotOffset}rad 0rad`); } } });
+    // 滚轮缩放会改 live FOV；同步 authored，避免取景框 FOV 锁用旧值把放大冲掉
+    viewer.addEventListener('wheel', () => {
+        requestAnimationFrame(() => {
+            annoSyncAuthoredFovFromLive();
+            annoSyncPerspectiveSlider();
+        });
+    }, { passive: true });
     window.addEventListener('resize', () => updateSVG());
     new MutationObserver(() => { if(!_isSvgUpdating) updateSVG(); }).observe(viewer, { attributes: true, subtree: true, childList: true, attributeFilter: ['visible', 'style'] });
     if (window.ResizeObserver) new ResizeObserver(() => updateSVG()).observe(viewer); function generateCode() {
@@ -1358,9 +1463,10 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
             }
         }
     }
-    const ANNO_COVER_AR = 16 / 9;
+    /* 竖向封面：宽:高 = 3:4（即高宽比 4:3） */
+    const ANNO_COVER_AR = 3 / 4;
     function annoGetCropCaptureRect(cropBoxEl, vw, vh) {
-        const fbW = 384, fbH = Math.round(fbW / ANNO_COVER_AR);
+        const fbW = 216, fbH = Math.round(fbW / ANNO_COVER_AR);
         if (!cropBoxEl || cropBoxEl.style.display === 'none') {
             return { left: Math.max(0, Math.floor((vw - fbW) / 2)), top: Math.max(0, Math.floor((vh - fbH) / 2)), width: fbW, height: fbH };
         }
@@ -1369,7 +1475,7 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
         const bl = parseFloat(cs.borderLeftWidth) || 0, bt = parseFloat(cs.borderTopWidth) || 0;
         let w = Math.max(1, cropBoxEl.clientWidth), h = Math.max(1, cropBoxEl.clientHeight);
         let left = outer.left + bl, top = outer.top + bt;
-        /* 强制按 16:9 取内缘居中区域，避免旧方框缓存导致比例跑偏 */
+        /* 强制按 3:4 取内缘居中区域，避免旧横框缓存导致比例跑偏 */
         const targetH = w / ANNO_COVER_AR;
         if (Math.abs(h - targetH) > 1) {
             if (h > targetH) { top += (h - targetH) * 0.5; h = targetH; }
@@ -1389,7 +1495,7 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
         dstCtx.drawImage(src, sx0, sy0, sw0, sh0, 0, 0, outW, outH);
     }
     async function captureCoverFromCrop() {
-        const OUT_W = 640, OUT_H = Math.round(OUT_W / ANNO_COVER_AR);
+        const OUT_W = 480, OUT_H = Math.round(OUT_W / ANNO_COVER_AR);
         const cropBox = document.getElementById('anno-crop-box');
         const prevVis = cropBox ? cropBox.style.visibility : '';
         if (cropBox) cropBox.style.visibility = 'hidden';
@@ -1440,10 +1546,29 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
     }
 
     function updateOverwriteSnapBtn() { const b = document.querySelector('#overwrite-snap-btn'); if (!b) return; b.disabled = selectedSnapId == null || !snapshotsData.some(s => s.id === selectedSnapId); }
+    /** 滚轮会同时改 orbit.radius 与 FOV；快照必须以 live 读数为准，并回写 authored，避免手机取景 FOV 锁把放大冲掉 */
+    function annoSyncAuthoredFovFromLive() {
+        let live = NaN;
+        try { if (viewer.getFieldOfView) live = viewer.getFieldOfView(); } catch (_e) {}
+        if (!Number.isFinite(live) || live <= 0) return null;
+        const clamped = annoClampFov(live);
+        if (window.__annoMobileFrame && typeof window.__annoMobileFrame.noteAuthoredFov === 'function') {
+            window.__annoMobileFrame.noteAuthoredFov(clamped);
+        }
+        return clamped;
+    }
     function captureSnapshotFields() {
     const oStr = viewer.getCameraOrbit ? viewer.getCameraOrbit().toString() : (viewer.getAttribute('camera-orbit') || 'auto auto auto');
     const tStr = viewer.getCameraTarget ? viewer.getCameraTarget().toString() : (viewer.getAttribute('camera-target') || 'auto auto auto');
-    const fStr = (function(){ const a=viewer.getAttribute('field-of-view'); if(a&&a!=='auto') return a; if(viewer.fieldOfView&&viewer.fieldOfView!=='auto') return viewer.fieldOfView; return viewer.getFieldOfView ? viewer.getFieldOfView()+'deg' : 'auto'; })(); const cam = { orbit: oStr, target: tStr, fov: fStr };
+    const fStr = (function(){
+        const synced = annoSyncAuthoredFovFromLive();
+        if (synced != null) return synced + 'deg';
+        const mf = window.__annoMobileFrame;
+        if (mf && typeof mf.getAuthoredFov === 'function' && mf.getAuthoredFov() != null) return mf.getAuthoredFov() + 'deg';
+        const a = viewer.getAttribute('field-of-view'); if (a && a !== 'auto') return a;
+        if (viewer.fieldOfView && viewer.fieldOfView !== 'auto') return viewer.fieldOfView;
+        return 'auto';
+    })(); const cam = { orbit: oStr, target: tStr, fov: fStr };
     const set = { modelOpacity: globalModelOpacity, surfaceGloss: defaultSurfaceGloss, ambient: defaultAmbient, ambientTemp: defaultAmbientTemp, ambientX: defaultAmbientX, ambientY: defaultAmbientY, spot: defaultSpot, spotTemp: defaultSpotTemp, spotX: defaultSpotX, spotY: defaultSpotY, shadowIntensity: defaultShadow, envRotOffset: envRotOffset, posterize: defaultPosterize, grayscale: defaultGrayscale };
     const vis = pointsData.filter(p => !p.hidden).map(p => p.id);
     const showTextIds = []; pointsData.forEach(p => { const slotQuery = (p.type === 'line' || p.type === 'spline' || p.type === 'contour' || p.type === 'bezier') && p.dots ? p.dots[p.midIndex || Math.floor(p.dots.length / 2)].slot : p.slot; const el = viewer.querySelector(`[slot="${slotQuery}"]`); if (el && el.classList.contains('show-text')) showTextIds.push(p.id); });
@@ -1466,7 +1591,13 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
     return thumb; }
     function applySnapshotFromData(s) {
     if (!s) return; _baseCamRadius = null; if (s.camera) { viewer.setAttribute('camera-target', s.camera.target);
-    viewer.setAttribute('camera-orbit', s.camera.orbit); viewer.setAttribute('field-of-view', s.camera.fov); }
+    viewer.setAttribute('camera-orbit', s.camera.orbit); viewer.setAttribute('field-of-view', s.camera.fov);
+    // 先落到目标 orbit/fov（含滚轮放大后的 radius+FOV），再交给手机取景 FOV 锁做窄画幅校正
+    try { if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal(); } catch (_eJump) {}
+    if (window.__annoMobileFrame) {
+        window.__annoMobileFrame.noteAuthoredFov(s.camera.fov);
+        if (window.__annoMobileFrame.isOn()) window.__annoMobileFrame.applyFovLock(s.camera.fov, { deferCorrect: true });
+    } }
     if (s.settings) { if (s.settings.ambient !== undefined) { setRangeVal('#global-ambient', defaultAmbient = s.settings.ambient); }
     if (s.settings.ambientTemp !== undefined) { setRangeVal('#global-ambient-temp', defaultAmbientTemp = s.settings.ambientTemp); }
     if (s.settings.ambientX !== undefined) { setRangeVal('#global-ambient-x', defaultAmbientX = s.settings.ambientX); }
@@ -1616,7 +1747,13 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
     s.camera = cam; s.settings = set; s.visiblePoints = vis; s.showTextPoints = showTextIds; s.thumb = thumb;
     // 当前已是目标视角：勿再 applySnapshotFromData（回写 orbit/fov 会触发插值，表现为突然缩小）
     generateCode(); renderSnapshots();
-    flashToast(`已复写「${s.name}」`);
+    // 挂载档案时顺带落盘，免再点右下角「覆写当前档案」
+    if (typeof window.saveOverwriteCurrentArchive === 'function' && window.currentFileHandle) {
+        const ok = await window.saveOverwriteCurrentArchive({ toast: false });
+        flashToast(ok ? `已复写并保存「${s.name}」` : `已复写「${s.name}」（落盘失败）`, !ok);
+    } else {
+        flashToast(`已复写「${s.name}」` + (window.currentFileHandle ? '' : '（未挂载档案，仅内存）'));
+    }
     } catch (err) { flashToast('复写失败', true); }
     });
     let _annoLabelEditing = false;
@@ -1875,10 +2012,10 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
         window.addEventListener('pointermove', e => {
             if (cDrag) { cropBox.style.left = (stL + e.clientX - stX) + 'px'; cropBox.style.top = (stT + e.clientY - stY) + 'px'; }
             if (cRes) {
-                const AR = 16 / 9;
-                let w = Math.max(160, stW + e.clientX - stX);
-                /* 也参考纵向拖动，取更能拉开的一边，再锁 16:9 */
-                const wFromH = Math.max(160, (stH + e.clientY - stY) * AR);
+                const AR = 3 / 4; /* 宽:高，竖向封面 */
+                let w = Math.max(120, stW + e.clientX - stX);
+                /* 也参考纵向拖动，取更能拉开的一边，再锁 3:4 */
+                const wFromH = Math.max(120, (stH + e.clientY - stY) * AR);
                 w = Math.max(w, wFromH);
                 const h = Math.round(w / AR);
                 cropBox.style.width = w + 'px'; cropBox.style.height = h + 'px';
@@ -1900,15 +2037,15 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
             if (cached) {
                 const c = JSON.parse(cached);
                 const cw = parseFloat(c.width), ch = parseFloat(c.height);
-                const arOk = cw > 0 && ch > 0 && Math.abs((cw / ch) - (16 / 9)) < 0.08;
+                const arOk = cw > 0 && ch > 0 && Math.abs((cw / ch) - (3 / 4)) < 0.08;
                 if (c.left) cropBox.style.left = c.left;
                 if (c.top) cropBox.style.top = c.top;
                 if (arOk) {
                     cropBox.style.width = c.width;
                     cropBox.style.height = c.height;
                 } else {
-                    cropBox.style.width = '384px';
-                    cropBox.style.height = '216px';
+                    cropBox.style.width = '216px';
+                    cropBox.style.height = '288px';
                 }
             }
         } catch (_e2) {}
@@ -2270,50 +2407,56 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
     // Ctrl+F5 / 普通刷新：恢复左侧列表 + 自动打开上次场景
     setTimeout(() => { restoreWorkspaceSession(); }, 280);
 
-    // --- 3. 拦截原有导出逻辑，实现“秒存覆写” ---
+    // --- 3. 秒存覆写（右下角按钮与左侧「复写」共用） ---
+    window.saveOverwriteCurrentArchive = async function(opts) {
+        const quiet = !!(opts && opts.toast === false);
+        if (!window.currentFileHandle) {
+            if (!quiet) flashToast('未挂载档案，无法覆写到磁盘', true);
+            return false;
+        }
+        try {
+            const codeStr = typeof generateCode === 'function' ? generateCode() : '';
+            if (!codeStr) { if (!quiet) flashToast('没有可保存的数据', true); return false; }
+            const fileName = window.currentFileHandle.name || 'archive.json';
+            try { localStorage.setItem('picker_last_file_name', fileName); } catch (_lf) {}
+            const savePack = { ts: Date.now(), fileName: fileName, code: codeStr };
+            try {
+                sessionStorage.setItem('picker_after_overwrite', JSON.stringify(savePack));
+            } catch (_ss) {
+                try {
+                    const slim = JSON.parse(codeStr);
+                    if (slim) { if (slim.mainThumbnail) slim.mainThumbnail = ''; if (slim.snapshots) slim.snapshots.forEach(s => { if (s) s.thumb = ''; }); }
+                    sessionStorage.setItem('picker_after_overwrite', JSON.stringify({
+                        ts: savePack.ts, fileName: fileName, code: JSON.stringify(slim)
+                    }));
+                } catch (_ss2) {}
+            }
+            armAnnoReloadBlock(15000);
+            const writable = await window.currentFileHandle.createWritable();
+            await writable.write(codeStr);
+            await writable.close();
+            if (!quiet) flashToast('已覆写 ' + fileName);
+            setTimeout(() => {
+                try {
+                    const raw = sessionStorage.getItem('picker_after_overwrite');
+                    if (!raw) return;
+                    const p = JSON.parse(raw);
+                    if (p && p.ts === savePack.ts) sessionStorage.removeItem('picker_after_overwrite');
+                } catch (_ss3) {}
+            }, 12000);
+            return true;
+        } catch (err) {
+            console.error(err);
+            if (!quiet) flashToast('覆写失败，请检查权限', true);
+            return false;
+        }
+    };
     if (exportBtn) {
         exportBtn.addEventListener('click', async (e) => {
             if (window.currentFileHandle) {
-                e.preventDefault(); 
-                e.stopImmediatePropagation(); 
-                try {
-                    const codeStr = typeof generateCode === 'function' ? generateCode() : '';
-                    if (!codeStr) { flashToast('没有可保存的数据', true); return; }
-                    const fileName = window.currentFileHandle.name || 'archive.json';
-                    try { localStorage.setItem('picker_last_file_name', fileName); } catch (_lf) {}
-                    const savePack = { ts: Date.now(), fileName: fileName, code: codeStr };
-                    try {
-                        sessionStorage.setItem('picker_after_overwrite', JSON.stringify(savePack));
-                    } catch (_ss) {
-                        try {
-                            // fallback without huge thumbs if quota exceeded
-                            const slim = JSON.parse(codeStr);
-                            if (slim) { if (slim.mainThumbnail) slim.mainThumbnail = ''; if (slim.snapshots) slim.snapshots.forEach(s => { if (s) s.thumb = ''; }); }
-                            sessionStorage.setItem('picker_after_overwrite', JSON.stringify({
-                                ts: savePack.ts, fileName: fileName, code: JSON.stringify(slim)
-                            }));
-                        } catch (_ss2) {}
-                    }
-                    // Arm BEFORE createWritable (file truncate triggers watchers immediately)
-                    armAnnoReloadBlock(15000);
-                    
-                    const writable = await window.currentFileHandle.createWritable();
-                    await writable.write(codeStr);
-                    await writable.close();
-                    // 不要立刻清 sessionStorage：Live Server 常在写入后几百毫秒才 reload
-                    flashToast('已覆写 ' + fileName);
-                    setTimeout(() => {
-                        try {
-                            const raw = sessionStorage.getItem('picker_after_overwrite');
-                            if (!raw) return;
-                            const p = JSON.parse(raw);
-                            if (p && p.ts === savePack.ts) sessionStorage.removeItem('picker_after_overwrite');
-                        } catch (_ss3) {}
-                    }, 12000);
-                } catch (err) {
-                    console.error(err);
-                    flashToast('覆写失败，请检查权限', true);
-                }
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                await window.saveOverwriteCurrentArchive();
             }
         }, true);
     }
