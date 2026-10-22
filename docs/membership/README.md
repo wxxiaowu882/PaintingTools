@@ -39,6 +39,6 @@
 
 密钥：Cloudflare Pages Secret `MEMBERSHIP_SECRET`（≥16 字符）  
 探针码：仅 `ALLOW_PROBE_CODES=1` 时可用  
-生成正式码：`自用工具文件_不部署/membership/gen-redeem-code.mjs`
+生成正式码：`node docs/membership/gen-redeem-code.mjs`（需与线上同一 `MEMBERSHIP_SECRET`）
 
 **生产环境**客户端不会在兑码失败时本地伪造会员；课表也不会回退到未过滤的公开全文。

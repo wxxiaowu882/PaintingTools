@@ -4,9 +4,9 @@
  *
  * 用法：
  *   set MEMBERSHIP_SECRET=你的密钥
- *   node 自用工具文件_不部署/membership/gen-redeem-code.mjs --tier member_3m
- *   node ... --tier member_1y --count 5
- *   node ... --tier member_forever --code-days 60
+ *   node docs/membership/gen-redeem-code.mjs --tier member_3m
+ *   node docs/membership/gen-redeem-code.mjs --tier member_1y --count 5
+ *   node docs/membership/gen-redeem-code.mjs --tier member_forever --code-days 60
  *
  * 档位：member_3m (90天会员) / member_1y (365) / member_forever (永久)
  * --code-days：兑换码本身多久内可兑（默认 30）
