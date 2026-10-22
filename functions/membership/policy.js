@@ -40,12 +40,81 @@ async function fetchAssetJson(context, assetPath) {
   return res.json();
 }
 
+const TIERS_ASSET = '/docs/membership/tiers.json';
+const KV_POLICY = 'policy_live';
+const KV_TIERS = 'tiers_live';
+
 export async function loadPolicy(context) {
+  let base = { version: 0, defaultRequire: 'free', resources: {} };
   try {
-    return await fetchAssetJson(context, POLICY_ASSET);
-  } catch (_e) {
-    return { version: 0, defaultRequire: 'free', resources: {} };
-  }
+    base = await fetchAssetJson(context, POLICY_ASSET);
+  } catch (_e) {}
+  try {
+    const kv = context.env && context.env.MEMBERSHIP_KV;
+    if (kv) {
+      const raw = await kv.get(KV_POLICY);
+      if (raw) {
+        const live = JSON.parse(raw);
+        if (live && typeof live === 'object') {
+          return {
+            ...base,
+            ...live,
+            resources: Object.assign({}, base.resources || {}, live.resources || {}),
+            _source: 'kv'
+          };
+        }
+      }
+    }
+  } catch (_e2) {}
+  base._source = 'file';
+  return base;
+}
+
+export async function loadTiers(context) {
+  let base = { version: 0, tiers: [], currency: 'CNY' };
+  try {
+    base = await fetchAssetJson(context, TIERS_ASSET);
+  } catch (_e) {}
+  try {
+    const kv = context.env && context.env.MEMBERSHIP_KV;
+    if (kv) {
+      const raw = await kv.get(KV_TIERS);
+      if (raw) {
+        const live = JSON.parse(raw);
+        if (live && typeof live === 'object') {
+          return Object.assign({}, base, live, { _source: 'kv' });
+        }
+      }
+    }
+  } catch (_e2) {}
+  base._source = 'file';
+  return base;
+}
+
+export async function savePolicyLive(context, policy) {
+  const kv = context.env && context.env.MEMBERSHIP_KV;
+  if (!kv) return { ok: false, error: '尚未绑定线上存储（MEMBERSHIP_KV），网页保存不可用。可先「下载配置」交给技术发版。' };
+  const toSave = Object.assign({}, policy);
+  delete toSave._source;
+  toSave.updated = new Date().toISOString().slice(0, 10);
+  await kv.put(KV_POLICY, JSON.stringify(toSave));
+  return { ok: true };
+}
+
+export async function saveTiersLive(context, tiersDoc) {
+  const kv = context.env && context.env.MEMBERSHIP_KV;
+  if (!kv) return { ok: false, error: '尚未绑定线上存储（MEMBERSHIP_KV），网页保存不可用。' };
+  const toSave = Object.assign({}, tiersDoc);
+  delete toSave._source;
+  await kv.put(KV_TIERS, JSON.stringify(toSave));
+  return { ok: true };
+}
+
+export async function listSceneNames(context, sandbox) {
+  const path = catalogAssetPath(sandbox);
+  const raw = await fetchAssetJson(context, path);
+  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  return list.map((s) => ({ name: s && s.name ? String(s.name) : '' })).filter((x) => x.name);
 }
 
 export function sceneResourceId(sandbox, scene) {

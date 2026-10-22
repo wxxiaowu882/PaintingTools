@@ -10,6 +10,7 @@
   var STORAGE_KEY = 'wuxiao_membership_entitlement_v1';
   var POLICY_URL = '/docs/membership/access-policy.json';
   var TIERS_URL = '/docs/membership/tiers.json';
+  var PUBLIC_CONFIG = '/api/membership/public-config';
   var API_REDEEM = '/api/membership/redeem';
   var API_ME = '/api/membership/me';
   var API_CATALOG = '/api/membership/catalog';
@@ -115,11 +116,17 @@
     if (_ready) return _ready;
     _entitlement = loadStoredEntitlement();
     _ready = Promise.all([
-      fetchJson(POLICY_URL).then(function (p) { _policy = p; }).catch(function () {
-        _policy = { version: 0, resources: {}, defaultRequire: 'free' };
-      }),
-      fetchJson(TIERS_URL).then(function (t) { _tiers = t; }).catch(function () {
-        _tiers = { tiers: [] };
+      fetchJson(PUBLIC_CONFIG).then(function (cfg) {
+        if (cfg && cfg.policy) _policy = cfg.policy;
+        if (cfg && cfg.tiers) _tiers = cfg.tiers;
+      }).catch(function () {
+        return Promise.all([
+          fetchJson(POLICY_URL).then(function (p) { _policy = p; }),
+          fetchJson(TIERS_URL).then(function (t) { _tiers = t; })
+        ]);
+      }).catch(function () {
+        if (!_policy) _policy = { version: 0, resources: {}, defaultRequire: 'free' };
+        if (!_tiers) _tiers = { tiers: [] };
       }),
       refreshFromServer().catch(function () { /* 无 API 时保留本地缓存（仅本地开发） */ })
     ]).then(function () { return api; });

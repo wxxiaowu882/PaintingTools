@@ -1,44 +1,50 @@
-# 会员模块部署清单
+# 会员上线与日常使用（给业务）
 
-## 1. Cloudflare Pages 密钥
+## 你平时用哪个页面
 
-项目 `soft-voice-f822`（或当前 Pages 项目）→ Settings → Environment variables / Secrets：
+打开：**`/member-ops`（会员运营台）**
 
-| 名称 | 必填 | 说明 |
-|------|------|------|
-| `MEMBERSHIP_SECRET` | 是 | ≥16 字符，签名 Cookie 与 `WXM1` 兑换码 |
-| `ALLOW_PROBE_CODES` | 否 | 设为 `1` 才允许 `PROBE-*`；生产不要开 |
+在这里可以：
 
-可选：创建 KV namespace，绑定名 `MEMBERSHIP_KV`（一码一用）。
+1. 看系统是否就绪（密钥、能不能网页保存）  
+2. 学员付款后 **一键生成兑换码**，复制发微信  
+3. **勾选哪些场景 / 功能要收费**  
+4. **改价格和兑换页说明文字**
 
-## 2. 发版
+学员用：**`/member`（会员 · 兑换）**
 
-仍用仓库根目录：
+---
 
-```bat
-docs\deploy.bat
-```
+## 上线前在 Cloudflare 里设 2～3 个 Secret
 
-或：
+进入 Pages 项目 → Settings → Variables / Secrets：
 
-```bash
-npx wrangler pages deploy . --project-name=soft-voice-f822
-```
+| 名称 | 要不要 | 干什么 |
+|------|--------|--------|
+| `MEMBERSHIP_SECRET` | 必填 | 保护会员登录态和兑换码（随机长字符串，≥16 位） |
+| `MEMBERSHIP_ADMIN_PASSWORD` | 必填 | 运营台登录口令（≥6 位，自己记牢） |
+| `ALLOW_PROBE_CODES` | 不要开 | 生产环境请留空或删除 |
 
-确认部署产物含 `functions/`（redeem / me / catalog / `docs/json/[[path]].js` 课表拦截）。
+可选：绑定一个 KV，名字填 **`MEMBERSHIP_KV`**。  
+绑了之后，运营台里的「保存收费设置 / 保存价格」会立刻在线上生效。  
+没绑也能发码；改收费项用页面上的「下载配置备份」交给技术发版。
 
-## 3. 本地带 Functions 调试
+---
 
-```bash
-npx wrangler pages dev . --binding MEMBERSHIP_SECRET=dev-only-wuxiao-membership-change-me --binding ALLOW_PROBE_CODES=1
-```
+## 发版
 
-（具体 flag 以当前 wrangler 版本文档为准；也可用 Dashboard 的 Preview。）
+照旧运行 `docs/deploy.bat`（或 wrangler pages deploy）。  
+发版后打开 `/member-ops` 用你设的口令登录试一次发码。
 
-## 4. 验收
+---
 
-1. 访客打开 `/Solid?sandbox=geometry`：探针场景无完整 items，点进引导兑换  
-2. 未带 Cookie 请求课表静态 URL：响应带 `X-Membership-Catalog: filtered`（或经 API 过滤）  
-3. `/member` 兑正式码或（仅允许时）探针码 → `/me` 显示会员  
-4. 伪造 localStorage 会员态：刷新后以 Cookie/`/me` 为准；无签名 Cookie 时课表仍过滤  
-5. 到期后自动变访客
+## 本地调试口令
+
+未配置正式密钥时，运营台默认口令：`ops-local`  
+（仅开发环境；上线后请用你自己设的 `MEMBERSHIP_ADMIN_PASSWORD`）
+
+---
+
+## 日常流程（一句话）
+
+学员付款并备注档位 → 你打开运营台生成码 → 微信发给对方 → 对方在「会员 · 兑换」输入 → 即可用收费内容。

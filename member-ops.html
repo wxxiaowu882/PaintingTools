@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>会员运营｜童画师吴晓</title>
+  <meta name="robots" content="noindex,nofollow">
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --card: #fffdf8;
+      --ink: #1c1915;
+      --muted: #6b645a;
+      --line: #e5dfd3;
+      --ok: #2f6b3a;
+      --warn: #9a5b00;
+      --bad: #9b2c2c;
+      --accent: #1f4b7a;
+      --btn: #1f4b7a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background: var(--bg); color: var(--ink); line-height: 1.55;
+    }
+    main { max-width: 760px; margin: 0 auto; padding: 28px 16px 64px; }
+    h1 { font-size: 1.45rem; margin: 0 0 6px; }
+    .sub { color: var(--muted); margin-bottom: 20px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 12px; padding: 16px; margin-bottom: 14px;
+    }
+    .card h2 { font-size: 1.05rem; margin: 0 0 10px; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+    label { font-size: 0.92rem; color: var(--muted); }
+    input, select, textarea {
+      font: inherit; padding: 8px 10px; border: 1px solid var(--line);
+      border-radius: 8px; background: #fff; color: var(--ink);
+    }
+    input[type="number"] { width: 88px; }
+    textarea { width: 100%; min-height: 110px; }
+    button {
+      font: inherit; border: none; border-radius: 8px; padding: 9px 14px;
+      background: var(--btn); color: #fff; cursor: pointer;
+    }
+    button.secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .pill {
+      display: inline-block; font-size: 0.8rem; padding: 2px 8px;
+      border-radius: 999px; border: 1px solid var(--line);
+    }
+    .pill.ok { background: #e7f4ea; color: var(--ok); border-color: #cfe6d4; }
+    .pill.warn { background: #fff3df; color: var(--warn); border-color: #f0dfb8; }
+    .pill.bad { background: #fde8e8; color: var(--bad); border-color: #f3c6c6; }
+    .tip { font-size: 0.9rem; color: var(--muted); margin: 4px 0; }
+    .msg { font-size: 0.9rem; margin-top: 8px; min-height: 1.2em; }
+    .msg.ok { color: var(--ok); }
+    .msg.err { color: var(--bad); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .hidden { display: none !important; }
+    a { color: var(--accent); }
+    .price-grid { display: grid; gap: 8px; }
+    .price-item { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .price-item span { min-width: 110px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>会员运营台</h1>
+    <p class="sub">给业务用的：看状态、发兑换码、调哪些课/功能要收费、改价格。不用记命令行。</p>
+    <p class="tip"><a href="/member">学员兑换页</a> · <a href="/Solid?sandbox=geometry">几何体场景</a></p>
+
+    <!-- 登录 -->
+    <section class="card" id="sec-login">
+      <h2>登录</h2>
+      <p class="tip">运营口令在 Cloudflare 里配置（名称：MEMBERSHIP_ADMIN_PASSWORD）。本地调试默认可用：<code>ops-local</code></p>
+      <div class="row">
+        <input id="ops-pwd" type="password" placeholder="输入运营口令" style="flex:1;min-width:180px">
+        <button type="button" id="btn-login">进入</button>
+      </div>
+      <p class="msg" id="login-msg"></p>
+    </section>
+
+    <div id="sec-app" class="hidden">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <span class="pill ok">已登录</span>
+        <button type="button" class="secondary" id="btn-logout">退出</button>
+      </div>
+
+      <!-- 状态 -->
+      <section class="card">
+        <h2>现在能不能正常卖</h2>
+        <div id="status-pills" class="row"></div>
+        <div id="status-tips"></div>
+      </section>
+
+      <!-- 发码 -->
+      <section class="card">
+        <h2>① 学员付完钱 → 在这里发兑换码</h2>
+        <p class="tip">选好档位，点生成，把整段话复制发微信即可。</p>
+        <div class="row">
+          <label>档位
+            <select id="code-tier">
+              <option value="member_3m">三个月（¥39）</option>
+              <option value="member_1y">一年（¥99）</option>
+              <option value="member_forever">永久（¥199）</option>
+            </select>
+          </label>
+          <label>数量 <input id="code-count" type="number" min="1" max="20" value="1"></label>
+          <label>码有效期（天） <input id="code-days" type="number" min="1" max="365" value="30"></label>
+          <button type="button" id="btn-gen">生成兑换码</button>
+        </div>
+        <textarea id="code-out" readonly placeholder="生成后显示可复制给学员的话术"></textarea>
+        <div class="row">
+          <button type="button" class="secondary" id="btn-copy-code">复制给学员</button>
+        </div>
+        <p class="msg" id="code-msg"></p>
+      </section>
+
+      <!-- 收费项 -->
+      <section class="card">
+        <h2>② 哪些内容要会员才能用</h2>
+        <p class="tip">打开开关 = 要会员；关掉 = 免费。改完后点保存（若提示不能在线保存，请下载配置发给技术发版）。</p>
+        <div class="row">
+          <button type="button" class="secondary" id="btn-reload-policy">刷新列表</button>
+          <button type="button" id="btn-save-policy">保存收费设置</button>
+          <button type="button" class="secondary" id="btn-dl-policy">下载配置备份</button>
+        </div>
+        <p class="msg" id="policy-msg"></p>
+        <h3 style="font-size:0.95rem;margin:14px 0 6px">场景（几何体）</h3>
+        <div style="max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:8px">
+          <table>
+            <thead><tr><th style="width:70px">收费</th><th>场景名</th></tr></thead>
+            <tbody id="scene-tbody"></tbody>
+          </table>
+        </div>
+        <h3 style="font-size:0.95rem;margin:14px 0 6px">功能按钮（Solid 底部面板）</h3>
+        <table>
+          <thead><tr><th style="width:70px">收费</th><th>功能</th></tr></thead>
+          <tbody id="ui-tbody"></tbody>
+        </table>
+      </section>
+
+      <!-- 价格 -->
+      <section class="card">
+        <h2>③ 价格与对外说明</h2>
+        <div class="price-grid" id="price-grid"></div>
+        <label class="tip" style="display:block;margin-top:10px">兑换页上的说明文案</label>
+        <textarea id="purchase-hint"></textarea>
+        <div class="row">
+          <label>联系微信 <input id="contact-wx" type="text" style="width:160px"></label>
+          <button type="button" id="btn-save-tiers">保存价格与文案</button>
+        </div>
+        <p class="msg" id="tiers-msg"></p>
+      </section>
+
+      <!-- 话术 -->
+      <section class="card">
+        <h2>④ 常用话术（可改再复制）</h2>
+        <textarea id="script-pay">【会员 · 早鸟】童画师吴晓
+
+按时长开通站内会员，用于访问标注为「会员」的场景与功能。
+
+· 三个月 ¥39
+· 一年 ¥99
+· 永久 ¥199
+
+付款备注：会员+档位+微信昵称
+截图发我，确认后发兑换码。
+到网站「会员 · 兑换」输入即可。</textarea>
+        <div class="row"><button type="button" class="secondary" id="btn-copy-script">复制购买说明</button></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let policy = null;
+    let tiersDoc = null;
+    let canSaveOnline = false;
+
+    function setMsg(el, text, ok) {
+      el.className = 'msg ' + (ok ? 'ok' : (text ? 'err' : ''));
+      el.textContent = text || '';
+    }
+
+    async function api(path, opts) {
+      const res = await fetch(path, Object.assign({
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }
+      }, opts || {}));
+      let data = null;
+      try { data = await res.json(); } catch (_e) {}
+      if (res.status === 401 && data && data.needLogin) {
+        $('sec-app').classList.add('hidden');
+        $('sec-login').classList.remove('hidden');
+      }
+      return { res, data };
+    }
+
+    function renderStatus(st, tips) {
+      const pills = [];
+      pills.push(st.secretReady
+        ? '<span class="pill ok">密钥已就绪</span>'
+        : '<span class="pill warn">密钥还是开发默认值</span>');
+      pills.push(st.canSaveOnline
+        ? '<span class="pill ok">可网页保存设置</span>'
+        : '<span class="pill warn">网页保存未开通（可发码）</span>');
+      pills.push(st.allowProbeCodes
+        ? '<span class="pill warn">探针码开启中</span>'
+        : '<span class="pill ok">探针码已关</span>');
+      $('status-pills').innerHTML = pills.join('');
+      $('status-tips').innerHTML = (tips || []).map(t => '<p class="tip">· ' + t + '</p>').join('');
+      canSaveOnline = !!st.canSaveOnline;
+      $('btn-save-policy').disabled = false;
+      $('btn-save-tiers').disabled = false;
+    }
+
+    function renderScenes(scenes) {
+      const tb = $('scene-tbody');
+      tb.innerHTML = '';
+      (scenes || []).forEach((s) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td><input type="checkbox" data-scene-id="' + encodeURIComponent(s.id) + '"' + (s.locked ? ' checked' : '') + '></td><td>' + escapeHtml(s.name) + '</td>';
+        tb.appendChild(tr);
+      });
+    }
+
+    function renderUiTabs() {
+      const defs = [
+        { id: 'ui:solid:tab:light', label: '主光（建议永远免费）' },
+        { id: 'ui:solid:tab:env', label: '环境光' },
+        { id: 'ui:solid:tab:atmos', label: '氛围' },
+        { id: 'ui:solid:tab:assist', label: '辅助' }
+      ];
+      const tb = $('ui-tbody');
+      tb.innerHTML = '';
+      defs.forEach((d) => {
+        const rule = (policy.resources && policy.resources[d.id]) || {};
+        const locked = rule.require === 'member' && rule.enabled !== false;
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td><input type="checkbox" data-ui-id="' + d.id + '"' + (locked ? ' checked' : '') + (d.id.endsWith(':light') ? ' data-keep-free="1"' : '') + '></td><td>' + d.label + '</td>';
+        tb.appendChild(tr);
+      });
+    }
+
+    function renderTiers() {
+      const box = $('price-grid');
+      box.innerHTML = '';
+      (tiersDoc.tiers || []).filter(t => t.id !== 'free').forEach((t) => {
+        const div = document.createElement('div');
+        div.className = 'price-item';
+        div.innerHTML = '<span>' + escapeHtml(t.name || t.id) + '</span>' +
+          '<label>价格 ¥ <input type="number" min="0" step="1" data-tier-price="' + t.id + '" value="' + (t.price || 0) + '"></label>';
+        box.appendChild(div);
+      });
+      $('purchase-hint').value = tiersDoc.purchaseHint || '';
+      $('contact-wx').value = tiersDoc.contactWeChat || '';
+    }
+
+    function escapeHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function collectPolicyFromUi() {
+      const next = JSON.parse(JSON.stringify(policy || { version: 1, defaultRequire: 'free', resources: {} }));
+      next.resources = next.resources || {};
+
+      document.querySelectorAll('#scene-tbody input[type=checkbox]').forEach((cb) => {
+        const id = decodeURIComponent(cb.getAttribute('data-scene-id'));
+        const name = id.replace(/^scene:[^:]+:name:/, '');
+        if (cb.checked) {
+          next.resources[id] = Object.assign({}, next.resources[id] || {}, {
+            require: 'member',
+            enabled: true,
+            label: name
+          });
+        } else if (next.resources[id]) {
+          next.resources[id].require = 'free';
+          next.resources[id].enabled = true;
+        }
+      });
+
+      document.querySelectorAll('#ui-tbody input[type=checkbox]').forEach((cb) => {
+        const id = cb.getAttribute('data-ui-id');
+        const labels = {
+          'ui:solid:tab:light': '主光',
+          'ui:solid:tab:env': '环境光',
+          'ui:solid:tab:atmos': '氛围',
+          'ui:solid:tab:assist': '辅助'
+        };
+        if (cb.getAttribute('data-keep-free') === '1') {
+          next.resources[id] = { require: 'free', enabled: true, label: labels[id] || id };
+          return;
+        }
+        next.resources[id] = {
+          require: cb.checked ? 'member' : 'free',
+          enabled: true,
+          label: labels[id] || id,
+          probe: !!(next.resources[id] && next.resources[id].probe)
+        };
+      });
+      return next;
+    }
+
+    function collectTiersFromUi() {
+      const next = JSON.parse(JSON.stringify(tiersDoc));
+      (next.tiers || []).forEach((t) => {
+        const inp = document.querySelector('input[data-tier-price="' + t.id + '"]');
+        if (inp) t.price = Number(inp.value || 0);
+      });
+      next.purchaseHint = $('purchase-hint').value.trim();
+      next.contactWeChat = $('contact-wx').value.trim();
+      return next;
+    }
+
+    async function loadAll() {
+      const { res, data } = await api('/api/membership/admin/overview');
+      if (!res.ok) {
+        setMsg($('login-msg'), (data && data.error) || '请先登录', false);
+        return false;
+      }
+      policy = data.policy;
+      tiersDoc = data.tiers;
+      renderStatus(data.status, data.tips);
+      renderUiTabs();
+      renderTiers();
+
+      const sc = await api('/api/membership/admin/policy?scenes=1&sandbox=geometry');
+      if (sc.res.ok && sc.data && sc.data.scenes) renderScenes(sc.data.scenes);
+      return true;
+    }
+
+    $('btn-login').onclick = async () => {
+      setMsg($('login-msg'), '登录中…', true);
+      const { res, data } = await api('/api/membership/admin/login', {
+        method: 'POST',
+        body: JSON.stringify({ password: $('ops-pwd').value })
+      });
+      if (!res.ok) {
+        setMsg($('login-msg'), (data && data.error) || '登录失败', false);
+        return;
+      }
+      setMsg($('login-msg'), '', true);
+      $('sec-login').classList.add('hidden');
+      $('sec-app').classList.remove('hidden');
+      await loadAll();
+    };
+
+    $('btn-logout').onclick = async () => {
+      await api('/api/membership/admin/login', { method: 'DELETE' });
+      $('sec-app').classList.add('hidden');
+      $('sec-login').classList.remove('hidden');
+    };
+
+    $('btn-gen').onclick = async () => {
+      setMsg($('code-msg'), '生成中…', true);
+      const { res, data } = await api('/api/membership/admin/codes', {
+        method: 'POST',
+        body: JSON.stringify({
+          tierId: $('code-tier').value,
+          count: Number($('code-count').value || 1),
+          codeDays: Number($('code-days').value || 30)
+        })
+      });
+      if (!res.ok) {
+        setMsg($('code-msg'), (data && data.error) || '生成失败', false);
+        return;
+      }
+      $('code-out').value = data.copyText || (data.codes || []).join('\n');
+      setMsg($('code-msg'), '已生成 ' + (data.codes || []).length + ' 个码', true);
+    };
+
+    $('btn-copy-code').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText($('code-out').value);
+        setMsg($('code-msg'), '已复制', true);
+      } catch (_e) {
+        setMsg($('code-msg'), '复制失败，请手动全选复制', false);
+      }
+    };
+
+    $('btn-reload-policy').onclick = () => loadAll();
+
+    $('btn-save-policy').onclick = async () => {
+      const next = collectPolicyFromUi();
+      setMsg($('policy-msg'), '保存中…', true);
+      const { res, data } = await api('/api/membership/admin/policy', {
+        method: 'PUT',
+        body: JSON.stringify({ policy: next })
+      });
+      if (!res.ok) {
+        setMsg($('policy-msg'), (data && data.error) || '保存失败', false);
+        return;
+      }
+      policy = data.policy;
+      setMsg($('policy-msg'), '已保存，学员端刷新后生效', true);
+      await loadAll();
+    };
+
+    $('btn-dl-policy').onclick = () => {
+      const next = collectPolicyFromUi();
+      const blob = new Blob([JSON.stringify(next, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'access-policy.json';
+      a.click();
+      setMsg($('policy-msg'), '已下载。若不能网页保存，把文件交给技术替换发版即可。', true);
+    };
+
+    $('btn-save-tiers').onclick = async () => {
+      const next = collectTiersFromUi();
+      setMsg($('tiers-msg'), '保存中…', true);
+      const { res, data } = await api('/api/membership/admin/tiers', {
+        method: 'PUT',
+        body: JSON.stringify({ tiers: next })
+      });
+      if (!res.ok) {
+        setMsg($('tiers-msg'), (data && data.error) || '保存失败', false);
+        return;
+      }
+      tiersDoc = data.tiers;
+      setMsg($('tiers-msg'), '已保存', true);
+    };
+
+    $('btn-copy-script').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText($('script-pay').value);
+        alert('已复制');
+      } catch (_e) {
+        alert('请手动复制');
+      }
+    };
+
+    // 尝试恢复会话
+    (async () => {
+      const { res } = await api('/api/membership/admin/overview');
+      if (res.ok) {
+        $('sec-login').classList.add('hidden');
+        $('sec-app').classList.remove('hidden');
+        await loadAll();
+      }
+    })();
+  </script>
+</body>
+</html>
