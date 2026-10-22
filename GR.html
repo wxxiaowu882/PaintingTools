@@ -3,46 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>我爱你们 - 绘画辅助</title>
-
-<!-- ========== SEO优化开始 ========== -->
-<meta name="description" content="童画师吴晓设计的色阶图生成与网格起型工具，帮助绘画者快速创建色阶参考和构图网格，提升绘画准确度。免费在线工具。">
-<meta name="keywords" content="吴晓,童画师吴晓,色阶图生成,网格起型,绘画辅助工具,颜色参考,构图工具,绘画网格,我爱你们工具">
+<title>晓阶 · 色阶分析与网格构图｜水彩肖像学习 - 童画师吴晓</title>
+<!-- ========== SEO ========== -->
+<meta name="description" content="晓阶：色阶分析 · 网格构图。童画师吴晓手绘工坊免费工具，把参考图压成色阶、用网格稳住起形，适合水彩人物与肖像画教程自学。">
+<meta name="keywords" content="晓阶,色阶分析,网格构图,色阶图,网格起型,水彩人物,肖像画教程,手绘教程,童画师吴晓,手绘工坊">
 <meta name="author" content="童画师吴晓">
-<meta property="og:title" content="色阶图生成器 · 网格起型工具 - 童画师吴晓">
-<meta property="og:description" content="童画师吴晓设计的免费色阶图生成与网格起型工具，帮助绘画构图和颜色参考">
-<meta property="og:image" content="docs/img/wuxiao_s.jpg">
-<meta property="og:url" content="https://www.wuxiaoart.com/GR.html">
+<link rel="canonical" href="https://www.wuxiaoart.com/GR">
+<meta property="og:title" content="晓阶 · 色阶分析与网格构图 - 童画师吴晓">
+<meta property="og:description" content="看清色阶、用网格稳起形。手绘工坊 · 童画师吴晓免费工具。">
+<meta property="og:image" content="https://www.wuxiaoart.com/docs/img/wuxiao_s.jpg">
+<meta property="og:url" content="https://www.wuxiaoart.com/GR">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="手绘工坊 · 童画师吴晓">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="色阶图生成器 · 网格起型工具 - 童画师吴晓">
-<meta name="twitter:description" content="童画师吴晓设计的免费色阶图生成与网格起型工具，帮助绘画构图">
-<meta name="twitter:image" content="docs/img/wuxiao_s.jpg">
-<script type="application/ld+json">
-{
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "色阶图生成器 · 网格起型工具",
-    "description": "童画师吴晓设计的色阶图生成与网格起型工具，帮助绘画构图和颜色参考",
-    "url": "https://www.wuxiaoart.com/GR.html",
-    "author": {
-        "@type": "Person",
-        "name": "吴晓",
-        "alternateName": "童画师吴晓",
-        "jobTitle": "儿童肖像定制画师",
-        "description": "专业儿童类题材肖像绘画师，并致力于设计实用的绘画辅助工具和教程"
-    },
-    "applicationCategory": "DesignApplication",
-    "operatingSystem": "Any",
-    "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "CNY"
-    }
-}
-</script>
-<!-- ========== SEO优化结束 ========== -->
+<meta name="twitter:title" content="晓阶 · 色阶分析与网格构图 - 童画师吴晓">
+<meta name="twitter:description" content="看清色阶、用网格稳起形。手绘工坊 · 童画师吴晓免费工具。">
+<meta name="twitter:image" content="https://www.wuxiaoart.com/docs/img/wuxiao_s.jpg">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"晓阶 · 色阶分析与网格构图","description":"色阶图生成与网格起型，辅助水彩人物与肖像构图","url":"https://www.wuxiaoart.com/GR","author":{"@type":"Person","name":"童画师吴晓"},"applicationCategory":"DesignApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"CNY"}}</script>
+<!-- ========== SEO结束 ========== -->
 
 <!-- 引入极细字体 Inter 统一品牌视觉 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -219,21 +197,21 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 <header>
     <div class="brand-card" onclick="toggleModal('aboutModal', true)">
         <div class="brand-avatar" style="background-image: url('docs/img/wuxiao_s.jpg'); background-size: cover; background-position: center;"></div>
-        <div class="brand-info"><div class="brand-name">我爱你们 <span class="brand-arrow">›</span></div><div class="brand-desc">By 童画师吴晓</div></div>
+        <div class="brand-info"><div class="brand-name">晓阶 <span class="brand-arrow">›</span></div><div class="brand-desc">By 童画师吴晓</div></div>
     </div>
     <div class="tabs">
-        <button class="tab-btn active" data-theme="blue" onclick="switchTab('grid', this)">网格起型</button>
-        <button class="tab-btn" data-theme="orange" onclick="switchTab('poster', this)">色阶图生成</button>
+        <button class="tab-btn active" data-theme="orange" onclick="switchTab('poster', this)">色阶图生成</button>
+        <button class="tab-btn" data-theme="blue" onclick="switchTab('grid', this)">网格起型</button>
     </div>
 </header>
-<div id="grid-content" class="tab-content active"><div class="controls-panel"><div class="control-row"><button class="btn-upload">打开相册图片</button></div><div class="control-row"><div class="merged-capsule"><div class="capsule-item" onclick="document.querySelector('#gridColor').click()"><div class="color-wrapper" title="网格颜色"><input type="color" id="gridColor" value="#505050" oninput="drawGrid()"></div><span class="label-text">网格颜色</span></div><div class="capsule-divider"></div><label class="capsule-item"><input type="checkbox" id="squareGridCheck"><span class="label-text">正方格</span></label></div></div><div class="slider-row"><div class="slider-container-transparent"><button class="btn-micro" onclick="adjustGridSize(-0.1)">-</button><input type="range" id="gridSize" min="2" max="15" value="3" step="0.05" oninput="drawGrid()"><button class="btn-micro" onclick="adjustGridSize(0.1)">+</button></div><div style="font-size: 13px; font-weight: 300; letter-spacing:0.05em; color: var(--text-sub); width: 24px; text-align: right; padding-right: 8px;" id="gridSizeVal">3.0</div></div><div class="control-row"><div class="mode-switch"><button class="mode-btn active blue-text" id="modeMove" onclick="setGridMode('move')">双指移动视图</button><button class="mode-btn" id="modeGrid" onclick="setGridMode('grid')">双指移动网格</button></div></div></div><div class="canvas-area" id="gridWindow">
+<div id="grid-content" class="tab-content"><div class="controls-panel"><div class="control-row"><button class="btn-upload">打开相册图片</button></div><div class="control-row"><div class="merged-capsule"><div class="capsule-item" onclick="document.querySelector('#gridColor').click()"><div class="color-wrapper" title="网格颜色"><input type="color" id="gridColor" value="#505050" oninput="drawGrid()"></div><span class="label-text">网格颜色</span></div><div class="capsule-divider"></div><label class="capsule-item"><input type="checkbox" id="squareGridCheck"><span class="label-text">正方格</span></label></div></div><div class="slider-row"><div class="slider-container-transparent"><button class="btn-micro" onclick="adjustGridSize(-0.1)">-</button><input type="range" id="gridSize" min="2" max="15" value="3" step="0.05" oninput="drawGrid()"><button class="btn-micro" onclick="adjustGridSize(0.1)">+</button></div><div style="font-size: 13px; font-weight: 300; letter-spacing:0.05em; color: var(--text-sub); width: 24px; text-align: right; padding-right: 8px;" id="gridSizeVal">3.0</div></div><div class="control-row"><div class="mode-switch"><button class="mode-btn active blue-text" id="modeMove" onclick="setGridMode('move')">双指移动视图</button><button class="mode-btn" id="modeGrid" onclick="setGridMode('grid')">双指移动网格</button></div></div></div><div class="canvas-area" id="gridWindow">
     <div class="empty-placeholder" id="gridPlaceholder" onclick="document.getElementById('gridImageInput').click()">
         <div class="plus-icon">+</div>
         <div style="font-weight: 300; letter-spacing: 0.2em; color: rgba(0,0,0,0.3); margin-bottom: 6px;">请选择图片</div>
         <div style="font-size: 11px; font-weight: 200; letter-spacing: 0.1em; color: rgba(0,0,0,0.2);">双指操作</div>
     </div>
 <canvas id="gridCanvas" style="display:none;"></canvas></div><div class="bottom-toolbar"><button class="btn-flat" onclick="resetGridOffset()">重置网格</button><div style="display: flex; align-items: center; gap: 8px;"><button class="btn-micro" onclick="updateZoom('grid', -0.1)">-</button><span class="zoom-display" id="gridZoomVal">100%</span><button class="btn-micro" onclick="updateZoom('grid', 0.1)">+</button></div><button class="btn-flat" onclick="fitView('grid')">适应</button></div><div class="bottom-actions"><button class="btn-cta" onclick="previewCanvas('gridCanvas', '网格参考图.jpg')">保存网格图</button></div></div>
-<div id="poster-content" class="tab-content"><div class="controls-panel"><div class="control-row"><button class="btn-upload orange">打开相册图片</button></div><div class="control-row"><div class="merged-capsule"><label class="capsule-item orange-accent"><input type="checkbox" id="grayscaleCheck" onchange="processPoster()"><span class="label-text">开启黑白模式</span></label></div></div><div class="slider-row"><div class="slider-container-transparent"><button class="btn-micro" onclick="adjustPosterLevel(-1)">-</button><input type="range" id="posterLevel" min="2" max="20" value="12" step="1" oninput="handlePosterSliderInput(this)" style="--track-color: var(--primary-black);"><button class="btn-micro" onclick="adjustPosterLevel(1)">+</button></div><div style="font-size: 13px; font-weight: 300; letter-spacing:0.05em; color: var(--text-sub); width: 24px; text-align: right; padding-right: 8px;" id="posterLevelVal">12</div></div></div><div class="canvas-area" id="posterWindow">
+<div id="poster-content" class="tab-content active"><div class="controls-panel"><div class="control-row"><button class="btn-upload orange">打开相册图片</button></div><div class="control-row"><div class="merged-capsule"><label class="capsule-item orange-accent"><input type="checkbox" id="grayscaleCheck" onchange="processPoster()"><span class="label-text">开启黑白模式</span></label></div></div><div class="slider-row"><div class="slider-container-transparent"><button class="btn-micro" onclick="adjustPosterLevel(-1)">-</button><input type="range" id="posterLevel" min="2" max="20" value="12" step="1" oninput="handlePosterSliderInput(this)" style="--track-color: var(--primary-black);"><button class="btn-micro" onclick="adjustPosterLevel(1)">+</button></div><div style="font-size: 13px; font-weight: 300; letter-spacing:0.05em; color: var(--text-sub); width: 24px; text-align: right; padding-right: 8px;" id="posterLevelVal">12</div></div></div><div class="canvas-area" id="posterWindow">
     <div class="empty-placeholder" id="posterPlaceholder" onclick="document.getElementById('posterImageInput').click()">
         <div class="plus-icon">+</div>
         <div style="font-weight: 300; letter-spacing: 0.2em; color: rgba(0,0,0,0.3);">请选择图片</div>
@@ -242,7 +220,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
 </div>
 <div class="modal-overlay" id="aboutModal" onclick="if(event.target === this) toggleModal('aboutModal', false)"><div class="about-card"><button class="close-btn" onclick="toggleModal('aboutModal', false)">×</button>
     <div class="about-avatar-large" style="background-image: url('docs/img/wuxiao_s.jpg'); background-size: cover; background-position: center;"></div>
-<div class="about-title">童画师吴晓</div><div class="about-subtitle"><div class="about-tag-capsule">儿童肖像画师 · 水彩 · 油画</div><div>用心画画，用爱发电</div></div><div style="font-size: 12.5px; color: var(--text-sub); margin-bottom: 28px; line-height: 1.8; padding: 0 4px; text-align: left; font-weight:300; letter-spacing:0.05em;">“<span class="brand-text-highlight">我爱你们</span>”不仅是工具的名字，更是我的心声。深知学画路上的不易，希望这个永久免费的小工具，能陪你画出更美好的世界。<br><br>如果它帮到了你，请把这份爱传递给更多画友，这是我更新最大的动力！</div><div class="action-row"><button class="share-btn" onclick="shareApp()"><div style="display:flex; flex-direction: column; line-height: 1.3; align-items: center; text-align: center;"><span>传递这份爱</span></div></button><button class="fav-btn" onclick="addToFavorites()">收藏本站</button></div><div style="text-align:left; margin-top:16px;"><div class="social-link" onclick="copyText('童画师吴晓', '小红书')">小红书：童画师吴晓 (围观日常)</div><div class="social-link" onclick="copyText('lightouches', '微信')">微信：lightouches (点击复制)</div></div><div class="copy-right">© 2026 童画师吴晓. All Rights Reserved.<br>欢迎分享，未经许可禁止商业使用。</div></div></div>
+<div class="about-title">童画师吴晓</div><div class="about-subtitle"><div class="about-tag-capsule">儿童肖像画师 · 水彩 · 油画</div><div>用心画画，用爱发电</div></div><div style="font-size: 12.5px; color: var(--text-sub); margin-bottom: 28px; line-height: 1.8; padding: 0 4px; text-align: left; font-weight:300; letter-spacing:0.05em;"><span class="brand-text-highlight">晓阶</span> 帮你两件事：看清色阶、用网格稳起形。<br><br>希望画画的路上，你少一点无助、多一点从容。工具永久免费；若它帮到了你，请把这份方便也传给更多画友。</div><div class="action-row"><button class="share-btn" onclick="shareApp()"><div style="display:flex; flex-direction: column; line-height: 1.3; align-items: center; text-align: center;"><span>分享给画友</span></div></button><button class="fav-btn" onclick="addToFavorites()">收藏本站</button></div><div style="text-align:left; margin-top:16px;"><div class="social-link" onclick="copyText('童画师吴晓', '小红书')">小红书：童画师吴晓 (围观日常)</div><div class="social-link" onclick="copyText('lightouches', '微信')">微信：lightouches (点击复制)</div></div><div class="copy-right">© 2026 童画师吴晓. All Rights Reserved.<br>欢迎分享，未经许可禁止商业使用。</div></div></div>
 <div class="modal-overlay" id="previewModal" onclick="if(event.target === this) toggleModal('previewModal', false)"><div class="about-card" style="width:95%; padding:24px 20px;"><h3 style="margin-top:0; font-size:15px; font-weight:300; letter-spacing:0.1em; color:var(--text-main);">预览结果</h3><img id="previewImage" class="preview-img" src="" alt="预览图片" style="display:none;"><div style="background:#F7F8FA; height:200px; border-radius:12px; border:1px dashed var(--border-color); display:flex; align-items:center; justify-content:center; margin-bottom:16px; color:var(--text-sub); display:none;" class="preview-placeholder">[生成的图片将显示在这里]</div><div id="mobileSaveHint" style="font-size:12px; color:var(--text-sub); font-weight:300; letter-spacing:0.05em; margin-bottom:20px; display:none;">请长按上方图片保存到相册</div><div id="pcSaveHint" style="font-size:12px; color:var(--text-sub); font-weight:300; letter-spacing:0.05em; margin-bottom:20px; display:none;">请点击下方按钮下载图片</div><div style="display:flex; gap:16px;"><button id="downloadBtn" class="share-btn" style="background:var(--primary-black); color:white; flex:1; display:none;" onclick="downloadPreviewImage()">下载图片</button><button class="btn-secondary" style="flex:1;" onclick="toggleModal('previewModal', false)">关闭</button></div></div></div>
 <script>
 // === 全局状态 & 基础函数 (保留100%原逻辑) ===
@@ -315,7 +293,7 @@ document.getElementById('gridColor').addEventListener('input',function(){drawGri
 const originalToggleModal = toggleModal;
 function toggleModal(id,s){const m=document.getElementById(id),b=document.getElementById('menu-trigger');if(s){m.style.display='flex';void m.offsetWidth;m.classList.add('active');if(b)b.style.display='none';if(id==='previewModal')setTimeout(adjustPreviewInterface,50)}else{m.classList.remove('active');if(b)b.style.display='flex';setTimeout(()=>m.style.display='none',300)}}function copyToClipboard(text,successMsg){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>{showToast(successMsg)}).catch(err=>{console.warn('Async copy failed, falling back to execCommand',err);fallbackCopy(text,successMsg)})}else{fallbackCopy(text,successMsg)}}
 function fallbackCopy(text,successMsg){const textArea=document.createElement('textarea');textArea.value=text;textArea.style.position='fixed';textArea.style.left='-9999px';textArea.style.top='0';document.body.appendChild(textArea);textArea.focus();textArea.select();try{const successful=document.execCommand('copy');if(successful){showToast(successMsg)}else{showToast('复制失败，请长按手动复制')}}catch(err){showToast('复制失败，请长按手动复制')}document.body.removeChild(textArea)}
-function shareApp(){const url=window.location.href;copyToClipboard(url,'链接已复制！把这份爱传递给画友们吧')}
+function shareApp(){const url=window.location.href;copyToClipboard(url,'链接已复制！欢迎分享给画友')}
 function addToFavorites(){showToast('请点击浏览器菜单，选择“添加到主屏幕”永久收藏')}
 function isMobileDevice(){return/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)}
 function adjustPreviewInterface(){const isMobile=isMobileDevice();const mobileHint=document.getElementById('mobileSaveHint');const pcHint=document.getElementById('pcSaveHint');const downloadBtn=document.getElementById('downloadBtn');if(isMobile){if(mobileHint)mobileHint.style.display='block';if(pcHint)pcHint.style.display='none';if(downloadBtn)downloadBtn.style.display='none'}else{if(mobileHint)mobileHint.style.display='none';if(pcHint)pcHint.style.display='block';if(downloadBtn)downloadBtn.style.display='flex'}}
@@ -328,13 +306,10 @@ function showToast(message){const oldToast=document.querySelector('.toast-contai
 
     <!-- ========== SEO隐藏内容区域开始 ========== -->
     <div style="position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none;">
-        <h1>色阶图生成器 · 网格起型工具 - 童画师吴晓</h1>
-        <h2>我爱你们绘画辅助工具 - 童画师吴晓设计</h2>
-        <p>童画师吴晓设计的“我爱你们”绘画辅助工具，包含色阶图生成和网格起型两大功能，帮助绘画爱好者快速创建颜色参考和构图网格，提升绘画准确度。</p>
-        <p>色阶图生成功能可以将图片转换为色阶参考图，帮助分析颜色层次；网格起型功能提供可调节的网格线，辅助构图和比例把握。</p>
-        <p>所有功能均由童画师吴晓作为产品经理的身份参与设计，且完全免费开放使用。童画师吴晓致力于为绘画社区提供实用的辅助工具。</p>
-        <p>核心关键词：吴晓, 童画师吴晓, 我爱你们工具, 色阶图生成, 网格起型, 绘画辅助工具, 颜色参考, 构图工具, 绘画网格</p>
-        <p>功能关键词：色阶图生成工具, 颜色层次分析, 网格构图辅助, 双指操作, 图片上传处理, 颜色调整, 网格密度调节</p>
+        <h1>晓阶 · 色阶分析与网格构图 - 童画师吴晓</h1>
+        <h2>手绘工坊实用工具 · 水彩人物与肖像学习</h2>
+        <p>晓阶是童画师吴晓手绘工坊的色阶分析与网格构图工具：把参考图压成色阶层次，用网格稳住起形，服务水彩人物与肖像画学习者。</p>
+        <p>核心：晓阶, 色阶分析, 网格构图, 童画师吴晓, 手绘工坊, 水彩人物, 肖像画教程</p>
     </div>
     <!-- ========== SEO隐藏内容区域结束 ========== -->
 </body>

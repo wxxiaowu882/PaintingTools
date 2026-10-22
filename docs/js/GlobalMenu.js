@@ -1,5 +1,5 @@
 /**
- * 视觉维度 / 手绘工坊 - 全局公共菜单组件
+ * 手绘工坊 · 童画师吴晓 - 全局公共菜单组件（「视觉维度」仅作历史/副称）
  * 功能：动态样式注入、DOM构建、当前页自动高亮、页面平滑跳转、跨页面历史路由控制(移动端自愈增强版)
  */
 (function() {
@@ -20,14 +20,14 @@
         { id: '07', text: '课程预约', url: '', disabled: true, tag: 'Coming Soon' },
 
         { type: 'category', text: '实用工具' },
-        { id: '08', text: '色阶图生成 · 网格起型', url: 'GR.html', color: '#3B82F6' },
+        { id: '08', text: '色阶分析 · 网格构图', url: 'GR.html', color: '#3B82F6' },
         { id: '09', text: '智能调色 · 颜料管理', url: 'XStudio.html', color: '#A855F7' },
         { id: '10', text: 'AR 线稿描摹', url: 'ARSketch.html', color: '#22C55E' },
 
         { type: 'category', text: '游戏' },
         { id: '11', text: '色感训练 · 光谱行者', url: 'games/ChromaWalker.html', color: '#F59E0B' },
 
-        { type: 'footer', text: '© 2026 Hand-painted Workshop' }
+        { type: 'footer', text: '© 2026 手绘工坊 · 童画师吴晓' }
     ];
 
     // === 2. 动态样式注入 ===

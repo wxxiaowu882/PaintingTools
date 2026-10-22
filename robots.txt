@@ -1,12 +1,18 @@
 User-agent: *
 Allow: /
+
+# 备份与私有目录不抓取
 Disallow: /Backup/
 Disallow: /单体功能OK版本备份/
+Disallow: /自用工具文件_不部署/
+Disallow: /.cursor/
+
+# 允许 docs 下说明页与分享图（OG 用 docs/img）；脚本库仍不强调收录
 Disallow: /docs/js/
-Disallow: /docs/img/
+Allow: /docs/img/
+Allow: /docs/AboutXStudio
 
 Sitemap: https://www.wuxiaoart.com/sitemap.xml
 
-# 欢迎搜索引擎抓取
-# 童画师吴晓绘画工具集 - 免费在线工具
-# 包含色阶图生成、智能调色、AR线稿描摹等功能
+# 手绘工坊 · 童画师吴晓
+# 水彩人物 / 肖像画教程 / 肖像画定制 · 免费绘画工具与场景课
