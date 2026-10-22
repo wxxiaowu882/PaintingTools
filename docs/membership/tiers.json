@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "currency": "CNY",
+  "earlyBird": true,
+  "contactWeChat": "lightouches",
+  "tiers": [
+    {
+      "id": "free",
+      "name": "免费",
+      "price": 0,
+      "durationDays": null,
+      "requireLevel": "free"
+    },
+    {
+      "id": "member_3m",
+      "name": "会员 · 三个月",
+      "price": 39,
+      "durationDays": 90,
+      "requireLevel": "member"
+    },
+    {
+      "id": "member_1y",
+      "name": "会员 · 一年",
+      "price": 99,
+      "durationDays": 365,
+      "requireLevel": "member"
+    },
+    {
+      "id": "member_forever",
+      "name": "会员 · 永久",
+      "price": 199,
+      "durationDays": null,
+      "requireLevel": "member"
+    }
+  ],
+  "purchaseHint": "开通后可用站内标注为「会员」的场景与功能；具体范围以网站当前说明为准，我们会持续更新。早鸟价日后可能调整。"
+}

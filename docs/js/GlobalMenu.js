@@ -18,6 +18,7 @@
         { id: '05', text: '肖像光影沙盒', url: 'solid.html?sandbox=portrait', color: '#F43F5E' },
         { id: '06', text: '吴晓的作品', url: 'Gallery.html', color: '#EC4899' },
         { id: '07', text: '课程预约', url: '', disabled: true, tag: 'Coming Soon' },
+        { id: '07b', text: '会员 · 兑换', url: 'member.html', color: '#E8C547' },
 
         { type: 'category', text: '实用工具' },
         { id: '08', text: '色阶分析 · 网格构图', url: 'GR.html', color: '#3B82F6' },

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>会员兑换｜手绘工坊 · 童画师吴晓</title>
+  <meta name="description" content="手绘工坊会员按时长开通：三个月、一年或永久。兑换码开通后可使用站内会员场景与功能。">
+  <meta name="robots" content="noindex,follow">
+  <link rel="canonical" href="https://www.wuxiaoart.com/member">
+  <style>
+    :root {
+      --bg: #111114;
+      --card: #1a1a1f;
+      --text: #f2f2f4;
+      --muted: #a0a0ab;
+      --accent: #e8c547;
+      --line: rgba(255,255,255,0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 20% -10%, #2a2438 0%, var(--bg) 55%);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    main {
+      max-width: 520px; margin: 0 auto; padding: 40px 20px 64px;
+    }
+    h1 { font-size: 1.45rem; font-weight: 600; margin: 0 0 8px; }
+    .sub { color: var(--muted); font-size: 0.95rem; margin-bottom: 28px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 12px; padding: 18px 16px; margin-bottom: 16px;
+    }
+    .card h2 { font-size: 1rem; margin: 0 0 12px; font-weight: 600; }
+    .tier {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 10px 0; border-bottom: 1px solid var(--line);
+    }
+    .tier:last-child { border-bottom: none; }
+    .price { color: var(--accent); font-weight: 600; }
+    label { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 6px; }
+    input[type="text"] {
+      width: 100%; padding: 12px 12px; border-radius: 8px;
+      border: 1px solid var(--line); background: #0d0d10; color: var(--text);
+      font-size: 1rem; letter-spacing: 0.04em;
+    }
+    button {
+      margin-top: 12px; width: 100%; padding: 12px;
+      border: none; border-radius: 8px; cursor: pointer;
+      background: var(--accent); color: #1a1408; font-weight: 700; font-size: 1rem;
+    }
+    button.secondary {
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--line); margin-top: 8px; font-weight: 500;
+    }
+    .msg { margin-top: 10px; font-size: 0.9rem; min-height: 1.2em; }
+    .msg.ok { color: #7dcea0; }
+    .msg.err { color: #f5a9a9; }
+    .status { font-size: 0.92rem; color: var(--muted); }
+    .status strong { color: var(--text); }
+    a.back { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+    a.back:hover { color: var(--text); }
+    .hint { font-size: 0.85rem; color: var(--muted); margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <main>
+    <p><a class="back" href="./">← 返回首页</a></p>
+    <h1>会员 · 兑换</h1>
+    <p class="sub" id="purchase-hint">按时长开通站内会员。具体可用场景与功能以网站说明为准。</p>
+
+    <section class="card">
+      <h2>早鸟价格</h2>
+      <div id="tier-list"></div>
+      <p class="hint">付款后请备注「会员+档位+微信昵称」，截图发微信 <strong id="wx">lightouches</strong>；确认到账后 24 小时内发送兑换码。</p>
+    </section>
+
+    <section class="card">
+      <h2>当前状态</h2>
+      <p class="status" id="status-line">读取中…</p>
+      <button type="button" class="secondary" id="btn-clear">退出本机会员状态</button>
+    </section>
+
+    <section class="card">
+      <h2>输入兑换码</h2>
+      <label for="code">兑换码</label>
+      <input id="code" type="text" autocomplete="off" placeholder="例如 PROBE-3M" />
+      <button type="button" id="btn-redeem">兑换</button>
+      <p class="msg" id="msg"></p>
+      <p class="hint">正式兑换码以 <code>WXM1.</code> 开头（付款后由童画师发送）。本地调试需开启 Pages Functions，并将 Cloudflare Secret <code>ALLOW_PROBE_CODES=1</code> 后才可用探针码。</p>
+    </section>
+  </main>
+  <script type="module">
+    import './docs/js/membership/MembershipAccess.js';
+    const MA = window.MembershipAccess;
+
+    function fmtEnt(e) {
+      if (!e || e.level !== 'member') return '访客（免费）';
+      const name = e.tierId || 'member';
+      if (e.expiresAt) {
+        const d = new Date(e.expiresAt);
+        return '会员已开通（' + name + '，至 ' + d.toLocaleDateString('zh-CN') + '）';
+      }
+      return '会员已开通（' + name + '，永久）';
+    }
+
+    function renderStatus() {
+      document.getElementById('status-line').innerHTML = '<strong>' + fmtEnt(MA.getEntitlement()) + '</strong>';
+    }
+
+    function renderTiers(tiersDoc) {
+      const list = document.getElementById('tier-list');
+      list.innerHTML = '';
+      const tiers = (tiersDoc && tiersDoc.tiers) || [];
+      tiers.filter(t => t.id !== 'free').forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'tier';
+        row.innerHTML = '<span>' + t.name + '</span><span class="price">¥' + t.price + '</span>';
+        list.appendChild(row);
+      });
+      if (tiersDoc && tiersDoc.purchaseHint) {
+        document.getElementById('purchase-hint').textContent = tiersDoc.purchaseHint;
+      }
+      if (tiersDoc && tiersDoc.contactWeChat) {
+        document.getElementById('wx').textContent = tiersDoc.contactWeChat;
+      }
+    }
+
+    function goReturn() {
+      try {
+        const u = new URL(location.href);
+        const ret = u.searchParams.get('return');
+        if (ret && ret.startsWith('/')) location.href = ret;
+      } catch (_e) {}
+    }
+
+    MA.ready().then(() => {
+      renderTiers(MA.getTiers());
+      renderStatus();
+      MA.onChange(renderStatus);
+    });
+
+    document.getElementById('btn-redeem').onclick = async () => {
+      const msg = document.getElementById('msg');
+      msg.className = 'msg';
+      msg.textContent = '兑换中…';
+      try {
+        await MA.redeem(document.getElementById('code').value);
+        msg.className = 'msg ok';
+        msg.textContent = '兑换成功';
+        renderStatus();
+        setTimeout(goReturn, 600);
+      } catch (e) {
+        msg.className = 'msg err';
+        msg.textContent = (e && e.message) || '兑换失败';
+      }
+    };
+
+    document.getElementById('btn-clear').onclick = () => {
+      MA.clearEntitlement();
+      document.getElementById('msg').className = 'msg';
+      document.getElementById('msg').textContent = '已清除本机状态';
+      renderStatus();
+    };
+  </script>
+</body>
+</html>
