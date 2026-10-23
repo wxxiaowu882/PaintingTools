@@ -12,7 +12,7 @@ export async function onRequestPost(context) {
   } catch (_e) {
     return jsonResponse({ ok: false, error: '请求无效' }, 400);
   }
-  const expected = getAdminPassword(context.env);
+  const expected = getAdminPassword(context.env, context.request);
   if (!expected) {
     return jsonResponse({
       ok: false,
@@ -22,10 +22,10 @@ export async function onRequestPost(context) {
   if (String(body.password || '') !== expected) {
     return jsonResponse({ ok: false, error: '口令不对' }, 401);
   }
-  const cookie = await issueAdminCookie(context.env);
+  const cookie = await issueAdminCookie(context.env, context.request);
   return jsonResponse({ ok: true }, 200, { 'Set-Cookie': cookie });
 }
 
 export async function onRequestDelete(context) {
-  return jsonResponse({ ok: true }, 200, { 'Set-Cookie': clearAdminCookie() });
+  return jsonResponse({ ok: true }, 200, { 'Set-Cookie': clearAdminCookie(context.request) });
 }

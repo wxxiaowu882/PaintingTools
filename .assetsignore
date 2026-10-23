@@ -1,0 +1,36 @@
+# Workers 静态资源忽略（语法同 gitignore）
+# soft-voice-f822 = Worker 仅静态资源；单文件上限 25 MiB
+
+.git/
+.wrangler/
+node_modules/
+dist/
+functions/
+Cloudflare/
+.cursor/
+历史备份文件/
+历史部署压缩包/
+临时_METS二级备考/
+
+# 自用工具整树不上传（避免超大 blend/glb；线上会员发版不依赖这些）
+自用工具文件_不部署/
+
+# 超大二进制（Workers 上限 25 MiB；需单独压缩后再放行）
+docs/model/石膏头像_男中青年_布鲁特斯_Bargello扫_opt.glb
+*.blend
+*.blend1
+*.blend2
+*.psd
+*.zip
+*.7z
+*.rar
+*.glb.bak
+
+# 构建/配置勿公开
+wrangler.toml
+.assetsignore
+.gitignore
+package.json
+package-lock.json
+docs/last-deploy.log
+docs/_test_run_portal20.bat

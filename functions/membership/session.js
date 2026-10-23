@@ -84,7 +84,14 @@ export function normalizeEntitlement(ent) {
   const level = ent.level === 'member' ? 'member' : 'free';
   const expiresAt = ent.expiresAt == null ? null : Number(ent.expiresAt);
   if (level === 'member' && expiresAt != null && expiresAt > 0 && expiresAt < Date.now()) {
-    return { tierId: 'free', level: 'free', expiresAt: null, source: 'expired' };
+    return {
+      tierId: 'free',
+      level: 'free',
+      expiresAt: null,
+      source: 'expired',
+      accountId: ent.accountId || null,
+      deviceId: ent.deviceId || null
+    };
   }
   return {
     tierId: ent.tierId || (level === 'member' ? 'member_3m' : 'free'),
@@ -92,7 +99,9 @@ export function normalizeEntitlement(ent) {
     expiresAt: expiresAt && expiresAt > 0 ? expiresAt : null,
     source: ent.source || 'server',
     redeemedAt: ent.redeemedAt || null,
-    jti: ent.jti || null
+    jti: ent.jti || null,
+    accountId: ent.accountId || null,
+    deviceId: ent.deviceId || null
   };
 }
 
@@ -119,10 +128,45 @@ export async function readEntitlementFromRequest(request, env) {
   if (!raw) return normalizeEntitlement(null);
   const secret = getSecret(env);
   const payload = await verifySigned(decodeURIComponent(raw), secret);
-  return normalizeEntitlement(payload);
+  let ent = normalizeEntitlement(payload);
+  // 已挂账号：以 KV 账号权益为准，并校验设备仍在名额内
+  if (ent.accountId) {
+    try {
+      const { loadAccount, deviceAllowed } = await import('./accounts.js');
+      const acct = await loadAccount(env, ent.accountId);
+      if (!acct) {
+        return normalizeEntitlement({ tierId: 'free', level: 'free', source: 'account_missing' });
+      }
+      if (ent.deviceId && !deviceAllowed(acct, ent.deviceId)) {
+        return normalizeEntitlement({
+          tierId: 'free',
+          level: 'free',
+          source: 'device_kicked',
+          accountId: ent.accountId
+        });
+      }
+      const ae = normalizeEntitlement(acct.entitlement || null);
+      ae.accountId = acct.accountId;
+      ae.deviceId = ent.deviceId || null;
+      ae.source = ae.source || 'account';
+      return ae;
+    } catch (_e) {
+      return ent;
+    }
+  }
+  return ent;
 }
 
-export async function buildSessionCookie(entitlement, env) {
+/** http://127.0.0.1 本地预览不能带 Secure，否则浏览器不存 Cookie */
+export function cookieFlags(request) {
+  let secure = false;
+  try {
+    if (request && new URL(request.url).protocol === 'https:') secure = true;
+  } catch (_e) {}
+  return secure ? '; SameSite=Lax; Secure; HttpOnly' : '; SameSite=Lax; HttpOnly';
+}
+
+export async function buildSessionCookie(entitlement, env, request) {
   const ent = normalizeEntitlement(entitlement);
   const secret = getSecret(env);
   const token = await signPayload(ent, secret);
@@ -130,11 +174,11 @@ export async function buildSessionCookie(entitlement, env) {
     ent.expiresAt == null
       ? MAX_AGE_FOREVER
       : Math.max(60, Math.floor((ent.expiresAt - Date.now()) / 1000));
-  return `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; SameSite=Lax; Secure; HttpOnly`;
+  return `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}${cookieFlags(request)}`;
 }
 
-export function clearSessionCookie() {
-  return `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; Secure; HttpOnly`;
+export function clearSessionCookie(request) {
+  return `${COOKIE_NAME}=; Path=/; Max-Age=0${cookieFlags(request)}`;
 }
 
 export function jsonResponse(data, status, headers) {

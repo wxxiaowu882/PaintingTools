@@ -4,29 +4,30 @@
  */
 (function() {
     // === 1. 数据驱动：菜单配置 ===
+    // 站内跳转一律无 .html 后缀（与线上隐藏后缀一致）；Solid 文件名大小写敏感，用 /Solid
     const menuConfig = [
         { type: 'header', text: 'TOOLS ARCHIVE' },
-        { id: '00', text: '首页 · Home', url: 'index.html', color: '#FCD34D' },
+        { id: '00', text: '首页 · Home', url: '/index', color: '#FCD34D' },
         
         { type: 'category', text: '造型基础' },
-        { id: '01', text: '几何体 · 静物', url: 'solid.html?sandbox=geometry', color: '#3B82F6' },
+        { id: '01', text: '几何体 · 静物', url: '/Solid?sandbox=geometry', color: '#3B82F6' },
         
         { type: 'category', text: '肖像' },
-        { id: '02', text: '头骨 · 骨点 · 肌肉', url: 'Portrait_c.html?lib=anatomy', color: '#A855F7' },
-        { id: '03', text: '五官', url: 'Portrait_c.html?lib=facial', color: '#C026D3' },
-        { id: '04', text: '头部造型规律', url: 'solid.html?sandbox=headform', color: '#D946EF' },
-        { id: '05', text: '肖像光影沙盒', url: 'solid.html?sandbox=portrait', color: '#F43F5E' },
-        { id: '06', text: '吴晓的作品', url: 'Gallery.html', color: '#EC4899' },
+        { id: '02', text: '头骨 · 骨点 · 肌肉', url: '/Portrait_c?lib=anatomy', color: '#A855F7' },
+        { id: '03', text: '五官', url: '/Portrait_c?lib=facial', color: '#C026D3' },
+        { id: '04', text: '头部造型规律', url: '/Solid?sandbox=headform', color: '#D946EF' },
+        { id: '05', text: '肖像光影沙盒', url: '/Solid?sandbox=portrait', color: '#F43F5E' },
+        { id: '06', text: '吴晓的作品', url: '/Gallery', color: '#EC4899' },
         { id: '07', text: '课程预约', url: '', disabled: true, tag: 'Coming Soon' },
-        { id: '07b', text: '会员 · 兑换', url: 'member.html', color: '#E8C547' },
+        { id: '07b', text: '会员 · 兑换', url: '/member', color: '#E8C547' },
 
         { type: 'category', text: '实用工具' },
-        { id: '08', text: '色阶分析 · 网格构图', url: 'GR.html', color: '#3B82F6' },
-        { id: '09', text: '智能调色 · 颜料管理', url: 'XStudio.html', color: '#A855F7' },
-        { id: '10', text: 'AR 线稿描摹', url: 'ARSketch.html', color: '#22C55E' },
+        { id: '08', text: '色阶分析 · 网格构图', url: '/GR', color: '#3B82F6' },
+        { id: '09', text: '智能调色 · 颜料管理', url: '/XStudio', color: '#A855F7' },
+        { id: '10', text: 'AR 线稿描摹', url: '/ARSketch', color: '#22C55E' },
 
         { type: 'category', text: '游戏' },
-        { id: '11', text: '色感训练 · 光谱行者', url: 'games/ChromaWalker.html', color: '#F59E0B' },
+        { id: '11', text: '色感训练 · 光谱行者', url: '/games/ChromaWalker', color: '#F59E0B' },
 
         { type: 'footer', text: '© 2026 手绘工坊 · 童画师吴晓' }
     ];
@@ -172,17 +173,22 @@
         backArrow.innerHTML = '<svg width="60" height="24" viewBox="0 0 60 24" fill="none" style="display:block;"><path d="M0.5 12L10 1M0.5 12L60 12M0.5 12L10 23" stroke="currentColor" stroke-width="0.5"/></svg>';
         container.appendChild(backArrow);
 
-        const currentPath = (window.location.pathname.split('/').pop() || 'index.html').toLowerCase();
+        function menuPathKey(p) {
+            let s = String(p || '').split('?')[0].split('/').pop() || '';
+            s = s.toLowerCase();
+            if (s.endsWith('.html')) s = s.slice(0, -5);
+            return s || 'index';
+        }
+        const currentPath = menuPathKey(window.location.pathname);
         function isMenuItemActive(item) {
             if (item.disabled || !item.url) return false;
-            const pathPart = item.url.split('?')[0].split('/').pop() || '';
-            const base = pathPart.toLowerCase();
-            const pathOk = base === currentPath || (currentPath === '' && base === 'index.html');
+            const base = menuPathKey(item.url);
+            const pathOk = base === currentPath;
             if (!pathOk) return false;
             const qMark = item.url.indexOf('?');
             const curParams = new URLSearchParams(window.location.search || '');
             if (qMark < 0) {
-                if (base === 'solid.html') {
+                if (base === 'solid') {
                     const s = (curParams.get('sandbox') || 'geometry').toLowerCase();
                     return s === 'geometry';
                 }
@@ -223,7 +229,11 @@
                     html += `<div class="hover-line" style="background:${item.color}; ${isActive ? 'width:100%;' : ''}"></div>`;
                     el.onclick = () => {
                         if (isActive) {
-                            window.toggleMenu(); 
+                            window.toggleMenu();
+                            // 当前页菜单项：关菜单后补一刀（防 history.back 时漏通知）
+                            setTimeout(function () {
+                                try { if (typeof window.__solidOnGlobalMenuClosed === 'function') window.__solidOnGlobalMenuClosed(); } catch (_eAct) {}
+                            }, 80);
                         } else {
                             window.zoomAndNavigate(item.url);
                         }
@@ -276,7 +286,17 @@
     }
 
     // === 4. 核心路由与状态管理 ===
-    let lastTriggerBtn = null; 
+    let lastTriggerBtn = null;
+    // 用独立标记：hashchange 多趟 sync 时 class 可能已被摘掉，不能只靠 classList 判断「刚关闭」
+    let _globalMenuUiOpen = false;
+
+    function _notifySolidMenuClosed() {
+        if (typeof window.__solidOnGlobalMenuClosed !== 'function') return;
+        // history.back 异步清 hash；稍后再通知，避免与多趟 sync 抢状态
+        setTimeout(function () {
+            try { window.__solidOnGlobalMenuClosed(); } catch (_eSolidMenu) {}
+        }, 30);
+    }
 
     function syncMenuWithHash() {
         const overlay = document.getElementById('global-menu-overlay');
@@ -286,6 +306,7 @@
         const btns = document.querySelectorAll('#menu-trigger, #menu-trigger-overlay, .menu-open');
 
         if (shouldBeActive) {
+            _globalMenuUiOpen = true;
             overlay.classList.add('active');
             btns.forEach(btn => btn.classList.add('menu-open'));
             // [新增] 菜单打开时校准底部箭头状态
@@ -294,11 +315,15 @@
                 setTimeout(window._updateMenuScrollIndicator, 400); // 等待动画完成再次测算
             }
         } else {
+            const closing = _globalMenuUiOpen || overlay.classList.contains('active');
+            _globalMenuUiOpen = false;
             overlay.classList.remove('active');
             btns.forEach(btn => {
                 btn.classList.remove('menu-open');
                 if (typeof btn.blur === 'function') btn.blur(); 
             });
+            // Solid 等页：关菜单后若仍未选课，须回课表，禁止空舞台（点当前沙盒菜单项也会走这里）
+            if (closing) _notifySolidMenuClosed();
         }
     }
 

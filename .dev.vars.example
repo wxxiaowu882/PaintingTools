@@ -1,0 +1,6 @@
+# 可选：仅在你手动跑 wrangler pages/dev 调试 functions 时复制为仓库根 .dev.vars
+# （.dev.vars 已 gitignore，不会上传）
+# 日常验收请用测试站（Portal 20b / 21c），不必再用本机 8788 运营台。
+
+MEMBERSHIP_ADMIN_PASSWORD=ops-local
+MEMBERSHIP_SECRET=dev-only-local-membership-secret-change-me

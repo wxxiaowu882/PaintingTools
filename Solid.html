@@ -24,7 +24,8 @@
     .menu-open .line-1{transform:rotate(45deg) translateY(-2px);background-color:rgba(255,255,255,0.72);} .menu-open .line-2{opacity:0;} .menu-open .line-3{transform:rotate(-45deg) translateY(2px);background-color:rgba(255,255,255,0.72);}
     /* 顶栏按钮（左上场景选择 + 右上菜单）：弱化亮度 + 上移，兼容刘海安全区；左边贴边 */
     /* z-index 须低于 #scene-loader(6000)，避免菜单进入后的加载画面上仍露出「场景：」控件 */
-    #top-left-scene-btn{top:20px !important; left:max(6px, env(safe-area-inset-left, 0px)) !important; opacity:0.82; transform:translateY(calc(env(safe-area-inset-top, 0px) - 16px)); z-index:5000 !important;}
+    /* z-index 须高于 #persistent-warning(6000)，否则顶部提示条会把「场景：」盖住看不见 */
+    #top-left-scene-btn{top:20px !important; left:max(6px, env(safe-area-inset-left, 0px)) !important; opacity:0.82; transform:translateY(calc(env(safe-area-inset-top, 0px) - 16px)); z-index:7001 !important;}
     /* 防回归：模型画布区域保持固定铺满，不受顶栏位移影响 */
     #canvas-container{top:0 !important; right:0 !important; bottom:0 !important; left:0 !important;}
     #top-left-scene-btn span{color:rgba(255,255,255,0.78) !important;}
@@ -53,6 +54,9 @@
     #solid-first-frame-hint-text{font-size:11px;color:rgba(255,255,255,0.42);letter-spacing:0.12em;font-weight:200;text-align:center;}
     .scene-load-bar-track{width:100%;height:2px;background:rgba(255,255,255,0.1);border-radius:1px;overflow:hidden;}
     .scene-load-bar-fill{display:block;height:100%;width:100%;background:rgba(255,255,255,0.55);transform-origin:left center;transform:scaleX(0);will-change:transform;}
+    /* 启动期未拿到真实进度时：细微呼吸，避免「卡死在 0%」的观感 */
+    #scene-loader.solid-boot-indeterminate .scene-load-bar-fill{animation:solid-boot-bar-pulse 1.1s ease-in-out infinite;}
+    @keyframes solid-boot-bar-pulse{0%,100%{opacity:0.45;}50%{opacity:0.95;}}
     /* 可视化场景网格弹窗 UI */
     #scene-grid-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9000; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); flex-direction:column; box-sizing:border-box; min-height:100vh; min-height:-webkit-fill-available; min-height:100dvh; padding:max(30px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(30px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px)); }
     .modal-header { display:flex; justify-content:space-between; align-items:center; color:#fff; margin-bottom:20px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.1); }
@@ -62,14 +66,17 @@
     .scene-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows:max-content; gap:15px; overflow-y:auto; flex:1; align-content:start; padding-bottom:30px; min-height:0; -webkit-overflow-scrolling:touch; }
     .scene-item { background:rgba(20,20,20,0.8); border:1px solid rgba(255,255,255,0.05); border-radius:10px; cursor:pointer; transition:all 0.3s cubic-bezier(0.4,0,0.2,1); overflow:hidden; position:relative; display:flex; flex-direction:column; box-shadow:0 4px 15px rgba(0,0,0,0.5); align-self:start; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
     .scene-item:hover, .scene-item.active { border-color:#fff; background:rgba(40,40,40,1); transform:translateY(-2px); box-shadow:0 8px 25px rgba(0,0,0,0.8); }
-    .scene-thumb { width:100%; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; background:#111; flex-shrink:0; }
+    .scene-thumb { width:100%; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; background:#111; flex-shrink:0; transition:opacity 0.28s ease; }
+    .scene-thumb.solid-thumb-pending { opacity:0.22; }
+    .scene-thumb.solid-thumb-ready { opacity:1; }
     .scene-name { padding:10px 8px; font-size:11px; text-align:center; color:#ddd; font-weight:300; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .scene-item.active::after { content:''; position:absolute; inset:0; border:2px solid #2ecc71; border-radius:10px; pointer-events:none; }
     /* 场景选择：左图右文列表（v2，demo/新数据用） */
     html.solid-scene-list-v2 .scene-grid { display:flex; flex-direction:column; gap:10px; padding-top:2px; }
     html.solid-scene-list-v2 .scene-item { display:flex; flex-direction:row; align-items:flex-start; gap:12px; padding:10px; }
     /* 手机端略加大缩略图 */
-    html.solid-scene-list-v2 .scene-thumb { width:132px; height:132px; aspect-ratio:auto; border-radius:10px; opacity:0.95; background:#111; }
+    html.solid-scene-list-v2 .scene-thumb { width:132px; height:132px; aspect-ratio:auto; border-radius:10px; background:#111; }
+    html.solid-scene-list-v2 .scene-thumb.solid-thumb-ready { opacity:0.95; }
     /* 移动端/默认：保持紧凑（不要被 PC 调整影响） */ .scene-meta { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; padding:0; }
     .scene-title { font-size:13px; font-weight:300; color:rgba(255,255,255,0.92); letter-spacing:0.06em; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .scene-detail { font-size:11px; color:rgba(175,178,186,0.92); line-height:1.55; white-space:normal; word-break:break-word; } .scene-detail b { color:rgba(255,255,255,0.92); font-weight:500; }
@@ -146,11 +153,47 @@
     <feComponentTransfer in="gray" id="posterize-transfer" result="posterizedGray"> <feFuncR type="discrete" tableValues="0 0.5 1"/>
     <feFuncG type="discrete" tableValues="0 0.5 1"/> <feFuncB type="discrete" tableValues="0 0.5 1"/> </feComponentTransfer>
     <feBlend mode="luminosity" in="posterizedGray" in2="SourceGraphic"/> </filter> </svg>
-    <div id="persistent-warning" style="display:none;position:fixed;top:0;left:0;width:100%;background:rgba(0,0,0,0.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);text-align:center;padding:6px 10px;font-size:9px;z-index:6000;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;">未能开启高级渲染。需要时可点「开启渲染」再试</div>
+    <div id="persistent-warning" style="display:none;position:fixed;top:0;left:0;width:100%;background:rgba(0,0,0,0.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);text-align:center;padding:6px 10px;font-size:9px;z-index:4500;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;">未能开启高级渲染。需要时可点「开启渲染」再试</div>
     <div id="fallback-msg" style="display:none;position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:6001;background:rgba(18,18,18,0.85);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;width:92%;max-width:320px;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.8);"> <h2 style="color:#fff;font-size:14px;font-weight:400;margin:0 0 8px 0;letter-spacing:1px;">暂时无法开启高级渲染</h2> <p style="color:#a0a0a0;font-size:11px;line-height:1.6;font-weight:300;margin:0 0 14px 0;">本次未能开启高级渲染，仍可正常观察模型与标注。关闭提示后，可随时点「开启渲染」再试。</p> <button id="retry-btn" onclick="acknowledgeFallback()" style="width:100%;background:#fff;border:none;color:#000;padding:9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:0.2s;">知道了</button> </div>
-    <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center"> <div id="scene-loader-inner"> <div id="scene-load-pct">0%</div> <div class="scene-load-bar-track" aria-hidden="true"><div id="scene-load-bar-fill" class="scene-load-bar-fill"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">系统环境初始化中...</div> <div id="loader-subtext"></div> </div> </div>
+    <div id="scene-loader" class="fixed inset-0 z-[6000] flex flex-col items-center justify-center solid-boot-indeterminate"> <div id="scene-loader-inner"> <div id="scene-load-pct">0%</div> <div class="scene-load-bar-track" aria-hidden="true"><div id="scene-load-bar-fill" class="scene-load-bar-fill"></div></div> <div id="loader-text" class="font-hairline text-[14px] tracking-[0.18em] text-white/45 text-center px-2">正在打开课程列表…</div> <div id="loader-subtext" class="font-hairline text-[10px] tracking-[0.08em] text-white/28 text-center px-2">可先稍等，列表出来后即可选课</div> </div> </div>
+    <script>
+    /* 列表优先：在 Three/插件大模块下载前并行预取课表，并给启动进度一点「呼吸感」 */
+    (function () {
+      try {
+        var qs = new URLSearchParams(window.location.search || '');
+        var sb = (qs.get('sandbox') || 'geometry').toLowerCase();
+        if (sb !== 'geometry' && sb !== 'portrait' && sb !== 'headform') sb = 'geometry';
+        window.__solidBootSandbox = sb;
+        window.__solidCatalogPrefetch = fetch('/api/membership/catalog?sandbox=' + encodeURIComponent(sb), {
+          credentials: 'same-origin',
+          cache: 'no-cache'
+        }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+        var p = 2;
+        var fill = document.getElementById('scene-load-bar-fill');
+        var pct = document.getElementById('scene-load-pct');
+        if (fill) fill.style.transform = 'scaleX(0.02)';
+        if (pct) pct.textContent = '2%';
+        window.__solidBootProgressTimer = setInterval(function () {
+          if (window.__solidBootProgressStop) return;
+          p = Math.min(22, p + 0.9);
+          window.__solidBootLastP = p;
+          if (fill) fill.style.transform = 'scaleX(' + (p / 100) + ')';
+          if (pct) pct.textContent = Math.floor(p) + '%';
+        }, 140);
+        window.__solidStopBootProgress = function () {
+          window.__solidBootProgressStop = true;
+          try { if (window.__solidBootProgressTimer) clearInterval(window.__solidBootProgressTimer); } catch (_e) {}
+          window.__solidBootProgressTimer = null;
+          try {
+            var ld = document.getElementById('scene-loader');
+            if (ld) ld.classList.remove('solid-boot-indeterminate');
+          } catch (_e2) {}
+        };
+      } catch (_eBoot) {}
+    })();
+    </script>
     <div id="perf-test-overlay" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9100;pointer-events:none;background:rgba(0,0,0,0.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:8px 14px;align-items:center;justify-content:center;gap:10px;flex-direction:row;border-bottom:1px solid rgba(255,255,255,0.06);"> <div class="w-3.5 h-3.5 rounded-full border-2 border-white/20 border-t-white animate-spin shrink-0"></div> <div style="min-width:0;text-align:left;"> <div class="font-hairline text-[10px] tracking-[0.14em] text-white/80">首次进入：后台检测设备渲染…</div> <div id="perf-test-phase" class="text-[8px] text-white/40 mt-0.5">可先浏览课程列表</div> </div> </div>
-    <div id="top-left-scene-btn" style="position:fixed; top:20px; left:max(6px, env(safe-area-inset-left, 0px)); z-index:5000; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:4px 5px 4px 4px; border-radius:10px; display:flex; align-items:center; gap:4px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="openSceneGridModal()"> <span class="solid-scene-label" style="color:#fff; font-weight:400; letter-spacing:0;">场景：</span>
+    <div id="top-left-scene-btn" style="position:fixed; top:20px; left:max(6px, env(safe-area-inset-left, 0px)); z-index:7001; cursor:pointer; background:rgba(15,15,15,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); padding:4px 5px 4px 4px; border-radius:10px; display:flex; align-items:center; gap:4px; box-shadow:0 4px 15px rgba(0,0,0,0.5); transition:all 0.3s;" onclick="openSceneGridModal()"> <span class="solid-scene-label" style="color:#fff; font-weight:400; letter-spacing:0;">场景：</span>
     <span id="scene-trigger-top" style="color:#fff; font-weight:normal; max-width:min(72vw, 320px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">点击选择...</span> <span style="color:#666; font-size:10px;">▼</span> </div>
     <div id="menu-trigger-overlay" onclick="toggleMenu()"><span class="menu-line line-1"></span><span class="menu-line line-2"></span><span class="menu-line line-3"></span></div>
     <div id="scene-grid-modal">
@@ -318,7 +361,7 @@
     window._solidUserStoppedRender = true;
     window.perfTestDone = false; window.isTestingPerformance = true; window.isLoadingScene = false; window._solidHardwareUnsupported = false; window._solidPerfSoftFail = false; window._solidSampleTimeout = false; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
     window.__solidJsonLoadStarted = false; window.__solidPendingSwitchSceneIndex = null; window.__solidPerfBgActive = false;
-    window.__solidInitRenderReady = false; window.__solidPerfKickStarted = false; window.__solidPerfWantBackground = false;
+    window.__solidInitRenderReady = false; window.__solidPerfKickStarted = false; window.__solidPerfWantBackground = false; window.__solidPerfDeferred = false;
     window.__solidNoInterModelShadow = false;
     window.updateDoFUIFromRaycaster = function(focusDist) { const slider = document.getElementById('dofFocusSlider'); if(slider) { slider.value = focusDist; if(window.updateDoFUI) window.updateDoFUI(); } };
     if (window.PosterizeShared && typeof window.PosterizeShared.init === 'function') {
@@ -500,7 +543,10 @@
     function safeDispose(obj) { if (!obj) return; if (Array.isArray(obj)) { obj.forEach(m => safeDispose(m)); return; }
     try { if (typeof obj.dispose === 'function') obj.dispose(); } catch(e) { /* 彻底静默，忽略第三方底层库的销毁瑕疵 */ } }
     window._solidContextLost = false; window._solidRecovering = false; window.__solidRecoverSeq = 0; window.__solidLastScheduleAt = 0;
-    window.__solidTryRecoverPathTracer = function(reason) { if (window._solidHardwareUnsupported) return false; if (window._solidRecovering) return false; if (!renderer || !scene || !camera) return false; window._solidRecovering = true; let recovered = false; try {
+    window.__solidTryRecoverPathTracer = function(reason) { if (window._solidHardwareUnsupported) return false; if (window._solidRecovering) return false; if (!renderer || !scene || !camera) return false;
+    // 默认预览：用户未点「开启渲染」时禁止自动切高级渲染（含软降级静默重试）
+    if (window._solidUserStoppedRender) { try { window.hwLog('[Recover] 用户预览模式，跳过自动开启高级渲染: ' + (reason || '')); } catch (_eR) {} return false; }
+    window._solidRecovering = true; let recovered = false; try {
     const gl = renderer.getContext ? renderer.getContext() : null; if (!gl) throw new Error('WebGL 上下文为空');
     if (typeof gl.isContextLost === 'function' && gl.isContextLost()) throw new Error('WebGL 上下文尚未恢复');
     if (!pathTracer) { pathTracer = new WebGLPathTracer(renderer); pathTracer.multipleImportanceSampling = _solidPtCfg.multipleImportanceSampling !== false; pathTracer.bounces = Number(_solidPtCfg.bounces || 3); pathTracer.renderScale = _solidPathTracerRenderScale(); if ('filterGlossyFactor' in pathTracer) pathTracer.filterGlossyFactor = _solidPt.filterGlossyFactor; }
@@ -823,7 +869,7 @@
     } catch (_eR3) {}
     } catch (_e) {}
     }
-    window.forceReRender = function() { window._solidUserStoppedRender = false; try { _solidClearDegradeGuard(); } catch(_eG) {} if (window._solidHardwareUnsupported) { window.hwLog('[forceReRender] 当前设备暂不支持高级渲染'); (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '当前设备暂不支持高级渲染'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 2500); } })(); try { syncRenderButtons(); } catch(_eBtn) {} return; }
+    window._solidDoForceReRenderCore = function() {
     try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.setEnabled) window.__solidPreviewLighting.setEnabled(false); } catch (_eT) {}
     try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.dispose) window.__solidPreviewLighting.dispose(); } catch (_eDisp) {}
     window.useAdvancedRender = true; document.getElementById('fallback-msg').style.display = 'none'; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
@@ -849,7 +895,12 @@
     if (_entered && pathTracer) { window.isUnsupported = false; window._solidContextLost = false; window._solidSampleTimeout = false; window._solidPerfSoftFail = false;
     if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); }
     syncRenderButtons();
-    hwLog("已尝试开启渲染并重建状态"); }; window.isUnsupported = false;
+    hwLog("已尝试开启渲染并重建状态");
+    };
+    // 仅用户点「开启渲染」才进高级（进课不测、不自动开；设备检测不再挡在开启按钮前）
+    window.forceReRender = function() { window._solidUserStoppedRender = false; try { _solidClearDegradeGuard(); } catch(_eG) {} if (window._solidHardwareUnsupported) { window.hwLog('[forceReRender] 当前设备暂不支持高级渲染'); (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '当前设备暂不支持高级渲染'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 2500); } })(); try { syncRenderButtons(); } catch(_eBtn) {} return; }
+    window._solidDoForceReRenderCore();
+    }; window.isUnsupported = false;
     window.__solidLastDegradeReason = null;
     function _solidIsGlContextLost() {
         try { const gl = renderer && renderer.getContext ? renderer.getContext() : null; return !!(gl && typeof gl.isContextLost === 'function' && gl.isContextLost()); } catch (_e) { return false; }
@@ -1303,15 +1354,54 @@
     try { showSolidSketchModeToast(); } catch (_e) {} } };
     document.addEventListener('click', () => { document.querySelectorAll('.custom-options').forEach(el => el.classList.remove('show')); });
     window.solidPathTraceUiBlocksSample = function() { const m = document.getElementById('scene-grid-modal'); const modalOpen = m && (m.style.display === 'flex' || (typeof getComputedStyle === 'function' && getComputedStyle(m).display === 'flex')); const go = document.getElementById('global-menu-overlay'); const menuOpen = (typeof location !== 'undefined' && location.hash === '#menu') || (go && go.classList.contains('active')); return !!(modalOpen || menuOpen); };
+    /** 是否已选过课（未选课时禁止停在空舞台） */
+    window.__solidHasSelectedScene = function () {
+        return !((window.currentSceneIndex == null) || Number(window.currentSceneIndex) < 0);
+    };
+    /**
+     * 全局菜单关闭后：若仍未选课，强制回课表。
+     * 覆盖：列表 × → 菜单 → 再点「几何体·静物/当前沙盒」只关菜单、落到空舞台的路径。
+     */
+    window.__solidOnGlobalMenuClosed = function () {
+        try {
+            if (window.__solidHasSelectedScene()) return;
+            if (window.isLoadingScene || window.__solidFetchingSceneDetail || (window.__solidPendingSwitchSceneIndex != null)) return;
+            const ld = document.getElementById('scene-loader');
+            if (ld) {
+                const cs = (typeof getComputedStyle === 'function') ? getComputedStyle(ld) : null;
+                const shown = ld.style.display !== 'none' && (!cs || (cs.display !== 'none' && parseFloat(cs.opacity || '1') > 0.05));
+                if (shown) return;
+            }
+            // 菜单若仍开着（关动画中），下一帧再试一次
+            const go = document.getElementById('global-menu-overlay');
+            if (go && go.classList.contains('active')) {
+                setTimeout(function () {
+                    try { window.__solidOnGlobalMenuClosed(); } catch (_eRetry) {}
+                }, 60);
+                return;
+            }
+            const modal = document.getElementById('scene-grid-modal');
+            if (modal && modal.style.display === 'flex') return;
+            if (typeof window.openSceneGridModal === 'function') window.openSceneGridModal();
+        } catch (_eEnsure) {}
+    };
     window.closeSceneGridModal = function() {
-    const noScene = (window.currentSceneIndex == null) || Number(window.currentSceneIndex) < 0;
-    // 未选课就关列表：回全局菜单，不落到空舞台（几何体/肖像/头部造型等一致）
+    const modal = document.getElementById('scene-grid-modal');
+    // 进课/拉详情进行中：只关列表，绝不能当成「未选课」去开全局菜单
+    // （列表点击曾误在 await switchScene 前同步调用本函数，导致约 1s 后跳到菜单）
+    const entering = !!(window.isLoadingScene || window.__solidFetchingSceneDetail || (window.__solidPendingSwitchSceneIndex != null));
+    if (entering) {
+        if (modal) modal.style.display = 'none';
+        return;
+    }
+    const noScene = !window.__solidHasSelectedScene();
+    // 未选课就关列表：回全局菜单（关菜单时会经 __solidOnGlobalMenuClosed 再回课表，避免空舞台）
     if (noScene) {
+        if (modal) modal.style.display = 'none';
         const overlay = document.getElementById('global-menu-overlay');
         if (overlay && !overlay.classList.contains('active') && typeof window.toggleMenu === 'function') window.toggleMenu();
         return;
     }
-    const modal = document.getElementById('scene-grid-modal');
     if (modal) modal.style.display = 'none';
     };
 
@@ -1576,9 +1666,26 @@
     solidApplyAtmosphereStateToPanel(window.__solidSceneAtmosphere || { enabled: false, density: 0.02, type: 'basic', color: '#ffffff', p1: 0, p2: 0 });
     solidApplyDoFStateToPanel(window.__solidSceneDoF || { enabled: false, aperture: 2.8, focusDistance: 10 });
     const pChk = document.getElementById('posterizeEnable'); if(pChk) { pChk.checked = (window.posterizeLevel > 0); const pSld = document.getElementById('posterizeSlider'); if(pSld){ pSld.style.opacity = (window.posterizeLevel > 0)?'1':'0.5'; } } if (window.syncAtmosAndPosterizeSliderInteractivity) window.syncAtmosAndPosterizeSliderInteractivity(); lightMoved = true; try { if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('reset_all'); } catch(_eP) {} };
-    window.switchScene = function(index) {
-    if (window.isLoadingScene) return;
+    window.switchScene = async function(index) {
+    // 进课/拉详情进行中：立刻给反馈并改排队目标，禁止「点了没反应」
+    if (window.isLoadingScene || window.__solidFetchingSceneDetail) {
+        window.__solidPendingSwitchSceneIndex = index;
+        try {
+            document.getElementById('scene-grid-modal').style.display = 'none';
+            const ldQ = document.getElementById('scene-loader');
+            if (ldQ) { ldQ.style.display = 'flex'; ldQ.style.opacity = '1'; }
+            setLoaderText('正在切换场景…', true);
+            setLoaderSubtext('当前课加载完成后将进入你刚点的场景', true);
+        } catch (_eQ) {}
+        try { window.hwLog('[switchScene] 加载中已改排队 index=' + index); } catch (_eQL) {}
+        return;
+    }
     if(index === window.currentSceneIndex) return;
+    // 首次进列表时已推迟检测：真正点进课时再测（逻辑在 init 内挂到 window，避免闭包找不到）
+    if (window.__solidPerfDeferred && typeof window._solidRunDeferredPerfThenEnter === 'function') {
+        if (window._solidRunDeferredPerfThenEnter(index)) return;
+        // 返回 false：无法/不必测，继续走正常进课
+    }
     // 【列表优先】后台 PerfTest 未结束时不可清场：排队，检测完再进课
     const _perfBusy = !!(window.PerfTester && window.PerfTester.isTesting) || (!!window.isTestingPerformance && !window.perfTestDone);
     if (_perfBusy) {
@@ -1592,6 +1699,46 @@
             setLoaderProgress(Math.max(8, window._solidPerfHardwareLastP || 8));
         } catch (_eGate) {}
         try { window.hwLog('[switchScene] 设备检测未完成，已排队 index=' + index); } catch (_eGateLog) {}
+        return;
+    }
+    // 列表仅为轻量卡：进课前再拉单课全文（避免课表接口塞 1MB+ 缩略图把首屏卡死）
+    try {
+        const _pre = window.customScenes && window.customScenes[index];
+        if (_pre && _pre.__listOnly && !_pre.__membershipLocked && window.MembershipAccess && typeof window.MembershipAccess.fetchScene === 'function') {
+            window.__solidFetchingSceneDetail = true;
+            document.getElementById('scene-grid-modal').style.display = 'none';
+            const ld0 = document.getElementById('scene-loader');
+            if (ld0) { ld0.style.display = 'flex'; ld0.style.opacity = '1'; }
+            setLoaderText('加载场景内容…', true);
+            setLoaderSubtext('正在下载本课模型与标注', true);
+            setLoaderProgress(4);
+            try {
+                const full = await window.MembershipAccess.fetchScene(window.__solidSandboxKey || 'geometry', _pre.name);
+                if (full && typeof full === 'object') {
+                    window.customScenes[index] = Object.assign({}, _pre, full);
+                    delete window.customScenes[index].__listOnly;
+                }
+            } finally {
+                window.__solidFetchingSceneDetail = false;
+            }
+            // 拉详情期间用户又点了别的课：改去排队目标，不继续进旧 index
+            if (window.__solidPendingSwitchSceneIndex != null && window.__solidPendingSwitchSceneIndex !== index) {
+                const _next = window.__solidPendingSwitchSceneIndex;
+                window.__solidPendingSwitchSceneIndex = null;
+                try { window.switchScene(_next); } catch (_ePend) {}
+                return;
+            }
+        }
+    } catch (_eSceneFetch) {
+        window.__solidFetchingSceneDetail = false;
+        window.isLoadingScene = false;
+        try {
+            setLoaderText((_eSceneFetch && _eSceneFetch.locked) ? '该场景需要会员' : ('场景加载失败：' + (_eSceneFetch && _eSceneFetch.message ? _eSceneFetch.message : _eSceneFetch)), true);
+            if (_eSceneFetch && _eSceneFetch.locked && window.MembershipAccess && window.MembershipAccess.promptUpgrade) {
+                window.MembershipAccess.promptUpgrade({ rule: { label: (window.customScenes[index] && window.customScenes[index].name) || '会员场景' } });
+            }
+        } catch (_eMsg) {}
+        try { document.getElementById('scene-grid-modal').style.display = 'flex'; } catch (_eM) {}
         return;
     }
     const _token = ++window.__solidSceneLoadToken;
@@ -1792,9 +1939,11 @@
     if (_isStale()) return;
     try { if (!window.useAdvancedRender) { try { if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); } catch (_eSkyIn) {} try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('scene_changed'); else if (typeof window._solidRequestRasterEnvProbe === 'function') window._solidRequestRasterEnvProbe('scene_changed'); } catch(_eP0) {} try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD0) {} try { requestAnimationFrame(() => { try { if (!window.useAdvancedRender) _solidTryRasterPreviewDraw(); } catch (_eD1) {} }); } catch (_eR1) {} }); } catch (_eR0) {} } } catch(_eVrIn) {}
     solidSceneLoadUxBeginStabilize();
+    // 加载中用户又点了别的课：本课收尾后立刻进排队目标
+    try { if (typeof window._solidDrainPendingSwitchScene === 'function') window._solidDrainPendingSwitchScene(); } catch (_eDrainSc) {}
     } catch (_ePhaseChain) {}
     })();
-    }).catch(err => { if (_isStale()) return; window.isLoadingScene = false; setLoaderProgress(0); solidSceneLoadUxFinish(); window.hwLog("场景加载致命异常: " + err.message); });
+    }).catch(err => { if (_isStale()) return; window.isLoadingScene = false; setLoaderProgress(0); solidSceneLoadUxFinish(); window.hwLog("场景加载致命异常: " + err.message); try { if (typeof window._solidDrainPendingSwitchScene === 'function') window._solidDrainPendingSwitchScene(); } catch (_eDrainEr) {} });
     };
     function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
     
@@ -1823,7 +1972,9 @@
         window.loadJSONData = function() {
         if (window.__solidJsonLoadStarted) return;
         window.__solidJsonLoadStarted = true;
-        setLoaderText("获取场景配置数据...");
+        try { if (typeof setLoaderProgress === 'function') setLoaderProgress(Math.max(24, window.__solidBootLastP || 24)); } catch (_eP0) {}
+        setLoaderText("正在加载课程列表…", true);
+        try { setLoaderSubtext('列表出来后即可选课，缩略图会陆续补上', true); } catch (_eSub0) {}
         document.getElementById('scene-loader').style.display = 'flex'; document.getElementById('scene-loader').style.opacity = '1';
         const _qs = new URLSearchParams(window.location.search || '');
         // 默认启用 v2（demo）列表样式；如需回退旧网格：?sceneListV2=0
@@ -1831,10 +1982,11 @@
         if (_forceV2) { try { document.documentElement.classList.add('solid-scene-list-v2'); } catch(_e) {} }
         const _sandboxKey = window.__solidSandboxKey || 'geometry';
         // 会员安全：优先经 MembershipAccess.fetchCatalog（服务端过滤）；失败时仅 localhost 可回退
+        // 课表接口已按 Cookie 过滤，不必等 ready()/me 完成再拉列表（ready 并行跑即可）
         (async function _solidLoadMembershipCatalog() {
         try {
             if (window.MembershipAccess && typeof window.MembershipAccess.ready === 'function') {
-                await window.MembershipAccess.ready();
+                try { window.MembershipAccess.ready(); } catch (_eReadyKick) {}
             }
             let data = [];
             if (window.MembershipAccess && typeof window.MembershipAccess.fetchCatalog === 'function') {
@@ -1843,12 +1995,27 @@
                 throw new Error('MembershipAccess 未加载');
             }
             if (!Array.isArray(data)) data = data ? [data] : [];
+            try { if (typeof window.__solidStopBootProgress === 'function') window.__solidStopBootProgress(); } catch (_eStop) {}
             window.customScenes = data; buildSceneGridUI(data); if(data.length > 0) {
             document.getElementById('scene-loader').style.display = 'none'; document.getElementById('scene-grid-modal').style.display = 'flex';
             document.querySelector('.modal-close').style.display = 'inline-flex';
             try { if (typeof window._solidMaybeStartBackgroundPerf === 'function') window._solidMaybeStartBackgroundPerf(); } catch (_eKick) {}
+            // 缩略图分批渐进补全（不挡列表；每批到了就更新对应卡片，避免等齐再一次性闪现）
+            try {
+                if (window.__solidThumbHydrateCancel) {
+                    try { window.__solidThumbHydrateCancel(); } catch (_eC0) {}
+                    window.__solidThumbHydrateCancel = null;
+                }
+                if (window.MembershipAccess && typeof window.MembershipAccess.hydrateCatalogThumbs === 'function') {
+                    const job = window.MembershipAccess.hydrateCatalogThumbs(_sandboxKey, function (items) {
+                        try { if (typeof window.__solidApplyCatalogThumbsBatch === 'function') window.__solidApplyCatalogThumbsBatch(items); } catch (_eApply) {}
+                    });
+                    if (job && typeof job.cancel === 'function') window.__solidThumbHydrateCancel = job.cancel;
+                }
+            } catch (_eThumbKick) {}
             } else { setLoaderText("场景库为空..."); window.isUnsupported=true; }
         } catch (err) {
+            try { if (typeof window.__solidStopBootProgress === 'function') window.__solidStopBootProgress(); } catch (_eStop2) {}
             addHwLog("JSON请求或解析失败: " + (err && err.message ? err.message : err));
             document.getElementById('scene-loader').style.display='none';
         }
@@ -2103,7 +2270,7 @@
             return model;
         }
         function solidBindSceneItemActivate(el, idx) {
-            let sx = 0, sy = 0, moved = false, hadTouch = false;
+            let sx = 0, sy = 0, moved = false, hadTouch = false, lastActAt = 0;
             const TH = 8;
             function _pt(e) {
                 try {
@@ -2122,8 +2289,14 @@
             function _activate(e) {
                 if (_isFromFav(e)) return;
                 if (moved) return;
+                // 避免 pointerup + click / touchend + pointerup 连点两次（会员门禁会弹两次）
+                const now = Date.now();
+                if (now - lastActAt < 450) return;
+                lastActAt = now;
+                // 只交给 switchScene：它会关列表并进课。勿再调 closeSceneGridModal——
+                // switchScene 为 async，currentSceneIndex 在 await 拉详情前仍为 -1，
+                // 同步 close 会被判成「未选课」而误开全局菜单（再点同沙盒菜单项只关菜单，就像跳过了列表）。
                 try { window.switchScene(idx); } catch (_e) {}
-                try { window.closeSceneGridModal(); } catch (_e) {}
             }
             el.addEventListener('touchstart', (e) => {
                 hadTouch = true;
@@ -2152,10 +2325,7 @@
                 const dy = Math.abs(Number(p.clientY || 0) - sy);
                 if (dx > TH || dy > TH) moved = true;
             }, { passive: true });
-            el.addEventListener('pointerup', (e) => {
-                if (moved) return;
-                _activate(e);
-            }, { passive: true });
+            // 鼠标：交给 click；触控：touchend 已处理。勿再绑 pointerup，否则会与 click/touchend 双触发。
             el.addEventListener('click', (e) => {
                 if (hadTouch) return;
                 _activate(e);
@@ -2178,8 +2348,9 @@
             const titleTitle = isHeadform
                 ? (escapeHtml(title) + ((sceneData && sceneData.name) ? (' · ' + escapeHtml(String(sceneData.name))) : ''))
                 : escapeHtml(title);
+            const thumbCls = 'scene-thumb' + (thumb ? ' solid-thumb-ready' : ' solid-thumb-pending');
             item.innerHTML =
-            `<img src="${escapeHtml(thumb)}" class="scene-thumb" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Crect width=\\'100%25\\' height=\\'100%25\\' fill=\\'%23111\\'/%3E%3C/svg%3E'">` +
+            `<img src="${escapeHtml(thumb)}" class="${thumbCls}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Crect width=\\'100%25\\' height=\\'100%25\\' fill=\\'%23111\\'/%3E%3C/svg%3E'">` +
             `<div class="scene-meta">` +
               `<div class="scene-title" title="${titleTitle}" style="display:flex;align-items:center;gap:4px;white-space:normal;">` +
                 `<span style="min-width:0;flex:1;">${escapeHtml(title)}</span>` +
@@ -2240,6 +2411,70 @@
                 localStorage.setItem(solidFavViewStorageKey(), next);
             } catch (_e) {}
         }
+        /** 分批写入缩略图：改数据 + 只更新已渲染卡片的 img，不整表重建（避免一次性闪现） */
+        window.__solidApplyCatalogThumbsBatch = function (items) {
+            if (!Array.isArray(items) || !items.length || !Array.isArray(window.customScenes)) return;
+            const touched = Object.create(null);
+            function _solidThumbSceneKey(sc) {
+                if (!sc) return '';
+                const m = sc.meta || {};
+                const mid = m.modelId != null ? String(m.modelId) : '';
+                const slot = m.slot != null ? String(m.slot) : '';
+                const line = m.line != null ? String(m.line) : '';
+                if (mid || slot || line) return String(sc.name || '') + '\0' + mid + '\0' + slot + '\0' + line;
+                return '';
+            }
+            for (let i = 0; i < items.length; i++) {
+                const t = items[i];
+                if (!t || !t.thumbnail) continue;
+                const th = String(t.thumbnail);
+                let idx = (typeof t.index === 'number' && isFinite(t.index)) ? Math.floor(t.index) : -1;
+                // 优先绝对序号（同名多头模唯一可靠）；再退回 name+modelId+slot+line
+                if (idx < 0 || idx >= window.customScenes.length) {
+                    idx = -1;
+                    const want = String(t.name || '') + '\0' + String(t.modelId || '') + '\0' + String(t.slot || '') + '\0' + String(t.line || '');
+                    if (want !== '\0\0\0') {
+                        for (let j = 0; j < window.customScenes.length; j++) {
+                            if (_solidThumbSceneKey(window.customScenes[j]) === want) { idx = j; break; }
+                        }
+                    }
+                }
+                if (idx < 0 || idx >= window.customScenes.length) continue;
+                const sc = window.customScenes[idx];
+                if (!sc) continue;
+                // 防错位：若带了 name 则校验
+                if (t.name && sc.name && String(sc.name) !== String(t.name)) continue;
+                if (sc.thumbnail !== th) sc.thumbnail = th;
+                touched[idx] = true;
+            }
+            const nodes = document.querySelectorAll('#scene-grid-container .scene-item[data-scene-index]');
+            for (let n = 0; n < nodes.length; n++) {
+                const el = nodes[n];
+                const idx = Number(el.getAttribute('data-scene-index'));
+                if (!Number.isFinite(idx) || idx < 0 || !touched[idx]) continue;
+                const sc = window.customScenes[idx];
+                if (!sc || !sc.thumbnail) continue;
+                const img = el.querySelector('img.scene-thumb');
+                if (!img) continue;
+                const next = String(sc.thumbnail);
+                if (img.getAttribute('src') === next) {
+                    img.classList.remove('solid-thumb-pending');
+                    img.classList.add('solid-thumb-ready');
+                    continue;
+                }
+                img.classList.add('solid-thumb-pending');
+                img.classList.remove('solid-thumb-ready');
+                const onDone = function () {
+                    img.classList.remove('solid-thumb-pending');
+                    img.classList.add('solid-thumb-ready');
+                    img.removeEventListener('load', onDone);
+                    img.removeEventListener('error', onDone);
+                };
+                img.addEventListener('load', onDone);
+                img.addEventListener('error', onDone);
+                img.src = next;
+            }
+        };
         function buildSceneGridUI(dataArr) {
         const container = document.getElementById('scene-grid-container'); container.innerHTML = '';
         const favSet = solidLoadFavSet();
@@ -2623,28 +2858,28 @@
             resetSolidPerfHardwareProgress(); _solidHidePerfBgTip();
             try { syncRenderButtons(); } catch (_eBtnP) {}
             window.perfTestDone = true; window.isTestingPerformance = false;
+            window._solidPerfPassedOnce = true;
             try { localStorage.setItem('SolidPerfResult_v1', JSON.stringify({ passed: true, ts: Date.now(), ua: navigator.userAgent })); } catch(_e) {}
             // 列表已提前加载；此处只收尾并放行排队中的进课
             _solidDrainPendingSwitchScene();
         }
-        // 【软降级】：PerfTest 失败不判死刑，先走光栅，12 秒后静默重试
+        // 【软降级】：PerfTest 失败不判死刑，保持光栅预览；不再 12 秒静默重试（会误开高级渲染）
         function _solidPerfTestSoftFail() {
             resetSolidPerfHardwareProgress(); _solidHidePerfBgTip();
-            window._solidPerfSoftFail = true; window.useAdvancedRender = false; window.isTestingPerformance = false; window.perfTestDone = true;
+            window._solidPerfSoftFail = true; window.useAdvancedRender = false; window._solidUserStoppedRender = true;
+            window.isTestingPerformance = false; window.perfTestDone = true;
             if (pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch(_e) {} }, 0); }
             try { _solidCommitStandardRasterFallback('perf_soft_fail'); } catch (_eRf) {}
             _solidDismissRenderToast();
             try { syncRenderButtons(); } catch (_eBtnS) {}
-            window.hwLog('[Init] 性能测试未通过，软降级到光栅模式，12 秒后将静默重试');
+            window.hwLog('[Init] 性能测试未通过，保持光栅预览（需用户再点「开启渲染」）');
             (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '本次未能开启高级渲染，可稍后点「开启渲染」再试'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 4000); } })();
             const pw = document.getElementById('persistent-warning'); if (pw) { pw.textContent = '未能开启高级渲染。需要时可点「开启渲染」再试'; pw.style.display = 'block'; }
             _solidDrainPendingSwitchScene();
-            setTimeout(function() { if (window._solidPerfSoftFail && !window.isUnsupported && !document.hidden) {
-            window.hwLog('[Init] 软降级后静默重试渲染...'); const ok = window.__solidTryRecoverPathTracer('perf_soft_retry');
-            if (ok) { window._solidPerfSoftFail = false; const _pw = document.getElementById('persistent-warning'); if (_pw) _pw.style.display = 'none';
-            try { localStorage.setItem('SolidPerfResult_v1', JSON.stringify({ passed: true, ts: Date.now(), ua: navigator.userAgent })); } catch(_e) {}
-            } else { window.hwLog('[Init] 静默重试失败，保持降级模式'); } } }, 12000);
         }
+        window._solidPerfTestPassActions = _solidPerfTestPassActions;
+        window._solidPerfTestSoftFail = _solidPerfTestSoftFail;
+        window._solidDrainPendingSwitchScene = _solidDrainPendingSwitchScene;
         // 【列表优先】课表 JSON 已尽早拉取；PathTracer / PerfTest 等课表 modal 可见后再启动
         window.loadJSONData();
         window._solidEnsurePathTracerForPerf = function () {
@@ -2665,26 +2900,46 @@
             }
         };
         window._solidMaybeStartBackgroundPerf = function () {
-            if (window.__solidPerfKickStarted) return;
-            if (!window.__solidInitRenderReady) return;
-            if (!window.__solidPerfWantBackground) return;
-            try {
-                const modal = document.getElementById('scene-grid-modal');
-                const open = modal && (modal.style.display === 'flex' || (typeof getComputedStyle === 'function' && getComputedStyle(modal).display === 'flex'));
-                if (!open) return;
-            } catch (_eModal) { return; }
-            window.__solidPerfKickStarted = true;
-            window.__solidPerfWantBackground = false;
-            if (!window._solidEnsurePathTracerForPerf()) {
-                try { _solidPerfTestSoftFail(); } catch (_eSf) {}
-                return;
+            // 已改为「进课时再测」，列表阶段不再后台踢 PerfTest
+            return;
+        };
+        /** 列表浏览不测；用户点进某课时再测一次，完成后自动进入排队场景 */
+        window._solidRunDeferredPerfThenEnter = function (index) {
+            if (!window.__solidPerfDeferred) return false;
+            if (window._solidHardwareUnsupported) {
+                window.__solidPerfDeferred = false;
+                window.perfTestDone = true;
+                window.isTestingPerformance = false;
+                return false;
             }
-            window.__solidPerfBgActive = true;
+            window.__solidPerfDeferred = false;
+            window.perfTestDone = false;
             window.isTestingPerformance = true;
-            _solidShowPerfBgTip();
+            window.__solidPendingSwitchSceneIndex = index;
+            try {
+                document.getElementById('scene-grid-modal').style.display = 'none';
+                const ld = document.getElementById('scene-loader');
+                if (ld) { ld.style.display = 'flex'; ld.style.opacity = '1'; }
+                setLoaderText('设备检测中，即将进入场景…', true);
+                setLoaderSubtext('首次进入场景需编译着色器，完成后自动进入', true);
+                setLoaderProgress(8);
+            } catch (_eDefUi) {}
+            try { window.hwLog('[Init] 进课触发推迟的设备检测 index=' + index); } catch (_eL) {}
+            if (!window._solidEnsurePathTracerForPerf()) {
+                try { _solidPerfTestSoftFail(); } catch (_eSf) {
+                    window.perfTestDone = true; window.isTestingPerformance = false;
+                }
+                return true;
+            }
+            window.__solidPerfBgActive = false;
             startSolidPerfHardwareProgress(isMobile);
+            if (!window.PerfTester) {
+                _solidPerfTestPassActions();
+                return true;
+            }
             window.PerfTester.onProgress = function (ph) { applySolidPerfHardwarePhase(ph); };
             window.PerfTester.start(scene, camera, pathTracer, isMobile, function () { _solidPerfTestPassActions(); }, function () { _solidPerfTestSoftFail(); });
+            return true;
         };
         window.__solidInitRenderReady = true;
         // Host-specific (consumer): 首次进入性能测试与软降级策略保留在消费端，不抽到共享模块。
@@ -2696,10 +2951,16 @@
             if (skipPerfTest) window.hwLog("[Init] 通过URL参数跳过性能测试");
             _solidPerfTestPassActions(); animate();
         } else {
-            window.__solidPerfWantBackground = true;
-            window.isTestingPerformance = true;
-            _solidShowPerfBgTip();
-            try { window._solidMaybeStartBackgroundPerf(); } catch (_eKick2) {}
+            // 【默认预览】列表与进课都不自动跑 PerfTest / 不自动高级渲染；仅用户点「开启渲染」才进高级。
+            window.__solidPerfDeferred = false;
+            window.__solidPerfWantBackground = false;
+            window.isTestingPerformance = false;
+            window.perfTestDone = true;
+            window._solidPerfPassedOnce = false;
+            window.useAdvancedRender = false;
+            window._solidUserStoppedRender = true;
+            _solidHidePerfBgTip();
+            try { window.hwLog('[Init] 默认光栅预览：不进课测、不自动高级渲染；点「开启渲染」再开启'); } catch (_eDef) {}
             animate();
         } } catch (e) { window.hwLog("[Init] 渲染/后续初始化异常: " + e.message); triggerUnsupported('init_post_path_tracer', e.message); } }); }
         document.addEventListener('visibilitychange', () => {
@@ -2955,12 +3216,13 @@
         // 【采样超时保底·防黑屏】：reset 后长时间卡在 samples=0，自动切光栅
         if (currentSamples === 0 && window.__solidLastResetAt && !window._solidSampleTimeout && !window.isLoadingScene) {
         const _stLimit = isMobile ? 8000 : 12000; if ((performance.now() - window.__solidLastResetAt) > _stLimit) {
-        window._solidSampleTimeout = true; window.useAdvancedRender = false;
+        window._solidSampleTimeout = true; window.useAdvancedRender = false; window._solidUserStoppedRender = true;
         if (pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch(_e) {} }, 0); }
         try { _solidCommitStandardRasterFallback('sample_timeout'); } catch (_eRf2) {}
         window.hwLog('[animate] 采样超时保底：首帧超 ' + (_stLimit/1000) + 's 未完成，切换光栅模式');
         (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '高级渲染耗时过长，已暂停。可点「开启渲染」重试'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 4000); } })();
         const _pw2 = document.getElementById('persistent-warning'); if (_pw2) { _pw2.textContent = '高级渲染超时已暂停。可点「开启渲染」重试'; _pw2.style.display = 'block'; }
+        try { syncRenderButtons(); } catch (_eBtnTo) {}
         const _br2 = document.getElementById('btn-rerender'); if(_br2) { _br2.style.display = ''; _br2.style.opacity = '0.8'; }
         if (renderer && renderer.domElement) renderer.domElement.style.filter = '';
         return; } }
@@ -2994,6 +3256,13 @@
             }
             var t = document.getElementById('render-toast');
             if (!t) return;
+            // 预览模式 / 仅设备检测：不要冒「准备渲染」（用户没点开启也会误解）
+            if (!window.useAdvancedRender) {
+                if (t.style.opacity !== '0' && /准备渲染|正在渲染光影|画质/.test(String(t.textContent || ''))) {
+                    t.style.opacity = '0';
+                }
+                return;
+            }
             var _isFloating = t.parentNode === document.body;
             if (currentSamples < _qualityTh && currentSamples < targetSamples) {
                 if (currentSamples < _qualityTh * 0.1)        t.textContent = '准备渲染…';

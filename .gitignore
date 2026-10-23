@@ -36,3 +36,9 @@ Cloudflare/
 .cursor/browser-automation/runs/
 .cursor/browser-automation/chrome-profile-sketchfab/
 node_modules/
+# Worker：Pages Functions 编译产物（本地发版生成，勿提交）
+dist/worker/
+# 发版窗口日志（本地）
+docs/last-deploy.log
+# 本机 Wrangler 密钥（勿提交）
+.dev.vars

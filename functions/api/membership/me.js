@@ -13,6 +13,6 @@ export async function onRequestDelete(context) {
   return jsonResponse(
     { ok: true, entitlement: { tierId: 'free', level: 'free', expiresAt: null, source: 'cleared' } },
     200,
-    { 'Set-Cookie': clearSessionCookie() }
+    { 'Set-Cookie': clearSessionCookie(context.request) }
   );
 }

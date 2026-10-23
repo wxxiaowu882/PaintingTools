@@ -80,17 +80,33 @@
     <section class="card">
       <h2>当前状态</h2>
       <p class="status" id="status-line">读取中…</p>
-      <button type="button" class="secondary" id="btn-clear">退出本机会员状态</button>
+      <p class="status" id="account-line" style="margin-top:6px"></p>
+      <button type="button" class="secondary" id="btn-clear">注销本机（清登录态）</button>
+      <p class="hint">注销只影响本浏览器。会员挂在账号上时，其它设备仍可用。反复测兑换：本页注销 + 运营台「重置可再兑」。</p>
+    </section>
+
+    <section class="card">
+      <h2>账号登录（最多 3 台设备）</h2>
+      <p class="hint">用手机号注册后，换电脑/手机登录同一账号即可共用会员（最多 3 台；第 4 台会顶掉最早一台）。</p>
+      <label for="phone">手机号</label>
+      <input id="phone" type="text" inputmode="tel" autocomplete="username" placeholder="11 位手机号" />
+      <label for="pwd" style="margin-top:10px">密码（至少 6 位）</label>
+      <input id="pwd" type="password" autocomplete="current-password" placeholder="登录密码" />
+      <label for="wxnote" style="margin-top:10px">微信备注（可选）</label>
+      <input id="wxnote" type="text" maxlength="40" placeholder="方便客服核对" />
+      <button type="button" id="btn-login-acct">登录</button>
+      <button type="button" class="secondary" id="btn-register-acct">注册新账号</button>
+      <p class="msg" id="acct-msg"></p>
+      <div id="device-box" class="hint" style="margin-top:12px"></div>
     </section>
 
     <section class="card">
       <h2>输入兑换码</h2>
       <label for="code">兑换码</label>
-      <input id="code" type="text" autocomplete="off" placeholder="例如 PROBE-3M" />
+      <input id="code" type="text" autocomplete="off" placeholder="10 位兑换码" />
       <button type="button" id="btn-redeem">兑换</button>
       <p class="msg" id="msg"></p>
-      <p class="hint">正式兑换码以 <code>WXM1.</code> 开头（付款后由童画师发送）。</p>
-      <p class="hint" style="margin-top:14px"><a href="/member-ops" style="color:#c9a227">运营台入口</a>（发码 / 调收费项，需口令）</p>
+      <p class="hint">建议先登录账号再兑换，会员会同步到你的其它设备。</p>
     </section>
   </main>
   <script type="module">
@@ -108,7 +124,45 @@
     }
 
     function renderStatus() {
-      document.getElementById('status-line').innerHTML = '<strong>' + fmtEnt(MA.getEntitlement()) + '</strong>';
+      const e = MA.getEntitlement();
+      document.getElementById('status-line').innerHTML = '<strong>' + fmtEnt(e) + '</strong>';
+      const al = document.getElementById('account-line');
+      if (e && e.accountId) {
+        al.innerHTML = '已登录账号（设备：' + (MA.getDeviceId() || '').slice(0, 12) + '…）';
+        refreshDevices();
+      } else {
+        al.textContent = '未登录账号（仅本浏览器有效）';
+        document.getElementById('device-box').innerHTML = '';
+      }
+    }
+
+    async function refreshDevices() {
+      const box = document.getElementById('device-box');
+      try {
+        const acct = await MA.fetchDevices();
+        const list = (acct.devices || []).map((d) => {
+          const mine = d.deviceId === MA.getDeviceId() ? '（本机）' : '';
+          return '<div class="tier"><span>' + (d.label || '设备') + ' ' + mine + '</span>' +
+            (mine ? '' : '<button type="button" class="secondary btn-kick" data-id="' + d.deviceId + '" style="width:auto;margin:0;padding:4px 10px;font-size:0.8rem">踢下线</button>') +
+            '</div>';
+        }).join('');
+        box.innerHTML = '<strong>已绑定设备（最多 3 台）</strong>' + (list || '<p>暂无</p>');
+        box.querySelectorAll('.btn-kick').forEach((btn) => {
+          btn.onclick = async () => {
+            try {
+              await MA.removeDevice(btn.getAttribute('data-id'));
+              document.getElementById('acct-msg').className = 'msg ok';
+              document.getElementById('acct-msg').textContent = '已踢下线该设备';
+              renderStatus();
+            } catch (err) {
+              document.getElementById('acct-msg').className = 'msg err';
+              document.getElementById('acct-msg').textContent = err.message || '操作失败';
+            }
+          };
+        });
+      } catch (_e) {
+        box.innerHTML = '';
+      }
     }
 
     function renderTiers(tiersDoc) {
@@ -137,11 +191,53 @@
       } catch (_e) {}
     }
 
+    function acctFields() {
+      return {
+        phone: document.getElementById('phone').value,
+        password: document.getElementById('pwd').value,
+        wechatNote: document.getElementById('wxnote').value
+      };
+    }
+
     MA.ready().then(() => {
       renderTiers(MA.getTiers());
       renderStatus();
       MA.onChange(renderStatus);
+      try {
+        const code = new URL(location.href).searchParams.get('code');
+        if (code) document.getElementById('code').value = code;
+      } catch (_e) {}
     });
+
+    document.getElementById('btn-register-acct').onclick = async () => {
+      const msg = document.getElementById('acct-msg');
+      msg.className = 'msg';
+      msg.textContent = '注册中…';
+      try {
+        const data = await MA.registerAccount(acctFields());
+        msg.className = 'msg ok';
+        msg.textContent = data.tip || '注册成功';
+        renderStatus();
+      } catch (e) {
+        msg.className = 'msg err';
+        msg.textContent = (e && e.message) || '注册失败';
+      }
+    };
+
+    document.getElementById('btn-login-acct').onclick = async () => {
+      const msg = document.getElementById('acct-msg');
+      msg.className = 'msg';
+      msg.textContent = '登录中…';
+      try {
+        const data = await MA.loginAccount(acctFields());
+        msg.className = 'msg ok';
+        msg.textContent = data.tip || '登录成功';
+        renderStatus();
+      } catch (e) {
+        msg.className = 'msg err';
+        msg.textContent = (e && e.message) || '登录失败';
+      }
+    };
 
     document.getElementById('btn-redeem').onclick = async () => {
       const msg = document.getElementById('msg');
@@ -152,17 +248,25 @@
         msg.className = 'msg ok';
         msg.textContent = '兑换成功';
         renderStatus();
-        setTimeout(goReturn, 600);
+        setTimeout(goReturn, 800);
       } catch (e) {
         msg.className = 'msg err';
         msg.textContent = (e && e.message) || '兑换失败';
       }
     };
 
-    document.getElementById('btn-clear').onclick = () => {
-      MA.clearEntitlement();
-      document.getElementById('msg').className = 'msg';
-      document.getElementById('msg').textContent = '已清除本机状态';
+    document.getElementById('btn-clear').onclick = async () => {
+      const msg = document.getElementById('msg');
+      msg.className = 'msg';
+      msg.textContent = '注销中…';
+      try {
+        await MA.clearEntitlement();
+        msg.className = 'msg ok';
+        msg.textContent = '已注销本机状态';
+      } catch (_e) {
+        msg.className = 'msg err';
+        msg.textContent = '注销失败，请刷新再试';
+      }
       renderStatus();
     };
   </script>

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 生成正式兑换码（HMAC，与 functions/membership/codes.js 一致）
+ * 生成旧版长码 WXM1.*（HMAC）。线上运营台已改为 10 位短码；本脚本仅兼容/离线备用。短码请用运营台网页发。
  *
  * 用法：
  *   set MEMBERSHIP_SECRET=你的密钥
