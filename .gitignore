@@ -40,5 +40,7 @@ node_modules/
 dist/worker/
 # 发版窗口日志（本地）
 docs/last-deploy.log
+# 安卓壳安装包（体积大；发站时上传 docs/app/，json 可入库）
+docs/app/*.apk
 # 本机 Wrangler 密钥（勿提交）
 .dev.vars

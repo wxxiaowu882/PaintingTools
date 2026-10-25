@@ -240,3 +240,5 @@ npm run sketchfab:batch -- --list lists/sketchfab-urls.txt
 在 Cursor 新对话中 `@Sketchfab下载到规范化_Agent提示词.md`，并写上任务与输出目录即可。Agent **只调既有脚本**，不重写下载/规范/压缩逻辑。
 
 详细步骤见 [`Sketchfab下载到规范化_Agent提示词.md`](Sketchfab下载到规范化_Agent提示词.md)。规范化子流程见 `自用工具文件_不部署/GBL管理器/batch-normalize/GLB批量规范化_Agent提示词.md`。
+
+21. **全局菜单「安卓 App 下载」回首页**：`menuPathKey` 对 `/docs/app/` 尾斜杠会 pop 空串当成 `index`，首页误判当前页只关菜单；另首页覆盖 `zoomAndNavigate` 动画未完成也不跳。修：多段路径键 + `/docs/app` 用 `location.assign`；验收 `PORT=18080 node scripts/qa-android-app-menu-nav.js`。

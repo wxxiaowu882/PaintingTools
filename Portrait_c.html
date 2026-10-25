@@ -22,14 +22,11 @@
   .spinner { width: 40px; height: 40px; border: 2px solid rgba(212, 175, 55, 0.2); border-top-color: var(--theme-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   #top-bar { position: absolute; top: 0; left: 0; width: 100%; height: 80px; box-sizing: border-box; z-index: 50; background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%); pointer-events: none; transition: background 0.6s cubic-bezier(0.16, 1, 0.3, 1), height 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease; }
-  #top-bar.init-center { background: transparent; height: 100vh; pointer-events: none; }
   .brand { position: absolute; top: 20px; left: 30px; transform: translate(0, 0); color: var(--theme-color); font-size: 18px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-  #top-bar.init-center .brand { left: 50%; top: 38%; transform: translate(-50%, -50%); font-size: 28px; text-shadow: 0 4px 20px rgba(212, 175, 55, 0.3); }
   /* 可视化画廊入口与模态框样式 */
   .gallery-trigger-btn { position: absolute; top: 14px; left: 160px; pointer-events: auto; z-index: 100; transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); background: rgba(212, 175, 55, 0.15); border: 1px solid rgba(212, 175, 55, 0.4); color: var(--theme-color); padding: 8px 16px; border-radius: 20px; font-size: 14px; cursor: pointer; font-weight: 500; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 6px; }
   .gallery-trigger-btn .gallery-trigger-caret { flex: 0 0 auto; display: block; opacity: 0.9; }
   .gallery-trigger-btn:hover { background: rgba(212, 175, 55, 0.25); transform: translateY(-2px); }
-  #top-bar.init-center .gallery-trigger-btn { left: 50%; top: 48%; transform: translate(-50%, -50%); padding: 14px 35px; font-size: 18px; box-shadow: 0 10px 40px rgba(212, 175, 55, 0.2); }
   
   #course-gallery-modal { position: fixed; inset: 0; background: rgba(5,5,8,0.92); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); z-index: 10000; display: none; flex-direction: column; opacity: 0; transition: opacity 0.5s ease; }
   #course-gallery-modal.show { display: flex; opacity: 1; }
@@ -49,7 +46,6 @@
   @media (max-width: 768px) {
     /* 紧挨「童画师吴晓」右侧；勿放到右上角（与汉堡菜单抢位） */
     .gallery-trigger-btn { top: 12px; left: 118px; right: auto; padding: 6px 12px; font-size: 12px; gap: 6px; }
-    #top-bar.init-center .gallery-trigger-btn { display: none; /* 既然自动打开画廊，中间的巨大入口按钮可以直接隐藏 */ }
     .gallery-header { padding: 20px 20px 10px; } .gallery-title { font-size: 16px; font-weight: bold; } 
     /* 核心修改：手机端画廊一行两个封面；行高按整卡，避免压住标题 */
     .gallery-grid { padding: 15px 20px 28px; grid-template-columns: repeat(2, 1fr); grid-auto-rows: max-content; gap: 14px 12px; align-items: start; }
@@ -96,8 +92,8 @@
   #control-panel.collapsed { transform: none !important; } .panel-header { cursor: default; padding-top: 20px; } .drawer-header-trigger { display: none; }
   #subtitle-panel { bottom: 85px; } .tab-container { justify-content: center; gap: 85px; } .auto-tour-btn { right: -60px; } }
   @media (max-width: 768px) { #top-bar { height: 60px; } .brand { top: 15px; left: 15px; font-size: 15px; }
-  #top-bar.init-center .brand { left: 50%; top: 38%; font-size: 22px; width: 100%; text-align: center; } .custom-select-container { top: 10px; left: 100px; right: auto; } .custom-select-trigger { padding: 6px 12px; font-size: 13px; }
-  #top-bar.init-center .custom-select-container { left: 50%; right: auto; top: 48%; transform: translate(-50%, -50%); width: 85%; } .drawer-handle { display: block; }
+.custom-select-container { top: 10px; left: 100px; right: auto; } .custom-select-trigger { padding: 6px 12px; font-size: 13px; }
+  .drawer-handle { display: block; }
   #control-panel { top: auto; bottom: 0; left: 0; width: 100%; height: 35vh; border-radius: 16px 16px 0 0; padding-bottom: env(safe-area-inset-bottom); border-bottom: none; box-shadow: 0 -10px 30px rgba(0,0,0,0.6); }
   #control-panel.collapsed { transform: translateY(calc(100% - 55px)); }
   .panel-header { padding: 0 15px 8px; } .drawer-header-trigger { padding: 10px 0 8px 0; } .drawer-handle { width: 32px; height: 4px; }
@@ -126,13 +122,13 @@
     .menu-open .hamburger-line.l3 { transform: rotate(45deg) translateY(-4px); }
   }
   </style> 
-  <script src="./docs/js/GlobalMenu.js"></script>
+  <script src="./docs/js/GlobalMenu.js?v=menuhigh2"></script>
   <script type="module" src="./docs/js/model-viewer.min.js"></script> </head> <body> <div id="loading-screen">
   <div class="spinner"></div> <div style="color:var(--text-sub); font-size:12px; letter-spacing:2px;">构建场景中...</div> <div id="loading-percent" style="color:var(--theme-color); font-size:14px; margin-top:8px; font-weight:bold; font-family:monospace;">0%</div> </div>
   <div id="top-bar" style="display: none; opacity: 0;"> 
     <div class="brand">童画师吴晓</div> 
     <button class="gallery-trigger-btn" onclick="window.openCourseGallery()" title="切换课程" aria-haspopup="dialog">
-      <span id="model-selector-text">切换知识库</span>
+      <span id="model-selector-text">选择课程</span>
       <svg class="gallery-trigger-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true" focusable="false"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button> 
     <div id="menu-trigger" onclick="window.toggleMenu()">
@@ -168,9 +164,9 @@
   <button class="tour-ctrl-btn" id="tour-next" title="下一个"> <svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8V4z M19 5h-2v14h2V5z"/></svg> </button> </div> <script>
   document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
   
-  // 【路由分发与配置中心】：解析 URL 参数，决定加载哪个知识库
+  // 【路由】：解析 URL ?lib=，决定本页课程列表（头骨线 / 五官线；换线走全局菜单）
   const urlParams = new URLSearchParams(window.location.search);
-  const libType = urlParams.get('lib') || 'anatomy'; // 默认为解剖库
+  const libType = urlParams.get('lib') || 'anatomy'; // 默认头骨·骨点·肌肉线
   
   let courseConfig = [];
   let galleryTitleText = '';
@@ -200,9 +196,11 @@
       modal.classList.add('show');
       const grid = document.getElementById('gallery-grid');
       
-      // 动态修改画廊标题
+      // 动态修改画廊标题；未选课前顶栏显示「选择课程」
       const titleEl = document.querySelector('.gallery-title');
       if (titleEl) titleEl.innerText = galleryTitleText;
+      const sel = document.getElementById('model-selector-text');
+      if (sel && (typeof currentData === 'undefined' || !currentData)) sel.innerText = '选择课程';
       
       // 只有第一次打开时去动态解析提取封面图，避免重复请求
       if (grid.children.length === 0) {
@@ -239,12 +237,15 @@
 
   window.closeCourseGallery = function(isSelectingCourse = false) {
       document.getElementById('course-gallery-modal').classList.remove('show');
-      
-      // 【核心体验闭环】：如果是首次进入，且“不是”因为点击了缩略图，才自动唤起系统菜单
+      // 未选课关列表：留在本页 URL（lib=…）并打开全局菜单，便于高亮当前线；勿 history.back 丢高亮
       if (!currentData && !isSelectingCourse) {
-          // 兜底：把 top-bar 显示出来，防止画面全黑没有按钮可点
-          const tb = document.getElementById('top-bar'); tb.style.display = 'block'; tb.offsetHeight; tb.style.opacity = '1';
-          if (typeof window.toggleMenu === 'function') window.toggleMenu();
+          const overlay = document.getElementById('global-menu-overlay');
+          if (overlay && !overlay.classList.contains('active') && typeof window.toggleMenu === 'function') {
+              window.toggleMenu();
+          } else if (typeof window.openCourseGallery === 'function') {
+              setTimeout(function () { window.openCourseGallery(); }, 0);
+          }
+          return;
       }
   };
 
@@ -252,6 +253,15 @@
       document.getElementById('model-selector-text').innerText = name;
       window.closeCourseGallery(true); // 传入 true 参数，明确告知系统“我是因为选了图谱才关的”，拦截系统菜单弹出
       loadSceneData(url);
+  };
+  // 与 Solid 对齐：关全局菜单且未选课时回到课程列表（GlobalMenu 会调此名）
+  window.__solidOnGlobalMenuClosed = function () {
+      try {
+          if (currentData) return;
+          const modal = document.getElementById('course-gallery-modal');
+          if (modal && modal.classList.contains('show')) return;
+          if (typeof window.openCourseGallery === 'function') window.openCourseGallery();
+      } catch (_e) {}
   };
   ['touchstart', 'touchmove'].forEach(ev => { document.addEventListener(ev, function(e) { if (e.touches && e.touches.length > 1 && e.target.closest('#control-panel, #top-bar')) { e.preventDefault();
   } }, { passive: false }); }); let _globalStartX = 0, _globalStartY = 0, _globalIsDragging = false, _lastTapTime = 0; document.addEventListener('pointerdown', e => {
@@ -1027,7 +1037,7 @@
   /* 首屏：在画廊打开前先铺一次全屏画布，避免尺寸为 0 */
   applyViewerLayout(); 
   
-  // 【自动唤醒】：页面加载完成后，无需点击，直接弹出对应的知识库画廊
+  // 【自动唤醒】：进站直接打开本线课程列表（无「切换知识库」中间层）
   document.addEventListener('DOMContentLoaded', () => {
       window.openCourseGallery();
   });

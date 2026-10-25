@@ -20,7 +20,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet"> <script async src="docs/js/es-module-shims.js"></script>
 <script type="importmap"> { "imports": { "three": "./docs/js/three/three.module.js", "three/addons/controls/OrbitControls.js": "./docs/js/three/OrbitControls.js",
 "@tweenjs/tween.js": "./docs/js/tween/tween.esm.js" } } </script> 
-<!-- 引入全局菜单组件 --> <script src="docs/js/GlobalMenu.js"></script>
+<!-- 引入全局菜单组件 --> <script src="docs/js/GlobalMenu.js?v=menuhigh2"></script>
 <style>
 body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 /* 强制极细字体风格 */ .font-hairline { font-weight: 100; } .font-thin { font-weight: 200; }
@@ -44,7 +44,7 @@ display: none; flex-direction: column; align-items: flex-end; padding: 20px 30px
 /* === VISION DIMENSIONS 标题样式 (分行版) === */ .site-title { position: absolute; top: 5vh; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
 text-align: center; width: 100%; gap: 0; } .title-line { font-size: 28px; font-weight: 100; letter-spacing: 0.2em; line-height: 1.3; color: rgba(255, 255, 255, 0.75); text-transform: uppercase; background: linear-gradient(135deg,
 rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.65) 50%, rgba(255, 255, 255, 0.4) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: flex; align-items: center;
-justify-content: center; } .subtitle { font-size: 10px; color: rgba(255, 255, 255, 0.4); letter-spacing: 0.5em; margin-top: 14px; font-weight: 200; text-transform: uppercase; }
+justify-content: center; } .title-line.title-brand { flex-direction: column; gap: 0.12em; background: none; -webkit-text-fill-color: initial; color: inherit; } .title-line .title-dim { display: block; font-size: 11px; letter-spacing: 0.42em; font-weight: 100; line-height: 1.2; color: rgba(255, 255, 255, 0.26); -webkit-text-fill-color: rgba(255, 255, 255, 0.26); background: none; text-transform: uppercase; } .title-line .title-zh { display: block; font-size: 28px; letter-spacing: 0.2em; font-weight: 100; line-height: 1.3; text-transform: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 50%, rgba(255, 255, 255, 0.45) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; } .subtitle { font-size: 10px; color: rgba(255, 255, 255, 0.4); letter-spacing: 0.5em; margin-top: 14px; font-weight: 200; text-transform: uppercase; }
 /* 嵌入文字中的头像圆圈 */ .avatar-o { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%;
 background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05)); border: 1px solid rgba(255, 255, 255, 0.35); backdrop-filter: blur(6px); box-shadow: 0 0 20px rgba(255,255,255,0.15); margin: 0 0.15em; position: relative;
 -webkit-text-fill-color: initial; background-clip: border-box; color: white; pointer-events: auto; cursor: pointer; overflow: hidden; transition: transform 0.3s ease, border-color 0.3s; } .avatar-o:hover { transform: scale(1.1);
@@ -53,20 +53,102 @@ transition: opacity 0.3s ease, transform 0.3s ease, filter 0.3s ease; } .avatar-
 /* 画布容器样式 - 增加位置下移 */
 #canvas-container { width: 100%; height: 100%; position: fixed; top: 0; left: 0; z-index: 0; /* 核心修改：整体下移 5% */
 transform: translateY(5vh); }
-@media (min-width: 640px) { .site-title { top: 7vh; } .title-line { font-size: 48px; letter-spacing: 0.3em; line-height: 1.4; } .subtitle { font-size: 12px; letter-spacing: 0.8em; margin-top: 20px; }
+@media (min-width: 640px) { .site-title { top: 7vh; } .title-line { font-size: 48px; letter-spacing: 0.3em; line-height: 1.4; } .title-line .title-dim { font-size: 15px; letter-spacing: 0.55em; color: rgba(255, 255, 255, 0.24); -webkit-text-fill-color: rgba(255, 255, 255, 0.24); } .title-line .title-zh { font-size: 48px; letter-spacing: 0.3em; } .subtitle { font-size: 12px; letter-spacing: 0.8em; margin-top: 20px; }
 .avatar-o { width: 58px; height: 58px; margin: 0 0.2em; border-width: 1.5px; } .avatar-emoji { font-size: 32px; } }
 /* 配合 GlobalMenu.js：菜单打开时汉堡变为 X */
 .menu-open .line-1 { transform: rotate(45deg) translateY(-1.5px); }
 .menu-open .line-2 { opacity: 0; }
 .menu-open .line-3 { transform: rotate(-45deg) translateY(1.5px); }
+
+/* 首页关于 / 分享弹窗（深色） */
+.index-about-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.62); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  opacity: 0; transition: opacity 0.35s ease; pointer-events: auto;
+}
+.index-about-overlay.active { display: flex; opacity: 1; }
+.index-about-card {
+  position: relative; width: 90%; max-width: 340px;
+  padding: 36px 26px 28px;
+  border-radius: 22px;
+  background: rgba(18,18,20,0.94);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+  text-align: center; color: rgba(255,255,255,0.88);
+  transform: scale(0.96); transition: transform 0.4s cubic-bezier(0.22,1,0.36,1);
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.index-about-overlay.active .index-about-card { transform: scale(1); }
+.index-about-close {
+  position: absolute; top: 12px; right: 14px; width: 32px; height: 32px;
+  border: none; border-radius: 8px; background: transparent;
+  color: rgba(255,255,255,0.4); font-size: 22px; line-height: 1; cursor: pointer;
+}
+.index-about-close:hover { color: rgba(255,255,255,0.85); }
+.index-about-avatar {
+  width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 14px;
+  background-size: cover; background-position: center;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.2), 0 10px 28px rgba(0,0,0,0.4);
+}
+.index-about-title { font-size: 18px; font-weight: 300; letter-spacing: 0.12em; margin-bottom: 8px; }
+.index-about-tag {
+  display: inline-block; font-size: 10px; letter-spacing: 0.14em; font-weight: 200;
+  color: rgba(232,197,71,0.85); border: 1px solid rgba(232,197,71,0.28);
+  border-radius: 999px; padding: 4px 10px; margin-bottom: 8px;
+}
+.index-about-slogan { font-size: 12px; color: rgba(255,255,255,0.42); letter-spacing: 0.08em; font-weight: 200; margin-bottom: 18px; }
+.index-about-body {
+  font-size: 12.5px; line-height: 1.8; letter-spacing: 0.04em; font-weight: 200;
+  color: rgba(255,255,255,0.55); text-align: left; margin-bottom: 22px; padding: 0 2px;
+}
+.index-about-body b { color: rgba(255,255,255,0.82); font-weight: 400; }
+.index-about-actions { display: flex; gap: 10px; margin-bottom: 16px; }
+.index-about-actions button {
+  flex: 1; min-height: 48px; border-radius: 12px; cursor: pointer;
+  font-size: 12px; letter-spacing: 0.1em; font-weight: 300;
+}
+.index-about-share { border: none; background: #fff; color: #111; }
+.index-about-fav {
+  border: 1px solid rgba(255,255,255,0.18); background: transparent; color: rgba(255,255,255,0.7);
+}
+.index-about-social { text-align: left; }
+.index-about-social-row {
+  font-size: 12px; color: rgba(255,255,255,0.45); letter-spacing: 0.04em; font-weight: 200;
+  padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer;
+}
+.index-about-social-row:last-of-type { border-bottom: none; }
+.index-about-social-row:active { color: rgba(255,255,255,0.8); }
+.index-about-copy { margin-top: 14px; font-size: 10px; letter-spacing: 0.12em; color: rgba(255,255,255,0.28); font-weight: 200; }
+.index-about-app {
+  text-align: left; margin: 0 0 14px; padding: 12px 12px 10px;
+  border: 1px solid rgba(255,255,255,0.10); border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+}
+.index-about-app-title { font-size: 12px; letter-spacing: 0.08em; color: rgba(255,255,255,0.72); margin-bottom: 6px; font-weight: 300; }
+.index-about-app-body { font-size: 11.5px; line-height: 1.7; color: rgba(255,255,255,0.42); font-weight: 200; margin-bottom: 10px; }
+.index-about-app a {
+  display: inline-block; font-size: 12px; letter-spacing: 0.06em; font-weight: 300;
+  color: #111; background: #fff; text-decoration: none;
+  padding: 8px 12px; border-radius: 999px;
+}
+.index-about-toast {
+  position: fixed; left: 50%; bottom: 48px; transform: translateX(-50%) translateY(8px);
+  z-index: 9100; padding: 10px 16px; border-radius: 999px;
+  background: rgba(0,0,0,0.78); border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.88); font-size: 12px; letter-spacing: 0.06em;
+  opacity: 0; pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease;
+  max-width: min(88vw, 320px); text-align: center;
+}
+.index-about-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style> <script> (function(){ // 微信引导层开关 - 设置为 false 即可禁用
 var SHOW_WECHAT_GUIDE = false; // true: 显示引导层, false: 不显示
 var ua = navigator.userAgent.toLowerCase(); if(ua.match(/MicroMessenger/i)=="micromessenger" && SHOW_WECHAT_GUIDE){ document.write('<style>.wechat-guide{display:flex !important;}</style>'); } })(); </script> </head>
 <body class="text-white selection:bg-white/10"> <!-- 微信引导 --> <div class="wechat-guide" onclick="this.style.display='none'"> <div class="arrow">↗</div>
 <div class="text">为了更好的体验<br>请点击右上角菜单<br>选择 <strong>在浏览器中打开</strong> 🌍</div> </div> <!-- UI 层 --> <div id="ui-layer" class="fixed inset-0 z-10 pointer-events-none">
 <!-- 1. 顶部居中：身份印记 --> <div class="site-title"> <div class="title-line">
-VISI<div class="avatar-o" onclick="toggleMenu()" title="童画师吴晓"><img src="docs/img/wuxiao_s.jpg" alt="童画师吴晓" class="avatar-img"></div>N
-</div> <div class="title-line"> DIMENSIONS </div> <div class="subtitle">COLOR • FORM <br/>CREATION</div> </div> <!-- 2. 右上角：总控菜单开关 (尺寸缩小，颜色调暗，位置贴近边缘) -->
+VISI<div class="avatar-o" onclick="toggleAboutModal(true)" title="关于 · 分享"><img src="docs/img/wuxiao_s.jpg" alt="童画师吴晓" class="avatar-img"></div>N
+</div> <div class="title-line title-brand"><span class="title-dim">DIMENSIONS</span><span class="title-zh">手绘工坊</span></div> <div class="subtitle">工具• 教程 <br/>互动场景课</div> </div> <!-- 2. 右上角：总控菜单开关 (尺寸缩小，颜色调暗，位置贴近边缘) -->
 <div id="menu-trigger" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center cursor-pointer pointer-events-auto group z-50 transition-all duration-300 animate-pulse hover:animate-none hover:bg-white/25" style="animation-duration: 4s;" onclick="toggleMenu()">
     <div class="relative w-6 h-3 flex flex-col justify-between items-end transition-all duration-300 group-hover:h-4">
         <!-- 三条极细线 -->
@@ -77,7 +159,33 @@ VISI<div class="avatar-o" onclick="toggleMenu()" title="童画师吴晓"><img sr
 </div> <!-- 3. 底部居中：隐形控制器 (文案更新) --> <div class="absolute bottom-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-4 pointer-events-auto z-40">
 <!-- 选色器：热区已扩大 --> <div class="color-input-wrapper group" title="点击更改颜色"> <div id="colorPreview" class="rounded-full bg-white breath-point transition-all duration-500 group-hover:scale-[3] group-hover:bg-white"></div>
 <input type="color" id="colorPicker" value="#ffffff"> </div> <div class="flex flex-col items-center gap-1 opacity-40 hover:opacity-80 transition-opacity duration-500"> <span class="font-hairline text-[9px] tracking-[0.2em] text-white">by 童画师吴晓</span> </div>
-</div> </div> <div id="scene-loader" class="fixed inset-0 z-0 flex flex-col items-center justify-center transition-opacity duration-1000 pointer-events-none">
+</div> </div> 
+<!-- 首页关于 / 分享 -->
+<div class="index-about-overlay" id="indexAboutModal" onclick="if(event.target===this)toggleAboutModal(false)">
+  <div class="index-about-card" role="dialog" aria-modal="true" aria-labelledby="indexAboutTitle">
+    <button type="button" class="index-about-close" onclick="toggleAboutModal(false)" aria-label="关闭">×</button>
+    <div class="index-about-avatar" style="background-image:url('docs/img/wuxiao_s.jpg')"></div>
+    <div class="index-about-title" id="indexAboutTitle">童画师吴晓</div>
+    <div class="index-about-tag">儿童肖像画师 · 水彩 · 油画</div>
+    <div class="index-about-slogan">用心画画，用爱发电</div>
+    <div class="index-about-body"><b>手绘工坊</b>：在这里学会画人物，从零也能开始。<br><br>这里除了工具和教程，还有我。<br><br>喜欢就分享，有事就联系。</div>
+    <div class="index-about-actions">
+      <button type="button" class="index-about-share" onclick="shareSite()">分享给画友</button>
+      <button type="button" class="index-about-fav" onclick="addSiteToFavorites()">收藏本站</button>
+    </div>
+    <div class="index-about-app">
+      <div class="index-about-app-title">手机 App</div>
+      <div class="index-about-app-body">安卓可安装桌面 App（网页套壳）。苹果手机暂时只有网页版，请用 Safari 打开本站，暂无 App。</div>
+      <a href="/docs/app/">安卓 App 下载说明</a>
+    </div>
+    <div class="index-about-social">
+      <div class="index-about-social-row" onclick="copyContact('童画师吴晓','小红书')">小红书：童画师吴晓（围观日常）</div>
+      <div class="index-about-social-row" onclick="copyContact('lightouches','微信')">微信：lightouches（点击复制）</div>
+    </div>
+    <div class="index-about-copy">© 2026 童画师吴晓</div>
+  </div>
+</div>
+<div id="scene-loader" class="fixed inset-0 z-0 flex flex-col items-center justify-center transition-opacity duration-1000 pointer-events-none">
 <div class="w-3 h-3 rounded-full bg-white/70 animate-pulse mb-6"></div> <div class="font-hairline text-[10px] tracking-[0.4em] text-white/40 uppercase animate-pulse" style="animation-delay: 0.5s;">Loading Dimensions...</div> </div> <!-- 3D 画布容器，已应用 translateY 下移 -->
 <div id="canvas-container" class="fixed top-0 left-0"></div> <script type="module"> import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; import * as TWEEN from '@tweenjs/tween.js'; // Configuration
@@ -235,8 +343,8 @@ const ring2 = new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.02, 16, 64), ringMat
 function setupUI() { const picker = document.getElementById('colorPicker'); const preview = document.getElementById('colorPreview'); picker.addEventListener('input', (e) => {
 selectedColor.set(e.target.value); preview.style.backgroundColor = e.target.value; const hsl = {}; selectedColor.getHSL(hsl); update3DSelection(hsl); }); 
 // Zoom & Navigate Animation
-window.zoomAndNavigate = function(url) { isAnimatingCamera = true; controls.autoRotate = false; controls.enabled = false; // 1. Hide UI immediately
-document.getElementById('ui-layer').style.opacity = '0'; const go = document.getElementById('global-menu-overlay'); if(go) go.classList.remove('active');
+window.zoomAndNavigate = function(url) { isAnimatingCamera = true; controls.autoRotate = false; controls.enabled = false; var __navDone=false; function __goNav(){ if(__navDone)return; __navDone=true; window.location.href=url; } setTimeout(__goNav, 1000); // 1. Hide UI immediately
+document.getElementById('ui-layer').style.opacity = '0'; const go = document.getElementById('global-menu-overlay'); if(go){ go.classList.remove('active'); go.classList.remove('instant'); }
 
 // [新增] 提前在动画结尾阶段加入整体淡出，完美掩盖浏览器加载新页面时的掉帧停滞
 setTimeout(function() { document.body.style.transition = "opacity 0.4s ease-out"; document.body.style.opacity = "0"; }, 600);
@@ -245,7 +353,7 @@ setTimeout(function() { document.body.style.transition = "opacity 0.4s ease-out"
 new TWEEN.Tween(camera.position) .to({ x: 0, y: 0, z: 0 }, 1000) // 从1500ms减少到1000ms
 .easing(TWEEN.Easing.Cubic.InOut) // 改为更平滑的缓动
 .onUpdate(() => camera.lookAt(0,0,0)) .onComplete(() => { // 添加一个微小的延迟确保动画完全结束
-setTimeout(() => { window.location.href = url; }, 50); }) .start(); }; }
+setTimeout(__goNav, 50); }) .start(); }; }
 function update3DSelection(hsl) { controls.autoRotate = false; selectionMarker.visible = true; const data = calculateData(hsl.h, hsl.s, hsl.l); const x = data.base.x + (data.munsell.x - data.base.x) * shapeMode;
 const y = data.base.y + (data.munsell.y - data.base.y) * shapeMode; const z = data.base.z + (data.munsell.z - data.base.z) * shapeMode; new TWEEN.Tween(selectionMarker.position) .to({ x: x, y: y, z: z }, 800) .easing(TWEEN.Easing.Cubic.Out)
 .onUpdate(() => selectionMarker.lookAt(camera.position)) .start(); selectionMarker.children[0].material.color.setHSL(hsl.h, hsl.s, hsl.l); const theta = hsl.h * Math.PI * 2; const offsetAngle = Math.PI / 4;
@@ -267,7 +375,12 @@ if (event.persisted) {
 document.body.style.transition = "none"; document.body.style.opacity = "1";
 // 1. 强制重置 UI 可见性
 document.getElementById('ui-layer').style.opacity = '1'; 
-const go = document.getElementById('global-menu-overlay'); if(go) go.classList.remove('active');
+// 菜单态返回：勿先拆菜单（避免闪首页再由 GlobalMenu 打开）
+const go = document.getElementById('global-menu-overlay');
+if (go) {
+  if (location.hash === '#menu') { go.classList.add('instant'); go.classList.add('active'); }
+  else { go.classList.remove('active'); go.classList.remove('instant'); }
+}
 // 2. 强制重置相机位置 (V3.1 基准)
 if (camera) { camera.position.set(0, 15, 115); camera.lookAt(0, 0, 0); }
 // 3. 强制重置控制器
@@ -275,7 +388,78 @@ if (controls) { controls.enabled = true; controls.autoRotate = true; controls.ta
 // 4. 重置动画锁
 isAnimatingCamera = false; } }); // 延迟 50ms 执行 init，让头尾 UI 和局部 Loading 优先渲染完毕
 setTimeout(function() { init(); var loader = document.getElementById('scene-loader'); if (loader) { loader.style.opacity = '0';
-setTimeout(function() { loader.style.display = 'none'; }, 1000); } }, 50); </script> <!-- ========== SEO隐藏内容区域开始 ========== -->
+setTimeout(function() { loader.style.display = 'none'; }, 1000); } }, 50); </script> 
+<script>
+(function () {
+  var _aboutHideTimer = null;
+  window.toggleAboutModal = function (show) {
+    var m = document.getElementById('indexAboutModal');
+    if (!m) return;
+    if (_aboutHideTimer) { clearTimeout(_aboutHideTimer); _aboutHideTimer = null; }
+    if (show) {
+      m.style.display = 'flex';
+      void m.offsetWidth;
+      m.classList.add('active');
+    } else {
+      m.classList.remove('active');
+      _aboutHideTimer = setTimeout(function () {
+        m.style.display = 'none';
+        _aboutHideTimer = null;
+      }, 300);
+    }
+  };
+  function showAboutToast(message) {
+    var old = document.querySelector('.index-about-toast');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var t = document.createElement('div');
+    t.className = 'index-about-toast';
+    t.textContent = message;
+    document.body.appendChild(t);
+    requestAnimationFrame(function () { t.classList.add('show'); });
+    setTimeout(function () {
+      t.classList.remove('show');
+      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 280);
+    }, 2600);
+  }
+  function fallbackCopy(text, successMsg) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try {
+      if (document.execCommand('copy')) showAboutToast(successMsg);
+      else showAboutToast('复制失败，请长按手动复制');
+    } catch (_e) {
+      showAboutToast('复制失败，请长按手动复制');
+    }
+    document.body.removeChild(ta);
+  }
+  function copyToClipboard(text, successMsg) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        showAboutToast(successMsg);
+      }).catch(function () { fallbackCopy(text, successMsg); });
+    } else {
+      fallbackCopy(text, successMsg);
+    }
+  }
+  window.shareSite = function () {
+    var url = (window.location.origin || '') + '/';
+    copyToClipboard(url, '链接已复制！欢迎分享给画友');
+  };
+  window.addSiteToFavorites = function () {
+    showAboutToast('请点击浏览器菜单，选择「添加到主屏幕」永久收藏');
+  };
+  window.copyContact = function (text, label) {
+    var msg = '已复制！快去搜索关注吧';
+    if (label === '小红书') msg = '已复制，快去小红书搜索吧';
+    else if (label === '微信') msg = '已复制，快去微信搜索吧';
+    copyToClipboard(text, msg);
+  };
+})();
+</script>
+<!-- ========== SEO隐藏内容区域开始 ========== -->
 <div style="position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none;">
 <h1>手绘工坊 · 童画师吴晓</h1>
 <h2>水彩人物与肖像画学习工具（「视觉维度」为历史副称）</h2>

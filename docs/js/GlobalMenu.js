@@ -3,6 +3,28 @@
  * 功能：动态样式注入、DOM构建、当前页自动高亮、页面平滑跳转、跨页面历史路由控制(移动端自愈增强版)
  */
 (function() {
+    // 冷启动 / 返回到 #menu：先盖一层黑底，避免底页闪一帧再出菜单
+    (function bootMenuCoverIfNeeded() {
+        if (typeof location === 'undefined' || location.hash !== '#menu') return;
+        if (document.getElementById('global-menu-boot-cover')) return;
+        var c = document.createElement('div');
+        c.id = 'global-menu-boot-cover';
+        c.setAttribute('aria-hidden', 'true');
+        c.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:#050505;pointer-events:none;';
+        var root = document.body || document.documentElement;
+        if (root) root.appendChild(c);
+        else document.addEventListener('DOMContentLoaded', function () {
+            if (!document.getElementById('global-menu-boot-cover')) {
+                (document.body || document.documentElement).appendChild(c);
+            }
+        });
+    })();
+
+    function removeMenuBootCover() {
+        var c = document.getElementById('global-menu-boot-cover');
+        if (c && c.parentNode) c.parentNode.removeChild(c);
+    }
+
     // === 1. 数据驱动：菜单配置 ===
     // 站内跳转一律无 .html 后缀（与线上隐藏后缀一致）；Solid 文件名大小写敏感，用 /Solid
     const menuConfig = [
@@ -29,6 +51,9 @@
         { type: 'category', text: '游戏' },
         { id: '11', text: '色感训练 · 光谱行者', url: '/games/ChromaWalker', color: '#F59E0B' },
 
+        { type: 'category', text: '安装' },
+        { id: '12', text: '安卓 App 下载', url: '/docs/app/', color: '#94A3B8' },
+
         { type: 'footer', text: '© 2026 手绘工坊 · 童画师吴晓' }
     ];
 
@@ -54,10 +79,14 @@
                 display: flex; align-items: center; justify-content: center; pointer-events: none;
             }
             #global-menu-overlay.active { opacity: 1; visibility: visible; pointer-events: auto; }
+            /* 返回 / 冷启动到菜单态：取消淡入，避免先露底页 */
+            #global-menu-overlay.instant {
+                transition: none !important;
+            }
 
             /* 返回箭头 (调整 margin-bottom 为 25px，配合 15px gap 刚好凑成 40px) */
             .global-menu-wrapper .back-arrow {
-                color: rgba(255,255,255,0.4);
+                color: rgba(255,255,255,0.48);
                 cursor: pointer; transition: color 0.3s, transform 0.3s; z-index: 10;
                 margin-bottom: 25px; align-self: flex-start;
                 display: flex; align-items: center; /* 确保图标自身绝对居中对齐 */
@@ -82,9 +111,9 @@
             }
 
             /* 文本标记样式 (增大字号和字距) */
-            .global-menu-wrapper .menu-header { font-size: 11px; color: rgba(255,255,255,0.3); letter-spacing: 5px; margin-bottom: 5px; }
-            .global-menu-wrapper .menu-category { font-size: 12px; color: rgba(255,255,255,0.5); letter-spacing: 3px; margin-top: 24px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08); text-transform: uppercase;}
-            .global-menu-wrapper .menu-footer { margin-top: 36px; font-size: 10px; color: rgba(255,255,255,0.2); letter-spacing: 2px; text-align: left; }
+            .global-menu-wrapper .menu-header { font-size: 11px; color: rgba(255,255,255,0.38); letter-spacing: 5px; margin-bottom: 5px; }
+            .global-menu-wrapper .menu-category { font-size: 12px; color: rgba(255,255,255,0.55); letter-spacing: 3px; margin-top: 24px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08); text-transform: uppercase;}
+            .global-menu-wrapper .menu-footer { margin-top: 36px; font-size: 10px; color: rgba(255,255,255,0.28); letter-spacing: 2px; text-align: left; }
 
             /* 菜单项基础样式 (增大气场) */
             .global-menu-wrapper .menu-item {
@@ -103,7 +132,7 @@
             .global-menu-wrapper .menu-item.touch-active { border-bottom-color: rgba(255,255,255,0.4); }
             .global-menu-wrapper .menu-item.touch-active .hover-line { width: 100%; }
 
-            .global-menu-wrapper .menu-item .num { font-size: 14px; color: rgba(255,255,255,0.3); flex-shrink: 0; transition: color 0.3s;}
+            .global-menu-wrapper .menu-item .num { font-size: 14px; color: rgba(255,255,255,0.38); flex-shrink: 0; transition: color 0.3s;}
             .global-menu-wrapper .menu-item .txt { font-size: 22px; letter-spacing: 2px; color: #e5e5e5; transition: color 0.3s; }
             
             /* 激活状态 (保持优雅，仅略微提亮加粗) */
@@ -134,7 +163,7 @@
                 margin-left: -12px;
                 width: 24px;
                 height: 24px;
-                color: rgba(255, 255, 255, 0.25);
+                color: rgba(255, 255, 255, 0.32);
                 z-index: 2147483648;
                 pointer-events: none;
                 opacity: 0;
@@ -148,6 +177,100 @@
             }
         `;
         document.head.appendChild(style);
+    }
+
+    /**
+     * 菜单路径键：多段路径保留层级（docs/app），避免 `/docs/app/` 因尾斜杠
+     * pop 出空串被当成 `index`，从而在首页误判「安卓下载」为当前页、只关菜单不跳转。
+     */
+    function menuPathKey(p) {
+        let s = String(p || '').split('?')[0];
+        s = s.replace(/\/+$/, '') || '/';
+        const parts = s.split('/').filter(Boolean).map(function (seg) {
+            let x = seg.toLowerCase();
+            if (x.endsWith('.html')) x = x.slice(0, -5);
+            return x;
+        });
+        if (!parts.length) return 'index';
+        if (parts.length === 1) return parts[0] || 'index';
+        return parts.join('/');
+    }
+
+    /** 手势/浏览器回退落到 #menu 时：高亮「上次从菜单进的栏目」，而非菜单底下那页 */
+    let _preferLastMenuNav = false;
+    var PT_LAST_MENU_NAV = 'pt_last_menu_nav';
+
+    function rememberMenuNav(url) {
+        try { sessionStorage.setItem(PT_LAST_MENU_NAV, String(url || '')); } catch (_e) {}
+    }
+
+    function readLastMenuNav() {
+        try { return sessionStorage.getItem(PT_LAST_MENU_NAV) || ''; } catch (_e) { return ''; }
+    }
+
+    /** 菜单项 URL 是否匹配「当前地址栏」真实页面（决定点该项是关菜单还是跳转） */
+    function isMenuItemCurrent(item) {
+        if (!item || item.disabled || !item.url) return false;
+        return menuUrlMatchesLocation(item.url, window.location.pathname, window.location.search || '');
+    }
+
+    function menuUrlMatchesLocation(itemUrl, pathname, search) {
+        const base = menuPathKey(itemUrl);
+        if (base !== menuPathKey(pathname)) return false;
+        const qMark = String(itemUrl).indexOf('?');
+        const curParams = new URLSearchParams(search || '');
+        if (qMark < 0) {
+            if (base === 'solid') {
+                const s = (curParams.get('sandbox') || 'geometry').toLowerCase();
+                return s === 'geometry';
+            }
+            return !search || search === '?';
+        }
+        const want = new URLSearchParams(String(itemUrl).slice(qMark));
+        for (const pair of want) {
+            const k = pair[0];
+            const v = pair[1];
+            let cur = curParams.get(k);
+            if (k === 'sandbox' && (cur == null || cur === '') && v === 'geometry') cur = 'geometry';
+            if ((cur || '') !== v) return false;
+        }
+        return true;
+    }
+
+    /** 下划线高亮：回退进菜单时优先上次栏目；否则跟当前 URL */
+    function isMenuItemActive(item) {
+        if (!item || item.disabled || !item.url) return false;
+        if (_preferLastMenuNav) {
+            const last = readLastMenuNav();
+            if (last) {
+                const q = last.indexOf('?');
+                const pathPart = q >= 0 ? last.slice(0, q) : last;
+                const searchPart = q >= 0 ? last.slice(q) : '';
+                return menuUrlMatchesLocation(item.url, pathPart, searchPart);
+            }
+        }
+        return isMenuItemCurrent(item);
+    }
+
+    /** 打开菜单时刷新下划线（O(菜单项)，不重建 DOM） */
+    function refreshGlobalMenuActiveStates() {
+        const nodes = document.querySelectorAll('.global-menu-wrapper .menu-item[data-menu-url]');
+        if (!nodes.length) return;
+        const byUrl = Object.create(null);
+        for (let i = 0; i < menuConfig.length; i++) {
+            const it = menuConfig[i];
+            if (it && it.url) byUrl[it.url] = it;
+        }
+        for (let i = 0; i < nodes.length; i++) {
+            const el = nodes[i];
+            const url = el.getAttribute('data-menu-url') || '';
+            const item = byUrl[url];
+            if (!item) continue;
+            const on = isMenuItemActive(item);
+            el.classList.toggle('active', on);
+            const line = el.querySelector('.hover-line');
+            if (line) line.style.width = on ? '100%' : '';
+        }
     }
 
     // === 3. DOM 构建与事件绑定 ===
@@ -173,36 +296,6 @@
         backArrow.innerHTML = '<svg width="60" height="24" viewBox="0 0 60 24" fill="none" style="display:block;"><path d="M0.5 12L10 1M0.5 12L60 12M0.5 12L10 23" stroke="currentColor" stroke-width="0.5"/></svg>';
         container.appendChild(backArrow);
 
-        function menuPathKey(p) {
-            let s = String(p || '').split('?')[0].split('/').pop() || '';
-            s = s.toLowerCase();
-            if (s.endsWith('.html')) s = s.slice(0, -5);
-            return s || 'index';
-        }
-        const currentPath = menuPathKey(window.location.pathname);
-        function isMenuItemActive(item) {
-            if (item.disabled || !item.url) return false;
-            const base = menuPathKey(item.url);
-            const pathOk = base === currentPath;
-            if (!pathOk) return false;
-            const qMark = item.url.indexOf('?');
-            const curParams = new URLSearchParams(window.location.search || '');
-            if (qMark < 0) {
-                if (base === 'solid') {
-                    const s = (curParams.get('sandbox') || 'geometry').toLowerCase();
-                    return s === 'geometry';
-                }
-                return !window.location.search || window.location.search === '?';
-            }
-            const want = new URLSearchParams(item.url.slice(qMark));
-            for (const [k, v] of want) {
-                let cur = curParams.get(k);
-                if (k === 'sandbox' && (cur == null || cur === '') && v === 'geometry') cur = 'geometry';
-                if ((cur || '') !== v) return false;
-            }
-            return true;
-        }
-
         menuConfig.forEach(item => {
             const el = document.createElement('div');
 
@@ -221,6 +314,7 @@
 
                 // 所有菜单项强制使用 nav-font-hairline (100)
                 el.className = `menu-item nav-font-hairline ${isActive ? 'active' : ''} ${item.disabled ? 'disabled' : ''}`;
+                el.setAttribute('data-menu-url', item.url || '');
                 let html = `<span class="num nav-font-hairline">${item.id}</span><span class="txt">${item.text}</span>`;
 
                 if (item.disabled) {
@@ -228,13 +322,17 @@
                 } else {
                     html += `<div class="hover-line" style="background:${item.color}; ${isActive ? 'width:100%;' : ''}"></div>`;
                     el.onclick = () => {
-                        if (isActive) {
+                        // 关菜单仅当「真在当前页」；回退高亮的上次栏目仍可再点进入
+                        if (isMenuItemCurrent(item)) {
                             window.toggleMenu();
-                            // 当前页菜单项：关菜单后补一刀（防 history.back 时漏通知）
                             setTimeout(function () {
                                 try { if (typeof window.__solidOnGlobalMenuClosed === 'function') window.__solidOnGlobalMenuClosed(); } catch (_eAct) {}
                             }, 80);
+                        } else if (/^\/docs\/app\/?/i.test(item.url) || item.hardNavigate) {
+                            rememberMenuNav(item.url);
+                            window.location.assign(item.url);
                         } else {
+                            rememberMenuNav(item.url);
                             window.zoomAndNavigate(item.url);
                         }
                     };
@@ -298,17 +396,30 @@
         }, 30);
     }
 
-    function syncMenuWithHash() {
+    function syncMenuWithHash(opts) {
         const overlay = document.getElementById('global-menu-overlay');
         if (!overlay) return;
+        const instant = !!(opts && opts.instant);
         
         const shouldBeActive = (window.location.hash === '#menu');
         const btns = document.querySelectorAll('#menu-trigger, #menu-trigger-overlay, .menu-open');
 
         if (shouldBeActive) {
             _globalMenuUiOpen = true;
+            if (instant) overlay.classList.add('instant');
             overlay.classList.add('active');
+            // 列表页/沙盒 URL 已在当前页：打开菜单时同步高亮（进课前后同一 pathname）
+            refreshGlobalMenuActiveStates();
             btns.forEach(btn => btn.classList.add('menu-open'));
+            removeMenuBootCover();
+            // 两帧后摘掉 instant，下次用户点开菜单仍可淡入
+            if (instant) {
+                requestAnimationFrame(function () {
+                    requestAnimationFrame(function () {
+                        overlay.classList.remove('instant');
+                    });
+                });
+            }
             // [新增] 菜单打开时校准底部箭头状态
             if (window._updateMenuScrollIndicator) {
                 setTimeout(window._updateMenuScrollIndicator, 50);
@@ -318,6 +429,8 @@
             const closing = _globalMenuUiOpen || overlay.classList.contains('active');
             _globalMenuUiOpen = false;
             overlay.classList.remove('active');
+            overlay.classList.remove('instant');
+            removeMenuBootCover();
             btns.forEach(btn => {
                 btn.classList.remove('menu-open');
                 if (typeof btn.blur === 'function') btn.blur(); 
@@ -340,6 +453,8 @@
                 syncMenuWithHash(); 
             }
         } else {
+            // 用户主动打开菜单：高亮跟当前 URL，不用「回退上次栏目」
+            _preferLastMenuNav = false;
             if (window.location.hash !== '#menu') {
                 history.pushState({ menu: true }, '', '#menu');
             }
@@ -348,13 +463,15 @@
     };
 
     window.zoomAndNavigate = function(url) {
-        if (window.location.hash === '#menu') {
-            history.replaceState(null, '', window.location.pathname + window.location.search);
-        }
-
+        // 保留 #menu 历史格：从菜单进新页后返回可回到「上一页 + 菜单开」
+        // （不再 replaceState 抹掉 #menu）
         const overlay = document.getElementById('global-menu-overlay');
-        if (overlay) overlay.classList.remove('active');
+        if (overlay) {
+            overlay.classList.remove('active');
+            overlay.classList.remove('instant');
+        }
         document.querySelectorAll('#menu-trigger, #menu-trigger-overlay, .menu-open').forEach(btn => btn.classList.remove('menu-open'));
+        _globalMenuUiOpen = false;
 
         document.body.style.transition = "opacity 0.5s ease";
         document.body.style.opacity = "0";
@@ -365,20 +482,30 @@
     };
 
     // === 5. 全局后退监听与页面唤醒修复 (多重自愈体系) ===
-    function triggerMultiPassSync() {
-        requestAnimationFrame(syncMenuWithHash);
-        setTimeout(syncMenuWithHash, 50);
+    function triggerMultiPassSync(instantFirst) {
+        if (instantFirst && location.hash === '#menu') {
+            syncMenuWithHash({ instant: true });
+        }
+        requestAnimationFrame(function () { syncMenuWithHash({ instant: !!instantFirst }); });
+        setTimeout(function () { syncMenuWithHash({ instant: !!instantFirst }); }, 50);
         setTimeout(syncMenuWithHash, 150);
         setTimeout(syncMenuWithHash, 300);
         setTimeout(syncMenuWithHash, 600);
     }
 
     window.addEventListener('popstate', function(e) {
-        triggerMultiPassSync();
+        // 历史回退落到 #menu：用上次菜单目标高亮下划线
+        _preferLastMenuNav = (location.hash === '#menu');
+        triggerMultiPassSync(true);
     });
 
     window.addEventListener('hashchange', function(e) {
-        triggerMultiPassSync();
+        if (location.hash === '#menu') {
+            // hashchange 也可能来自回退；若无 push 标记则保持 prefer（popstate 已设）
+        } else {
+            _preferLastMenuNav = false;
+        }
+        triggerMultiPassSync(location.hash === '#menu');
     });
 
     window.addEventListener('pageshow', function(e) {
@@ -388,17 +515,29 @@
             setTimeout(() => { document.body.style.transition = "opacity 0.5s ease"; }, 50);
             const ui = document.getElementById('ui-layer');
             if (ui) ui.style.opacity = '1';
+            // bfcache 回退到 #menu
+            if (location.hash === '#menu') _preferLastMenuNav = true;
         }
-        triggerMultiPassSync();
+        triggerMultiPassSync(location.hash === '#menu');
     });
 
     // === 6. 自动执行挂载 ===
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
-            injectStyles(); buildMenuDOM(); triggerMultiPassSync();
+            injectStyles(); buildMenuDOM(); triggerMultiPassSync(location.hash === '#menu');
         });
     } else {
-        injectStyles(); buildMenuDOM(); triggerMultiPassSync();
+        injectStyles(); buildMenuDOM(); triggerMultiPassSync(location.hash === '#menu');
     }
+
+    // 菜单右上角身份条（接 MembershipAccess）
+    (function loadIdentityChrome() {
+        if (document.querySelector('script[data-pt-identity-chrome]')) return;
+        var s = document.createElement('script');
+        s.src = '/docs/js/membership/IdentityChrome.js';
+        s.async = true;
+        s.setAttribute('data-pt-identity-chrome', '1');
+        document.head.appendChild(s);
+    })();
 
 })();

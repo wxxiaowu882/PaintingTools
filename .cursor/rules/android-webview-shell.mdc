@@ -1,0 +1,32 @@
+---
+description: 安卓 WebView 空壳改动时必须自动升版本并同步站点更新配置（勿让用户手改版本号）
+globs: 自用工具文件_不部署/android-webview-shell/**,docs/app/**
+alwaysApply: true
+---
+
+# 安卓套壳（WebView）版本纪律
+
+凡修改 `自用工具文件_不部署/android-webview-shell/` 内**会影响已安装用户行为**的代码或资源（Kotlin/Manifest/资源/Gradle 壳配置等），在同一轮交付中 **Agent 必须自动升版本**，禁止让用户手改版本号文件。
+
+## 必须同步改的三处
+
+1. `自用工具文件_不部署/android-webview-shell/app/build.gradle.kts`  
+   - `versionCode`：**+1**（整数，单调递增）  
+   - `versionName`：按语义递增（如 `1.0.3` → `1.0.4`；重大变更可升次版本）
+2. `docs/app/android-shell-update.json`  
+   - `minVersionCode` / `latestVersionCode` = 新的 `versionCode`  
+   - `versionName` = 新的 `versionName`  
+   - `message` 可按本次壳变更改一句说明（仍强调：站点内容更新不用换包）
+3. 打出新 APK 后复制为：  
+   - `自用工具文件_不部署/android-webview-shell/dist/童画师吴晓-{versionName}-debug.apk`（或 release）  
+   - `docs/app/wuxiao-workshop.apk`（供站点下载；apk 已 gitignore，发站时上传）
+
+## 原则（写进产品口径）
+
+- **站点网页 / 场景 / JS 更新** → 只发站，**不**升壳版本、**不**逼用户换 APK。  
+- **壳本身更新**（选图、强制更新逻辑、启动域名、权限、壳内 UI 等）→ **必须**升版本 + 更新 json + 新 apk。  
+- 发测试/正式站时：**先上传新 apk，再（或同时）提高 json 的 minVersionCode**，避免用户点下载仍是旧包。
+
+## 纯文档 / 注释
+
+仅改 README 说明、无行为变化时，可不升 `versionCode`；若有疑虑，宁可 +1。
