@@ -1,0 +1,28 @@
+# Gradle / Android
+.gradle/
+.kotlin/
+build/
+**/build/
+local.properties
+keystore.properties
+*.iml
+.idea/
+.cxx/
+captures/
+
+# Keys & packages (勿入库)
+*.jks
+*.keystore
+*.apk
+*.aab
+dist/*.apk
+dist/*.aab
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 本机解压的 Gradle 发行包（体积大；用 wrapper 即可）
+gradle-8.9/
+gradle-8.9-bin.zip
+
