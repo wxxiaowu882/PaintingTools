@@ -1,4 +1,5 @@
 import { registerAccount } from '../../../membership/accounts.js';
+import { bindReferralOnce } from '../../../membership/referral.js';
 import {
   buildSessionCookie,
   jsonResponse,
@@ -14,6 +15,15 @@ export async function onRequestPost(context) {
   }
   const result = await registerAccount(context.env, body);
   if (!result.ok) return jsonResponse({ ok: false, error: result.error }, 400);
+
+  // 宣传链接归因（只绑一次；失败不影响注册）
+  try {
+    if (body && body.ref) {
+      await bindReferralOnce(context.env, result.account.accountId, body.ref, {
+        deviceId: body.deviceId || null
+      });
+    }
+  } catch (_eRef) {}
 
   const ent = normalizeEntitlement(
     Object.assign({}, result.account.entitlement || {}, {

@@ -62,7 +62,7 @@ export async function loadAccount(env, accountId) {
   }
 }
 
-async function saveAccount(env, acct) {
+export async function saveAccountRaw(env, acct) {
   const store = kv(env);
   if (!store) return { ok: false, error: '未开通发码记录本，无法使用账号' };
   acct.updatedAt = Date.now();
@@ -71,6 +71,23 @@ async function saveAccount(env, acct) {
     await store.put(PHONE_PREFIX + acct.phone, acct.accountId);
   }
   return { ok: true };
+}
+
+async function saveAccount(env, acct) {
+  return saveAccountRaw(env, acct);
+}
+
+/** 宣传/归因相关字段兜底（不改已有值） */
+export function ensureAccountFields(acct) {
+  if (!acct) return acct;
+  if (acct.promoCode == null) acct.promoCode = null;
+  if (acct.referredByAccountId == null) acct.referredByAccountId = null;
+  if (acct.referredByPromoCode == null) acct.referredByPromoCode = null;
+  if (acct.referredAt == null) acct.referredAt = null;
+  if (acct.referralRewardCountMonth == null) acct.referralRewardCountMonth = 0;
+  if (acct.referralRewardMonthKey == null) acct.referralRewardMonthKey = null;
+  if (acct.referralRewardTotal == null) acct.referralRewardTotal = 0;
+  return acct;
 }
 
 export async function findAccountByPhone(env, phone) {
@@ -89,6 +106,8 @@ function publicAccount(acct) {
     phone: acct.phone,
     wechatNote: acct.wechatNote || '',
     entitlement: acct.entitlement || null,
+    promoCode: acct.promoCode || null,
+    referredByAccountId: acct.referredByAccountId || null,
     devices: (acct.devices || []).map((d) => ({
       deviceId: d.deviceId,
       label: d.label || '',
@@ -157,7 +176,7 @@ export async function registerAccount(env, opts) {
     saltB64: pass.saltB64,
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    entitlement: { tierId: 'free', level: 'free', expiresAt: null, source: 'register' },
+    entitlement: { tierId: 'free', level: 'user', expiresAt: null, source: 'register' },
     devices: []
   };
   const touched = touchDevice(acct, deviceId, opts && opts.deviceLabel);
@@ -215,7 +234,168 @@ export async function applyEntitlementToAccount(env, accountId, entitlement, dev
 export async function removeDevice(env, accountId, deviceId) {
   let acct = await loadAccount(env, accountId);
   if (!acct) return { ok: false, error: '账号不存在' };
-  acct.devices = (acct.devices || []).filter((d) => d.deviceId !== deviceId);
+  const id = String(deviceId || '').trim();
+  const before = acct.devices || [];
+  if (!before.some((d) => d.deviceId === id)) {
+    return { ok: false, error: '该账号下没有这台设备' };
+  }
+  acct.devices = before.filter((d) => d.deviceId !== id);
+  const saved = await saveAccount(env, acct);
+  if (!saved.ok) return saved;
+  return { ok: true, account: publicAccount(acct) };
+}
+
+/** 运营台：按手机号查账号 */
+export async function adminFindByPhone(env, phoneRaw) {
+  const acct = await findAccountByPhone(env, phoneRaw);
+  if (!acct) return { ok: false, error: '未找到该手机号' };
+  return { ok: true, account: publicAccount(acct) };
+}
+
+/**
+ * 运营台：列出全部学员账号（KV list prefix acct:）。
+ * opts.cursor / opts.limit 分页；默认拉满（多页合并，上限 2000）。
+ */
+export async function adminListAccounts(env, opts) {
+  const store = kv(env);
+  if (!store) return { ok: false, error: '未开通账号存储（MEMBERSHIP_KV）' };
+  const o = opts && typeof opts === 'object' ? opts : {};
+  let limit = Number(o.limit);
+  if (!Number.isFinite(limit) || limit <= 0) limit = 200;
+  limit = Math.min(200, Math.max(1, Math.floor(limit)));
+  const maxTotal = Math.min(2000, Number(o.maxTotal) > 0 ? Math.floor(Number(o.maxTotal)) : 2000);
+  const accounts = [];
+  let cursor = o.cursor != null && String(o.cursor) ? String(o.cursor) : undefined;
+  let pages = 0;
+  while (accounts.length < maxTotal && pages < 50) {
+    pages++;
+    const listOpts = { prefix: ACCT_PREFIX, limit };
+    if (cursor) listOpts.cursor = cursor;
+    const listed = await store.list(listOpts);
+    const keys = (listed && listed.keys) || [];
+    for (const k of keys) {
+      if (accounts.length >= maxTotal) break;
+      const name = k && k.name != null ? String(k.name) : '';
+      if (!name.startsWith(ACCT_PREFIX)) continue;
+      const raw = await store.get(name);
+      if (!raw) continue;
+      let acct;
+      try {
+        acct = JSON.parse(raw);
+      } catch (_e) {
+        continue;
+      }
+      if (!acct || typeof acct !== 'object') continue;
+      accounts.push(publicAccount(acct));
+    }
+    const complete = !!(listed && listed.list_complete);
+    cursor = listed && listed.cursor != null ? String(listed.cursor) : '';
+    if (complete || !cursor) {
+      cursor = '';
+      break;
+    }
+    // 单页模式：调用方传了 cursor 且只要一页
+    if (o.singlePage) break;
+  }
+  accounts.sort((a, b) => String(a.phone || '').localeCompare(String(b.phone || ''), 'zh-CN'));
+  return {
+    ok: true,
+    accounts,
+    cursor: cursor || null,
+    truncated: accounts.length >= maxTotal
+  };
+}
+
+/** 运营台：人工重置密码（无短信） */
+export async function adminResetPassword(env, phoneRaw, newPassword) {
+  const password = String(newPassword || '');
+  if (password.length < 6) return { ok: false, error: '新密码至少 6 位' };
+  let acct = await findAccountByPhone(env, phoneRaw);
+  if (!acct) return { ok: false, error: '未找到该手机号' };
+  const secret = getSecret(env);
+  const pass = await newPassRecord(password, secret);
+  acct.passHash = pass.passHash;
+  acct.saltB64 = pass.saltB64;
+  const saved = await saveAccount(env, acct);
+  if (!saved.ok) return saved;
+  return { ok: true, account: publicAccount(acct) };
+}
+
+/** 运营台：改微信备注 */
+export async function adminUpdateNote(env, phoneRaw, wechatNote) {
+  let acct = await findAccountByPhone(env, phoneRaw);
+  if (!acct) return { ok: false, error: '未找到该手机号' };
+  acct.wechatNote = String(wechatNote || '').trim().slice(0, 40);
+  const saved = await saveAccount(env, acct);
+  if (!saved.ok) return saved;
+  return { ok: true, account: publicAccount(acct) };
+}
+
+/** 运营台：踢设备（单账号 1 读 1 写） */
+export async function adminRemoveDevice(env, phoneRaw, deviceId) {
+  let acct = await findAccountByPhone(env, phoneRaw);
+  if (!acct) return { ok: false, error: '未找到该手机号' };
+  const id = String(deviceId || '').trim();
+  if (!id) return { ok: false, error: '缺少设备 ID' };
+  const result = await removeDevice(env, acct.accountId, id);
+  if (!result.ok) return result;
+  return { ok: true, account: result.account };
+}
+
+/**
+ * 按账号 ID 延期高级会员（天）。已是高级则在现到期日上加；否则从今天起算并升高级。
+ * forever 档返回错误。宣传奖励与运营台共用。
+ */
+export async function extendMemberByDays(env, accountId, daysRaw, sourceTag) {
+  let acct = await loadAccount(env, accountId);
+  if (!acct) return { ok: false, error: '账号不存在' };
+  const days = Math.min(3660, Math.max(1, parseInt(daysRaw, 10) || 0));
+  if (!days) return { ok: false, error: '延期天数至少 1 天' };
+  const ent = Object.assign({}, acct.entitlement || {});
+  const now = Date.now();
+  const tierId = ent.tierId || 'member_3m';
+  if (tierId === 'member_forever' && ent.level === 'member' && !ent.expiresAt) {
+    return { ok: false, error: '永久档无需延期' };
+  }
+  let base = now;
+  if (ent.level === 'member' && ent.expiresAt && Number(ent.expiresAt) > now) {
+    base = Number(ent.expiresAt);
+  }
+  ent.level = 'member';
+  if (!ent.tierId || ent.tierId === 'free') ent.tierId = 'member_3m';
+  ent.expiresAt = base + days * 86400000;
+  // 宣传奖励改写来源；运营延期尽量保留原兑码来源便于对账
+  if (sourceTag === 'referral_reward') ent.source = 'referral_reward';
+  else if (!ent.source) ent.source = sourceTag || 'admin_extend';
+  acct.entitlement = ent;
+  const saved = await saveAccount(env, acct);
+  if (!saved.ok) return saved;
+  return { ok: true, account: publicAccount(acct) };
+}
+
+/**
+ * 运营台：延期高级会员（天）。
+ */
+export async function adminExtendMember(env, phoneRaw, daysRaw) {
+  let acct = await findAccountByPhone(env, phoneRaw);
+  if (!acct) return { ok: false, error: '未找到该手机号' };
+  return extendMemberByDays(env, acct.accountId, daysRaw, 'admin_extend');
+}
+
+/** 运营台：取消高级权益（退回注册会员档）。保留 redeemCode 便于对账。 */
+export async function adminRevokeMember(env, phoneRaw) {
+  let acct = await findAccountByPhone(env, phoneRaw);
+  if (!acct) return { ok: false, error: '未找到该手机号' };
+  const prev = acct.entitlement || {};
+  acct.entitlement = {
+    tierId: 'free',
+    level: 'user',
+    expiresAt: null,
+    source: 'admin_revoke',
+    redeemedAt: prev.redeemedAt || null,
+    jti: prev.jti || null,
+    redeemCode: prev.redeemCode || null
+  };
   const saved = await saveAccount(env, acct);
   if (!saved.ok) return saved;
   return { ok: true, account: publicAccount(acct) };

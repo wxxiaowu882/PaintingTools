@@ -1,5 +1,5 @@
 import { loadFilteredCatalogList, loadCatalogThumbsBatch } from '../../membership/policy.js';
-import { isMember, jsonResponse, readEntitlementFromRequest } from '../../membership/session.js';
+import { accessLevel, jsonResponse, readEntitlementFromRequest } from '../../membership/session.js';
 
 /**
  * 课表列表（轻量）：默认不含 items/标注，也不下发 dataURL 缩略图，保证首屏可进。
@@ -10,7 +10,7 @@ export async function onRequestGet(context) {
   const sandbox = (url.searchParams.get('sandbox') || 'geometry').toLowerCase();
   const includeThumb = url.searchParams.get('thumbs') === '1';
   const ent = await readEntitlementFromRequest(context.request, context.env);
-  const member = isMember(ent);
+  const level = accessLevel(ent);
 
   try {
     if (includeThumb) {
@@ -22,7 +22,8 @@ export async function onRequestGet(context) {
         {
           ok: true,
           sandbox,
-          member,
+          accessLevel: level,
+          member: level === 'member',
           thumbs: true,
           batch: true,
           total: batch.total,
@@ -36,12 +37,13 @@ export async function onRequestGet(context) {
       );
     }
 
-    const data = await loadFilteredCatalogList(context, sandbox, member, false);
+    const data = await loadFilteredCatalogList(context, sandbox, level, false);
     return jsonResponse(
       {
         ok: true,
         sandbox,
-        member,
+        accessLevel: level,
+        member: level === 'member',
         listOnly: true,
         thumbs: false,
         scenes: data

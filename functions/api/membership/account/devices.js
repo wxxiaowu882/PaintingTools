@@ -41,9 +41,8 @@ export async function onRequestDelete(context) {
   if (deviceId === ent.deviceId) {
     nextEnt = normalizeEntitlement({
       tierId: 'free',
-      level: 'free',
-      source: 'device_removed',
-      accountId: result.account.accountId
+      level: 'guest',
+      source: 'device_removed'
     });
   }
   const cookie = await buildSessionCookie(nextEnt, context.env, context.request);

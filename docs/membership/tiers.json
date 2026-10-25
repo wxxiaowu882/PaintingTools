@@ -1,37 +1,49 @@
 {
-  "version": 1,
+  "version": 2,
   "currency": "CNY",
   "earlyBird": true,
   "contactWeChat": "lightouches",
   "tiers": [
     {
-      "id": "free",
-      "name": "免费",
+      "id": "guest",
+      "name": "游客",
       "price": 0,
       "durationDays": null,
-      "requireLevel": "free"
+      "requireLevel": "public",
+      "benefits": ["可浏览公开场景与基础功能", "无需注册"]
+    },
+    {
+      "id": "user",
+      "name": "会员",
+      "price": 0,
+      "durationDays": null,
+      "requireLevel": "user",
+      "benefits": ["注册免费", "可使用标注为「会员免费」的场景与功能", "最多 3 台设备同步登录"]
     },
     {
       "id": "member_3m",
-      "name": "会员 · 三个月",
+      "name": "高级会员 · 三个月",
       "price": 39,
       "durationDays": 90,
-      "requireLevel": "member"
+      "requireLevel": "member",
+      "benefits": ["含会员全部权益", "可使用「高级会员尊享」场景与功能"]
     },
     {
       "id": "member_1y",
-      "name": "会员 · 一年",
+      "name": "高级会员 · 一年",
       "price": 99,
       "durationDays": 365,
-      "requireLevel": "member"
+      "requireLevel": "member",
+      "benefits": ["含会员全部权益", "可使用「高级会员尊享」场景与功能"]
     },
     {
       "id": "member_forever",
-      "name": "会员 · 永久",
+      "name": "高级会员 · 永久",
       "price": 199,
       "durationDays": null,
-      "requireLevel": "member"
+      "requireLevel": "member",
+      "benefits": ["含会员全部权益", "可使用「高级会员尊享」场景与功能", "一次开通长期有效"]
     }
   ],
-  "purchaseHint": "开通后可用站内标注为「会员」的场景与功能；具体范围以网站当前说明为准，我们会持续更新。早鸟价日后可能调整。"
+  "purchaseHint": "游客可看公开内容；注册即为会员，可免费使用「会员免费」内容；开通高级会员（按时长）可使用「高级会员尊享」内容。具体范围以网站当前标注为准，我们会持续更新。早鸟价日后可能调整。"
 }

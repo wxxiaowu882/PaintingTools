@@ -1,37 +1,43 @@
 {
-  "version": 1,
-  "updated": "2026-10-22",
-  "notes": "权益与策略分离：改本文件即可调整收费项，不必改兑换/支付逻辑。probe=true 仅技术验证，正式上线前可改 enabled 或删条目。",
-  "defaultRequire": "free",
+  "version": 2,
+  "updated": "2026-10-23",
+  "notes": "三档：public=游客可见，user=会员（注册）可进，member=高级会员尊享。probe=true 仅技术验证，业务清单后定。旧值 free 视为 public。",
+  "defaultRequire": "public",
   "resources": {
+    "scene:geometry:name:【氛围 · 光】顶光": {
+      "require": "user",
+      "enabled": true,
+      "probe": true,
+      "label": "会员免费探针场景（非业务定价）"
+    },
     "scene:geometry:name:【光影基础规律】面转则明暗分，体积现": {
       "require": "member",
       "enabled": true,
       "probe": true,
-      "label": "几何体探针场景（非业务定价）"
+      "label": "高级会员探针场景（非业务定价）"
     },
     "ui:solid:tab:env": {
       "require": "member",
       "enabled": true,
       "probe": true,
-      "label": "环境光 Tab（探针）"
+      "label": "环境光 Tab（高级会员探针）"
     },
     "ui:solid:tab:atmos": {
-      "require": "member",
+      "require": "user",
       "enabled": true,
       "probe": true,
-      "label": "氛围 Tab（探针）"
+      "label": "氛围 Tab（会员探针）"
     },
     "ui:solid:tab:assist": {
       "require": "member",
       "enabled": true,
       "probe": true,
-      "label": "辅助 Tab（探针）"
+      "label": "辅助 Tab（高级会员探针）"
     },
     "ui:solid:tab:light": {
-      "require": "free",
+      "require": "public",
       "enabled": true,
-      "label": "主光 Tab（始终免费）"
+      "label": "主光 Tab（游客可见）"
     }
   }
 }

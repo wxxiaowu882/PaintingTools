@@ -77,20 +77,47 @@ export async function verifySigned(token, secret) {
   }
 }
 
+/** 策略 require：public（兼容 free）| user | member */
+export function normalizeRequire(req) {
+  const r = String(req == null ? 'public' : req).toLowerCase().trim();
+  if (r === 'member' || r === 'premium') return 'member';
+  if (r === 'user' || r === 'registered') return 'user';
+  return 'public'; // free / public / 空 / 其它
+}
+
+/**
+ * 归一权益。level：guest | user | member（旧 free → guest；有 accountId 的非付费 → user）
+ */
 export function normalizeEntitlement(ent) {
   if (!ent || typeof ent !== 'object') {
-    return { tierId: 'free', level: 'free', expiresAt: null, source: 'default' };
+    return { tierId: 'free', level: 'guest', expiresAt: null, source: 'default' };
   }
-  const level = ent.level === 'member' ? 'member' : 'free';
+  const accountId = ent.accountId || null;
+  const deviceId = ent.deviceId || null;
+  let level = String(ent.level || '').toLowerCase();
+  if (level === 'free') level = accountId ? 'user' : 'guest';
+  if (level !== 'member' && level !== 'user' && level !== 'guest') {
+    level = accountId ? 'user' : 'guest';
+  }
+  if (level === 'guest' && accountId) level = 'user';
+
   const expiresAt = ent.expiresAt == null ? null : Number(ent.expiresAt);
+  let redeemCode = ent.redeemCode || null;
+  if (!redeemCode && ent.jti && String(ent.jti).indexOf('short:') === 0) {
+    redeemCode = String(ent.jti).slice(6);
+  }
+  // 过期：降为会员档，但保留 redeemCode 便于运营对账（不另开 KV）
   if (level === 'member' && expiresAt != null && expiresAt > 0 && expiresAt < Date.now()) {
     return {
       tierId: 'free',
-      level: 'free',
+      level: accountId ? 'user' : 'guest',
       expiresAt: null,
       source: 'expired',
-      accountId: ent.accountId || null,
-      deviceId: ent.deviceId || null
+      redeemedAt: ent.redeemedAt || null,
+      jti: ent.jti || null,
+      redeemCode: redeemCode || null,
+      accountId,
+      deviceId
     };
   }
   return {
@@ -100,14 +127,34 @@ export function normalizeEntitlement(ent) {
     source: ent.source || 'server',
     redeemedAt: ent.redeemedAt || null,
     jti: ent.jti || null,
-    accountId: ent.accountId || null,
-    deviceId: ent.deviceId || null
+    redeemCode: redeemCode || null,
+    accountId,
+    deviceId
   };
 }
 
-export function isMember(ent) {
+/** 访问档：guest | user | member */
+export function accessLevel(ent) {
   const e = normalizeEntitlement(ent);
-  return e.level === 'member';
+  if (e.level === 'member') return 'member';
+  if (e.level === 'user' || e.accountId) return 'user';
+  return 'guest';
+}
+
+/** 用户档是否满足策略 require */
+export function meetsRequire(levelOrEnt, require) {
+  const level =
+    typeof levelOrEnt === 'string' ? String(levelOrEnt).toLowerCase() : accessLevel(levelOrEnt);
+  const req = normalizeRequire(require);
+  if (req === 'public') return true;
+  if (req === 'user') return level === 'user' || level === 'member';
+  if (req === 'member') return level === 'member';
+  return true;
+}
+
+/** 是否高级会员（付费有效期内） */
+export function isMember(ent) {
+  return accessLevel(ent) === 'member';
 }
 
 export function parseCookies(header) {
@@ -135,14 +182,13 @@ export async function readEntitlementFromRequest(request, env) {
       const { loadAccount, deviceAllowed } = await import('./accounts.js');
       const acct = await loadAccount(env, ent.accountId);
       if (!acct) {
-        return normalizeEntitlement({ tierId: 'free', level: 'free', source: 'account_missing' });
+        return normalizeEntitlement({ tierId: 'free', level: 'guest', source: 'account_missing' });
       }
       if (ent.deviceId && !deviceAllowed(acct, ent.deviceId)) {
         return normalizeEntitlement({
           tierId: 'free',
-          level: 'free',
-          source: 'device_kicked',
-          accountId: ent.accountId
+          level: 'guest',
+          source: 'device_kicked'
         });
       }
       const ae = normalizeEntitlement(acct.entitlement || null);

@@ -1,4 +1,5 @@
 import { loginAccount } from '../../../membership/accounts.js';
+import { bindReferralOnce } from '../../../membership/referral.js';
 import {
   buildSessionCookie,
   jsonResponse,
@@ -14,6 +15,15 @@ export async function onRequestPost(context) {
   }
   const result = await loginAccount(context.env, body);
   if (!result.ok) return jsonResponse({ ok: false, error: result.error }, 400);
+
+  // 尚无归因时可用 ref 补绑一次（已绑不改）
+  try {
+    if (body && body.ref && result.account && result.account.accountId) {
+      await bindReferralOnce(context.env, result.account.accountId, body.ref, {
+        deviceId: body.deviceId || null
+      });
+    }
+  } catch (_eRef) {}
 
   const ent = normalizeEntitlement(
     Object.assign({}, result.account.entitlement || {}, {

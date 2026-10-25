@@ -24,13 +24,19 @@ export function buildEntitlementFromGrant(grant) {
     durationDays == null || !isFinite(durationDays)
       ? null
       : now + durationDays * 86400000;
+  const jti = grant.jti || null;
+  let redeemCode = grant.redeemCode || null;
+  if (!redeemCode && jti && String(jti).indexOf('short:') === 0) {
+    redeemCode = String(jti).slice(6);
+  }
   return {
     tierId: grant.tierId,
     level: 'member',
     expiresAt,
     source: grant.source || 'redeem',
     redeemedAt: now,
-    jti: grant.jti || null
+    jti,
+    redeemCode: redeemCode || null
   };
 }
 
@@ -104,9 +110,36 @@ async function resolveShortCode(code, env) {
       tierId: rec.tierId || 'member_3m',
       durationDays: rec.durationDays == null ? null : Number(rec.durationDays),
       source: 'short_code',
-      jti: rec.jti || 'short:' + code
+      jti: rec.jti || 'short:' + code,
+      redeemCode: code
     }
   };
+}
+
+/**
+ * 兑码成功后补记「兑到谁」（多 1 次 get+put；兑码低频可接受）。
+ * 失败不回滚权益，仅影响运营台对账显示。
+ */
+export async function bindShortCodeToAccount(env, rawCode, opts) {
+  const store = kv(env);
+  if (!store) return { ok: false, error: '未开通发码记录本' };
+  const code = normalizeShortCode(rawCode);
+  if (!isShortCodeShape(code)) return { ok: false, error: '兑换码格式不对' };
+  const raw = await store.get(CODE_KEY_PREFIX + code);
+  if (!raw) return { ok: false, error: '找不到这个兑换码' };
+  let rec;
+  try {
+    rec = JSON.parse(raw);
+  } catch (_e) {
+    return { ok: false, error: '兑换码记录损坏' };
+  }
+  const accountId = opts && opts.accountId ? String(opts.accountId) : '';
+  const phone = opts && opts.phone ? String(opts.phone).trim() : '';
+  rec.redeemedByAccountId = accountId || rec.redeemedByAccountId || null;
+  rec.redeemedByPhone = phone || rec.redeemedByPhone || null;
+  if (!rec.redeemedAt) rec.redeemedAt = Date.now();
+  await store.put(CODE_KEY_PREFIX + code, JSON.stringify(rec));
+  return { ok: true, record: rec };
 }
 
 export async function resolveRedeemCode(rawCode, env) {
@@ -227,6 +260,8 @@ export async function resetShortRedeemCode(env, rawCode) {
     return { ok: false, error: '兑换码记录损坏' };
   }
   rec.redeemedAt = null;
+  rec.redeemedByAccountId = null;
+  rec.redeemedByPhone = null;
   rec.disabled = false;
   await store.put(CODE_KEY_PREFIX + code, JSON.stringify(rec));
   return { ok: true, record: rec };

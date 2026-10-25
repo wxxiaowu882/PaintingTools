@@ -18,6 +18,8 @@
   var API_SCENE = '/api/membership/scene';
   var API_REGISTER = '/api/membership/account/register';
   var API_LOGIN = '/api/membership/account/login';
+  var PROMO_REF_KEY = 'pt_promo_ref';
+  var _promoInfo = null;
   var API_DEVICES = '/api/membership/account/devices';
 
   var _policy = null;
@@ -76,7 +78,8 @@
   function saveEntitlement(ent) {
     _entitlement = normalizeEntitlement(ent);
     try {
-      if (_entitlement && _entitlement.level === 'member') {
+      // 缓存登录态与高级会员，供弱网展示；真正门禁以 Cookie/服务端为准
+      if (_entitlement && (_entitlement.level === 'member' || _entitlement.level === 'user' || _entitlement.accountId)) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(_entitlement));
       } else {
         localStorage.removeItem(STORAGE_KEY);
@@ -86,31 +89,79 @@
     return _entitlement;
   }
 
+  function normalizeRequire(req) {
+    var r = String(req == null ? 'public' : req).toLowerCase().trim();
+    if (r === 'member' || r === 'premium') return 'member';
+    if (r === 'user' || r === 'registered') return 'user';
+    return 'public';
+  }
+
   function normalizeEntitlement(obj) {
-    if (!obj) return { tierId: 'free', level: 'free', expiresAt: null, source: 'default' };
+    if (!obj) return { tierId: 'free', level: 'guest', expiresAt: null, source: 'default' };
+    var accountId = obj.accountId || null;
+    var deviceId = obj.deviceId || null;
     var tierId = String(obj.tierId || obj.tier || 'free');
-    var level = obj.level || (tierId === 'free' ? 'free' : 'member');
+    var level = String(obj.level || '').toLowerCase();
+    if (level === 'free') level = accountId ? 'user' : 'guest';
+    if (level !== 'member' && level !== 'user' && level !== 'guest') {
+      level = accountId ? 'user' : (tierId !== 'free' && tierId !== 'guest' && tierId !== 'user' ? 'member' : 'guest');
+    }
+    if (level === 'guest' && accountId) level = 'user';
     var expiresAt = obj.expiresAt == null ? null : Number(obj.expiresAt);
     if (level === 'member' && expiresAt != null && isFinite(expiresAt) && expiresAt > 0 && expiresAt < nowMs()) {
-      return { tierId: 'free', level: 'free', expiresAt: null, source: 'expired' };
+      return {
+        tierId: 'free',
+        level: accountId ? 'user' : 'guest',
+        expiresAt: null,
+        source: 'expired',
+        accountId: accountId,
+        deviceId: deviceId
+      };
     }
     return {
       tierId: tierId,
-      level: level === 'member' ? 'member' : 'free',
+      level: level,
       expiresAt: (expiresAt != null && isFinite(expiresAt) && expiresAt > 0) ? expiresAt : null,
       source: obj.source || 'local',
-      redeemedAt: obj.redeemedAt || null
+      redeemedAt: obj.redeemedAt || null,
+      accountId: accountId,
+      deviceId: deviceId
     };
   }
 
   function getEntitlement() {
     if (_entitlement) return normalizeEntitlement(_entitlement);
-    _entitlement = loadStoredEntitlement() || { tierId: 'free', level: 'free', expiresAt: null, source: 'default' };
+    _entitlement = loadStoredEntitlement() || { tierId: 'free', level: 'guest', expiresAt: null, source: 'default' };
     return _entitlement;
   }
 
+  /** guest | user | member */
+  function getAccessLevel() {
+    var e = getEntitlement();
+    if (e.level === 'member') return 'member';
+    if (e.level === 'user' || e.accountId) return 'user';
+    return 'guest';
+  }
+
+  function meetsRequire(require) {
+    var level = getAccessLevel();
+    var req = normalizeRequire(require);
+    if (req === 'public') return true;
+    if (req === 'user') return level === 'user' || level === 'member';
+    if (req === 'member') return level === 'member';
+    return true;
+  }
+
+  /** 是否高级会员（付费有效） */
   function isMemberActive() {
-    return getEntitlement().level === 'member';
+    return getAccessLevel() === 'member';
+  }
+
+  function badgeLabelForRequire(require) {
+    var req = normalizeRequire(require);
+    if (req === 'user') return '会员免费';
+    if (req === 'member') return '高级会员尊享';
+    return '';
   }
 
   function notify() {
@@ -155,7 +206,7 @@
           fetchJson(TIERS_URL).then(function (t) { _tiers = t; })
         ]);
       }).catch(function () {
-        if (!_policy) _policy = { version: 0, resources: {}, defaultRequire: 'free' };
+        if (!_policy) _policy = { version: 0, resources: {}, defaultRequire: 'public' };
         if (!_tiers) _tiers = { tiers: [] };
       }),
       refreshFromServer().catch(function () { /* 无 API 时保留本地缓存（仅本地开发） */ })
@@ -163,7 +214,30 @@
     return _ready;
   }
 
+  function capturePromoRefFromUrl() {
+    try {
+      var u = new URL(global.location.href);
+      var ref = String(u.searchParams.get('ref') || '').trim().toUpperCase();
+      if (ref && /^[A-Z0-9]{6,12}$/.test(ref)) {
+        global.localStorage.setItem(PROMO_REF_KEY, ref);
+      }
+    } catch (_e) {}
+  }
+
+  function getStoredPromoRef() {
+    try {
+      return String(global.localStorage.getItem(PROMO_REF_KEY) || '').trim().toUpperCase();
+    } catch (_e2) {
+      return '';
+    }
+  }
+
+  function getPromoInfo() {
+    return _promoInfo;
+  }
+
   function refreshFromServer() {
+    capturePromoRefFromUrl();
     return fetch(API_ME, { credentials: 'same-origin', cache: 'no-cache' }).then(function (r) {
       if (r.status === 404) {
         _serverAuthoritative = false;
@@ -178,18 +252,32 @@
         // 服务端为准：覆盖本地（含伪造的 localStorage）
         saveEntitlement(Object.assign({}, data.entitlement, { source: data.entitlement.source || 'server' }));
       }
-      return data.entitlement || null;
+      if (data.promoUrl || data.promoCode || data.referral) {
+        _promoInfo = {
+          promoUrl: data.promoUrl || null,
+          promoCode: data.promoCode || null,
+          referral: data.referral || null,
+          referralStats: data.referralStats || null
+        };
+      } else if (!(data.accessLevel === 'user' || data.accessLevel === 'member')) {
+        _promoInfo = null;
+      }
+      return data;
     });
   }
 
   function ruleFor(resourceId) {
-    var pol = _policy || { resources: {}, defaultRequire: 'free' };
+    var pol = _policy || { resources: {}, defaultRequire: 'public' };
     var res = (pol.resources && pol.resources[resourceId]) || null;
     if (!res || res.enabled === false) {
-      return { require: pol.defaultRequire || 'free', enabled: false, resourceId: resourceId };
+      return {
+        require: normalizeRequire(pol.defaultRequire || 'public'),
+        enabled: false,
+        resourceId: resourceId
+      };
     }
     return {
-      require: res.require || 'free',
+      require: normalizeRequire(res.require || pol.defaultRequire || 'public'),
       enabled: true,
       probe: !!res.probe,
       label: res.label || resourceId,
@@ -199,13 +287,23 @@
 
   function canAccess(resourceId) {
     var rule = ruleFor(resourceId);
-    if (!rule.enabled || rule.require === 'free') {
-      return { ok: true, reason: 'free', rule: rule, entitlement: getEntitlement() };
+    var ent = getEntitlement();
+    var level = getAccessLevel();
+    if (!rule.enabled || normalizeRequire(rule.require) === 'public') {
+      return { ok: true, reason: 'public', rule: rule, entitlement: ent, accessLevel: level };
     }
-    if (rule.require === 'member' && isMemberActive()) {
-      return { ok: true, reason: 'member', rule: rule, entitlement: getEntitlement() };
+    if (meetsRequire(rule.require)) {
+      return { ok: true, reason: rule.require, rule: rule, entitlement: ent, accessLevel: level };
     }
-    return { ok: false, reason: 'need_member', rule: rule, entitlement: getEntitlement() };
+    var need = normalizeRequire(rule.require);
+    return {
+      ok: false,
+      reason: need === 'user' ? 'need_user' : 'need_member',
+      needLevel: need,
+      rule: rule,
+      entitlement: ent,
+      accessLevel: level
+    };
   }
 
   function sceneResourceId(sandbox, sceneData) {
@@ -239,10 +337,15 @@
     return API_CATALOG + q;
   }
 
-  function sceneUrl(sandbox, name) {
-    return API_SCENE
-      + '?sandbox=' + encodeURIComponent(sandbox || currentSandbox())
-      + '&name=' + encodeURIComponent(name || '');
+  function sceneUrl(sandbox, nameOrOpts) {
+    var o = (nameOrOpts && typeof nameOrOpts === 'object')
+      ? nameOrOpts
+      : { name: nameOrOpts };
+    var q = '?sandbox=' + encodeURIComponent(sandbox || currentSandbox());
+    if (o.uid) q += '&uid=' + encodeURIComponent(String(o.uid));
+    if (o.id) q += '&id=' + encodeURIComponent(String(o.id));
+    if (o.name) q += '&name=' + encodeURIComponent(String(o.name));
+    return API_SCENE + q;
   }
 
   function stripScenePayload(scene) {
@@ -265,12 +368,16 @@
   /** 本地无 Functions 时的客户端过滤（生产禁止依赖此路径防白嫖） */
   function filterScenesClientSide(scenes, sandbox) {
     var list = Array.isArray(scenes) ? scenes : [];
-    if (isMemberActive()) return list;
     return list.map(function (sc) {
       var rid = sceneResourceId(sandbox, sc);
       if (!rid) return sc;
       var gate = canAccess(rid);
-      if (!gate.ok) return stripScenePayload(sc);
+      if (!gate.ok) {
+        var stripped = stripScenePayload(sc);
+        if (stripped && stripped.meta) stripped.meta.require = gate.needLevel || (gate.rule && gate.rule.require);
+        stripped.__require = gate.needLevel || (gate.rule && gate.rule.require);
+        return stripped;
+      }
       return sc;
     });
   }
@@ -314,7 +421,7 @@
           if (!sc || typeof sc !== 'object') return sc;
           // 本地回退也按列表卡裁剪，行为与线上一致
           var locked = !!sc.__membershipLocked || !!(sc.meta && sc.meta.locked);
-          return {
+          var card = {
             name: sc.name,
             thumbnail: '',
             meta: sc.meta
@@ -337,6 +444,9 @@
             __listOnly: true,
             __membershipLocked: locked ? true : undefined
           };
+          if (sc.uid != null && String(sc.uid).trim() !== '') card.uid = String(sc.uid).trim();
+          if (sc.id != null && String(sc.id).trim() !== '') card.id = String(sc.id).trim();
+          return card;
         });
       });
     });
@@ -383,7 +493,7 @@
 
   /**
    * 分批拉取缩略图；每批回调 onBatch(items)，便于 UI 逐批上屏。
-   * 首批默认 8 张（首屏），之后每批 12。
+   * 批较小、批间让出约 40ms，避免与进课/列表滚动抢主线程。
    */
   function hydrateCatalogThumbs(sandbox, onBatch) {
     var sb = sandbox || currentSandbox();
@@ -393,7 +503,7 @@
 
     function step() {
       if (cancelled) return Promise.resolve();
-      var limit = first ? 8 : 12;
+      var limit = first ? 6 : 6;
       first = false;
       return fetchCatalogThumbsBatch(sb, offset, limit).then(function (batch) {
         if (cancelled) return;
@@ -402,9 +512,9 @@
         }
         if (batch.done) return;
         offset = batch.nextOffset != null ? batch.nextOffset : offset + (batch.items ? batch.items.length : 0);
-        // 让出主线程，方便浏览器先画上本批图
+        // 让出主线程，方便浏览器先画上本批图、响应进课点击
         return new Promise(function (resolve) {
-          setTimeout(function () { resolve(step()); }, 0);
+          setTimeout(function () { resolve(step()); }, 40);
         });
       });
     }
@@ -422,16 +532,23 @@
     }).then(function () { return all; });
   }
 
-  /** 进课：拉取单课全文 */
-  function fetchScene(sandbox, name) {
+  /** 进课：拉取单课全文（优先 uid / id，名称兜底） */
+  function fetchScene(sandbox, nameOrOpts) {
     var sb = sandbox || currentSandbox();
-    var n = String(name || '').trim();
-    if (!n) return Promise.reject(new Error('缺少场景名'));
-    return fetchJson(sceneUrl(sb, n)).then(function (data) {
+    var o = (nameOrOpts && typeof nameOrOpts === 'object')
+      ? nameOrOpts
+      : { name: nameOrOpts };
+    var wantUid = String(o.uid || '').trim();
+    var wantId = String(o.id || '').trim();
+    var n = String(o.name || '').trim();
+    if (!wantUid && !wantId && !n) return Promise.reject(new Error('缺少场景标识'));
+    return fetchJson(sceneUrl(sb, { uid: wantUid, id: wantId, name: n })).then(function (data) {
       if (data && data.ok && data.scene) {
         if (data.locked || data.scene.__membershipLocked) {
-          var err = new Error('need_member');
+          var need = data.require || (data.scene.meta && data.scene.meta.require) || 'member';
+          var err = new Error(need === 'user' ? 'need_user' : 'need_member');
           err.locked = true;
+          err.needLevel = need;
           err.scene = data.scene;
           throw err;
         }
@@ -449,12 +566,17 @@
       };
       return fetchJson(staticMap[sb] || staticMap.geometry).then(function (raw) {
         var arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
-        var hit = arr.find(function (s) { return s && String(s.name || '').trim() === n; });
+        var hit = null;
+        if (wantUid) hit = arr.find(function (s) { return s && String(s.uid || '').trim() === wantUid; }) || null;
+        if (!hit && wantId) hit = arr.find(function (s) { return s && String(s.id || '').trim() === wantId; }) || null;
+        if (!hit && n) hit = arr.find(function (s) { return s && String(s.name || '').trim() === n; }) || null;
         if (!hit) throw new Error('场景不存在');
         var filtered = filterScenesClientSide([hit], sb)[0];
         if (filtered && filtered.__membershipLocked) {
-          var e2 = new Error('need_member');
+          var need2 = filtered.__require || (filtered.meta && filtered.meta.require) || 'member';
+          var e2 = new Error(need2 === 'user' ? 'need_user' : 'need_member');
           e2.locked = true;
+          e2.needLevel = need2;
           e2.scene = filtered;
           throw e2;
         }
@@ -478,41 +600,46 @@
       if (!r.ok || !data || !data.ok) {
         throw new Error((data && data.error) || ('兑换失败 HTTP ' + r.status));
       }
-      return saveEntitlement(Object.assign({}, data.entitlement, { source: 'server' }));
+      saveEntitlement(Object.assign({}, data.entitlement, { source: 'server' }));
+      return data;
     });
   }
 
   function registerAccount(opts) {
     var o = opts || {};
+    capturePromoRefFromUrl();
     return postJson(API_REGISTER, {
       phone: o.phone,
       password: o.password,
       wechatNote: o.wechatNote || '',
       deviceId: getDeviceId(),
-      deviceLabel: o.deviceLabel || guessDeviceLabel()
+      deviceLabel: o.deviceLabel || guessDeviceLabel(),
+      ref: o.ref || getStoredPromoRef() || undefined
     }).then(function (res) {
       if (!res.r.ok || !res.data || !res.data.ok) {
         throw new Error((res.data && res.data.error) || '注册失败');
       }
       saveEntitlement(Object.assign({}, res.data.entitlement, { source: 'account' }));
-      return res.data;
+      return refreshFromServer().then(function () { return res.data; });
     });
   }
 
   function loginAccount(opts) {
     var o = opts || {};
+    capturePromoRefFromUrl();
     return postJson(API_LOGIN, {
       phone: o.phone,
       password: o.password,
       wechatNote: o.wechatNote || '',
       deviceId: getDeviceId(),
-      deviceLabel: o.deviceLabel || guessDeviceLabel()
+      deviceLabel: o.deviceLabel || guessDeviceLabel(),
+      ref: o.ref || getStoredPromoRef() || undefined
     }).then(function (res) {
       if (!res.r.ok || !res.data || !res.data.ok) {
         throw new Error((res.data && res.data.error) || '登录失败');
       }
       saveEntitlement(Object.assign({}, res.data.entitlement, { source: 'account' }));
-      return res.data;
+      return refreshFromServer().then(function () { return res.data; });
     });
   }
 
@@ -558,15 +685,19 @@
   }
 
   function clearEntitlement() {
-    saveEntitlement({ tierId: 'free', level: 'free', expiresAt: null, source: 'cleared' });
+    saveEntitlement({ tierId: 'free', level: 'guest', expiresAt: null, source: 'cleared' });
     return fetch(API_ME, { method: 'DELETE', credentials: 'same-origin' }).catch(function () {
       return null;
     });
   }
 
-  function memberPageUrl(extraQuery) {
-    var q = extraQuery ? ('?' + extraQuery) : '';
-    return '/member' + q;
+  function memberPageUrl(hashOrQuery) {
+    var s = String(hashOrQuery || '');
+    if (s.charAt(0) === '#') return '/member' + s;
+    if (s.charAt(0) === '?') return '/member' + s;
+    if (s.indexOf('=') >= 0 || s.indexOf('&') >= 0) return '/member?' + s;
+    if (s) return '/member#' + s.replace(/^#/, '');
+    return '/member';
   }
 
   var _upgradePromptAt = 0;
@@ -604,7 +735,7 @@
         'color:#f3f1ec;' +
         'font-family:\"Microsoft YaHei\",\"PingFang SC\",sans-serif;' +
       '">' +
-        '<div style="font-size:11px;letter-spacing:0.12em;color:rgba(245,215,110,0.9);margin-bottom:8px">会员内容</div>' +
+        '<div class="mu-eyebrow" style="font-size:11px;letter-spacing:0.12em;color:rgba(245,215,110,0.9);margin-bottom:8px">会员内容</div>' +
         '<div class="mu-title" style="font-size:1.15rem;font-weight:600;line-height:1.35;margin:0 0 8px"></div>' +
         '<p class="mu-body" style="margin:0 0 18px;font-size:0.92rem;line-height:1.55;color:rgba(243,241,236,0.72)"></p>' +
         '<div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">' +
@@ -615,7 +746,7 @@
           '<button type="button" class="mu-ok" style="' +
             'font:inherit;min-width:120px;padding:10px 16px;border-radius:10px;cursor:pointer;' +
             'background:#f5d76e;color:#1a160c;border:none;font-weight:600' +
-          '">前往兑换</button>' +
+          '">前往开通</button>' +
         '</div>' +
       '</div>';
     root.appendChild(wrap);
@@ -633,29 +764,53 @@
     if (now - _upgradePromptAt < 800) return;
     _upgradePromptAt = now;
 
+    var need = normalizeRequire(
+      (detail && detail.needLevel) ||
+      (detail && detail.rule && detail.rule.require) ||
+      (detail && detail.reason === 'need_user' ? 'user' : 'member')
+    );
     var label = (detail && detail.rule && detail.rule.label) ? String(detail.rule.label) : '';
-    var title = label ? ('「' + label + '」需要会员') : '此内容需要会员';
-    var body = '开通后可学习标注为会员的课程与功能。可先兑换，再回来继续。';
+    var nameHint = (detail && detail.sceneName) ? String(detail.sceneName) : '';
+    var subject = label || nameHint || '此内容';
+    var title;
+    var body;
+    var okText;
+    var hash;
+    if (need === 'user') {
+      title = '「' + subject + '」会员免费';
+      body = '注册成为会员后即可免费使用。注册免费，还可多设备同步登录。';
+      okText = '去注册';
+      hash = 'account';
+    } else {
+      title = '「' + subject + '」高级会员尊享';
+      body = '开通高级会员后可学习此类场景与功能。请先登录会员账号再兑换，权益可同步到其它设备。';
+      okText = '查看权益与兑换';
+      hash = 'benefits';
+    }
 
-    function goRedeem() {
+    function goMember() {
       var ret = '';
       try { ret = encodeURIComponent(global.location.pathname + global.location.search); } catch (_e) {}
-      global.location.href = memberPageUrl(ret ? ('return=' + ret) : '');
+      var q = ret ? ('?return=' + ret) : '';
+      global.location.href = '/member' + q + '#' + hash;
     }
 
     try {
       var modal = ensureUpgradeModal();
       if (!modal) {
-        if (global.confirm(title + ' 前往兑换页？')) goRedeem();
+        if (global.confirm(title + ' 前往会员页？')) goMember();
         return;
       }
+      var eye = modal.querySelector('.mu-eyebrow');
+      if (eye) eye.textContent = need === 'user' ? '会员免费' : '高级会员尊享';
       modal.querySelector('.mu-title').textContent = title;
       modal.querySelector('.mu-body').textContent = body;
+      var okBtn = modal.querySelector('.mu-ok');
+      okBtn.textContent = okText;
       modal.style.display = 'flex';
 
-      var okBtn = modal.querySelector('.mu-ok');
       var cancelBtn = modal.querySelector('.mu-cancel');
-      function onOk() { cleanup(); goRedeem(); }
+      function onOk() { cleanup(); goMember(); }
       function onCancel() { cleanup(); }
       function onBackdrop(e) { if (e.target === modal) cleanup(); }
       function onKey(e) { if (e.key === 'Escape') cleanup(); }
@@ -673,9 +828,9 @@
       try { okBtn.focus(); } catch (_f) {}
     } catch (_e2) {
       try {
-        if (global.confirm(title + ' 前往兑换页？')) goRedeem();
+        if (global.confirm(title + ' 前往会员页？')) goMember();
       } catch (_e3) {
-        goRedeem();
+        goMember();
       }
     }
   }
@@ -685,6 +840,10 @@
     canAccess: canAccess,
     ruleFor: ruleFor,
     getEntitlement: getEntitlement,
+    getAccessLevel: getAccessLevel,
+    meetsRequire: meetsRequire,
+    normalizeRequire: normalizeRequire,
+    badgeLabelForRequire: badgeLabelForRequire,
     isMemberActive: isMemberActive,
     redeem: redeem,
     clearEntitlement: clearEntitlement,
@@ -694,6 +853,9 @@
     fetchDevices: fetchDevices,
     removeDevice: removeDevice,
     refreshFromServer: refreshFromServer,
+    capturePromoRefFromUrl: capturePromoRefFromUrl,
+    getStoredPromoRef: getStoredPromoRef,
+    getPromoInfo: getPromoInfo,
     fetchCatalog: fetchCatalog,
     fetchCatalogThumbs: fetchCatalogThumbs,
     fetchCatalogThumbsBatch: fetchCatalogThumbsBatch,

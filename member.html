@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>会员兑换｜手绘工坊 · 童画师吴晓</title>
-  <meta name="description" content="手绘工坊会员按时长开通：三个月、一年或永久。兑换码开通后可使用站内会员场景与功能。">
+  <title>会员权益｜手绘工坊 · 童画师吴晓</title>
+  <meta name="description" content="手绘工坊：游客可逛公开内容；注册即为会员；高级会员按时长开通尊享场景与功能。">
   <meta name="robots" content="noindex,follow">
   <link rel="canonical" href="https://www.wuxiaoart.com/member">
   <style>
@@ -25,24 +25,62 @@
       line-height: 1.55;
     }
     main {
-      max-width: 520px; margin: 0 auto; padding: 40px 20px 64px;
+      max-width: 960px; margin: 0 auto; padding: 36px 20px 72px;
     }
-    h1 { font-size: 1.45rem; font-weight: 600; margin: 0 0 8px; }
-    .sub { color: var(--muted); font-size: 0.95rem; margin-bottom: 28px; }
+    @media (max-width: 720px) {
+      main { max-width: 520px; padding: 28px 16px 56px; }
+    }
+    h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 8px; }
+    .sub { color: var(--muted); font-size: 0.95rem; margin-bottom: 20px; max-width: 42em; }
+    .jump {
+      display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 22px;
+      font-size: 0.9rem;
+    }
+    .jump a { color: var(--accent); text-decoration: none; }
+    .jump a:hover { text-decoration: underline; }
     .card {
       background: var(--card); border: 1px solid var(--line);
-      border-radius: 12px; padding: 18px 16px; margin-bottom: 16px;
+      border-radius: 12px; padding: 20px 18px; margin-bottom: 18px;
+      scroll-margin-top: 20px;
     }
-    .card h2 { font-size: 1rem; margin: 0 0 12px; font-weight: 600; }
+    .card h2 { font-size: 1.05rem; margin: 0 0 12px; font-weight: 600; }
+    .card h3 { font-size: 0.95rem; margin: 16px 0 8px; font-weight: 600; color: var(--muted); }
+    .benefit-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    @media (max-width: 800px) {
+      .benefit-grid { grid-template-columns: 1fr; }
+    }
+    .benefit {
+      border: 1px solid var(--line); border-radius: 10px;
+      padding: 14px 14px 12px; background: rgba(0,0,0,0.22);
+      min-height: 100%;
+    }
+    .benefit .tag {
+      display: inline-block; font-size: 0.75rem; letter-spacing: 0.06em;
+      color: var(--accent); margin-bottom: 6px;
+    }
+    .benefit .name { font-size: 1.05rem; font-weight: 600; margin: 0 0 8px; }
+    .benefit ul { margin: 0; padding-left: 1.15em; color: var(--muted); font-size: 0.88rem; }
+    .benefit li { margin: 4px 0; }
     .tier {
       display: flex; justify-content: space-between; align-items: baseline;
-      padding: 10px 0; border-bottom: 1px solid var(--line);
+      padding: 10px 0; border-bottom: 1px solid var(--line); gap: 12px;
     }
     .tier:last-child { border-bottom: none; }
-    .price { color: var(--accent); font-weight: 600; }
+    .price { color: var(--accent); font-weight: 600; white-space: nowrap; }
+    .two-col {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    }
+    @media (max-width: 800px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
     label { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 6px; }
-    input[type="text"] {
-      width: 100%; padding: 12px 12px; border-radius: 8px;
+    input[type="text"], input[type="password"] {
+      width: 100%; padding: 12px; border-radius: 8px;
       border: 1px solid var(--line); background: #0d0d10; color: var(--text);
       font-size: 1rem; letter-spacing: 0.04em;
     }
@@ -55,6 +93,14 @@
       background: transparent; color: var(--muted);
       border: 1px solid var(--line); margin-top: 8px; font-weight: 500;
     }
+    button:disabled {
+      opacity: 0.45; cursor: not-allowed;
+    }
+    input:disabled {
+      opacity: 0.55; cursor: not-allowed;
+    }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-row button { flex: 1; min-width: 120px; }
     .msg { margin-top: 10px; font-size: 0.9rem; min-height: 1.2em; }
     .msg.ok { color: #7dcea0; }
     .msg.err { color: #f5a9a9; }
@@ -63,50 +109,173 @@
     a.back { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
     a.back:hover { color: var(--text); }
     .hint { font-size: 0.85rem; color: var(--muted); margin-top: 10px; }
+    .pay-box {
+      margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
+    }
+    .pay-box h3 { margin-top: 0; color: var(--text); }
+    .pay-steps {
+      margin: 0 0 14px; padding-left: 1.2em; color: var(--muted); font-size: 0.88rem;
+    }
+    .pay-steps li { margin: 5px 0; }
+    .pay-qrs {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 14px;
+      align-items: start;
+    }
+    @media (max-width: 640px) {
+      .pay-qrs { grid-template-columns: 1fr; }
+    }
+    .pay-qr {
+      text-align: center;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 12px 14px;
+      background: rgba(0,0,0,0.22);
+    }
+    .pay-qr.primary {
+      border-color: rgba(232, 197, 71, 0.35);
+      background: rgba(232, 197, 71, 0.06);
+    }
+    .pay-qr .qr-label {
+      font-size: 0.82rem; color: var(--accent); margin-bottom: 8px; font-weight: 600;
+    }
+    .pay-qr.secondary .qr-label { color: var(--muted); font-weight: 500; }
+    .pay-qr img {
+      width: 100%; max-width: 220px; height: auto;
+      border-radius: 6px; background: #fff; display: block; margin: 0 auto;
+    }
+    .pay-qr.secondary img { max-width: 168px; }
+    .pay-qr .qr-tip { font-size: 0.78rem; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+    .wx-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+      margin-top: 12px; font-size: 0.9rem; color: var(--muted);
+    }
+    .wx-row strong { color: var(--text); letter-spacing: 0.04em; }
+    .wx-row button.copy-wx {
+      width: auto; margin: 0; padding: 6px 12px; font-size: 0.82rem;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
   <main>
-    <p><a class="back" href="./">← 返回首页</a></p>
-    <h1>会员 · 兑换</h1>
-    <p class="sub" id="purchase-hint">按时长开通站内会员。具体可用场景与功能以网站说明为准。</p>
+    <p><a class="back" href="/" id="btn-back">← 返回</a></p>
+    <h1>会员权益</h1>
+    <p class="sub" id="purchase-hint">游客可逛公开内容；注册即为会员；高级会员按时长开通尊享内容。</p>
+    <nav class="jump" aria-label="本页导航">
+      <a href="#benefits">权益与价格</a>
+      <a href="#how-to-pay">如何开通</a>
+      <a href="#account">账号</a>
+      <a href="#redeem">兑换</a>
+      <a href="#promo">宣传链接</a>
+    </nav>
 
-    <section class="card">
-      <h2>早鸟价格</h2>
+    <section class="card" id="benefits">
+      <h2>三档说明</h2>
+      <div class="benefit-grid" id="benefit-grid">
+        <div class="benefit">
+          <div class="tag">无需注册</div>
+          <p class="name">游客</p>
+          <ul>
+            <li>可浏览公开场景与基础功能</li>
+            <li>列表中标注「会员免费 / 高级会员尊享」的内容需升级后使用</li>
+          </ul>
+        </div>
+        <div class="benefit">
+          <div class="tag">注册免费</div>
+          <p class="name">会员</p>
+          <ul>
+            <li>可使用标注为「会员免费」的场景与功能</li>
+            <li>最多 3 台设备同步登录</li>
+          </ul>
+        </div>
+        <div class="benefit">
+          <div class="tag">付费开通</div>
+          <p class="name">高级会员</p>
+          <ul>
+            <li>含会员全部权益</li>
+            <li>可使用「高级会员尊享」场景与功能</li>
+            <li>按时长：三个月 / 一年 / 永久</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>高级会员 · 早鸟价格</h3>
       <div id="tier-list"></div>
-      <p class="hint">付款后请备注「会员+档位+微信昵称」，截图发微信 <strong id="wx">lightouches</strong>；确认到账后 24 小时内发送兑换码。</p>
+
+      <div class="pay-box" id="how-to-pay">
+        <h3>如何开通</h3>
+        <ol class="pay-steps">
+          <li>先在本页注册 / 登录会员账号</li>
+          <li>扫「收款码」付款，备注写：高级会员 + 档位（三个月/一年/永久）+ 注册手机号</li>
+          <li>再扫「名片码」加微信，或搜微信号：lightouches（复制微信号），等待微信好友通过后，发送付款截图。</li>
+          <li>本站收到您的付款截图，确认到账后 2 小时内发您兑换码，您回到本页「兑换」粘贴即可。</li>
+        </ol>
+        <div class="pay-qrs">
+          <div class="pay-qr primary">
+            <div class="qr-label">① 微信收款码（先付款）</div>
+            <img src="/docs/membership/wechat-pay.jpg" width="220" height="220" alt="微信收款码" loading="lazy" decoding="async">
+            <p class="qr-tip">付完请备注档位与注册手机号</p>
+          </div>
+          <div class="pay-qr secondary">
+            <div class="qr-label">② 名片码（加好友发截图）</div>
+            <img src="/docs/membership/wechat-contact.jpg" width="168" height="168" alt="微信名片二维码" loading="lazy" decoding="async">
+            <div class="wx-row" style="justify-content:center;margin-top:10px">
+              <span>也可搜微信号：<strong id="wx">lightouches</strong></span>
+              <button type="button" class="secondary copy-wx" id="btn-copy-wx">复制微信号</button>
+            </div>
+            <p class="hint" id="pay-copy-msg" style="margin-top:6px"></p>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="card">
-      <h2>当前状态</h2>
-      <p class="status" id="status-line">读取中…</p>
-      <p class="status" id="account-line" style="margin-top:6px"></p>
-      <button type="button" class="secondary" id="btn-clear">注销本机（清登录态）</button>
-      <p class="hint">注销只影响本浏览器。会员挂在账号上时，其它设备仍可用。反复测兑换：本页注销 + 运营台「重置可再兑」。</p>
-    </section>
+    <div class="two-col">
+      <section class="card" id="account">
+        <h2>账号</h2>
+        <p class="status" id="status-line">读取中…</p>
+        <p class="status" id="account-line" style="margin-top:6px"></p>
+        <p class="hint">用手机号注册后即为会员。换设备登录同一账号可共用高级会员权益（最多 3 台；第 4 台会顶掉最早一台）。</p>
+        <label for="phone">手机号</label>
+        <input id="phone" type="text" inputmode="tel" autocomplete="username" placeholder="11 位手机号" />
+        <label for="pwd" style="margin-top:10px">密码（至少 6 位）</label>
+        <input id="pwd" type="password" autocomplete="current-password" placeholder="登录密码" />
+        <label for="wxnote" style="margin-top:10px">微信备注（可选）</label>
+        <input id="wxnote" type="text" maxlength="40" placeholder="方便客服核对" />
+        <div class="btn-row">
+          <button type="button" id="btn-login-acct">登录</button>
+          <button type="button" class="secondary" id="btn-register-acct">注册</button>
+        </div>
+        <p class="msg" id="acct-msg"></p>
+        <p class="hint">忘记密码：请微信联系 <strong class="wx-copy">lightouches</strong>，提供注册手机号，由我们人工重置（暂不支持网页自助找回）。</p>
+        <div id="device-box" class="hint" style="margin-top:12px"></div>
+        <div id="logout-box" hidden>
+          <button type="button" class="secondary" id="btn-clear">注销本机（清登录态）</button>
+          <p class="hint">注销只影响本浏览器。高级会员挂在账号上时，其它设备仍可用。</p>
+        </div>
+      </section>
 
-    <section class="card">
-      <h2>账号登录（最多 3 台设备）</h2>
-      <p class="hint">用手机号注册后，换电脑/手机登录同一账号即可共用会员（最多 3 台；第 4 台会顶掉最早一台）。</p>
-      <label for="phone">手机号</label>
-      <input id="phone" type="text" inputmode="tel" autocomplete="username" placeholder="11 位手机号" />
-      <label for="pwd" style="margin-top:10px">密码（至少 6 位）</label>
-      <input id="pwd" type="password" autocomplete="current-password" placeholder="登录密码" />
-      <label for="wxnote" style="margin-top:10px">微信备注（可选）</label>
-      <input id="wxnote" type="text" maxlength="40" placeholder="方便客服核对" />
-      <button type="button" id="btn-login-acct">登录</button>
-      <button type="button" class="secondary" id="btn-register-acct">注册新账号</button>
-      <p class="msg" id="acct-msg"></p>
-      <div id="device-box" class="hint" style="margin-top:12px"></div>
-    </section>
+      <section class="card" id="redeem">
+        <h2>兑换高级会员</h2>
+        <p class="hint" id="redeem-hint">兑换前请先注册或登录会员账号，以便多设备同步权益。</p>
+        <label for="code">兑换码</label>
+        <input id="code" type="text" autocomplete="off" placeholder="10 位兑换码" />
+        <button type="button" id="btn-redeem">兑换</button>
+        <p class="msg" id="msg"></p>
+      </section>
+    </div>
 
-    <section class="card">
-      <h2>输入兑换码</h2>
-      <label for="code">兑换码</label>
-      <input id="code" type="text" autocomplete="off" placeholder="10 位兑换码" />
-      <button type="button" id="btn-redeem">兑换</button>
-      <p class="msg" id="msg"></p>
-      <p class="hint">建议先登录账号再兑换，会员会同步到你的其它设备。</p>
+    <section class="card" id="promo" hidden>
+      <h2>分享有奖励！</h2>
+      <p class="hint" id="promo-hint">把链接发到小红书、朋友圈或画群。有人通过你的链接进来，并兑换开通高级会员后，你的高级会员会自动延长 <strong id="promo-reward-days">90</strong> 天。</p>
+      <label for="promo-url">你的专属链接</label>
+      <input id="promo-url" type="text" readonly style="width:100%" />
+      <div class="btn-row" style="margin-top:10px">
+        <button type="button" id="btn-copy-promo">复制链接</button>
+      </div>
+      <p class="hint" id="promo-stats" style="margin-top:8px"></p>
+      <p class="msg" id="promo-msg"></p>
     </section>
   </main>
   <script type="module">
@@ -114,13 +283,91 @@
     const MA = window.MembershipAccess;
 
     function fmtEnt(e) {
-      if (!e || e.level !== 'member') return '访客（免费）';
-      const name = e.tierId || 'member';
-      if (e.expiresAt) {
-        const d = new Date(e.expiresAt);
-        return '会员已开通（' + name + '，至 ' + d.toLocaleDateString('zh-CN') + '）';
+      const level = (MA.getAccessLevel && MA.getAccessLevel()) || (e && e.level) || 'guest';
+      if (level === 'member') {
+        const name = (e && e.tierId) || 'member';
+        if (e && e.expiresAt) {
+          const d = new Date(e.expiresAt);
+          return '高级会员（' + name + '，至 ' + d.toLocaleDateString('zh-CN') + '）';
+        }
+        return '高级会员（' + name + '，永久）';
       }
-      return '会员已开通（' + name + '，永久）';
+      if (level === 'user' || (e && e.accountId)) return '会员（已注册）';
+      return '游客';
+    }
+
+    function setWx(wx) {
+      const id = wx || 'lightouches';
+      document.getElementById('wx').textContent = id;
+      document.querySelectorAll('.wx-copy').forEach((el) => { el.textContent = id; });
+    }
+
+    function currentWxId() {
+      const el = document.getElementById('wx');
+      return ((el && el.textContent) || 'lightouches').trim();
+    }
+
+    document.getElementById('btn-copy-wx').onclick = async () => {
+      const msg = document.getElementById('pay-copy-msg');
+      const id = currentWxId();
+      try {
+        await navigator.clipboard.writeText(id);
+        if (msg) {
+          msg.className = 'hint';
+          msg.style.color = '#7dcea0';
+          msg.textContent = '微信号已复制：' + id;
+        }
+      } catch (_e) {
+        if (msg) {
+          msg.className = 'hint';
+          msg.style.color = '#f5a9a9';
+          msg.textContent = '复制失败，请手动选中微信号';
+        }
+      }
+    };
+
+    function isLoggedIn() {
+      const level = (MA.getAccessLevel && MA.getAccessLevel()) || 'guest';
+      return level === 'user' || level === 'member';
+    }
+
+    function syncLogoutBox() {
+      const box = document.getElementById('logout-box');
+      if (box) box.hidden = !isLoggedIn();
+    }
+
+    function syncRedeemGate() {
+      const logged = isLoggedIn();
+      const code = document.getElementById('code');
+      const btn = document.getElementById('btn-redeem');
+      const hint = document.getElementById('redeem-hint');
+      if (code) code.disabled = !logged;
+      if (btn) btn.disabled = !logged;
+      if (hint) {
+        hint.textContent = logged
+          ? '兑换后权益会同步到你已登录的其它设备。'
+          : '兑换前请先注册或登录会员账号，以便多设备同步权益。';
+      }
+    }
+
+    function renderPromo() {
+      const box = document.getElementById('promo');
+      const info = MA.getPromoInfo && MA.getPromoInfo();
+      const logged = isLoggedIn();
+      if (!box) return;
+      const enabled = !!(info && info.referral && info.referral.enabled !== false && info.promoUrl);
+      box.hidden = !(logged && enabled);
+      if (!logged || !enabled) return;
+      const urlInp = document.getElementById('promo-url');
+      if (urlInp) urlInp.value = info.promoUrl || '';
+      const days = (info.referral && info.referral.rewardDays) || 90;
+      const daysEl = document.getElementById('promo-reward-days');
+      if (daysEl) daysEl.textContent = String(days);
+      const st = info.referralStats || {};
+      let stats = '每成功推荐一人兑换高级会员，你可延长 ' + days + ' 天。';
+      if (st.rewardTotal) stats += '累计已奖励 ' + st.rewardTotal + ' 次。';
+      const statsEl = document.getElementById('promo-stats');
+      if (statsEl) statsEl.textContent = stats;
     }
 
     function renderStatus() {
@@ -131,9 +378,46 @@
         al.innerHTML = '已登录账号（设备：' + (MA.getDeviceId() || '').slice(0, 12) + '…）';
         refreshDevices();
       } else {
-        al.textContent = '未登录账号（仅本浏览器有效）';
+        al.textContent = '未登录';
         document.getElementById('device-box').innerHTML = '';
       }
+      syncLogoutBox();
+      syncRedeemGate();
+      renderPromo();
+    }
+
+    function resolveBackTarget() {
+      try {
+        const u = new URL(location.href);
+        const ret = u.searchParams.get('return');
+        if (ret && ret.charAt(0) === '/' && ret.charAt(1) !== '/' && ret.indexOf('/member') !== 0) {
+          return ret;
+        }
+      } catch (_e) {}
+      return null;
+    }
+
+    function goBack(e) {
+      if (e) e.preventDefault();
+      const ret = resolveBackTarget();
+      if (ret) {
+        location.href = ret;
+        return;
+      }
+      try {
+        if (document.referrer) {
+          const r = new URL(document.referrer);
+          if (r.origin === location.origin && r.pathname.indexOf('/member') !== 0) {
+            history.back();
+            return;
+          }
+        }
+      } catch (_e2) {}
+      if (window.history.length > 1) {
+        history.back();
+        return;
+      }
+      location.href = '/';
     }
 
     async function refreshDevices() {
@@ -169,7 +453,7 @@
       const list = document.getElementById('tier-list');
       list.innerHTML = '';
       const tiers = (tiersDoc && tiersDoc.tiers) || [];
-      tiers.filter(t => t.id !== 'free').forEach(t => {
+      tiers.filter((t) => t.requireLevel === 'member' || (t.id && String(t.id).indexOf('member_') === 0)).forEach((t) => {
         const row = document.createElement('div');
         row.className = 'tier';
         row.innerHTML = '<span>' + t.name + '</span><span class="price">¥' + t.price + '</span>';
@@ -178,16 +462,23 @@
       if (tiersDoc && tiersDoc.purchaseHint) {
         document.getElementById('purchase-hint').textContent = tiersDoc.purchaseHint;
       }
-      if (tiersDoc && tiersDoc.contactWeChat) {
-        document.getElementById('wx').textContent = tiersDoc.contactWeChat;
-      }
+      if (tiersDoc && tiersDoc.contactWeChat) setWx(tiersDoc.contactWeChat);
     }
 
     function goReturn() {
+      const ret = resolveBackTarget();
+      if (ret) {
+        location.href = ret;
+        return;
+      }
       try {
-        const u = new URL(location.href);
-        const ret = u.searchParams.get('return');
-        if (ret && ret.startsWith('/')) location.href = ret;
+        if (document.referrer) {
+          const r = new URL(document.referrer);
+          if (r.origin === location.origin && r.pathname.indexOf('/member') !== 0) {
+            history.back();
+            return;
+          }
+        }
       } catch (_e) {}
     }
 
@@ -199,13 +490,39 @@
       };
     }
 
+    document.getElementById('btn-back').addEventListener('click', goBack);
+
+    document.getElementById('btn-copy-promo').onclick = async () => {
+      const msg = document.getElementById('promo-msg');
+      const url = (document.getElementById('promo-url').value || '').trim();
+      if (!url) {
+        msg.className = 'msg err';
+        msg.textContent = '暂无链接，请刷新后再试';
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        msg.className = 'msg ok';
+        msg.textContent = '链接已复制，可以发到网上了';
+      } catch (_e) {
+        msg.className = 'msg err';
+        msg.textContent = '复制失败，请长按链接手动复制';
+      }
+    };
+
     MA.ready().then(() => {
+      if (MA.capturePromoRefFromUrl) MA.capturePromoRefFromUrl();
       renderTiers(MA.getTiers());
       renderStatus();
       MA.onChange(renderStatus);
       try {
-        const code = new URL(location.href).searchParams.get('code');
+        const u = new URL(location.href);
+        const code = u.searchParams.get('code');
         if (code) document.getElementById('code').value = code;
+        if (location.hash === '#account' || location.hash === '#redeem' || location.hash === '#benefits' || location.hash === '#promo' || location.hash === '#how-to-pay') {
+          const el = document.querySelector(location.hash);
+          if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+        }
       } catch (_e) {}
     });
 
@@ -216,7 +533,7 @@
       try {
         const data = await MA.registerAccount(acctFields());
         msg.className = 'msg ok';
-        msg.textContent = data.tip || '注册成功';
+        msg.textContent = data.tip || '注册成功，你已是会员';
         renderStatus();
       } catch (e) {
         msg.className = 'msg err';
@@ -241,12 +558,19 @@
 
     document.getElementById('btn-redeem').onclick = async () => {
       const msg = document.getElementById('msg');
+      if (!isLoggedIn()) {
+        msg.className = 'msg err';
+        msg.textContent = '请先注册或登录会员账号再兑换';
+        const acct = document.getElementById('account');
+        if (acct) acct.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
       msg.className = 'msg';
       msg.textContent = '兑换中…';
       try {
-        await MA.redeem(document.getElementById('code').value);
+        const data = await MA.redeem(document.getElementById('code').value);
         msg.className = 'msg ok';
-        msg.textContent = '兑换成功';
+        msg.textContent = (data && data.tip) || '兑换成功，已开通高级会员';
         renderStatus();
         setTimeout(goReturn, 800);
       } catch (e) {
@@ -256,7 +580,7 @@
     };
 
     document.getElementById('btn-clear').onclick = async () => {
-      const msg = document.getElementById('msg');
+      const msg = document.getElementById('acct-msg');
       msg.className = 'msg';
       msg.textContent = '注销中…';
       try {

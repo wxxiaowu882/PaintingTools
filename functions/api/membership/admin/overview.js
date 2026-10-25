@@ -26,13 +26,13 @@ export async function onRequestGet(context) {
       return {
         id,
         label: r.label || id,
-        require: r.require || 'free',
+        require: r.require || 'public',
         enabled: r.enabled !== false,
         probe: !!r.probe,
         kind: id.startsWith('scene:') ? 'scene' : id.startsWith('ui:') ? 'ui' : 'feature'
       };
     })
-    .filter((x) => x.require === 'member' && x.enabled);
+    .filter((x) => x.enabled && (x.require === 'member' || x.require === 'user'));
 
   // 给前端/排障用；业务页默认不展示生造名词
   const tips = [];

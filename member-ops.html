@@ -76,6 +76,29 @@
     }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+    .acct-layout {
+      display: grid; gap: 14px;
+      grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.9fr);
+    }
+    @media (max-width: 860px) {
+      .acct-layout { grid-template-columns: 1fr; }
+    }
+    .acct-table-wrap {
+      max-height: 480px; overflow: auto;
+      border: 1px solid var(--line); border-radius: 8px;
+    }
+    .acct-table-wrap tr { cursor: pointer; }
+    .acct-table-wrap tr:hover td { background: #f7f3eb; }
+    .acct-table-wrap tr.active td { background: #eef4fb; }
+    .acct-table-wrap th { position: sticky; top: 0; background: var(--card); z-index: 1; }
+    .ent-banner {
+      padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+      background: #f7f3eb; margin-bottom: 8px;
+    }
+    .ent-banner.member { background: #e7f4ea; border-color: #cfe6d4; }
+    .ent-banner.user { background: #eef4fb; border-color: #cfdceb; }
+    .ent-banner .ent-main { font-size: 1.05rem; font-weight: 600; }
+    .ent-banner .ent-sub { font-size: 0.88rem; color: var(--muted); margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -102,6 +125,7 @@
 
       <nav class="tabs" id="ops-tabs" aria-label="运营台分区">
         <button type="button" class="tab active" data-tab="codes">发码与记录</button>
+        <button type="button" class="tab" data-tab="accounts">会员账号</button>
         <button type="button" class="tab" data-tab="policy">收费设置</button>
         <button type="button" class="tab" data-tab="prices">价格文案</button>
         <button type="button" class="tab" data-tab="scripts">常用话术</button>
@@ -111,12 +135,13 @@
       <div class="tab-panel" data-panel="start">
         <section class="card">
           <h2>怎么测一遍</h2>
-          <p class="tip">按正常卖课流程走即可：发码 → 学员兑换 → 打开收费场景看是否解锁。</p>
+          <p class="tip">三档：游客 / 会员（注册）/ 高级会员（兑码）。探针场景可用来验门禁。</p>
           <ol class="tip" style="margin:8px 0 0;padding-left:1.2em">
-            <li>在「发码与记录」生成一个兑换码</li>
-            <li>打开兑换页，输入该码完成兑换</li>
-            <li>打开几何体场景，确认收费内容已解锁</li>
-            <li>要反复测：兑换页点「注销」，回到本台对那条记录点「重置可再兑」</li>
+            <li>游客打开几何体：看「会员免费 / 高级会员尊享」角标与拦截文案</li>
+            <li>注册登录后：会员免费探针可进，高级会员探针仍锁</li>
+            <li>发码 → 兑换页兑码 → 高级会员内容解锁</li>
+            <li>宣传链接：A 复制链接 → B 用链接注册 → B 兑高级 → 看 A 是否延期</li>
+            <li>忘记密码：本台「会员账号」按手机号重置</li>
           </ol>
           <div id="status-box" class="hidden" style="margin-top:12px"></div>
         </section>
@@ -129,9 +154,9 @@
           <div class="row">
             <label>档位
               <select id="code-tier">
-                <option value="member_3m">三个月（¥39）</option>
-                <option value="member_1y">一年（¥99）</option>
-                <option value="member_forever">永久（¥199）</option>
+                <option value="member_3m">高级会员 · 三个月（¥39）</option>
+                <option value="member_1y">高级会员 · 一年（¥99）</option>
+                <option value="member_forever">高级会员 · 永久（¥199）</option>
               </select>
             </label>
             <label>数量 <input id="code-count" type="number" min="1" max="20" value="1"></label>
@@ -153,7 +178,7 @@
         </section>
         <section class="card">
           <h2>发码记录（谁开通过）</h2>
-          <p class="tip">生成时间、档位、是否已兑。建议发码时写备注。</p>
+          <p class="tip">生成时间、档位、是否已兑、兑到哪台手机。建议发码时写备注。</p>
           <div class="row">
             <button type="button" class="secondary" id="btn-refresh-ledger">刷新列表</button>
           </div>
@@ -165,12 +190,13 @@
                   <th>档位</th>
                   <th>生成时间</th>
                   <th>状态</th>
+                  <th>兑到手机</th>
                   <th>备注</th>
                   <th>操作</th>
                 </tr>
               </thead>
               <tbody id="ledger-tbody">
-                <tr><td colspan="6" class="tip">登录后自动加载…</td></tr>
+                <tr><td colspan="7" class="tip">登录后自动加载…</td></tr>
               </tbody>
             </table>
           </div>
@@ -178,10 +204,103 @@
         </section>
       </div>
 
+      <div class="tab-panel" data-panel="accounts">
+        <section class="card">
+          <h2>会员账号</h2>
+          <p class="tip">列表一次拉取后本地筛选（少打接口）。点行看权益/兑码；可延期、取消高级、踢设备、复制回复话术。</p>
+          <div class="row">
+            <label style="flex:1;min-width:160px">手机号
+              <input id="acct-phone" type="text" inputmode="tel" placeholder="片段过滤" style="width:100%">
+            </label>
+            <label>状态
+              <select id="acct-filter-status">
+                <option value="all">全部</option>
+                <option value="member">仅高级会员</option>
+                <option value="user">仅注册会员</option>
+                <option value="expiring">7 天内到期</option>
+              </select>
+            </label>
+            <button type="button" class="secondary" id="btn-acct-reload">刷新列表</button>
+            <button type="button" id="btn-acct-lookup">精确查询</button>
+          </div>
+          <p class="msg" id="acct-msg"></p>
+          <div class="acct-layout" style="margin-top:12px">
+            <div>
+              <div class="tip" id="acct-list-meta">加载中…</div>
+              <div class="acct-table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>手机号</th>
+                      <th>备注</th>
+                      <th>档位</th>
+                      <th>到期</th>
+                      <th>设备</th>
+                    </tr>
+                  </thead>
+                  <tbody id="acct-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <div id="acct-result" class="tip">从左侧点选账号查看详情。</div>
+              <div id="acct-actions" class="hidden" style="margin-top:12px">
+                <label>微信备注
+                  <input id="acct-note" type="text" maxlength="40" style="width:100%;max-width:320px">
+                </label>
+                <div class="row" style="margin-top:8px">
+                  <button type="button" class="secondary" id="btn-acct-note">保存备注</button>
+                  <button type="button" class="secondary" id="btn-acct-copy-script">复制回复话术</button>
+                </div>
+                <div class="row" style="margin-top:10px;align-items:flex-end">
+                  <label>延期（天）
+                    <input id="acct-extend-days" type="number" min="1" max="3660" value="30" style="width:88px">
+                  </label>
+                  <button type="button" class="secondary" id="btn-acct-extend">延期高级</button>
+                  <button type="button" class="secondary" id="btn-acct-revoke">取消高级</button>
+                </div>
+                <div id="acct-devices" class="tip" style="margin-top:10px"></div>
+                <label style="display:block;margin-top:12px">新密码（至少 6 位）
+                  <input id="acct-new-pwd" type="text" autocomplete="off" style="width:100%;max-width:320px" placeholder="重置后请私下告知用户">
+                </label>
+                <div class="row" style="margin-top:8px">
+                  <button type="button" id="btn-acct-reset">重置密码</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
       <div class="tab-panel" data-panel="policy">
         <section class="card">
-          <h2>哪些内容要会员才能用</h2>
-          <p class="tip">打开开关 = 要会员；关掉 = 免费。改完点保存。</p>
+          <h2>宣传链接奖励</h2>
+          <p class="tip">鼓励学员把专属链接发到网上。别人通过链接注册并<strong>兑换高级会员</strong>后，给分享者延期。默认 +90 天；可关总开关。</p>
+          <div class="row" style="align-items:center">
+            <label style="display:flex;align-items:center;gap:8px">
+              <input id="ref-enabled" type="checkbox" checked> 开启宣传奖励
+            </label>
+            <label>每次成功奖励（天）
+              <input id="ref-days" type="number" min="1" max="365" value="90" style="width:88px">
+            </label>
+            <label>每人每月最多几次（0=不封顶）
+              <input id="ref-cap" type="number" min="0" max="99" value="0" style="width:72px">
+            </label>
+          </div>
+          <div class="row" style="align-items:center;margin-top:8px">
+            <label style="display:flex;align-items:center;gap:8px">
+              <input id="ref-block-self" type="checkbox" checked> 禁止自己推自己
+            </label>
+            <label style="display:flex;align-items:center;gap:8px">
+              <input id="ref-block-device" type="checkbox" checked> 禁止同设备刷奖
+            </label>
+            <button type="button" id="btn-save-referral">保存宣传设置</button>
+          </div>
+          <p class="msg" id="referral-msg"></p>
+        </section>
+        <section class="card">
+          <h2>哪些内容要哪一档才能用</h2>
+          <p class="tip">三选一：游客可见 / 会员（注册）/ 高级会员。改完点保存；学员端刷新后生效。</p>
           <div class="row">
             <button type="button" class="secondary" id="btn-reload-policy">刷新列表</button>
             <button type="button" id="btn-save-policy">保存收费设置</button>
@@ -191,13 +310,13 @@
           <h3 style="font-size:0.95rem;margin:14px 0 6px">场景（几何体）</h3>
           <div style="max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:8px">
             <table>
-              <thead><tr><th style="width:70px">收费</th><th>场景名</th></tr></thead>
+              <thead><tr><th style="width:160px">权限</th><th>场景名</th></tr></thead>
               <tbody id="scene-tbody"></tbody>
             </table>
           </div>
           <h3 style="font-size:0.95rem;margin:14px 0 6px">功能按钮（Solid 底部面板）</h3>
           <table>
-            <thead><tr><th style="width:70px">收费</th><th>功能</th></tr></thead>
+            <thead><tr><th style="width:160px">权限</th><th>功能</th></tr></thead>
             <tbody id="ui-tbody"></tbody>
           </table>
         </section>
@@ -243,6 +362,10 @@
     let tiersDoc = null;
     let canSaveOnline = false;
     let lastCodes = [];
+    let acctCache = [];
+    let lastAcctPhone = '';
+    let selectedAcctPhone = '';
+    let selectedAcct = null;
 
     function switchTab(name) {
       document.querySelectorAll('#ops-tabs .tab').forEach((b) => {
@@ -252,6 +375,13 @@
         p.classList.toggle('active', p.getAttribute('data-panel') === name);
       });
       try { localStorage.setItem('memberOpsTab', name); } catch (_e) {}
+      // 有缓存则本地筛，避免每次切 Tab 再打列表接口（免费档省请求）
+      if (name === 'accounts' && typeof loadAcctList === 'function') {
+        try {
+          if (!acctCache || !acctCache.length) loadAcctList();
+          else renderAcctTable(acctCache);
+        } catch (_eAcct) {}
+      }
     }
 
     document.querySelectorAll('#ops-tabs .tab').forEach((b) => {
@@ -305,7 +435,7 @@
     function renderLedger(codes) {
       const tb = $('ledger-tbody');
       if (!codes || !codes.length) {
-        tb.innerHTML = '<tr><td colspan="6" class="tip">还没有发过码。付完款后在「发码与记录」里生成即可。</td></tr>';
+        tb.innerHTML = '<tr><td colspan="7" class="tip">还没有发过码。付完款后在「发码与记录」里生成即可。</td></tr>';
         return;
       }
       tb.innerHTML = '';
@@ -315,12 +445,16 @@
           : (c.codeExpiresAt && c.codeExpiresAt < Date.now()
             ? '<span class="pill bad">已过期未兑</span>'
             : '<span class="pill warn">待兑换</span>');
+        const who = c.redeemedByPhone
+          ? ('<button type="button" class="secondary btn-goto-phone" data-phone="' + escapeHtml(c.redeemedByPhone) + '" style="padding:4px 8px">' + escapeHtml(c.redeemedByPhone) + '</button>')
+          : (c.redeemedAt ? '<span class="tip">旧数据无绑定</span>' : '—');
         const tr = document.createElement('tr');
         tr.innerHTML =
           '<td><code>' + escapeHtml(c.code) + '</code></td>' +
           '<td>' + escapeHtml(c.tierName || c.tierId) + '</td>' +
           '<td>' + fmtTime(c.createdAt) + '</td>' +
           '<td>' + status + '</td>' +
+          '<td>' + who + '</td>' +
           '<td>' + escapeHtml(c.note || '') + '</td>' +
           '<td class="row" style="margin:0">' +
             '<button type="button" class="secondary btn-copy-one" data-code="' + escapeHtml(c.code) + '">复制</button>' +
@@ -328,6 +462,21 @@
             '<button type="button" class="secondary btn-open-one" data-code="' + escapeHtml(c.code) + '">去兑换</button>' +
           '</td>';
         tb.appendChild(tr);
+      });
+      tb.querySelectorAll('.btn-goto-phone').forEach((btn) => {
+        btn.onclick = () => {
+          const phone = btn.getAttribute('data-phone') || '';
+          switchTab('accounts');
+          $('acct-phone').value = phone;
+          $('acct-filter-status').value = 'all';
+          loadAcctList().then(() => {
+            const hit = (acctCache || []).find((x) => x.phone === phone);
+            if (hit) showAcct(hit);
+            else {
+              $('btn-acct-lookup').click();
+            }
+          });
+        };
       });
       tb.querySelectorAll('.btn-copy-one').forEach((btn) => {
         btn.onclick = async () => {
@@ -379,19 +528,38 @@
       renderLedger(data.codes || []);
     }
 
+    function normalizeReq(r) {
+      const x = String(r || 'public').toLowerCase();
+      if (x === 'member' || x === 'premium') return 'member';
+      if (x === 'user' || x === 'registered') return 'user';
+      return 'public';
+    }
+
+    function requireSelectHtml(attrName, attrVal, current, forcePublic) {
+      const cur = forcePublic ? 'public' : normalizeReq(current);
+      const opts = [
+        ['public', '游客可见'],
+        ['user', '会员'],
+        ['member', '高级会员']
+      ].map(([v, lab]) => '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + lab + '</option>').join('');
+      return '<select ' + attrName + '="' + attrVal + '"' + (forcePublic ? ' disabled' : '') + '>' + opts + '</select>';
+    }
+
     function renderScenes(scenes) {
       const tb = $('scene-tbody');
       tb.innerHTML = '';
       (scenes || []).forEach((s) => {
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td><input type="checkbox" data-scene-id="' + encodeURIComponent(s.id) + '"' + (s.locked ? ' checked' : '') + '></td><td>' + escapeHtml(s.name) + '</td>';
+        const req = s.require || (s.locked ? 'member' : 'public');
+        tr.innerHTML = '<td>' + requireSelectHtml('data-scene-id', encodeURIComponent(s.id), req, false) +
+          '</td><td>' + escapeHtml(s.name) + '</td>';
         tb.appendChild(tr);
       });
     }
 
     function renderUiTabs() {
       const defs = [
-        { id: 'ui:solid:tab:light', label: '主光（建议永远免费）' },
+        { id: 'ui:solid:tab:light', label: '主光（建议始终游客可见）', keepPublic: true },
         { id: 'ui:solid:tab:env', label: '环境光' },
         { id: 'ui:solid:tab:atmos', label: '氛围' },
         { id: 'ui:solid:tab:assist', label: '辅助' }
@@ -400,9 +568,10 @@
       tb.innerHTML = '';
       defs.forEach((d) => {
         const rule = (policy.resources && policy.resources[d.id]) || {};
-        const locked = rule.require === 'member' && rule.enabled !== false;
+        const req = normalizeReq(rule.require || 'public');
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td><input type="checkbox" data-ui-id="' + d.id + '"' + (locked ? ' checked' : '') + (d.id.endsWith(':light') ? ' data-keep-free="1"' : '') + '></td><td>' + d.label + '</td>';
+        tr.innerHTML = '<td>' + requireSelectHtml('data-ui-id', d.id, req, !!d.keepPublic) +
+          '</td><td>' + d.label + '</td>';
         tb.appendChild(tr);
       });
     }
@@ -410,7 +579,7 @@
     function renderTiers() {
       const box = $('price-grid');
       box.innerHTML = '';
-      (tiersDoc.tiers || []).filter(t => t.id !== 'free').forEach((t) => {
+      (tiersDoc.tiers || []).filter((t) => t.requireLevel === 'member' || String(t.id || '').indexOf('member_') === 0).forEach((t) => {
         const div = document.createElement('div');
         div.className = 'price-item';
         div.innerHTML = '<span>' + escapeHtml(t.name || t.id) + '</span>' +
@@ -426,34 +595,35 @@
     }
 
     function collectPolicyFromUi() {
-      const next = JSON.parse(JSON.stringify(policy || { version: 1, defaultRequire: 'free', resources: {} }));
+      const next = JSON.parse(JSON.stringify(policy || { version: 2, defaultRequire: 'public', resources: {} }));
+      next.defaultRequire = normalizeReq(next.defaultRequire || 'public');
       next.resources = next.resources || {};
-      document.querySelectorAll('#scene-tbody input[type=checkbox]').forEach((cb) => {
-        const id = decodeURIComponent(cb.getAttribute('data-scene-id'));
+      document.querySelectorAll('#scene-tbody select[data-scene-id]').forEach((sel) => {
+        const id = decodeURIComponent(sel.getAttribute('data-scene-id'));
         const name = id.replace(/^scene:[^:]+:name:/, '');
-        if (cb.checked) {
+        const req = normalizeReq(sel.value);
+        if (req === 'public') {
+          if (next.resources[id]) {
+            next.resources[id].require = 'public';
+            next.resources[id].enabled = true;
+          }
+        } else {
           next.resources[id] = Object.assign({}, next.resources[id] || {}, {
-            require: 'member', enabled: true, label: name
+            require: req, enabled: true, label: name
           });
-        } else if (next.resources[id]) {
-          next.resources[id].require = 'free';
-          next.resources[id].enabled = true;
         }
       });
-      document.querySelectorAll('#ui-tbody input[type=checkbox]').forEach((cb) => {
-        const id = cb.getAttribute('data-ui-id');
-        const labels = {
-          'ui:solid:tab:light': '主光',
-          'ui:solid:tab:env': '环境光',
-          'ui:solid:tab:atmos': '氛围',
-          'ui:solid:tab:assist': '辅助'
-        };
-        if (cb.getAttribute('data-keep-free') === '1') {
-          next.resources[id] = { require: 'free', enabled: true, label: labels[id] || id };
-          return;
-        }
+      const labels = {
+        'ui:solid:tab:light': '主光',
+        'ui:solid:tab:env': '环境光',
+        'ui:solid:tab:atmos': '氛围',
+        'ui:solid:tab:assist': '辅助'
+      };
+      document.querySelectorAll('#ui-tbody select[data-ui-id]').forEach((sel) => {
+        const id = sel.getAttribute('data-ui-id');
+        const req = sel.disabled ? 'public' : normalizeReq(sel.value);
         next.resources[id] = {
-          require: cb.checked ? 'member' : 'free',
+          require: req,
           enabled: true,
           label: labels[id] || id,
           probe: !!(next.resources[id] && next.resources[id].probe)
@@ -482,12 +652,35 @@
       policy = data.policy;
       tiersDoc = data.tiers;
       renderStatus(data.status || {});
+      fillReferralForm(data.opsSettings || {});
       renderUiTabs();
       renderTiers();
       const sc = await api('/api/membership/admin/policy?scenes=1&sandbox=geometry');
       if (sc.res.ok && sc.data && sc.data.scenes) renderScenes(sc.data.scenes);
       await loadLedger();
       return true;
+    }
+
+    if ($('btn-save-referral')) {
+      $('btn-save-referral').onclick = async () => {
+        setMsg($('referral-msg'), '保存中…', true);
+        const { res, data } = await api('/api/membership/admin/settings', {
+          method: 'PUT',
+          body: JSON.stringify({
+            referralEnabled: !!$('ref-enabled').checked,
+            referralRewardDays: parseInt($('ref-days').value, 10) || 90,
+            referralMonthlyCap: parseInt($('ref-cap').value, 10),
+            referralBlockSelf: !!$('ref-block-self').checked,
+            referralBlockSameDevice: !!$('ref-block-device').checked
+          })
+        });
+        if (!res.ok) {
+          setMsg($('referral-msg'), (data && data.error) || '保存失败', false);
+          return;
+        }
+        fillReferralForm(data.settings || {});
+        setMsg($('referral-msg'), data.tip || '宣传设置已保存', true);
+      };
     }
 
     function restoreTab() {
@@ -630,6 +823,357 @@
       } catch (_e) {
         alert('请手动复制');
       }
+    };
+
+    function levelLabel(account) {
+      if (!account) return '—';
+      if (account.accessLevel === 'member') return '高级会员';
+      if (account.accessLevel === 'user') return '会员';
+      return '游客';
+    }
+
+    function expireLabel(account) {
+      const ent = (account && account.entitlement) || {};
+      if (ent.expiresAt) return new Date(ent.expiresAt).toLocaleString('zh-CN');
+      if (account && account.accessLevel === 'member') return '永久';
+      return '—';
+    }
+
+    function daysLeft(account) {
+      const ent = (account && account.entitlement) || {};
+      if (!ent.expiresAt) return null;
+      return Math.ceil((Number(ent.expiresAt) - Date.now()) / 86400000);
+    }
+
+    /** 运营台展示：内部 source 代号 → 人话（不区分旧长签名码） */
+    function sourceLabel(source) {
+      const s = String(source || '').trim();
+      if (s === 'short_code') return '短码兑换开通';
+      if (s === 'register') return '仅注册，尚未兑高级';
+      if (s === 'admin_extend') return '运营台延期';
+      if (s === 'admin_revoke') return '运营台已取消高级';
+      if (s === 'referral_reward') return '宣传链接奖励延期';
+      if (s === 'probe') return '测试假码开通';
+      if (s === 'expired') return '高级已过期';
+      if (s === 'signed_code') return '兑换开通';
+      if (!s) return '未记录';
+      return '其它方式开通';
+    }
+
+    function tierLabel(tierId) {
+      const id = String(tierId || '').trim();
+      if (id === 'member_3m') return '高级会员 · 三个月';
+      if (id === 'member_1y') return '高级会员 · 一年';
+      if (id === 'member_forever') return '高级会员 · 永久';
+      if (id === 'free') return '注册会员';
+      return id || '—';
+    }
+
+    function formatReferralTip(account) {
+      const r = (account && account.referral) || {};
+      const lines = [];
+      if (r.promoCode) lines.push('宣传码：' + r.promoCode);
+      if (r.referredByPromoCode || r.referredByAccountId) {
+        lines.push('来自宣传：' + (r.referredByPromoCode || String(r.referredByAccountId).slice(0, 8)));
+      }
+      if (r.referralRewardTotal) {
+        lines.push(
+          '宣传奖励累计 ' + r.referralRewardTotal + ' 次' +
+          (r.referralRewardMonthKey
+            ? '（本月 ' + (r.referralRewardCountMonth || 0) + '，' + r.referralRewardMonthKey + '）'
+            : '')
+        );
+      }
+      if (r.referralLastRewardAt) {
+        lines.push(
+          '最近奖励：' + fmtTime(r.referralLastRewardAt) +
+          (r.referralLastRewardDays ? (' +' + r.referralLastRewardDays + ' 天') : '')
+        );
+      }
+      if (!lines.length) return '<div class="tip">宣传：暂无记录</div>';
+      return '<div class="tip" style="margin-top:6px">' + lines.map(escapeHtml).join('<br>') + '</div>';
+    }
+
+    function fillReferralForm(settings) {
+      const s = settings || {};
+      if ($('ref-enabled')) $('ref-enabled').checked = s.referralEnabled !== false;
+      if ($('ref-days')) $('ref-days').value = String(s.referralRewardDays != null ? s.referralRewardDays : 90);
+      if ($('ref-cap')) $('ref-cap').value = String(s.referralMonthlyCap != null ? s.referralMonthlyCap : 0);
+      if ($('ref-block-self')) $('ref-block-self').checked = s.referralBlockSelf !== false;
+      if ($('ref-block-device')) $('ref-block-device').checked = s.referralBlockSameDevice !== false;
+    }
+
+    function patchAcctCache(account) {
+      if (!account || !account.phone) return;
+      const i = acctCache.findIndex((x) => x.phone === account.phone);
+      if (i >= 0) acctCache[i] = account;
+      else acctCache.push(account);
+    }
+
+    function buildAcctReplyScript(account) {
+      const ent = (account && account.entitlement) || {};
+      const level = levelLabel(account);
+      const exp = expireLabel(account);
+      const code = ent.redeemCode ? String(ent.redeemCode) : '';
+      const lines = [
+        '你好，已查到你的会员账号：',
+        '手机号：' + (account.phone || ''),
+        '当前权益：' + level + (ent.tierId ? '（' + ent.tierId + '）' : ''),
+        '到期时间：' + exp
+      ];
+      if (code) lines.push('关联兑换码：' + code);
+      if (account.wechatNote) lines.push('（内部备注：' + account.wechatNote + '）');
+      lines.push('如需延期或改密码，直接回复我就行。');
+      return lines.join('\n');
+    }
+
+    function showAcct(account) {
+      const box = $('acct-result');
+      const actions = $('acct-actions');
+      const devicesBox = $('acct-devices');
+      if (!account) {
+        box.textContent = '未找到';
+        actions.classList.add('hidden');
+        selectedAcctPhone = '';
+        selectedAcct = null;
+        if (devicesBox) devicesBox.innerHTML = '';
+        return;
+      }
+      lastAcctPhone = account.phone || lastAcctPhone;
+      selectedAcctPhone = account.phone || '';
+      selectedAcct = account;
+      const ent = account.entitlement || {};
+      const levelLab = levelLabel(account);
+      const exp = expireLabel(account);
+      const left = daysLeft(account);
+      const bannerClass = account.accessLevel === 'member' ? 'member'
+        : (account.accessLevel === 'user' ? 'user' : '');
+      let leftTip = '';
+      if (account.accessLevel === 'member' && left != null) {
+        if (left < 0) leftTip = '（已过期）';
+        else if (left <= 7) leftTip = '（剩 ' + left + ' 天，临近到期）';
+        else leftTip = '（剩 ' + left + ' 天）';
+      }
+      const codeHtml = ent.redeemCode
+        ? ('<code>' + escapeHtml(String(ent.redeemCode)) + '</code>')
+        : '<span class="tip">无（兑码时未写入，或非短码开通）</span>';
+      box.innerHTML =
+        '<div class="ent-banner ' + bannerClass + '">' +
+          '<div class="ent-main">' + escapeHtml(levelLab) +
+            ' · ' + escapeHtml(account.phone || '') + '</div>' +
+          '<div class="ent-sub">档位 ' + escapeHtml(tierLabel(ent.tierId)) +
+            ' · 到期 ' + escapeHtml(exp) + escapeHtml(leftTip) + '</div>' +
+          '<div class="ent-sub">兑换码 ' + codeHtml + '</div>' +
+        '</div>' +
+        '<div class="tip">备注：' + escapeHtml(account.wechatNote || '—') + '</div>' +
+        '<div class="tip">来源：' + escapeHtml(sourceLabel(ent.source)) +
+          (ent.redeemedAt ? (' · 兑码时间 ' + fmtTime(ent.redeemedAt)) : '') + '</div>' +
+        formatReferralTip(account);
+      $('acct-note').value = account.wechatNote || '';
+      const devices = account.devices || [];
+      if (!devices.length) {
+        devicesBox.innerHTML = '设备：无';
+      } else {
+        devicesBox.innerHTML = '设备（' + devices.length + '/3）：<br>' + devices.map((d) => {
+          const seen = d.lastSeenAt ? (' · 最近 ' + new Date(d.lastSeenAt).toLocaleString('zh-CN')) : '';
+          const id = String(d.deviceId || '');
+          return '<div class="row" style="margin:4px 0;align-items:center">' +
+            '<span>' + escapeHtml(d.label || '设备') + ' · ' + escapeHtml(id.slice(0, 12)) +
+            escapeHtml(seen) + '</span>' +
+            '<button type="button" class="secondary btn-kick-dev" data-device="' +
+            escapeHtml(id) + '" style="padding:4px 8px">踢掉</button></div>';
+        }).join('');
+        devicesBox.querySelectorAll('.btn-kick-dev').forEach((btn) => {
+          btn.onclick = () => kickDevice(btn.getAttribute('data-device') || '');
+        });
+      }
+      actions.classList.remove('hidden');
+      renderAcctTable(acctCache);
+    }
+
+    function filterAcctRows(list) {
+      const q = ($('acct-phone').value || '').trim();
+      const st = ($('acct-filter-status') && $('acct-filter-status').value) || 'all';
+      const now = Date.now();
+      const week = 7 * 86400000;
+      return (list || []).filter((a) => {
+        if (q && String(a.phone || '').indexOf(q) < 0) return false;
+        if (st === 'member' && a.accessLevel !== 'member') return false;
+        if (st === 'user' && a.accessLevel !== 'user') return false;
+        if (st === 'expiring') {
+          const exp = a.entitlement && a.entitlement.expiresAt;
+          if (a.accessLevel !== 'member' || !exp) return false;
+          const t = Number(exp);
+          if (!(t > now && t <= now + week)) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderAcctTable(list) {
+      const tbody = $('acct-tbody');
+      const meta = $('acct-list-meta');
+      const rows = filterAcctRows(list);
+      const st = ($('acct-filter-status') && $('acct-filter-status').value) || 'all';
+      const q = ($('acct-phone').value || '').trim();
+      const filtered = !!(q || st !== 'all');
+      meta.textContent = '共 ' + String((list || []).length) + ' 个账号' +
+        (filtered ? '（筛选后 ' + rows.length + '）' : '');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="tip">暂无账号</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map((a) => {
+        const active = selectedAcctPhone && a.phone === selectedAcctPhone ? ' active' : '';
+        const devN = (a.devices || []).length;
+        return '<tr class="' + active.trim() + '" data-phone="' + escapeHtml(a.phone || '') + '">' +
+          '<td>' + escapeHtml(a.phone || '') + '</td>' +
+          '<td>' + escapeHtml(a.wechatNote || '—') + '</td>' +
+          '<td>' + escapeHtml(levelLabel(a)) + '</td>' +
+          '<td>' + escapeHtml(expireLabel(a)) + '</td>' +
+          '<td>' + String(devN) + '/3</td></tr>';
+      }).join('');
+      tbody.querySelectorAll('tr[data-phone]').forEach((tr) => {
+        tr.onclick = () => {
+          const phone = tr.getAttribute('data-phone') || '';
+          const hit = (acctCache || []).find((x) => x.phone === phone);
+          if (hit) showAcct(hit);
+        };
+      });
+    }
+
+    async function loadAcctList() {
+      setMsg($('acct-msg'), '加载账号列表…', true);
+      const { res, data } = await api('/api/membership/admin/accounts');
+      if (!res.ok) {
+        setMsg($('acct-msg'), (data && data.error) || '列表加载失败', false);
+        acctCache = [];
+        renderAcctTable([]);
+        return;
+      }
+      acctCache = Array.isArray(data.accounts) ? data.accounts : [];
+      setMsg($('acct-msg'), data.truncated ? '列表已截断（账号很多时只显示前一批）' : '', true);
+      renderAcctTable(acctCache);
+      if (selectedAcctPhone) {
+        const hit = acctCache.find((x) => x.phone === selectedAcctPhone);
+        if (hit) showAcct(hit);
+      }
+    }
+
+    async function postAcctAction(body, okTip) {
+      setMsg($('acct-msg'), '处理中…', true);
+      const { res, data } = await api('/api/membership/admin/accounts', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        setMsg($('acct-msg'), (data && data.error) || '操作失败', false);
+        return null;
+      }
+      setMsg($('acct-msg'), (data && data.tip) || okTip || '已完成', true);
+      if (data && data.account) {
+        patchAcctCache(data.account);
+        showAcct(data.account);
+      }
+      return data;
+    }
+
+    async function kickDevice(deviceId) {
+      const phone = lastAcctPhone || ($('acct-phone').value || '').trim();
+      if (!phone || !deviceId) return;
+      if (!confirm('确认踢掉这台设备？用户需重新登录占用名额。')) return;
+      await postAcctAction({ action: 'remove_device', phone: phone, deviceId: deviceId }, '已踢掉该设备');
+    }
+
+    $('acct-phone').addEventListener('input', () => { renderAcctTable(acctCache); });
+    if ($('acct-filter-status')) {
+      $('acct-filter-status').addEventListener('change', () => { renderAcctTable(acctCache); });
+    }
+    $('btn-acct-reload').onclick = () => { loadAcctList(); };
+
+    $('btn-acct-lookup').onclick = async () => {
+      const phone = ($('acct-phone').value || '').trim();
+      if (!phone) {
+        await loadAcctList();
+        return;
+      }
+      setMsg($('acct-msg'), '查询中…', true);
+      const { res, data } = await api('/api/membership/admin/accounts?phone=' + encodeURIComponent(phone));
+      if (!res.ok) {
+        setMsg($('acct-msg'), (data && data.error) || '查询失败', false);
+        showAcct(null);
+        return;
+      }
+      setMsg($('acct-msg'), '', true);
+      if (data.account) {
+        patchAcctCache(data.account);
+        showAcct(data.account);
+      }
+    };
+
+    $('btn-acct-note').onclick = async () => {
+      const phone = lastAcctPhone || ($('acct-phone').value || '').trim();
+      await postAcctAction({
+        action: 'update_note',
+        phone: phone,
+        wechatNote: $('acct-note').value
+      }, '备注已更新');
+    };
+
+    $('btn-acct-copy-script').onclick = async () => {
+      const account = selectedAcct;
+      if (!account) {
+        setMsg($('acct-msg'), '请先点选账号', false);
+        return;
+      }
+      const text = buildAcctReplyScript(account);
+      try {
+        await navigator.clipboard.writeText(text);
+        setMsg($('acct-msg'), '话术已复制', true);
+      } catch (_e) {
+        setMsg($('acct-msg'), '复制失败，请手动选中回复', false);
+      }
+    };
+
+    $('btn-acct-extend').onclick = async () => {
+      const phone = lastAcctPhone || ($('acct-phone').value || '').trim();
+      const days = parseInt(($('acct-extend-days').value || '30'), 10);
+      if (!phone) {
+        setMsg($('acct-msg'), '请先点选账号', false);
+        return;
+      }
+      if (!days || days < 1) {
+        setMsg($('acct-msg'), '延期天数至少 1 天', false);
+        return;
+      }
+      if (!confirm('确认给 ' + phone + ' 延期 ' + days + ' 天高级会员？')) return;
+      await postAcctAction({ action: 'extend_days', phone: phone, days: days }, '已延期');
+    };
+
+    $('btn-acct-revoke').onclick = async () => {
+      const phone = lastAcctPhone || ($('acct-phone').value || '').trim();
+      if (!phone) {
+        setMsg($('acct-msg'), '请先点选账号', false);
+        return;
+      }
+      if (!confirm('确认取消 ' + phone + ' 的高级会员？将退回注册会员档（兑换码记录仍保留）。')) return;
+      await postAcctAction({ action: 'revoke_member', phone: phone }, '已取消高级会员');
+    };
+
+    $('btn-acct-reset').onclick = async () => {
+      const phone = lastAcctPhone || ($('acct-phone').value || '').trim();
+      const password = ($('acct-new-pwd').value || '').trim();
+      if (!password || password.length < 6) {
+        setMsg($('acct-msg'), '新密码至少 6 位', false);
+        return;
+      }
+      if (!confirm('确认重置该账号密码？重置后请私下告知用户。')) return;
+      const data = await postAcctAction({
+        action: 'reset_password',
+        phone: phone,
+        password: password
+      }, '密码已重置');
+      if (data) $('acct-new-pwd').value = '';
     };
 
     (async () => {

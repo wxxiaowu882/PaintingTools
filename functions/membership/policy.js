@@ -1,5 +1,7 @@
 /** 读取 access-policy 并过滤课表（不改磁盘权威 JSON） */
 
+import { accessLevel, meetsRequire, normalizeRequire } from './session.js';
+
 const POLICY_ASSET = '/docs/membership/access-policy.json';
 
 const CATALOG_BY_SANDBOX = {
@@ -56,7 +58,7 @@ const KV_POLICY = 'policy_live';
 const KV_TIERS = 'tiers_live';
 
 export async function loadPolicy(context) {
-  let base = { version: 0, defaultRequire: 'free', resources: {} };
+  let base = { version: 0, defaultRequire: 'public', resources: {} };
   try {
     base = await fetchAssetJson(context, POLICY_ASSET);
   } catch (_e) {}
@@ -134,39 +136,50 @@ export function sceneResourceId(sandbox, scene) {
   return 'scene:' + String(sandbox || 'geometry').toLowerCase() + ':name:' + name;
 }
 
+/** 资源所需档：public | user | member；无规则时用 defaultRequire */
+export function resourceRequire(policy, resourceId) {
+  if (!resourceId || !policy) return normalizeRequire(policy && policy.defaultRequire);
+  const rule = policy.resources && policy.resources[resourceId];
+  if (!rule || rule.enabled === false) {
+    return normalizeRequire(policy.defaultRequire);
+  }
+  return normalizeRequire(rule.require != null ? rule.require : policy.defaultRequire);
+}
+
+/** @deprecated 兼容旧调用：是否要求高级会员 */
 export function requiresMember(policy, resourceId) {
-  if (!resourceId || !policy || !policy.resources) return false;
-  const rule = policy.resources[resourceId];
-  if (!rule || rule.enabled === false) return false;
-  return rule.require === 'member';
+  return resourceRequire(policy, resourceId) === 'member';
 }
 
 /**
- * 非会员：保留列表可见字段，去掉可复现课的载荷
+ * 当前用户不够档：保留列表可见字段，去掉可复现课的载荷
  */
-export function stripScenePayload(scene) {
+export function stripScenePayload(scene, requireLevel) {
   if (!scene || typeof scene !== 'object') return scene;
-  const out = {
+  const req = normalizeRequire(requireLevel || 'member');
+  const meta = scene.meta
+    ? {
+        category: scene.meta.category,
+        detail: scene.meta.detail,
+        description: scene.meta.description,
+        locked: true,
+        require: req
+      }
+    : { locked: true, require: req };
+  return {
     name: scene.name,
     thumbnail: scene.thumbnail,
-    meta: scene.meta
-      ? {
-          category: scene.meta.category,
-          detail: scene.meta.detail,
-          description: scene.meta.description,
-          locked: true
-        }
-      : { locked: true },
-    __membershipLocked: true
+    meta,
+    __membershipLocked: true,
+    __require: req
   };
-  return out;
 }
 
 /**
  * 列表卡：去掉 items/标注等重字段；dataURL 缩略图默认剥离（约 1MB+），避免课表接口把首屏卡死。
  * includeThumb=true 时保留缩略图（供列表二次补全）。
  */
-export function toCatalogListCard(scene, locked, includeThumb) {
+export function toCatalogListCard(scene, locked, includeThumb, requireLevel) {
   if (!scene || typeof scene !== 'object') return scene;
   let thumb = '';
   if (includeThumb && scene.thumbnail != null) {
@@ -193,6 +206,8 @@ export function toCatalogListCard(scene, locked, includeThumb) {
         region: scene.meta.region
       }
     : {};
+  const req = normalizeRequire(requireLevel || 'public');
+  if (req !== 'public') meta.require = req;
   if (locked) meta.locked = true;
   const out = {
     name: scene.name,
@@ -200,50 +215,57 @@ export function toCatalogListCard(scene, locked, includeThumb) {
     meta: meta,
     __listOnly: true
   };
-  if (locked) out.__membershipLocked = true;
+  // 收藏/进课索引：必须带回唯一键（headform 多头模同名；uid 为三位数权威编号）
+  if (scene.uid != null && String(scene.uid).trim() !== '') out.uid = String(scene.uid).trim();
+  if (scene.id != null && String(scene.id).trim() !== '') out.id = String(scene.id).trim();
+  if (locked) {
+    out.__membershipLocked = true;
+    out.__require = req;
+  }
   return out;
 }
 
-export function filterCatalog(scenes, sandbox, policy, isMemberUser) {
+/** userLevel：guest|user|member，或传入 entitlement 对象 */
+export function filterCatalog(scenes, sandbox, policy, userLevel) {
   const list = Array.isArray(scenes) ? scenes : scenes ? [scenes] : [];
-  if (isMemberUser) {
-    return list.map((s) => {
-      if (!s || typeof s !== 'object') return s;
-      const copy = Object.assign({}, s);
-      delete copy.__membershipLocked;
-      return copy;
-    });
-  }
-  return list.map((scene) => {
-    const rid = sceneResourceId(sandbox, scene);
-    if (rid && requiresMember(policy, rid)) return stripScenePayload(scene);
-    return scene;
-  });
-}
-
-/** 列表专用：全员只返回轻量卡（收费课带 locked），体积远小于全文课表 */
-export function filterCatalogList(scenes, sandbox, policy, isMemberUser, includeThumb) {
-  const list = Array.isArray(scenes) ? scenes : scenes ? [scenes] : [];
+  const level = typeof userLevel === 'string' ? userLevel : accessLevel(userLevel);
   return list.map((scene) => {
     if (!scene || typeof scene !== 'object') return scene;
     const rid = sceneResourceId(sandbox, scene);
-    const locked = !isMemberUser && !!(rid && requiresMember(policy, rid));
-    return toCatalogListCard(scene, locked, !!includeThumb);
+    const req = rid ? resourceRequire(policy, rid) : normalizeRequire(policy && policy.defaultRequire);
+    if (!meetsRequire(level, req)) return stripScenePayload(scene, req);
+    const copy = Object.assign({}, scene);
+    delete copy.__membershipLocked;
+    delete copy.__require;
+    return copy;
   });
 }
 
-export async function loadFilteredCatalog(context, sandbox, isMemberUser) {
-  const path = catalogAssetPath(sandbox);
-  const policy = await loadPolicy(context);
-  const raw = await fetchAssetJson(context, path);
-  return filterCatalog(raw, sandbox, policy, isMemberUser);
+/** 列表专用：全员只返回轻量卡（不够档带 locked + require），体积远小于全文课表 */
+export function filterCatalogList(scenes, sandbox, policy, userLevel, includeThumb) {
+  const list = Array.isArray(scenes) ? scenes : scenes ? [scenes] : [];
+  const level = typeof userLevel === 'string' ? userLevel : accessLevel(userLevel);
+  return list.map((scene) => {
+    if (!scene || typeof scene !== 'object') return scene;
+    const rid = sceneResourceId(sandbox, scene);
+    const req = rid ? resourceRequire(policy, rid) : normalizeRequire(policy && policy.defaultRequire);
+    const locked = !meetsRequire(level, req);
+    return toCatalogListCard(scene, locked, !!includeThumb, req);
+  });
 }
 
-export async function loadFilteredCatalogList(context, sandbox, isMemberUser, includeThumb) {
+export async function loadFilteredCatalog(context, sandbox, userLevel) {
   const path = catalogAssetPath(sandbox);
   const policy = await loadPolicy(context);
   const raw = await fetchAssetJson(context, path);
-  return filterCatalogList(raw, sandbox, policy, isMemberUser, includeThumb);
+  return filterCatalog(raw, sandbox, policy, userLevel);
+}
+
+export async function loadFilteredCatalogList(context, sandbox, userLevel, includeThumb) {
+  const path = catalogAssetPath(sandbox);
+  const policy = await loadPolicy(context);
+  const raw = await fetchAssetJson(context, path);
+  return filterCatalogList(raw, sandbox, policy, userLevel, includeThumb);
 }
 
 /**
@@ -267,6 +289,8 @@ export async function loadCatalogThumbsBatch(context, sandbox, offset, limit) {
       index: start + i,
       name: s && s.name != null ? String(s.name) : '',
       thumbnail: s && s.thumbnail != null ? String(s.thumbnail) : '',
+      uid: s && s.uid != null ? String(s.uid) : '',
+      id: s && s.id != null ? String(s.id) : '',
       modelId: meta.modelId != null ? String(meta.modelId) : '',
       slot: meta.slot != null ? String(meta.slot) : '',
       line: meta.line != null ? String(meta.line) : ''
@@ -283,22 +307,34 @@ export async function loadCatalogThumbsBatch(context, sandbox, offset, limit) {
   };
 }
 
-/** 进课用：按名称取单课全文（仍按会员过滤；未授权返回 stripped） */
-export async function loadFilteredSceneByName(context, sandbox, isMemberUser, sceneName) {
-  const want = String(sceneName || '').trim();
-  if (!want) return { ok: false, error: '缺少场景名' };
+/**
+ * 进课用：按 uid / id / 名称取单课全文（按访问档过滤；未授权返回 stripped）。
+ * headform 多头模同名时必须优先 uid 或 id，勿仅靠 name。
+ */
+export async function loadFilteredSceneByName(context, sandbox, userLevel, sceneName, opts) {
+  const o = opts && typeof opts === 'object' ? opts : {};
+  const wantUid = String(o.uid || '').trim();
+  const wantId = String(o.id || '').trim();
+  const want = String(sceneName || o.name || '').trim();
+  if (!wantUid && !wantId && !want) return { ok: false, error: '缺少场景标识' };
   const path = catalogAssetPath(sandbox);
   const policy = await loadPolicy(context);
   const raw = await fetchAssetJson(context, path);
   const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  const hit = list.find((s) => s && String(s.name || '').trim() === want);
+  let hit = null;
+  if (wantUid) hit = list.find((s) => s && String(s.uid || '').trim() === wantUid) || null;
+  if (!hit && wantId) hit = list.find((s) => s && String(s.id || '').trim() === wantId) || null;
+  if (!hit && want) hit = list.find((s) => s && String(s.name || '').trim() === want) || null;
   if (!hit) return { ok: false, error: '场景不存在' };
+  const level = typeof userLevel === 'string' ? userLevel : accessLevel(userLevel);
   const rid = sceneResourceId(sandbox, hit);
-  if (!isMemberUser && rid && requiresMember(policy, rid)) {
-    return { ok: true, locked: true, scene: stripScenePayload(hit) };
+  const req = rid ? resourceRequire(policy, rid) : normalizeRequire(policy.defaultRequire);
+  if (!meetsRequire(level, req)) {
+    return { ok: true, locked: true, require: req, scene: stripScenePayload(hit, req) };
   }
   const copy = Object.assign({}, hit);
   delete copy.__membershipLocked;
+  delete copy.__require;
   delete copy.__listOnly;
-  return { ok: true, locked: false, scene: copy };
+  return { ok: true, locked: false, require: req, scene: copy };
 }

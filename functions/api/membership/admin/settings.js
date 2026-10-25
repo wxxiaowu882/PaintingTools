@@ -22,14 +22,23 @@ export async function onRequestPut(context) {
     return jsonResponse({ ok: false, error: '请求无效' }, 400);
   }
   const saved = await saveOpsSettings(context.env, {
-    allowProbeCodes: !!body.allowProbeCodes
+    allowProbeCodes:
+      typeof body.allowProbeCodes === 'boolean' ? body.allowProbeCodes : undefined,
+    referralEnabled:
+      typeof body.referralEnabled === 'boolean' ? body.referralEnabled : undefined,
+    referralRewardDays: body.referralRewardDays,
+    referralMonthlyCap: body.referralMonthlyCap,
+    referralBlockSelf:
+      typeof body.referralBlockSelf === 'boolean' ? body.referralBlockSelf : undefined,
+    referralBlockSameDevice:
+      typeof body.referralBlockSameDevice === 'boolean'
+        ? body.referralBlockSameDevice
+        : undefined
   });
   if (!saved.ok) return jsonResponse({ ok: false, error: saved.error }, 503);
   return jsonResponse({
     ok: true,
     settings: saved.settings,
-    tip: saved.settings.allowProbeCodes
-      ? '开发自测通道已打开（仅供内部调试，勿告诉学员）。'
-      : '开发自测通道已关闭。学员只能用你发出的兑换码。'
+    tip: '设置已保存'
   });
 }
