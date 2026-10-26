@@ -2039,7 +2039,8 @@ window.AnnotationManager = {
             let lineScale = (data.baseDist / safeDist) * (modelScaleX / data.baseScale);
             lineScale = Math.max(0.1, Math.min(lineScale, 10.0));
             data.currentScale = lineScale;
-            const textScale = 1.0;
+            // 标签字号：相对首帧相机距离做离散三档（滞回），与引线 lineScale 解耦
+            const textScale = this.resolveDiscreteLabelScale(data, safeDist);
             if (data.anchorObj.parent && data.anchorObj.userData.localNormal) {
                 this._normalMatrix.getNormalMatrix(data.anchorObj.parent.matrixWorld);
                 this._currentWorldNormal.copy(data.anchorObj.userData.localNormal).applyMatrix3(this._normalMatrix).normalize();
@@ -2204,6 +2205,24 @@ window.AnnotationManager = {
         const data = window.annoDataList.find(a => a.id === id);
         return data ? (data.detailText || '') : '';
     }
+};
+
+// 标签 DOM 按「相机→锚点 / baseDist」离散三档缩放（带滞回）；运行时写 data._labelScaleTier，不进序列化
+// 档：近 1.0 / 中 0.84 / 远 0.7；仅影响字号观感，不改引线长度公式
+window.AnnotationManager.resolveDiscreteLabelScale = function(data, safeDist) {
+    const SCALES = [1.0, 0.84, 0.7];
+    const ENTER = [1.22, 1.50]; // 拉远：进入中档 / 远档
+    const EXIT = [1.12, 1.38];  // 推近：退出中档 / 远档
+    if (!data) return SCALES[0];
+    const base = (typeof data.baseDist === 'number' && data.baseDist > 0) ? data.baseDist : safeDist;
+    const ratio = Math.max(0.1, Number(safeDist) || 0.1) / Math.max(0.1, base);
+    let tier = (typeof data._labelScaleTier === 'number' && isFinite(data._labelScaleTier))
+        ? Math.max(0, Math.min(2, data._labelScaleTier | 0))
+        : 0;
+    while (tier < 2 && ratio >= ENTER[tier]) tier++;
+    while (tier > 0 && ratio < EXIT[tier - 1]) tier--;
+    data._labelScaleTier = tier;
+    return SCALES[tier];
 };
 
 // 以锚点处的“1个世界单位”换算成多少像素：用于让引线长度跟模型保持一致

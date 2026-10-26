@@ -16,6 +16,11 @@ const RING_STROKE_SELECTED = 'rgba(145,148,155,0.72)';
 const RING_W = '1';
 const RING_W_SEL = '1.15';
 const SAMPLE_MIN_INTERVAL_MS = 220;
+/** 取色标签贴边：最大宽 / 翻侧阈值 / 视口边距 / 翻侧滞回（避免抖） */
+const CS_LABEL_MAX_W = 260;
+const CS_LABEL_MIN_SIDE = 88;
+const CS_LABEL_EDGE_PAD = 8;
+const CS_LABEL_FLIP_HYST = 20;
 
 function colorSampleDebugLog(msg) {
     const line = '[ColorSample] ' + msg;
@@ -65,7 +70,8 @@ window.ColorSampleAnnotationManager = {
                 .anno-cs-end { pointer-events: auto; cursor: grab; }
                 .anno-cs-ring { pointer-events: auto; cursor: pointer; fill: none; }
                 /* 取色标签对齐经典引线：暖米白字，边框/引线仍跟 lineColor（勿死白抢戏） */
-                .anno-cs-label { position:absolute; pointer-events:auto; cursor:pointer; border:1px solid #0df; color:rgba(232, 224, 212, 0.92); padding:4px 8px; font-size:11px; line-height:1.45; box-sizing:border-box; font-weight:700; font-family:'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; white-space:pre-wrap; user-select:none; border-radius:2px; transition:opacity 0.2s; box-shadow:0 4px 10px rgba(0,0,0,0.5); transform:translate(0,-50%); max-width:260px; display:inline-flex; align-items:center; justify-content:flex-start; }
+                /* width:max-content 避免贴边时 absolute+width:auto 的 shrink-to-fit 把框压成一字竖条 */
+                .anno-cs-label { position:absolute; pointer-events:auto; cursor:pointer; border:1px solid #0df; color:rgba(232, 224, 212, 0.92); padding:4px 8px; font-size:11px; line-height:1.45; box-sizing:border-box; font-weight:700; font-family:'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; white-space:pre-wrap; overflow-wrap:break-word; word-break:normal; user-select:none; border-radius:2px; transition:opacity 0.2s; box-shadow:0 4px 10px rgba(0,0,0,0.5); transform:translate(0,-50%); width:max-content; max-width:260px; display:inline-flex; align-items:center; justify-content:flex-start; }
                 /* 编辑态完全对齐经典引线 */
                 .anno-cs-label.editing { background:#fff !important; color:#000 !important; outline:none; border-color:#fff !important; box-shadow:0 0 10px rgba(0,210,255,0.5) !important; user-select:text !important; cursor:text !important; }
             `;
@@ -681,36 +687,74 @@ window.ColorSampleAnnotationManager = {
                         data.svgRing.setAttribute('stroke-width', isSel ? RING_W_SEL : RING_W);
                         data.svgRing.style.pointerEvents = pointerEvents;
                     }
+                    // 标签字号 + 端点色块半径：同一套相机距离三档（与经典引出线共用 helper）
+                    const mgr = window.AnnotationManager;
+                    const tierScale = (mgr && typeof mgr.resolveDiscreteLabelScale === 'function')
+                        ? mgr.resolveDiscreteLabelScale(data, safeDist)
+                        : 1.0;
+                    const endR = END_CIRCLE_R * tierScale;
+                    const endStrokeW = END_STROKE_W * tierScale;
                     if (data.svgEnd) {
                         data.svgEnd.setAttribute('cx', x1);
                         data.svgEnd.setAttribute('cy', y1);
                         data.svgEnd.setAttribute('fill', data.sampledColor || '#666666');
-                        data.svgEnd.setAttribute('r', String(END_CIRCLE_R));
+                        data.svgEnd.setAttribute('r', String(endR));
                         data.svgEnd.setAttribute('stroke', isSel ? END_STROKE_SELECTED : END_STROKE_COLOR);
-                        data.svgEnd.setAttribute('stroke-width', String(END_STROKE_W));
+                        data.svgEnd.setAttribute('stroke-width', String(endStrokeW));
                         data.svgEnd.setAttribute('opacity', '1');
                         data.svgEnd.style.pointerEvents = pointerEvents;
                     }
                     if (data.domLabel) {
-                        // 文本框位置：实心圆正左侧或正右侧（不斜放），形成：线段 -> 实心圆 -> 文本框
-                        // 用引线水平指向决定放置在左还是右；若几乎无水平分量则默认放右侧
-                        const anchorRight = scaledDx < -1; // true: 文本在圆左侧（右端锚定），false: 文本在圆右侧（左端锚定）
-                        const gap = 10;
-                        const lx = x1 + (anchorRight ? -(END_CIRCLE_R + gap) : (END_CIRCLE_R + gap));
+                        // 文本框：圆左/圆右；贴视口边时翻侧 + 限制 max-width，避免一字竖条
+                        const gap = 10 * tierScale;
+                        const spaceLeft = (x1 - endR - gap) - CS_LABEL_EDGE_PAD;
+                        const spaceRight = window.innerWidth - (x1 + endR + gap) - CS_LABEL_EDGE_PAD;
+                        let anchorRight = scaledDx < -1; // true: 文本在圆左侧
+                        const prevSide = data._csLabelAnchorRight;
+                        if (typeof prevSide === 'boolean') {
+                            const spacePrev = prevSide ? spaceLeft : spaceRight;
+                            const spaceAlt = prevSide ? spaceRight : spaceLeft;
+                            if (spacePrev >= CS_LABEL_MIN_SIDE - CS_LABEL_FLIP_HYST) {
+                                anchorRight = prevSide;
+                            } else if (spaceAlt > spacePrev + CS_LABEL_FLIP_HYST) {
+                                anchorRight = !prevSide;
+                            } else {
+                                anchorRight = prevSide;
+                            }
+                        } else {
+                            if (!anchorRight && spaceRight < CS_LABEL_MIN_SIDE && spaceLeft > spaceRight) {
+                                anchorRight = true;
+                            } else if (anchorRight && spaceLeft < CS_LABEL_MIN_SIDE && spaceRight > spaceLeft) {
+                                anchorRight = false;
+                            }
+                        }
+                        data._csLabelAnchorRight = anchorRight;
+                        const lx = x1 + (anchorRight ? -(endR + gap) : (endR + gap));
                         const ly = y1;
-                        data.domLabel.style.left = `${lx}px`;
+                        const avail = anchorRight ? spaceLeft : spaceRight;
+                        const maxW = Math.min(CS_LABEL_MAX_W, Math.max(48, avail));
+                        // 右端锚定用 right，避免 left+translate(-100%) 在贴右边时 shrink-to-fit 压成竖条
+                        if (anchorRight) {
+                            data.domLabel.style.left = 'auto';
+                            data.domLabel.style.right = `${Math.max(0, window.innerWidth - lx)}px`;
+                            data.domLabel.style.transformOrigin = '100% 50%';
+                            data.domLabel.style.transform = `translate(0,-50%) scale(${tierScale})`;
+                        } else {
+                            data.domLabel.style.right = 'auto';
+                            data.domLabel.style.left = `${lx}px`;
+                            data.domLabel.style.transformOrigin = '0 50%';
+                            data.domLabel.style.transform = `translate(0,-50%) scale(${tierScale})`;
+                        }
                         data.domLabel.style.top = `${ly}px`;
+                        data.domLabel.style.maxWidth = `${maxW}px`;
                         data.domLabel.style.opacity = '1';
                         data.domLabel.style.pointerEvents = pointerEvents;
                         data.domLabel.style.display = data.labelVisible === false ? 'none' : 'block';
-                        data.domLabel.style.transform = anchorRight ? 'translate(-100%,-50%)' : 'translate(0,-50%)';
-                        // 多行文本统一左对齐；锚定端仅由 transform 决定
                         data.domLabel.style.textAlign = 'left';
                         data.domLabel.style.borderColor = leaderCol;
                         data.domLabel.style.backgroundColor = getDarkBg(leaderCol);
-                        // 圆点到文本框之间的短连线（水平）
                         if (data.svgStem) {
-                            const xStart = x1 + (anchorRight ? -END_CIRCLE_R : END_CIRCLE_R);
+                            const xStart = x1 + (anchorRight ? -endR : endR);
                             const xEnd = lx;
                             data.svgStem.setAttribute('x1', String(xStart));
                             data.svgStem.setAttribute('y1', String(ly));
