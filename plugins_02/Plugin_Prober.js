@@ -20,8 +20,9 @@ window.ProberManager = {
     },
 
     getToneData: function(angle) {
-        if (angle <= 20) return { text: `夹角 ${angle.toFixed(0)}°【亮面/高光】`, color: '#ffffff', bg: 'rgba(15,15,20,0.7)' };
-        if (angle <= 75) return { text: `夹角 ${angle.toFixed(0)}°【灰面/侧受光】`, color: '#dddddd', bg: 'rgba(15,15,20,0.7)' };
+        // 亮面字色用暖米白，避免与暗调场景抢戏（入射黄/反射青不变）
+        if (angle <= 20) return { text: `夹角 ${angle.toFixed(0)}°【亮面/高光】`, color: '#e8e0d4', bg: 'rgba(15,15,20,0.7)' };
+        if (angle <= 75) return { text: `夹角 ${angle.toFixed(0)}°【灰面/侧受光】`, color: '#c8c0b4', bg: 'rgba(15,15,20,0.7)' };
         if (angle <= 100) return { text: `夹角 ${angle.toFixed(0)}°【明暗交界区域】`, color: '#ff3333', bg: 'rgba(50,10,10,0.7)' };
         return { text: `夹角 ${angle.toFixed(0)}°【暗部/背光区】`, color: '#66ccff', bg: 'rgba(10,20,35,0.7)' }; 
     },
@@ -480,7 +481,7 @@ window.ProberManager = {
 
             if (sectorPath) {
                 htmlStr += `<path d="${sectorPath}" fill="${tone.color}" opacity="0.5" stroke="none" style="transition: fill 0.2s;" />`;
-                htmlStr += `<text x="${tx}" y="${ty}" fill="#ffffff" font-size="10" font-weight="bold" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" style="filter: drop-shadow(0 0 2px rgba(0,0,0,0.9));">${p.displayAngle}°</text>`;
+                htmlStr += `<text x="${tx}" y="${ty}" fill="#e8e0d4" font-size="10" font-weight="bold" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" style="filter: drop-shadow(0 0 2px rgba(0,0,0,0.9));">${p.displayAngle}°</text>`;
             }
 
             const drawFacet = (pA, pB, pC, overlayCol, overlayOp, baseColor, alpha) => {
@@ -492,7 +493,8 @@ window.ProberManager = {
             };
             const draw3DArrow = (tip, p1, p2, p3, baseColor, alpha) => {
                 const T = get2D(tip), P1 = get2D(p1), P2 = get2D(p2), P3 = get2D(p3);
-                drawFacet(T, P1, P2, '#ffffff', 0.3, baseColor, alpha); drawFacet(T, P2, P3, '#000000', 0.2, baseColor, alpha);
+                // 箭头高光面用暖米白，勿纯白
+                drawFacet(T, P1, P2, '#e8e0d4', 0.3, baseColor, alpha); drawFacet(T, P2, P3, '#000000', 0.2, baseColor, alpha);
                 drawFacet(T, P3, P1, '#000000', 0.5, baseColor, alpha); drawFacet(P1, P3, P2, '#000000', 0.7, baseColor, alpha);
             };
 
@@ -504,14 +506,15 @@ window.ProberManager = {
             const filterBlur = isBacklight ? 'none' : 'drop-shadow(0 0 3px #ffaa00)';
             htmlStr += `<line x1="${P0.x}" y1="${P0.y}" x2="${PL.x}" y2="${PL.y}" stroke="#ffcc00" stroke-width="2.5" stroke-dasharray="4,4" opacity="${lightAlpha}" style="filter: ${filterBlur};" />`;
             draw3DArrow(arrL.tip, arrL.p1, arrL.p2, arrL.p3, '#ffcc00', lightAlpha);
-            htmlStr += `<circle cx="${PL.x}" cy="${PL.y}" r="3" fill="#ffffff" stroke="#ffcc00" stroke-width="1.5" opacity="${lightAlpha}" />`; 
+            htmlStr += `<circle cx="${PL.x}" cy="${PL.y}" r="3" fill="#e8e0d4" stroke="#ffcc00" stroke-width="1.5" opacity="${lightAlpha}" />`; 
 
             if (angle <= 90) {
                 htmlStr += `<line x1="${P0.x}" y1="${P0.y}" x2="${PR.x}" y2="${PR.y}" stroke="#88ccff" stroke-width="2" stroke-dasharray="4,4" opacity="0.6" style="filter: drop-shadow(0 0 3px #88ccff);" />`;
                 draw3DArrow(arrR.tip, arrR.p1, arrR.p2, arrR.p3, '#88ccff', 0.72);
             }
 
-            htmlStr += `<circle cx="${P0.x}" cy="${P0.y}" r="2.5" fill="#ffffff" />`;
+            // 贴面锚点：随法线色，勿死白圆点
+            htmlStr += `<circle cx="${P0.x}" cy="${P0.y}" r="2.5" fill="${p.color || '#bdb9b2'}" />`;
 
             p.dom.svgGroup.innerHTML = htmlStr;
         });
@@ -612,7 +615,7 @@ window.ProberManager = {
             ctx.lineTo(sEnd.x, sEnd.y);
             ctx.stroke();
 
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = data.color || '#bdb9b2';
             ctx.beginPath();
             ctx.arc(sStart.x, sStart.y, 2, 0, Math.PI*2);
             ctx.fill();

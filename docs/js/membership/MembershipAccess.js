@@ -452,6 +452,59 @@
     });
   }
 
+  var _localThumbSceneCache = Object.create(null);
+
+  function localCatalogStaticUrl(sandbox) {
+    var map = {
+      geometry: '/docs/json/沙盒_几何体静物/沙盒_几何体静物.json',
+      portrait: '/docs/json/沙盒_肖像光影沙盒/沙盒_肖像光影沙盒.json',
+      headform: '/docs/json/沙盒_头部造型规律/沙盒_头部造型规律.json'
+    };
+    return map[sandbox] || map.geometry;
+  }
+
+  function sliceLocalThumbBatch(arr, offset, limit) {
+    var start = Math.max(0, Number(offset) || 0);
+    var lim = Math.max(1, Math.min(24, Number(limit) || 10));
+    var end = Math.min(arr.length, start + lim);
+    var items = [];
+    for (var i = start; i < end; i++) {
+      var s = arr[i];
+      if (!s) continue;
+      var m = (s && s.meta) || {};
+      var row = {
+        index: i,
+        name: s && s.name,
+        thumbnail: s && s.thumbnail != null ? String(s.thumbnail) : '',
+        modelId: m.modelId != null ? String(m.modelId) : '',
+        slot: m.slot != null ? String(m.slot) : '',
+        line: m.line != null ? String(m.line) : ''
+      };
+      if (s.uid != null && String(s.uid).trim() !== '') row.uid = String(s.uid).trim();
+      if (s.id != null && String(s.id).trim() !== '') row.id = String(s.id).trim();
+      items.push(row);
+    }
+    return {
+      items: items,
+      nextOffset: end,
+      done: end >= arr.length,
+      total: arr.length
+    };
+  }
+
+  /** localhost 无 Functions：从静态全文按批切缩略图（与线上 thumbs 批接口对齐） */
+  function fetchLocalCatalogThumbsBatch(sandbox, offset, limit) {
+    var sb = sandbox || currentSandbox();
+    if (_localThumbSceneCache[sb]) {
+      return Promise.resolve(sliceLocalThumbBatch(_localThumbSceneCache[sb], offset, limit));
+    }
+    return fetchJson(localCatalogStaticUrl(sb)).then(function (raw) {
+      var arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      _localThumbSceneCache[sb] = arr;
+      return sliceLocalThumbBatch(arr, offset, limit);
+    });
+  }
+
   /** 单批缩略图（渐进补全用） */
   function fetchCatalogThumbsBatch(sandbox, offset, limit) {
     var sb = sandbox || currentSandbox();
@@ -488,6 +541,9 @@
         };
       }
       throw new Error('catalog_thumbs_invalid');
+    }).catch(function (err) {
+      if (!isLocalHost()) throw err;
+      return fetchLocalCatalogThumbsBatch(sb, offset, limit);
     });
   }
 

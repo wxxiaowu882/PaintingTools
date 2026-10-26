@@ -1675,7 +1675,8 @@ window.AnnotationManager = {
                     #anno-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
                     #anno-anchor-handles { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100001 !important; overflow: visible; }
                     .anno-dom { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; font-family: 'Inter', sans-serif; }
-                    .anno-leader-label { border: 1px solid #0df; color: #fff; padding: 4px 8px; font-size: 11px; line-height: 1.45; box-sizing: border-box; text-align: left; max-width: min(88vw, 360px); cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-block; vertical-align: top; touch-action: none; -webkit-user-select: none; }
+                    /* 字色用暖米白，避免与暗调场景抢戏；边框/引线仍跟 data.color */
+                    .anno-leader-label { border: 1px solid #0df; color: rgba(232, 224, 212, 0.92); padding: 4px 8px; font-size: 11px; line-height: 1.45; box-sizing: border-box; text-align: left; max-width: min(88vw, 360px); cursor: pointer; user-select: none; border-radius: 2px; transition: opacity 0.2s; display: inline-block; vertical-align: top; touch-action: none; -webkit-user-select: none; }
                     .anno-leader-label.is-circle { border-radius: 50%; padding: 1px; text-align: center; display: inline-flex; align-items: center; justify-content: center; max-width: none; overflow: hidden; line-height: 1; }
                     .anno-leader-label.is-circle .anno-leader-text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; max-width: 100%; margin: 0; padding: 0; box-sizing: border-box; text-align: center; line-height: 1; white-space: pre-wrap; word-break: break-word; }
                     .anno-leader-label.is-circle .anno-collapse-btn { display: none !important; }

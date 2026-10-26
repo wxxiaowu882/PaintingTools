@@ -1,1 +1,644 @@
-{"name":"【构图-例10】形断气连","thumbnail":"data:image/jpeg;base64,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","camera":{"pos":[-8.994,9.672,61.537],"target":[-0.785,-2.347,7.335],"zoom":0.52},"light":{"type":"rect","azimuth":104,"elevation":52,"distance":40,"temp":33,"size":1,"intensity":8},"env":{"hasWall":false,"defaultMat":"origin","posterizeLevel":0,"wallColor":"#cccccc","groundColor":"#278b33","skyColor":"#0d0d0f","skyLightScale":0.26,"atmosphere":{"enabled":false,"density":0.01,"type":"height","color":"#ffffff","p1":4.3,"p2":1.1},"dof":{"enabled":false,"aperture":2.9,"focusDistance":10},"lightIndicatorEnabled":false},"crop":{"display":"block","left":"547.4px","top":"73.2px","width":"628.8px","height":"628.8px"},"items":[{"type":"builtin","shape":"cube","pos":[0,2.691,1.267],"rot":[0,0,0],"scale":[0.504,1.794,0.504],"color":"#28d745","annotations":[{"id":"anno_1785887604176_59","annotationKind":"leader","text":"连：节奏与脉络延续","detailText":"","collapsed":false,"color":"#ffffff","dx":55.79998779296875,"dy":-145.19996643066406,"dxN":0.032292,"dyN":-0.14029,"dxW":3.802714,"dyW":-9.895233,"localPos":[0.5856,0.9052,1.5],"localNormal":[0,0,1],"baseDist":60.472416984269444,"baseScale":0.504}]},{"type":"builtin","shape":"cube","pos":[2.149,1.789,0],"rot":[0,0,0],"scale":[0.504,1.193,0.504],"color":"#28d745"},{"type":"builtin","shape":"cube","pos":[5.763,1.72,0],"rot":[0,0,0],"scale":[0.504,1.146,0.504],"color":"#2be34a"},{"type":"builtin","shape":"cube","pos":[-6.991,2.575,1.965],"rot":[0,0,0],"scale":[0.504,1.716,0.504],"color":"#28d745"},{"type":"builtin","shape":"cube","pos":[7.853,1.291,-0.312],"rot":[0,0,0],"scale":[0.504,0.861,0.504],"color":"#2ae549"},{"type":"builtin","shape":"cube","pos":[-4.72,5.797,15.9],"rot":[0,0,0],"scale":[1.012,3.865,1.224],"color":"#ec4bb1"},{"type":"builtin","shape":"cube","pos":[12.207,2.075,1.663],"rot":[0,0,0],"scale":[0.504,1.383,0.504],"color":"#2cdd4a"},{"type":"builtin","shape":"cube","pos":[0.74,3.344,17.769],"rot":[0,0,0],"scale":[1.012,2.229,1.224],"color":"#ff42cd","annotations":[{"id":"anno_1785887573521_58","annotationKind":"leader","text":"断：前景遮挡切开","detailText":"","collapsed":false,"color":"#ffffff","dx":61,"dy":-91,"dxN":0.035301,"dyN":-0.087923,"dxW":3.102911,"dyW":-4.628933,"localPos":[-1.5,0.9737,-0.3469],"localNormal":[-1,0,0],"baseDist":45.14179435338119,"baseScale":1.012}]},{"type":"builtin","shape":"cube","pos":[-2.787,2.972,-0.25],"rot":[0,0,0],"scale":[0.624,1.981,0.638],"color":"#2ed64a"},{"type":"builtin","shape":"cube","pos":[-4.862,2.744,0.495],"rot":[0,0,0],"scale":[0.504,1.829,0.504],"color":"#2ed64a"},{"type":"builtin","shape":"cube","pos":[5.033,1.772,-3.255],"rot":[0,0,0],"scale":[0.504,1.181,0.504],"color":"#2adf48"},{"type":"builtin","shape":"cube","pos":[11.14,1.447,-1.054],"rot":[0,0,0],"scale":[0.504,0.965,0.504],"color":"#33e651"},{"type":"builtin","shape":"cube","pos":[14.385,4.635,2.422],"rot":[0,0,0],"scale":[0.504,3.09,0.504],"color":"#2ed64a"},{"type":"builtin","shape":"cube","pos":[16.367,1.363,1.469],"rot":[0,0,0],"scale":[0.504,0.909,0.504],"color":"#2dd248"},{"type":"builtin","shape":"cube","pos":[-9.509,2.055,-0.434],"rot":[0,0,0],"scale":[0.504,1.37,0.504],"color":"#23d140"},{"type":"builtin","shape":"cube","pos":[-11.788,1.681,1.368],"rot":[0,0,0],"scale":[0.504,1.12,0.504],"color":"#29d646"},{"type":"builtin","shape":"cube","pos":[-13.827,1.114,-2.404],"rot":[0,0,0],"scale":[0.504,0.743,0.504],"color":"#29db47"},{"type":"builtin","shape":"cube","pos":[-17.382,0.803,-2.404],"rot":[0,0,0],"scale":[0.504,0.535,0.504],"color":"#24d642"},{"type":"builtin","shape":"cube","pos":[18.482,1.005,2.182],"rot":[0,0,0],"scale":[0.504,0.67,0.514],"color":"#2ed64a"},{"type":"builtin","shape":"cube","pos":[16.867,3.407,1.469],"rot":[0,0,0],"scale":[0.504,2.271,0.504],"color":"#2dd248"},{"type":"builtin","shape":"cube","pos":[8.081,1.291,3.793],"rot":[0,0,0],"scale":[0.504,0.861,0.504],"color":"#2ae549"},{"type":"builtin","shape":"cube","pos":[-7.41,2.055,-1.517],"rot":[0,0,0],"scale":[0.504,1.37,0.504],"color":"#23d140"},{"type":"builtin","shape":"cube","pos":[6.498,1.168,17.769],"rot":[0,0,0],"scale":[1.012,0.779,1.224],"color":"#ff42cd"},{"type":"builtin","shape":"cube","pos":[-10.358,2.51,15.9],"rot":[0,0,0],"scale":[1.012,1.673,1.224],"color":"#ec4bb1"},{"type":"builtin","shape":"cube","pos":[12.295,1.682,17.769],"rot":[0,0,0],"scale":[1.012,1.122,1.224],"color":"#ff42cd"},{"type":"builtin","shape":"cube","pos":[-15.574,1.599,15.9],"rot":[0,0,0],"scale":[1.012,1.066,1.224],"color":"#ec4bb1"}],"groundAnnotations":[],"groundNormArrows":[],"groundPolygon3ds":[],"groundColorSampleAnnotations":[],"meta":{"detail":"<b>形断气连</b>\n\n看似中断、遮挡分隔，实际整体关系仍连续。","category":"构图","keyPoints":"【构图】例10 · 形断气连。\n\n上一例我们学过：同一堆材料也能长出不同主题，关键在于重新编排“视觉核心是谁”，让主角从杂物里被读出来。  \n这一例换一种更微妙的情况：前景一遮，形体外观看上去会被切断、被分割；但真正要守住的，是整体原本就该连在一起的关系——不能因为遮挡就被割裂成两截。\n\n① 先立意  \n主题「形断气连」：物象受前景遮挡，形体外观看似断裂分隔；但群组内部原本连续的秩序、走势与高低起伏要保持贯通。断的是“形的连续性”，连的是“整体关系的连续性”。\n\n② 达共识  \n所有形体共处同一空间，共用统一光源与空间规则。画面先成立，再谈“断”和“连”。\n\n③ 造冲突  \n请就眼前这个画面看：前景紫红色棱柱横亘在前，把后方绿色柱阵截断分割，制造序列断裂、形体被割裂的视觉冲突。红绿互补也强化了这种“被切开”的对比感。\n\n④ 驯冲突  \n用秩序把这份“断”驯得“断而不散”：  \n以进前的紫红棱柱为主体，其后方绿色柱群为宾，主次分明、以宾衬主；并且要让“被遮挡的部分”之后，后方仍能顺着原本的节奏接下去——高低起伏的层次、疏密的节拍、以及整体排布的方向要保持连贯。这样即使绿色柱群在视觉上被隔断，你依然能把它读成同一个整体：形断在眼前，关系不断在全局，这就是“形断气连”、韵律中的“气韵贯通”。\n\n抓重点：用”形断气连“来确保整体本来就该连续的东西，不因为前景的遮挡而割裂。  \n\n下一站进入几何体写生：你在画到被遮挡的结构时，也用同一条原则——断开在“形”，不断在“整体关系”，让结构依然能被读成一整块。","keyPointsRich":"【构图】例10 · 形断气连。<br><br>上一例我们学过：同一堆材料也能长出不同主题，关键在于重新编排“视觉核心是谁”，让主角从杂物里被读出来。  <br>这一例换一种更微妙的情况：<strong style=\"color: rgb(255, 217, 102);\">前景一遮，形体外观看上去会被切断、被分割；但真正要守住的，是整体原本就该连在一起的关系——不能因为遮挡就被割裂成两截。</strong><br><br><strong style=\"color: rgb(255, 217, 102);\">① 先立意</strong>  <br>主题「形断气连」：物象受前景遮挡，形体外观看似断裂分隔；但群组内部原本连续的秩序、走势与高低起伏要保持贯通。断的是“形的连续性”，连的是“整体关系的连续性”。<br><br><strong style=\"color: rgb(255, 217, 102);\">② 达共识  </strong><br>所有形体共处同一空间，共用统一光源与空间规则。画面先成立，再谈“断”和“连”。<br><br><strong style=\"color: rgb(255, 217, 102);\">③ 造冲突</strong>  <br>请就眼前这个画面看：前景紫红色棱柱横亘在前，把后方绿色柱阵截断分割，制造序列断裂、形体被割裂的视觉冲突。红绿互补也强化了这种“被切开”的对比感。<br><br><strong style=\"color: rgb(255, 217, 102);\">④ 驯冲突</strong>  <br>用秩序把这份“断”驯得“断而不散”：  <br>以进前的紫红棱柱为主体，其后方绿色柱群为宾，主次分明、以宾衬主；并且要让“被遮挡的部分”之后，后方仍能顺着原本的节奏接下去——高低起伏的层次、疏密的节拍、以及整体排布的方向要保持连贯。这样即使绿色柱群在视觉上被隔断，你依然能把它读成同一个整体：形断在眼前，关系不断在全局，这就是“形断气连”、<strong style=\"color: rgb(255, 217, 102);\">韵律中的“气韵贯通”</strong>。<br><br><strong style=\"color: rgb(255, 217, 102);\">抓重点：用”形断气连“来确保整体本来就该连续的东西，不因为前景的遮挡而割裂。</strong>  <br><br>下一站进入几何体写生：你在画到被遮挡的结构时，也用同一条原则——断开在“形”，不断在“整体关系”，让结构依然能被读成一整块。"}}
+{
+  "name": "【构图-例10】形断气连",
+  "thumbnail": "data:image/jpeg;base64,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",
+  "camera": {
+    "pos": [
+      -8.994,
+      9.672,
+      61.537
+    ],
+    "target": [
+      -0.785,
+      -2.347,
+      7.335
+    ],
+    "zoom": 0.52
+  },
+  "light": {
+    "type": "rect",
+    "azimuth": 104,
+    "elevation": 52,
+    "distance": 40,
+    "temp": 33,
+    "size": 1,
+    "intensity": 8
+  },
+  "env": {
+    "hasWall": false,
+    "defaultMat": "origin",
+    "posterizeLevel": 0,
+    "wallColor": "#cccccc",
+    "groundColor": "#278b33",
+    "skyColor": "#0d0d0f",
+    "skyLightScale": 0.26,
+    "atmosphere": {
+      "enabled": false,
+      "density": 0.01,
+      "type": "height",
+      "color": "#ffffff",
+      "p1": 4.3,
+      "p2": 1.1
+    },
+    "dof": {
+      "enabled": false,
+      "aperture": 2.9,
+      "focusDistance": 10
+    },
+    "lightIndicatorEnabled": false
+  },
+  "crop": {
+    "display": "block",
+    "left": "547.4px",
+    "top": "73.2px",
+    "width": "628.8px",
+    "height": "628.8px"
+  },
+  "items": [
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        0,
+        2.691,
+        1.267
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        1.794,
+        0.504
+      ],
+      "color": "#28d745",
+      "annotations": [
+        {
+          "id": "anno_1785887604176_59",
+          "annotationKind": "leader",
+          "text": "连：节奏与脉络延续",
+          "detailText": "",
+          "collapsed": false,
+          "color": "#bdb9b2",
+          "dx": 55.79998779296875,
+          "dy": -145.19996643066406,
+          "dxN": 0.032292,
+          "dyN": -0.14029,
+          "dxW": 3.802714,
+          "dyW": -9.895233,
+          "localPos": [
+            0.5856,
+            0.9052,
+            1.5
+          ],
+          "localNormal": [
+            0,
+            0,
+            1
+          ],
+          "baseDist": 60.472416984269444,
+          "baseScale": 0.504
+        }
+      ]
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        2.149,
+        1.789,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        1.193,
+        0.504
+      ],
+      "color": "#28d745"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        5.763,
+        1.72,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        1.146,
+        0.504
+      ],
+      "color": "#2be34a"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        -6.991,
+        2.575,
+        1.965
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        1.716,
+        0.504
+      ],
+      "color": "#28d745"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        7.853,
+        1.291,
+        -0.312
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        0.861,
+        0.504
+      ],
+      "color": "#2ae549"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        -4.72,
+        5.797,
+        15.9
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1.012,
+        3.865,
+        1.224
+      ],
+      "color": "#ec4bb1"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        12.207,
+        2.075,
+        1.663
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        1.383,
+        0.504
+      ],
+      "color": "#2cdd4a"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        0.74,
+        3.344,
+        17.769
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1.012,
+        2.229,
+        1.224
+      ],
+      "color": "#ff42cd",
+      "annotations": [
+        {
+          "id": "anno_1785887573521_58",
+          "annotationKind": "leader",
+          "text": "断：前景遮挡切开",
+          "detailText": "",
+          "collapsed": false,
+          "color": "#bdb9b2",
+          "dx": 61,
+          "dy": -91,
+          "dxN": 0.035301,
+          "dyN": -0.087923,
+          "dxW": 3.102911,
+          "dyW": -4.628933,
+          "localPos": [
+            -1.5,
+            0.9737,
+            -0.3469
+          ],
+          "localNormal": [
+            -1,
+            0,
+            0
+          ],
+          "baseDist": 45.14179435338119,
+          "baseScale": 1.012
+        }
+      ]
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        -2.787,
+        2.972,
+        -0.25
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.624,
+        1.981,
+        0.638
+      ],
+      "color": "#2ed64a"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        -4.862,
+        2.744,
+        0.495
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        1.829,
+        0.504
+      ],
+      "color": "#2ed64a"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        5.033,
+        1.772,
+        -3.255
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        1.181,
+        0.504
+      ],
+      "color": "#2adf48"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        11.14,
+        1.447,
+        -1.054
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        0.965,
+        0.504
+      ],
+      "color": "#33e651"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        14.385,
+        4.635,
+        2.422
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        3.09,
+        0.504
+      ],
+      "color": "#2ed64a"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        16.367,
+        1.363,
+        1.469
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        0.909,
+        0.504
+      ],
+      "color": "#2dd248"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        -9.509,
+        2.055,
+        -0.434
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        1.37,
+        0.504
+      ],
+      "color": "#23d140"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        -11.788,
+        1.681,
+        1.368
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        1.12,
+        0.504
+      ],
+      "color": "#29d646"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        -13.827,
+        1.114,
+        -2.404
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        0.743,
+        0.504
+      ],
+      "color": "#29db47"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        -17.382,
+        0.803,
+        -2.404
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        0.535,
+        0.504
+      ],
+      "color": "#24d642"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        18.482,
+        1.005,
+        2.182
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        0.67,
+        0.514
+      ],
+      "color": "#2ed64a"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        16.867,
+        3.407,
+        1.469
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        2.271,
+        0.504
+      ],
+      "color": "#2dd248"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        8.081,
+        1.291,
+        3.793
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        0.861,
+        0.504
+      ],
+      "color": "#2ae549"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        -7.41,
+        2.055,
+        -1.517
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.504,
+        1.37,
+        0.504
+      ],
+      "color": "#23d140"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        6.498,
+        1.168,
+        17.769
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1.012,
+        0.779,
+        1.224
+      ],
+      "color": "#ff42cd"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        -10.358,
+        2.51,
+        15.9
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1.012,
+        1.673,
+        1.224
+      ],
+      "color": "#ec4bb1"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        12.295,
+        1.682,
+        17.769
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1.012,
+        1.122,
+        1.224
+      ],
+      "color": "#ff42cd"
+    },
+    {
+      "type": "builtin",
+      "shape": "cube",
+      "pos": [
+        -15.574,
+        1.599,
+        15.9
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1.012,
+        1.066,
+        1.224
+      ],
+      "color": "#ec4bb1"
+    }
+  ],
+  "groundAnnotations": [],
+  "groundNormArrows": [],
+  "groundPolygon3ds": [],
+  "groundColorSampleAnnotations": [],
+  "meta": {
+    "detail": "<b>形断气连</b>\n\n看似中断、遮挡分隔，实际整体关系仍连续。",
+    "category": "构图",
+    "keyPoints": "【构图】例10 · 形断气连。\n\n上一例我们学过：同一堆材料也能长出不同主题，关键在于重新编排“视觉核心是谁”，让主角从杂物里被读出来。  \n这一例换一种更微妙的情况：前景一遮，形体外观看上去会被切断、被分割；但真正要守住的，是整体原本就该连在一起的关系——不能因为遮挡就被割裂成两截。\n\n① 先立意  \n主题「形断气连」：物象受前景遮挡，形体外观看似断裂分隔；但群组内部原本连续的秩序、走势与高低起伏要保持贯通。断的是“形的连续性”，连的是“整体关系的连续性”。\n\n② 达共识  \n所有形体共处同一空间，共用统一光源与空间规则。画面先成立，再谈“断”和“连”。\n\n③ 造冲突  \n请就眼前这个画面看：前景紫红色棱柱横亘在前，把后方绿色柱阵截断分割，制造序列断裂、形体被割裂的视觉冲突。红绿互补也强化了这种“被切开”的对比感。\n\n④ 驯冲突  \n用秩序把这份“断”驯得“断而不散”：  \n以进前的紫红棱柱为主体，其后方绿色柱群为宾，主次分明、以宾衬主；并且要让“被遮挡的部分”之后，后方仍能顺着原本的节奏接下去——高低起伏的层次、疏密的节拍、以及整体排布的方向要保持连贯。这样即使绿色柱群在视觉上被隔断，你依然能把它读成同一个整体：形断在眼前，关系不断在全局，这就是“形断气连”、韵律中的“气韵贯通”。\n\n抓重点：用”形断气连“来确保整体本来就该连续的东西，不因为前景的遮挡而割裂。  \n\n下一站进入几何体写生：你在画到被遮挡的结构时，也用同一条原则——断开在“形”，不断在“整体关系”，让结构依然能被读成一整块。",
+    "keyPointsRich": "【构图】例10 · 形断气连。<br><br>上一例我们学过：同一堆材料也能长出不同主题，关键在于重新编排“视觉核心是谁”，让主角从杂物里被读出来。  <br>这一例换一种更微妙的情况：<strong style=\"color: rgb(255, 217, 102);\">前景一遮，形体外观看上去会被切断、被分割；但真正要守住的，是整体原本就该连在一起的关系——不能因为遮挡就被割裂成两截。</strong><br><br><strong style=\"color: rgb(255, 217, 102);\">① 先立意</strong>  <br>主题「形断气连」：物象受前景遮挡，形体外观看似断裂分隔；但群组内部原本连续的秩序、走势与高低起伏要保持贯通。断的是“形的连续性”，连的是“整体关系的连续性”。<br><br><strong style=\"color: rgb(255, 217, 102);\">② 达共识  </strong><br>所有形体共处同一空间，共用统一光源与空间规则。画面先成立，再谈“断”和“连”。<br><br><strong style=\"color: rgb(255, 217, 102);\">③ 造冲突</strong>  <br>请就眼前这个画面看：前景紫红色棱柱横亘在前，把后方绿色柱阵截断分割，制造序列断裂、形体被割裂的视觉冲突。红绿互补也强化了这种“被切开”的对比感。<br><br><strong style=\"color: rgb(255, 217, 102);\">④ 驯冲突</strong>  <br>用秩序把这份“断”驯得“断而不散”：  <br>以进前的紫红棱柱为主体，其后方绿色柱群为宾，主次分明、以宾衬主；并且要让“被遮挡的部分”之后，后方仍能顺着原本的节奏接下去——高低起伏的层次、疏密的节拍、以及整体排布的方向要保持连贯。这样即使绿色柱群在视觉上被隔断，你依然能把它读成同一个整体：形断在眼前，关系不断在全局，这就是“形断气连”、<strong style=\"color: rgb(255, 217, 102);\">韵律中的“气韵贯通”</strong>。<br><br><strong style=\"color: rgb(255, 217, 102);\">抓重点：用”形断气连“来确保整体本来就该连续的东西，不因为前景的遮挡而割裂。</strong>  <br><br>下一站进入几何体写生：你在画到被遮挡的结构时，也用同一条原则——断开在“形”，不断在“整体关系”，让结构依然能被读成一整块。"
+  }
+}
