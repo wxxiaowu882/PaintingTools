@@ -40,7 +40,7 @@ background-image: radial-gradient(#C7C7CC 1px, transparent 1px); background-size
 width: 100%; height: 100%; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); border-radius: 20px; box-shadow: var(--shadow-md); color: var(--text-secondary);
 display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; } .plus-icon { font-size: 32px; color: var(--accent-color); margin-bottom: 8px; }
 .placeholder-text { font-size: 14px; font-weight: 600; color: var(--text-primary); }
-#paletteImg { display: none; position: absolute; top: 0; left: 0; transform-origin: 0 0; user-select: none; pointer-events: none; border-radius: 8px; }
+#paletteImg { display: none; position: absolute; top: 0; left: 0; transform-origin: 0 0; user-select: none; pointer-events: none; border-radius: 0; }
 .crosshair { position: absolute; top: 50%; left: 50%; width: 120px; height: 120px; z-index: 50; display: none; pointer-events: auto; touch-action: none; }
 .crosshair-visual { position: absolute; top: 50%; left: 50%; width: 0; height: 0; pointer-events: none; }
 .crosshair-circle { position: absolute; width: 12px; height: 12px; transform: translate(-50%, -50%); border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.3); border-radius: 50%; background: transparent; }
@@ -102,8 +102,53 @@ margin-top: -24px; border-top-left-radius: 32px; border-top-right-radius: 32px; 
 .modal-title { font-size: 18px; font-weight: 700; color: var(--text-primary); } .close-modal { font-size: 28px; color: var(--text-secondary); cursor: pointer; padding: 4px; line-height: 1; }
 .tabs-container { background: var(--surface-opaque); padding: 12px 20px; overflow-x: auto; white-space: nowrap; display: flex; gap: 12px; flex-shrink: 0; border-bottom: 1px solid var(--border-light); -ms-overflow-style: none; scrollbar-width: none; }
 .tabs-container::-webkit-scrollbar { display: none; }
+.tab-chip-wrap { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .tab-chip { display: inline-block; padding: 8px 16px; border-radius: 18px; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: #F2F2F7; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; }
-.tab-chip.active { background: var(--text-primary); color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.15); } .modal-body { flex: 1; overflow-y: auto; padding: 24px; }
+.tab-chip.active { background: var(--text-primary); color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+.tab-rename-btn { width: 28px; height: 28px; border-radius: 50%; border: none; background: #E5E5EA; color: #1C1C1E; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1; flex-shrink: 0; }
+/* 铅笔在 chip 外侧浅底上，勿随 active 改成白字否则看不见 */
+.tab-chip-wrap.is-active .tab-rename-btn { background: #E5E5EA; color: #1C1C1E; }
+/* 次级分享操作：权重低于 Tab，放在说明文案下方 */
+.section-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.box-inline-share-btn { display: none; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.08); background: #F2F2F7; color: var(--text-primary); cursor: pointer; white-space: nowrap; }
+.confirm-action-swatch { width: 48px; height: 40px; border-radius: 10px; margin: 4px auto 0; box-shadow: inset 0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.06); }
+.btn-confirm-danger { background: #FF3B30 !important; color: #fff !important; opacity: 1 !important; pointer-events: auto !important; }
+.rename-box-hint { font-size: 12px; color: var(--text-secondary); text-align: center; margin: -4px 0 0; line-height: 1.4; }
+.btn-confirm-name.always-on { opacity: 1; pointer-events: auto; }
+.top-gear-btn { width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.03); background: #F2F2F7; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #1C1C1E; flex-shrink: 0; padding: 0; box-shadow: none; }
+.top-gear-btn svg { display: block; }
+.modal-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+.modal-import-btn { flex-shrink: 0; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.08); background: #F2F2F7; color: var(--text-primary); cursor: pointer; white-space: nowrap; }
+.share-export-stack { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 4px; }
+.share-export-stack button { width: 100%; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 14px; border: 1px solid #E5E5EA; background: #F7F7F8; color: var(--text-primary); cursor: pointer; }
+.share-export-stack button.primary { background: #1C1C1E; color: #fff; border-color: #1C1C1E; }
+.about-overlay { position: fixed; inset: 0; z-index: 230; background: rgba(0,0,0,0.45); display: none; align-items: flex-end; justify-content: center; padding: 0; }
+.about-overlay.active { display: flex; }
+.about-sheet { width: 100%; max-width: 520px; max-height: min(88vh, 920px); background: #F2F2F7; border-radius: 24px 24px 0 0; box-shadow: 0 -12px 40px rgba(0,0,0,0.18); display: flex; flex-direction: column; overflow: hidden; }
+@media (min-width: 560px) { .about-overlay { align-items: center; padding: 20px; } .about-sheet { border-radius: 24px; max-height: 85vh; } }
+.about-sheet-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px 12px; background: #fff; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.about-sheet-header h3 { margin: 0; font-size: 17px; font-weight: 700; color: #1C1C1E; }
+.about-sheet-close { width: 32px; height: 32px; border: none; border-radius: 8px; background: #F2F2F7; color: #1C1C1E; font-size: 22px; line-height: 1; cursor: pointer; }
+.about-sheet-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 20px 8px; font-family: Inter, -apple-system, BlinkMacSystemFont, "微软雅黑", "PingFang SC", "Helvetica Neue", sans-serif; color: #1C1C1E; }
+.about-sheet-body .about-card { background: #fff; border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+.about-sheet-body h4 { margin: 0 0 10px; font-size: 15px; font-weight: 700; }
+.about-sheet-body p, .about-sheet-body li { font-size: 13px; line-height: 1.55; color: #3A3A3C; margin: 0 0 8px; }
+.about-sheet-body ul, .about-sheet-body ol { margin: 0 0 4px; padding-left: 18px; }
+.about-sheet-body li { margin-bottom: 6px; }
+.about-sheet-body .about-muted { color: #8E8E93; font-size: 12px; }
+.about-delta-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; padding: 10px; border-radius: 12px; background: #F2F2F7; }
+.about-delta-tag { flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: #1C1C1E; color: #fff; white-space: nowrap; }
+.about-sheet-footer { flex-shrink: 0; padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px)); background: #fff; border-top: 1px solid rgba(0,0,0,0.06); }
+.about-sheet-footer button { width: 100%; padding: 14px; border: none; border-radius: 16px; background: #1C1C1E; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+.share-code-overlay { position: fixed; inset: 0; z-index: 220; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; padding: 20px; }
+.share-code-overlay.active { display: flex; }
+.share-code-box { width: 100%; max-width: 420px; background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.2); }
+.share-code-box h3 { margin: 0 0 8px; font-size: 16px; }
+.share-code-box p { margin: 0 0 12px; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.share-code-box textarea { width: 100%; min-height: 120px; border-radius: 12px; border: 1px solid #E5E5EA; padding: 10px; font-size: 12px; box-sizing: border-box; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.share-code-actions { display: flex; gap: 10px; margin-top: 12px; }
+.share-code-actions button { flex: 1; padding: 12px; border-radius: 12px; font-weight: 600; border: none; cursor: pointer; }
+.modal-body { flex: 1; overflow-y: auto; padding: 24px; }
 .section-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5; padding: 12px; background: #fff; border-radius: 12px; }
 .section-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; margin-top: 24px; }
 .section-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.5px; text-transform: uppercase; margin: 0; }
@@ -174,14 +219,19 @@ border-radius: 8px; border: 1px solid rgba(0,0,0,0.03); padding-right: 8px; /* �
 .menu-open .line-3 { transform: rotate(-45deg) translateY(2px); background-color: #1C1C1E; }
 /* [修复] Header 样式还原：移除之前为了避让按钮加的 padding-right: 60px */ .app-header { width: 100%; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-body); z-index: 60; box-sizing: border-box; } </style>
 </head> <body> <div class="app-container" id="appContainer"> <!-- [新增] 品牌栏：包含标题、作者、帮助和菜单 --> <div class="brand-bar"> <div class="brand-info">
-<div class="brand-title">晓色 · 调色助手</div> <div class="brand-author">by 童画师吴晓</div> </div> <div class="brand-actions"> <!-- 帮助按钮 (从下方移动上来) -->
+<div class="brand-title">晓色 · 调色助手</div> <div class="brand-author">by 童画师吴晓</div> </div> <div class="brand-actions">
+<button type="button" class="top-gear-btn" id="topConfigGearBtn" title="配置我的颜料盒" aria-label="配置我的颜料盒" onclick="openPigmentModal()">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path></svg>
+</button>
 <button class="info-btn" onclick="showInfo()" style="height:36px;width:36px;padding:0;border-radius:8px;background:#F2F2F7;border:1px solid rgba(0,0,0,0.03);box-shadow:none;">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#1C1C1E"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-</button> <!-- 菜单按钮 (从底部移动上来) --> <div id="menu-trigger" onclick="toggleMenu()" title="切换菜单"> <span class="menu-line line-1"></span>
+</button>
+<div id="menu-trigger" onclick="toggleMenu()" title="切换菜单"> <span class="menu-line line-1"></span>
 <span class="menu-line line-2"></span> <span class="menu-line line-3"></span> </div> </div> </div> <div class="app-header">
-<button class="top-open-btn" onclick="document.getElementById('fileInput').click()">打开图片选色</button> <div class="header-right"> <div class="mode-toggle" ontouchstart="event.stopPropagation()">
+<button type="button" class="top-open-btn" onclick="document.getElementById('fileInput').click()">打开图片选色</button>
+<div class="header-right"> <div class="mode-toggle" ontouchstart="event.stopPropagation()">
 <div class="mode-opt active" id="modeWatercolor" onclick="setMode('watercolor')">水彩</div>
-<div class="mode-opt" id="modeOil" onclick="setMode('oil')">油画/丙烯</div> </div> <!-- 原本的帮助按钮已移走 --> </div> </div>
+<div class="mode-opt" id="modeOil" onclick="setMode('oil')">油画/丙烯</div> </div> </div> </div>
 <div class="palette-stage" id="stage"> <div class="image-container-wrapper" id="imgWrapper"> <div class="upload-trigger-container" id="uploadContainer">
 <div class="empty-placeholder" id="placeholder" onclick="document.getElementById('fileInput').click()"> <div class="plus-icon">+</div> <div class="placeholder-text">打开图片选色</div> </div> </div>
 <img id="paletteImg" src="">
@@ -191,27 +241,154 @@ border-radius: 8px; border: 1px solid rgba(0,0,0,0.03); padding-right: 8px; /* �
 <div id="statusBadgeContainer" class="status-badge-container"></div>
 <div class="action-group" id="mainActionGroup" style="display: none;"><button class="pick-btn primary" id="pickBtn" onclick="triggerAutoMix()" ontouchstart="event.stopPropagation()">自动调色</button></div>
 </div> <div id="focusContainer"><div id="trayHint">点击上方打开图片选色</div></div> <div class="section-header" id="manualBarHeader" style="display:none; align-items: center; justify-content: space-between;">
-<div style="display:flex; align-items:center; gap:10px;"><span>我的颜料盒</span></div> <button class="pick-btn" id="practiceBtn" style="height: 28px; font-size: 12px; padding: 0 12px;" onclick="triggerPractice()">调色练习</button>
+<div style="display:flex; align-items:center; gap:10px;"><span>当前颜料盒</span></div> <button class="pick-btn" id="practiceBtn" style="height: 28px; font-size: 12px; padding: 0 12px;" onclick="triggerPractice()">调色练习</button>
 </div> <div class="manual-adjust-bar" id="manualBar" style="display:none;"></div> <div class="app-footer">晓色 · 调色助手</div> </div> </div>
 <input type="file" id="fileInput" accept="image/*" style="display:none">
 <div class="backdrop" id="modalBackdrop" onclick="closePigmentModal()"></div>
 <div class="backdrop" id="gamutBackdrop" style="z-index: 2050;" onclick="closeGamutPopover()"></div>
 <div class="gamut-popover" id="gamutPopover"><h4 id="gamutTitle">色域说明</h4><div id="gamutDesc" style="font-size: 13px; line-height: 1.6; color: var(--text-secondary);"></div></div>
 <div class="pigment-modal" id="pigmentModal">
-<div class="modal-header"><div class="modal-title">配置颜料盒</div><div class="close-modal" onclick="closePigmentModal()">×</div></div>
-<div class="tabs-container" id="modalTabs"></div> <div class="modal-body"> <div id="setDescription" class="section-desc"></div>
-<div class="section-header-row"><div class="section-title" id="currentGroupTitle">当前组颜料</div><div class="reset-custom-btn" id="resetCustomBtn" onclick="resetCustomSet()">重置</div></div>
+<div class="modal-header">
+  <div class="modal-header-left">
+    <div class="modal-title">配置我的颜料盒</div>
+    <button type="button" class="modal-import-btn" id="modalImportBoxBtn" title="导入后会新建一个颜料盒" onclick="openImportBoxOverlay()">导入颜料盒</button>
+  </div>
+  <div class="close-modal" onclick="closePigmentModal()">×</div>
+</div>
+<div class="tabs-container" id="modalTabs"></div>
+<div class="modal-body"> <div id="setDescription" class="section-desc"></div>
+<div class="section-header-row">
+  <div class="section-title" id="currentGroupTitle">这个颜料盒中的颜料：</div>
+  <div class="section-header-actions">
+    <button type="button" class="box-inline-share-btn" id="shareBoxInlineBtn" onclick="openShareBoxOverlay()">分享颜料盒</button>
+    <div class="reset-custom-btn" id="resetCustomBtn" onclick="resetCustomSet()">重置</div>
+  </div>
+</div>
 <div class="pigment-grid" id="currentSetGrid"></div>
-<div id="librarySection" style="display:none;"><div class="section-title" style="margin-top:40px; border-top:1px dashed #eee; padding-top:20px; margin-bottom: 16px;">添加更多颜料</div><div class="pigment-grid" id="fullLibraryGrid"></div></div>
+<div id="librarySection" style="display:none;"><div class="section-title" id="librarySectionTitle" style="margin-top:40px; border-top:1px dashed #eee; padding-top:20px; margin-bottom: 16px;">添加更多颜料（这是你的颜料后备仓库）</div><div class="pigment-grid" id="fullLibraryGrid"></div></div>
 <div class="name-input-overlay" id="nameInputOverlay"> <div class="name-input-box"> <h3>添加新颜料</h3>
 <input type="text" id="newPigmentNameInput" class="name-input-field" placeholder="请输入颜料名称(5字内)" maxlength="5">
 <div class="color-picker-row"> <div id="previewSwatch" class="preview-swatch"></div>
 <button class="btn-outline" style="flex:1; border-radius:12px; padding:12px; font-weight:600; color:var(--text-primary);" onclick="document.getElementById('pickerFileInput').click()">📷 拍照/上传图片取色</button>
 <input type="file" id="pickerFileInput" accept="image/*" style="display:none" onchange="handlePickerFile(this)"> </div>
 <div id="nameInputError" class="name-input-error"></div> <div class="name-input-btns"> <button class="btn-cancel-name" onclick="hideNameInputOverlay()">取消</button>
-<button id="confirmAddBtn" class="btn-confirm-name" onclick="finalSubmit()">确认添加</button> </div> </div> </div> </div>
+<button id="confirmAddBtn" class="btn-confirm-name" onclick="finalSubmit()">确认添加</button> </div> </div> </div>
+<div class="name-input-overlay" id="renameBoxOverlay">
+  <div class="name-input-box">
+    <h3>给颜料盒起名</h3>
+    <p class="rename-box-hint">起个好认的名字，方便和画友区分不同盒子</p>
+    <input type="text" id="renameBoxInput" class="name-input-field" placeholder="例如：课堂写生盒" maxlength="16">
+    <div id="renameBoxError" class="name-input-error"></div>
+    <div class="name-input-btns">
+      <button type="button" class="btn-cancel-name" onclick="hideRenameBoxOverlay()">取消</button>
+      <button type="button" id="confirmRenameBoxBtn" class="btn-confirm-name always-on" onclick="confirmRenameBox()">保存</button>
+    </div>
+  </div>
+</div>
+<div class="name-input-overlay" id="confirmActionOverlay">
+  <div class="name-input-box">
+    <div class="confirm-action-swatch" id="confirmActionSwatch"></div>
+    <h3 id="confirmActionTitle">确认操作</h3>
+    <p class="rename-box-hint" id="confirmActionDesc"></p>
+    <div class="name-input-btns">
+      <button type="button" class="btn-cancel-name" onclick="hideConfirmAction()">取消</button>
+      <button type="button" id="confirmActionOkBtn" class="btn-confirm-name always-on" onclick="runConfirmAction()">确认</button>
+    </div>
+  </div>
+</div>
+</div>
 <div class="modal-footer"><button class="btn-footer btn-outline" onclick="closePigmentModal()">取消</button><button class="btn-footer btn-primary" onclick="confirmPigmentSet()">使用此方案</button></div>
-</div> <div id="pickerOverlay" class="picker-overlay"> <div class="picker-stage-area" id="pickerStageArea">
+</div>
+<div class="about-overlay" id="aboutOverlay" onclick="if(event.target===this)closeAbout()">
+  <div class="about-sheet" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="aboutSheetTitle">
+    <div class="about-sheet-header">
+      <h3 id="aboutSheetTitle">使用说明</h3>
+      <button type="button" class="about-sheet-close" onclick="closeAbout()" aria-label="关闭">×</button>
+    </div>
+    <div class="about-sheet-body">
+      <div class="about-card">
+        <h4>这是什么</h4>
+        <p>晓色帮你干三件实事：</p>
+        <ol>
+          <li><strong>给配方</strong>——从参考图取一个目标色，按你手头颜料算出怎么调。</li>
+          <li><strong>练调色</strong>——先自己想比例再点颜料，用反馈把色感练出来。</li>
+          <li><strong>管颜料盒</strong>——按自己手头实际的颜料盒中的颜料来配置，也能和画友互相分享整盒方案。</li>
+        </ol>
+        <p class="about-muted">水彩 / 油画丙烯都可用 · 永久免费 · 童画师吴晓</p>
+      </div>
+      <div class="about-card">
+        <h4>怎么拿到配方</h4>
+        <ol>
+          <li>打开一张参考图（或用页面上的作品图）。</li>
+          <li>拖准心对准要调的颜色，切换水彩或油画/丙烯。</li>
+          <li>点「自动调色」，按比例在实体色盘上挤色即可。</li>
+        </ol>
+        <p>调好后，点颜料条下方、与齿轮并排的<strong>分享图标</strong>，可生成一张配方图，方便保存或发给画友对照。</p>
+        <p class="about-muted">双指可缩放移动图片；单指拖准心。</p>
+      </div>
+      <div class="about-card">
+        <h4>怎么练调色</h4>
+        <p>取好目标色后，先别急着点自动。点「调色练习」，自己选颜料、估比例，看色差变小——这就是在练脑子，不是练手指点按钮。</p>
+        <p class="about-muted">颜料条长按可暂时不用某支，模拟「手头就这几支」。</p>
+      </div>
+      <div class="about-card">
+        <h4>颜料盒与分享</h4>
+        <ul>
+          <li>右上角<strong>齿轮</strong>：按你真实手头的颜色配盒，可起多个名字方便切换。</li>
+          <li>拍照录入自建色：把挤在盘上的颜料拍进来，配方更贴你的实物。</li>
+          <li><strong>分享颜料盒</strong>给画友；对方用<strong>导入颜料盒</strong>收下——课堂、写生小组都能统一方案。</li>
+        </ul>
+      </div>
+      <div class="about-card">
+        <h4>色差大概怎么看</h4>
+        <p>ΔE 越小越接近目标色。数字很大时，多半是盒里缺合适的颜料，换盒或补色比死磕更有效。</p>
+        <div class="about-delta-row"><span class="about-delta-tag">≤ 1</span><span>几乎看不出差别</span></div>
+        <div class="about-delta-row"><span class="about-delta-tag">1～2</span><span>很接近</span></div>
+        <div class="about-delta-row"><span class="about-delta-tag">2～5</span><span>能看出一点偏差</span></div>
+        <div class="about-delta-row"><span class="about-delta-tag">&gt; 5</span><span>明显不够，考虑换颜料组合</span></div>
+      </div>
+      <div class="about-card">
+        <h4>用的时候留意</h4>
+        <ul>
+          <li>屏幕和灯光会有色差，结果当参考，最终以实物为准。</li>
+          <li>自建颜料尽量在平时作画的光线下拍，会更准。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="about-sheet-footer">
+      <button type="button" onclick="closeAbout()">知道了</button>
+    </div>
+  </div>
+</div>
+<div class="share-code-overlay" id="shareBoxOverlay" onclick="if(event.target===this)closeShareBoxOverlay()">
+  <div class="share-code-box" onclick="event.stopPropagation()">
+    <h3>分享颜料盒</h3>
+    <p>把当前这个自定义盒发给画友。可复制分享码粘贴发送，或下载分享文件再转发。</p>
+    <div class="share-export-stack">
+      <button type="button" class="primary" onclick="exportCurrentBoxShare()">复制分享码</button>
+      <button type="button" onclick="downloadCurrentBoxShare()">下载分享文件</button>
+    </div>
+    <div class="share-code-actions" style="margin-top:14px">
+      <button type="button" class="btn-outline" style="background:#F2F2F7" onclick="closeShareBoxOverlay()">关闭</button>
+    </div>
+  </div>
+</div>
+<div class="share-code-overlay" id="importBoxOverlay" onclick="if(event.target===this)closeImportBoxOverlay()">
+  <div class="share-code-box" onclick="event.stopPropagation()">
+    <h3>导入颜料盒</h3>
+    <p>粘贴画友发来的分享码，或打开对方导出的分享文件。导入后会在最前面新建一个颜料盒，需再点「使用此方案」才会真正启用。</p>
+    <textarea id="importBoxTextarea" placeholder="粘贴 XWBOX1.… 分享码"></textarea>
+    <div class="share-code-actions">
+      <button type="button" class="btn-outline" style="background:#F2F2F7" onclick="closeImportBoxOverlay()">取消</button>
+      <button type="button" class="btn-primary" style="background:#1C1C1E;color:#fff" onclick="confirmImportBoxShare()">导入</button>
+    </div>
+    <div style="margin-top:10px">
+      <button type="button" class="btn-outline" style="width:100%;padding:10px;border-radius:12px;border:1px solid #E5E5EA;background:#fff;font-weight:600;cursor:pointer" onclick="document.getElementById('importBoxFileInput').click()">从分享文件导入</button>
+      <input type="file" id="importBoxFileInput" accept=".txt,.json,text/plain,application/json" style="display:none" onchange="handleImportBoxFile(this)">
+    </div>
+  </div>
+</div>
+<div id="pickerOverlay" class="picker-overlay"> <div class="picker-stage-area" id="pickerStageArea">
 <img id="pickerImage" src="">
 <div class="crosshair" id="pickerCrosshair"><div class="crosshair-visual"><div class="crosshair-line ch-top"></div><div class="crosshair-line ch-bottom"></div><div class="crosshair-line ch-left"></div><div class="crosshair-line ch-right"></div><div class="crosshair-circle"></div></div></div>
 </div> <div class="picker-controls"> <button class="btn-cancel-name" onclick="closePickerStage()">取消</button>
@@ -271,8 +448,9 @@ const differenceCiede2000 = culoriLib ? culoriLib.differenceCiede2000() : null; 
 { id: 'neutral-tint', name: '中性灰', rgb: [79, 79, 85], hex: '#4F4F55' },
 { id: 'ivory-black', name: '象牙黑', rgb: [30, 30, 30], hex: '#1E1E1E' },
 { id: 'mars-black', name: '马斯黑', rgb: [35, 30, 30], hex: '#231E1E' },
-{ id: 'titanium-white', name: '钛白', rgb: [255, 255, 255], hex: '#FFFFFF' } ]; const PRESET_TABS = [
-{ id: 'custom', name: '自定义色1', desc: '基于标准24色，可自由增删颜料。配置会保存。' }, { id: 'custom2', name: '自定义色2', desc: '基于标准12色，可自由增删颜料。配置会保存。' },
+{ id: 'titanium-white', name: '钛白', rgb: [255, 255, 255], hex: '#FFFFFF' } ];
+/** 系统只读方案（「我的颜料盒」由 appState.myBoxes 管理） */
+const PRESET_TABS = [
 { id: 'basic', name: '基础三色', desc: '红黄蓝 (RYB) 经典组合。', ids: ['medium-yellow', 'crimson', 'ultramarine', 'titanium-white'] },
 { id: 'modern', name: '现代三原色', desc: 'CMY 体系，色域最广。', ids: ['lemon-yellow', 'quinacridone-rose', 'phthalo-blue', 'titanium-white'] },
 { id: 'split', name: '冷暖双原色', desc: '6色系统，包含冷暖倾向。', ids: ['lemon-yellow', 'medium-yellow', 'crimson', 'vermilion', 'ultramarine', 'phthalo-blue', 'titanium-white'] },
@@ -289,7 +467,114 @@ const differenceCiede2000 = culoriLib ? culoriLib.differenceCiede2000() : null; 
 level2: { title: "接近颜料盒色域", threshold: "2.0 < ΔE ≤ 5.0", desc: "虽然用<b>[颜料盒]</b>中的颜料品种能调出和目标色类似的颜色，但是感觉显著断层，人眼可察觉明显不一致。<br><br>在<b>[自动调色]</b>中可看到颜料盒子调出的颜色和目标色间的明显不一致。" },
 level3: { title: "大致匹配颜料盒色域", threshold: "1.0 < ΔE ≤ 2.0", desc: "可通过<b>[颜料盒]</b>中的颜料品种调出和目标色近似的颜色，稍有色差，但人眼可以接收。<br><br>在<b>[自动调色]</b>中可观察到调合色和目标色的微小色差。" },
 level4: { title: "完美匹配颜料盒色域", threshold: "ΔE ≤ 1.0", desc: "可通过<b>[颜料盒]</b>中的颜料品种调出和目标色几乎相同的颜色，准确度极高，肉眼几乎无法分辨色差。<br><br>在<b>[自动调色]</b>中可观察到几乎一致的调合色和目标色。" } };
-let appState = { currentTabId: 'custom', customIds: [], customIds2: [], activePigments: [], userAddedPigments: [] }, modalState = { viewingTabId: 'custom', tempCustom1Ids: [], tempCustom2Ids: [] }, currentMode = 'watercolor', globalSession = { targetRGB: null, targetHex: null, currentRecipe: [], activePool: [], minError: null }, disabledPigmentIds = new Set(), moveDebounceTimer = null, gearRotation = 0, autoMixCount = 0;
+const MY_BOX_MAX = 20;
+const SHARE_PREFIX = 'XWBOX1.';
+const LS_MY_BOXES = 'xstudioMyBoxes';
+let appState = { currentTabId: 'my_custom', myBoxes: [], activePigments: [], userAddedPigments: [] };
+let modalState = { viewingTabId: 'my_custom', tempMyBoxes: [], tempUserAdded: [] };
+// 挂到 window，便于调试/自动化（let 不会自动成为 window 属性）
+window.appState = appState;
+window.modalState = modalState;
+let currentMode = 'watercolor', globalSession = { targetRGB: null, targetHex: null, currentRecipe: [], activePool: [], minError: null }, disabledPigmentIds = new Set(), moveDebounceTimer = null, gearRotation = 0, autoMixCount = 0;
+window.globalSession = globalSession;
+
+function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+function defaultStdIds(key) { const t = PRESET_TABS.find(x => x.id === key); return t ? [...t.ids] : []; }
+function normalizeLegacyBoxName(name) {
+  const s = String(name || '').trim();
+  const m = /^自定义色(\d*)$/.exec(s);
+  if (!m) return s;
+  return m[1] ? ('自定义盒' + m[1]) : '自定义盒';
+}
+function migrateLoadMyBoxes() {
+  try {
+    const raw = localStorage.getItem(LS_MY_BOXES);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) {
+        return arr.map((b, i) => ({
+          id: String(b.id || ('my_' + i)),
+          name: normalizeLegacyBoxName(b.name || ('自定义盒' + (i + 1))),
+          ids: Array.isArray(b.ids) ? b.ids.slice() : defaultStdIds('std24')
+        }));
+      }
+    }
+  } catch (_e) {}
+  let ids1 = defaultStdIds('std24'), ids2 = defaultStdIds('std12');
+  try { const sc = localStorage.getItem('customIds'); if (sc) ids1 = JSON.parse(sc); } catch (_e) {}
+  try { const sc2 = localStorage.getItem('customIds2'); if (sc2) ids2 = JSON.parse(sc2); } catch (_e) {}
+  return [
+    { id: 'my_custom', name: '自定义盒1', ids: Array.isArray(ids1) ? ids1 : defaultStdIds('std24') },
+    { id: 'my_custom2', name: '自定义盒2', ids: Array.isArray(ids2) ? ids2 : defaultStdIds('std12') }
+  ];
+}
+function mapLegacyTabId(id) {
+  if (id === 'custom') return 'my_custom';
+  if (id === 'custom2') return 'my_custom2';
+  return id || 'my_custom';
+}
+function isMyBoxId(id, boxes) {
+  const list = boxes || appState.myBoxes;
+  return !!(list && list.some(b => b.id === id));
+}
+function findBoxById(id, boxes) {
+  const list = boxes || appState.myBoxes;
+  return list ? list.find(b => b.id === id) : null;
+}
+function uniqueBoxName(base, boxes, excludeId) {
+  const list = boxes || [];
+  const presetNames = PRESET_TABS.map(t => t.name);
+  const taken = (n) => presetNames.includes(n) || list.some(b => b.name === n && b.id !== excludeId);
+  let name = String(base || '我的颜料盒').trim() || '我的颜料盒';
+  if (!taken(name)) return name;
+  let i = 2;
+  while (taken(name + ' (' + i + ')')) i++;
+  return name + ' (' + i + ')';
+}
+function getBoxIdsForTab(tabId, boxes) {
+  const box = findBoxById(tabId, boxes);
+  if (box) return box.ids;
+  const preset = PRESET_TABS.find(t => t.id === tabId);
+  return preset ? preset.ids : (boxes && boxes[0] ? boxes[0].ids : defaultStdIds('std24'));
+}
+function persistMyBoxes() {
+  localStorage.setItem(LS_MY_BOXES, JSON.stringify(appState.myBoxes));
+  localStorage.setItem('currentTabId', appState.currentTabId);
+}
+function utf8ToBase64(str) {
+  try { return btoa(unescape(encodeURIComponent(str))); } catch (_e) { return btoa(str); }
+}
+function base64ToUtf8(b64) {
+  try { return decodeURIComponent(escape(atob(b64))); } catch (_e) { return atob(b64); }
+}
+function buildSharePayloadForTab(tabId, boxes, userPigments) {
+  const ids = getBoxIdsForTab(tabId, boxes).slice();
+  const box = findBoxById(tabId, boxes);
+  const preset = PRESET_TABS.find(t => t.id === tabId);
+  const name = box ? box.name : (preset ? preset.name : '我的颜料盒');
+  const all = [...ALL_PIGMENTS, ...(userPigments || [])];
+  const customs = [];
+  ids.forEach(id => {
+    const p = all.find(x => x.id === id);
+    if (p && (p.isUserCreated || String(id).indexOf('u_') === 0)) {
+      customs.push({ id: p.id, name: p.name, hex: p.hex, rgb: p.rgb && p.rgb.slice ? p.rgb.slice() : p.rgb });
+    }
+  });
+  return { v: 1, name, ids, customs };
+}
+function encodeShareCode(payload) {
+  return SHARE_PREFIX + utf8ToBase64(JSON.stringify(payload));
+}
+function decodeShareCode(text) {
+  let s = String(text || '').trim();
+  if (!s) throw new Error('分享码为空');
+  if (s.indexOf(SHARE_PREFIX) >= 0) s = s.slice(s.indexOf(SHARE_PREFIX));
+  if (s.indexOf(SHARE_PREFIX) !== 0) throw new Error('不是有效的颜料盒分享码');
+  const raw = base64ToUtf8(s.slice(SHARE_PREFIX.length));
+  const data = JSON.parse(raw);
+  if (!data || data.v !== 1 || !Array.isArray(data.ids)) throw new Error('分享码格式不对');
+  return data;
+}
 let isGuideVisible = false; function showGamutPopover(level) { const info = GAMUT_INFO[level]; if(!info) return; document.getElementById('gamutTitle').innerText = info.title;
 document.getElementById('gamutDesc').innerHTML = `${info.desc}<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #eee;color:#999;font-size:12px;">色差范围：${info.threshold}</div>`; document.getElementById('gamutBackdrop').classList.add('active');
 document.getElementById('gamutPopover').classList.add('active'); }
@@ -305,37 +590,271 @@ if (toast.timeoutId) clearTimeout(toast.timeoutId); toast.timeoutId = setTimeout
 function getDeltaE(rgb1, rgb2) { if (!culoriLib) { const r = (rgb1[0]-rgb2[0])*0.3, g = (rgb1[1]-rgb2[1])*0.59, b = (rgb1[2]-rgb2[2])*0.11; return Math.sqrt(r*r + g*g + b*b)*0.5; }
 return differenceCiede2000({mode:'rgb', r:rgb1[0]/255, g:rgb1[1]/255, b:rgb1[2]/255}, {mode:'rgb', r:rgb2[0]/255, g:rgb2[1]/255, b:rgb2[2]/255}); }
 function initApp() {
-const st = localStorage.getItem('currentTabId'), sc = localStorage.getItem('customIds'), sc2 = localStorage.getItem('customIds2'), su = localStorage.getItem('userAddedPigments'), sm = localStorage.getItem('currentMode');
+const st = localStorage.getItem('currentTabId'), su = localStorage.getItem('userAddedPigments'), sm = localStorage.getItem('currentMode');
 if(sm){currentMode=sm;setTimeout(()=>{const w=document.getElementById('modeWatercolor'),o=document.getElementById('modeOil');if(w&&o){w.className=sm==='watercolor'?'mode-opt active':'mode-opt';o.className=sm==='oil'?'mode-opt active':'mode-opt';}},50);}
-appState.currentTabId = st || 'custom'; appState.customIds = sc ? JSON.parse(sc) : [...PRESET_TABS.find(t=>t.id==='std24').ids];
-appState.customIds2 = sc2 ? JSON.parse(sc2) : [...PRESET_TABS.find(t=>t.id==='std12').ids]; appState.userAddedPigments = su ? JSON.parse(su) : []; updateActivePigments(); updateGlobalSessionPool(); renderManualBar();
-document.getElementById('trayHint').innerHTML = "点击上方打开图片选色"; setInterval(() => { gearRotation += 90; const btn = document.getElementById('configGearBtn');
+appState.myBoxes = migrateLoadMyBoxes();
+let tabId = mapLegacyTabId(st || 'my_custom');
+if (!isMyBoxId(tabId) && !PRESET_TABS.some(t => t.id === tabId)) tabId = appState.myBoxes[0].id;
+appState.currentTabId = tabId;
+try { appState.userAddedPigments = su ? JSON.parse(su) : []; } catch (_e) { appState.userAddedPigments = []; }
+persistMyBoxes();
+updateActivePigments(); updateGlobalSessionPool(); renderManualBar();
+setInterval(() => { gearRotation += 90; const btn = document.getElementById('configGearBtn');
 if (btn) btn.style.transform = `rotate(${gearRotation}deg)`; }, 15000); document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
 document.addEventListener('dblclick', function(e) { e.preventDefault(); }, { passive: false }); }
 function updateGlobalSessionPool() { let p = [...appState.activePigments], w = null;
 if (currentMode === 'watercolor') { p = p.filter(x=>x.id!=='titanium-white'); w = { id:'water', name:'水', rgb:[255,255,255], hex:'#FFFFFF', isWater:true }; }
 else { let ew = p.find(x=>x.id==='titanium-white'); if(ew) { w = ew; p = p.filter(x=>x.id!==ew.id); } else w = { id:'titanium-white', name:'钛白', rgb:[255,255,255], hex:'#FFFFFF' }; }
 globalSession.activePool = [...p]; if(w) globalSession.activePool.push(w); }
-function getAllAvailablePigments() { return [...ALL_PIGMENTS, ...appState.userAddedPigments]; }
-function updateActivePigments() {
-let ids; if(appState.currentTabId==='custom') ids=appState.customIds; else if(appState.currentTabId==='custom2') ids=appState.customIds2; else ids=PRESET_TABS.find(t=>t.id===appState.currentTabId).ids;
-const all = getAllAvailablePigments(); appState.activePigments = []; ids.forEach(id => { let p = all.find(x=>x.id===id); if(p) { let n = JSON.parse(JSON.stringify(p)); n.cmyk = rgbToCmyk(...n.rgb); appState.activePigments.push(n); } });
-localStorage.setItem('currentTabId', appState.currentTabId); if(appState.currentTabId==='custom') localStorage.setItem('customIds', JSON.stringify(appState.customIds));
-if(appState.currentTabId==='custom2') localStorage.setItem('customIds2', JSON.stringify(appState.customIds2)); }
-function openPigmentModal() { modalState.viewingTabId = appState.currentTabId; modalState.tempCustom1Ids = [...appState.customIds]; modalState.tempCustom2Ids = [...appState.customIds2];
-renderModalContent(); document.getElementById('modalBackdrop').classList.add('active');
-document.getElementById('pigmentModal').classList.add('active'); document.body.classList.add('modal-open');
-setTimeout(() => { const a = document.querySelector('.tab-chip.active'); if(a) a.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center'}); }, 100);
+function getAllAvailablePigments() {
+  const user = (document.getElementById('pigmentModal') && document.getElementById('pigmentModal').classList.contains('active') && modalState.tempUserAdded)
+    ? modalState.tempUserAdded : appState.userAddedPigments;
+  return [...ALL_PIGMENTS, ...(user || [])];
 }
-function closePigmentModal() { document.getElementById('modalBackdrop').classList.remove('active'); document.getElementById('pigmentModal').classList.remove('active'); document.body.classList.remove('modal-open'); }
-function confirmPigmentSet() { try { appState.currentTabId = modalState.viewingTabId; appState.customIds = [...modalState.tempCustom1Ids]; appState.customIds2 = [...modalState.tempCustom2Ids];
-updateActivePigments(); updateGlobalSessionPool(); renderManualBar(); showToast("颜料箱配置已更新"); } catch(e){console.error(e)} finally{closePigmentModal()} }
+function updateActivePigments() {
+const ids = getBoxIdsForTab(appState.currentTabId, appState.myBoxes);
+const all = [...ALL_PIGMENTS, ...appState.userAddedPigments];
+appState.activePigments = [];
+ids.forEach(id => { let p = all.find(x=>x.id===id); if(p) { let n = JSON.parse(JSON.stringify(p)); n.cmyk = rgbToCmyk(...n.rgb); appState.activePigments.push(n); } });
+persistMyBoxes();
+localStorage.setItem('userAddedPigments', JSON.stringify(appState.userAddedPigments));
+}
+function openPigmentModal() {
+  modalState.viewingTabId = appState.currentTabId;
+  modalState.tempMyBoxes = deepClone(appState.myBoxes);
+  modalState.tempUserAdded = deepClone(appState.userAddedPigments || []);
+  renderModalContent(); document.getElementById('modalBackdrop').classList.add('active');
+  document.getElementById('pigmentModal').classList.add('active'); document.body.classList.add('modal-open');
+  setTimeout(() => { const a = document.querySelector('.tab-chip.active'); if(a) a.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center'}); }, 100);
+}
+function closePigmentModal() {
+  document.getElementById('modalBackdrop').classList.remove('active');
+  document.getElementById('pigmentModal').classList.remove('active');
+  document.body.classList.remove('modal-open');
+  closeImportBoxOverlay();
+  hideRenameBoxOverlay();
+}
+function confirmPigmentSet() {
+  try {
+    appState.myBoxes = deepClone(modalState.tempMyBoxes);
+    appState.userAddedPigments = deepClone(modalState.tempUserAdded || []);
+    if (!isMyBoxId(modalState.viewingTabId) && !PRESET_TABS.some(t => t.id === modalState.viewingTabId)) {
+      modalState.viewingTabId = appState.myBoxes[0].id;
+    }
+    appState.currentTabId = modalState.viewingTabId;
+    updateActivePigments(); updateGlobalSessionPool(); renderManualBar();
+    showToast("颜料箱配置已更新");
+  } catch(e){ console.error(e); }
+  finally { closePigmentModal(); }
+}
 function switchModalTab(id) { modalState.viewingTabId = id; renderModalContent(); }
-function toggleCustomPigment(id) { if(id==='titanium-white')return; const target = (modalState.viewingTabId === 'custom2') ? modalState.tempCustom2Ids : modalState.tempCustom1Ids;
-const i = target.indexOf(id); if(i>-1) target.splice(i,1); else target.push(id); renderModalContent(); }
-function resetCustomSet() { if(confirm("确定要重置吗？")) { const defaultSetId = modalState.viewingTabId === 'custom2' ? 'std12' : 'std24';
-const defaultIds = [...PRESET_TABS.find(t=>t.id===defaultSetId).ids]; if(modalState.viewingTabId === 'custom2') modalState.tempCustom2Ids = defaultIds; else modalState.tempCustom1Ids = defaultIds; renderModalContent();
-} }
+function getTempViewBox() { return findBoxById(modalState.viewingTabId, modalState.tempMyBoxes); }
+let _confirmAction = null;
+function showConfirmAction(opts) {
+  _confirmAction = opts || null;
+  const overlay = document.getElementById('confirmActionOverlay');
+  const title = document.getElementById('confirmActionTitle');
+  const desc = document.getElementById('confirmActionDesc');
+  const swatch = document.getElementById('confirmActionSwatch');
+  const okBtn = document.getElementById('confirmActionOkBtn');
+  if (title) title.innerText = (opts && opts.title) || '确认操作';
+  if (desc) desc.innerText = (opts && opts.desc) || '';
+  if (swatch) {
+    swatch.style.backgroundColor = (opts && opts.hex) || '#F2F2F7';
+    swatch.style.display = (opts && opts.hex) ? 'block' : 'none';
+  }
+  if (okBtn) {
+    okBtn.innerText = (opts && opts.okText) || '确认';
+    okBtn.className = 'btn-confirm-name always-on' + ((opts && opts.danger) ? ' btn-confirm-danger' : '');
+  }
+  if (overlay) overlay.classList.add('active');
+}
+function hideConfirmAction() {
+  const overlay = document.getElementById('confirmActionOverlay');
+  if (overlay) overlay.classList.remove('active');
+  _confirmAction = null;
+}
+function runConfirmAction() {
+  const fn = _confirmAction && _confirmAction.onOk;
+  hideConfirmAction();
+  if (typeof fn === 'function') fn();
+}
+function findPigmentById(id) {
+  return getAllAvailablePigments().find(x => x.id === id) || null;
+}
+function toggleCustomPigment(id) {
+  if (id === 'titanium-white') return;
+  const box = getTempViewBox();
+  if (!box) return;
+  const i = box.ids.indexOf(id);
+  if (i > -1) {
+    const p = findPigmentById(id) || { id: id, name: '此颜料', hex: '#E5E5EA' };
+    showConfirmAction({
+      title: '移出颜料盒',
+      desc: '将「' + p.name + '」从当前颜料盒中移出。颜料仍留在后备仓库，需要时可再加回来。',
+      okText: '移出',
+      hex: p.hex,
+      danger: false,
+      onOk: () => {
+        const b = getTempViewBox();
+        if (!b) return;
+        const idx = b.ids.indexOf(id);
+        if (idx > -1) b.ids.splice(idx, 1);
+        renderModalContent();
+        showToast('已移出「' + p.name + '」');
+      }
+    });
+  } else {
+    box.ids.push(id);
+    renderModalContent();
+  }
+}
+function resetCustomSet() {
+  const box = getTempViewBox();
+  if (!box) return;
+  if (!confirm("确定要重置吗？")) return;
+  const fallback = (box.id === 'my_custom2') ? 'std12' : 'std24';
+  box.ids = defaultStdIds(fallback);
+  renderModalContent();
+}
+let _renameBoxId = null;
+function renameMyBox(boxId) {
+  const box = findBoxById(boxId, modalState.tempMyBoxes);
+  if (!box) return;
+  _renameBoxId = boxId;
+  const overlay = document.getElementById('renameBoxOverlay');
+  const input = document.getElementById('renameBoxInput');
+  const err = document.getElementById('renameBoxError');
+  if (err) err.innerText = '';
+  if (input) { input.value = box.name; }
+  if (overlay) overlay.classList.add('active');
+  setTimeout(() => { if (input) { input.focus(); input.select(); } }, 120);
+}
+function hideRenameBoxOverlay() {
+  const overlay = document.getElementById('renameBoxOverlay');
+  if (overlay) overlay.classList.remove('active');
+  _renameBoxId = null;
+}
+function confirmRenameBox() {
+  const box = findBoxById(_renameBoxId, modalState.tempMyBoxes);
+  const input = document.getElementById('renameBoxInput');
+  const err = document.getElementById('renameBoxError');
+  if (!box || !input) return;
+  const name = String(input.value || '').trim();
+  if (!name) { if (err) err.innerText = '名称不能为空'; return; }
+  if (name.length > 16) { if (err) err.innerText = '最多 16 个字'; return; }
+  const next = uniqueBoxName(name, modalState.tempMyBoxes, box.id);
+  box.name = next;
+  hideRenameBoxOverlay();
+  if (next !== name) showToast('名称已存在，已改为「' + next + '」');
+  else showToast('已改名');
+  renderModalContent();
+}
+function openShareBoxOverlay() {
+  const el = document.getElementById('shareBoxOverlay');
+  if (el) el.classList.add('active');
+}
+function closeShareBoxOverlay() {
+  const el = document.getElementById('shareBoxOverlay');
+  if (el) el.classList.remove('active');
+}
+async function exportCurrentBoxShare() {
+  try {
+    const payload = buildSharePayloadForTab(modalState.viewingTabId, modalState.tempMyBoxes, modalState.tempUserAdded);
+    const code = encodeShareCode(payload);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(code);
+      showToast('已复制分享码，发给画友即可');
+    } else {
+      // 无剪贴板时在分享弹层内提示，勿误开导入层
+      openShareBoxOverlay();
+      showToast('当前环境无法自动复制，请改用「下载分享文件」');
+    }
+  } catch (e) {
+    console.error(e);
+    showToast('分享失败');
+  }
+}
+function downloadCurrentBoxShare() {
+  try {
+    const payload = buildSharePayloadForTab(modalState.viewingTabId, modalState.tempMyBoxes, modalState.tempUserAdded);
+    const code = encodeShareCode(payload);
+    const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    const safe = String(payload.name || '颜料盒').replace(/[\\/:*?"<>|]/g, '_');
+    a.href = URL.createObjectURL(blob);
+    a.download = safe + '.xwbox.txt';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    showToast('已导出分享文件，可存到手机再发给画友');
+  } catch (e) {
+    console.error(e);
+    showToast('导出失败');
+  }
+}
+function openImportBoxOverlay() {
+  const el = document.getElementById('importBoxOverlay');
+  const ta = document.getElementById('importBoxTextarea');
+  if (ta) ta.value = '';
+  if (el) el.classList.add('active');
+}
+function closeImportBoxOverlay() {
+  const el = document.getElementById('importBoxOverlay');
+  if (el) el.classList.remove('active');
+}
+function handleImportBoxFile(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById('importBoxTextarea').value = String(reader.result || '');
+  };
+  reader.readAsText(f);
+  input.value = '';
+}
+function confirmImportBoxShare() {
+  try {
+    if (modalState.tempMyBoxes.length >= MY_BOX_MAX) {
+      showToast('我的颜料盒最多 ' + MY_BOX_MAX + ' 个');
+      return;
+    }
+    const data = decodeShareCode(document.getElementById('importBoxTextarea').value);
+    const idMap = {};
+    (data.customs || []).forEach(c => {
+      if (!c || !c.hex) return;
+      let local = (modalState.tempUserAdded || []).find(x => x.id === c.id)
+        || (modalState.tempUserAdded || []).find(x => x.hex === c.hex && x.name === c.name);
+      if (!local) {
+        const newId = (c.id && String(c.id).indexOf('u_') === 0 && !(modalState.tempUserAdded || []).some(x => x.id === c.id))
+          ? c.id
+          : ('u_' + Date.now() + '_' + Math.floor(Math.random() * 1000));
+        let rgb = c.rgb;
+        if (!Array.isArray(rgb) || rgb.length < 3) {
+          const hex = String(c.hex).replace('#', '');
+          rgb = [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+        }
+        local = { id: newId, name: String(c.name || '自定义').slice(0, 5), hex: c.hex, rgb, isUserCreated: true };
+        modalState.tempUserAdded.push(local);
+      }
+      if (c.id) idMap[c.id] = local.id;
+    });
+    const ids = (data.ids || []).map(id => idMap[id] || id).filter((id, i, arr) => arr.indexOf(id) === i);
+    if (!ids.includes('titanium-white') && ALL_PIGMENTS.some(p => p.id === 'titanium-white')) ids.push('titanium-white');
+    const name = uniqueBoxName(data.name || '导入的颜料盒', modalState.tempMyBoxes);
+    const newId = 'my_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    modalState.tempMyBoxes.unshift({ id: newId, name, ids });
+    modalState.viewingTabId = newId;
+    closeImportBoxOverlay();
+    renderModalContent();
+    showToast(name === (data.name || '导入的颜料盒')
+      ? '已加入配置，点「使用此方案」后生效'
+      : '已加入为「' + name + '」，点「使用此方案」后生效');
+  } catch (e) {
+    console.error(e);
+    showToast(e.message || '导入失败');
+  }
+}
 let tempNewPigmentHex = null; // 新的：全屏拍照取色逻辑
 let pickerState = { x:0, y:0, scale:1 };
 const pickerImage = document.getElementById('pickerImage'), pickerStage = document.getElementById('pickerStageArea'), pickerCrosshair = document.getElementById('pickerCrosshair');
@@ -386,28 +905,100 @@ if (getAllAvailablePigments().some(x => x.name === n)) { error.innerText = "名�
 if (!tempNewPigmentHex) { error.innerText = "请点击上方按钮选取颜色"; return; }
 // 所有校验通过，执行添加
 const r=parseInt(tempNewPigmentHex.substr(1,2),16), g=parseInt(tempNewPigmentHex.substr(3,2),16), b=parseInt(tempNewPigmentHex.substr(5,2),16);
-const np = { id:'u_'+Date.now()+'_'+Math.floor(Math.random()*1000), name:n, hex:tempNewPigmentHex, rgb:[r,g,b], isUserCreated:true }; appState.userAddedPigments.push(np);
-localStorage.setItem('userAddedPigments', JSON.stringify(appState.userAddedPigments)); // 明确的隔离逻辑
-if(modalState.viewingTabId === 'custom') { modalState.tempCustom1Ids.push(np.id); } else if(modalState.viewingTabId === 'custom2') { modalState.tempCustom2Ids.push(np.id); }
+const np = { id:'u_'+Date.now()+'_'+Math.floor(Math.random()*1000), name:n, hex:tempNewPigmentHex, rgb:[r,g,b], isUserCreated:true };
+modalState.tempUserAdded.push(np);
+const box = getTempViewBox();
+if (box) box.ids.push(np.id);
 renderModalContent(); showToast("已成功添加新颜料"); hideNameInputOverlay(); }
-function deleteUserPigment(id) { if (confirm("确定删除？")) { appState.userAddedPigments = appState.userAddedPigments.filter(x => x.id !== id);
-localStorage.setItem('userAddedPigments', JSON.stringify(appState.userAddedPigments)); appState.customIds = appState.customIds.filter(x => x !== id); appState.customIds2 = appState.customIds2.filter(x => x !== id);
-if(modalState.tempCustom1Ids) modalState.tempCustom1Ids = modalState.tempCustom1Ids.filter(x => x !== id); if(modalState.tempCustom2Ids) modalState.tempCustom2Ids = modalState.tempCustom2Ids.filter(x => x !== id);
-renderModalContent(); showToast("已删除自定义颜料"); } }
+function deleteUserPigment(id) {
+  const p = (modalState.tempUserAdded || []).find(x => x.id === id) || { id: id, name: '此颜料', hex: '#E5E5EA' };
+  showConfirmAction({
+    title: '删除自定义颜料',
+    desc: '将从后备仓库彻底删除「' + p.name + '」，所有颜料盒里的引用也会一并移除。点「使用此方案」后才会真正保存。',
+    okText: '删除',
+    hex: p.hex,
+    danger: true,
+    onOk: () => {
+      modalState.tempUserAdded = (modalState.tempUserAdded || []).filter(x => x.id !== id);
+      modalState.tempMyBoxes.forEach(b => { b.ids = b.ids.filter(x => x !== id); });
+      renderModalContent();
+      showToast('已删除「' + p.name + '」');
+    }
+  });
+}
 function renderModalContent() {
-const tabs = document.getElementById('modalTabs'); tabs.innerHTML=''; PRESET_TABS.forEach(t=>{ const c=document.createElement('div'); c.className=`tab-chip ${t.id===modalState.viewingTabId?'active':''}`; c.innerText=t.name; c.onclick=()=>switchModalTab(t.id); tabs.appendChild(c); });
-const isC = (modalState.viewingTabId==='custom' || modalState.viewingTabId==='custom2'), curT = PRESET_TABS.find(t=>t.id===modalState.viewingTabId);
-let ids = (modalState.viewingTabId === 'custom') ? modalState.tempCustom1Ids : (modalState.viewingTabId === 'custom2' ? modalState.tempCustom2Ids : curT.ids);
-document.getElementById('setDescription').innerText=curT.desc; document.getElementById('currentGroupTitle').innerText=isC?"自定义":"包含颜料"; document.getElementById('resetCustomBtn').style.display=isC?'block':'none';
-const grid = document.getElementById('currentSetGrid'); grid.innerHTML=''; const all = getAllAvailablePigments();
-all.forEach(p=>{ if(ids.includes(p.id)) grid.appendChild(createPanElement(p, isC?()=>toggleCustomPigment(p.id):()=>{}, isC?'action-remove':'', !isC)); });
-const libS = document.getElementById('librarySection'), libG = document.getElementById('fullLibraryGrid');
-if(isC){ libS.style.display='block'; libG.innerHTML=''; all.forEach(p=>{ if(p.id==='titanium-white')return; libG.appendChild(createSelectablePan(p, ids.includes(p.id), ()=>toggleCustomPigment(p.id), p.isUserCreated?()=>deleteUserPigment(p.id):null)); }); const add = document.createElement('div'); add.className='add-new-pigment-pan'; add.innerText='+'; add.onclick=triggerAddUserPigment; libG.appendChild(add); } else libS.style.display='none';
+  const tabs = document.getElementById('modalTabs');
+  tabs.innerHTML = '';
+  (modalState.tempMyBoxes || []).forEach(b => {
+    const isActive = b.id === modalState.viewingTabId;
+    const wrap = document.createElement('div');
+    wrap.className = 'tab-chip-wrap' + (isActive ? ' is-active' : '');
+    const c = document.createElement('div');
+    c.className = 'tab-chip' + (isActive ? ' active' : '');
+    c.innerText = b.name;
+    c.onclick = () => switchModalTab(b.id);
+    wrap.appendChild(c);
+    if (isActive) {
+      const pen = document.createElement('button');
+      pen.type = 'button';
+      pen.className = 'tab-rename-btn';
+      pen.title = '改名';
+      pen.setAttribute('aria-label', '改名');
+      pen.innerText = '✎';
+      pen.onclick = (e) => { e.stopPropagation(); renameMyBox(b.id); };
+      wrap.appendChild(pen);
+    }
+    tabs.appendChild(wrap);
+  });
+  PRESET_TABS.forEach(t => {
+    const c = document.createElement('div');
+    c.className = 'tab-chip' + (t.id === modalState.viewingTabId ? ' active' : '');
+    c.innerText = t.name;
+    c.onclick = () => switchModalTab(t.id);
+    tabs.appendChild(c);
+  });
+  const isC = isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes);
+  const box = getTempViewBox();
+  const curT = PRESET_TABS.find(t => t.id === modalState.viewingTabId);
+  const ids = getBoxIdsForTab(modalState.viewingTabId, modalState.tempMyBoxes);
+  const desc = isC
+    ? '这是当前颜料盒，可自由增删颜料、改名，并用右侧「分享颜料盒」发给画友。改动需点「使用此方案」后保存。新建盒子请用标题旁的「导入颜料盒」。'
+    : (curT ? curT.desc : '');
+  document.getElementById('setDescription').innerText = desc;
+  const shareInline = document.getElementById('shareBoxInlineBtn');
+  if (shareInline) shareInline.style.display = isC ? 'inline-flex' : 'none';
+  document.getElementById('currentGroupTitle').innerText = isC ? '这个颜料盒中的颜料：' : '包含颜料';
+  document.getElementById('resetCustomBtn').style.display = isC ? 'block' : 'none';
+  const grid = document.getElementById('currentSetGrid');
+  grid.innerHTML = '';
+  const all = getAllAvailablePigments();
+  all.forEach(p => {
+    if (ids.includes(p.id)) {
+      const canRemove = isC && p.id !== 'titanium-white';
+      grid.appendChild(createPanElement(p, isC ? () => toggleCustomPigment(p.id) : () => {}, canRemove ? 'action-remove' : '', !isC));
+    }
+  });
+  const libS = document.getElementById('librarySection'), libG = document.getElementById('fullLibraryGrid');
+  if (isC) {
+    libS.style.display = 'block';
+    libG.innerHTML = '';
+    all.forEach(p => {
+      if (p.id === 'titanium-white') return;
+      libG.appendChild(createSelectablePan(p, ids.includes(p.id), () => toggleCustomPigment(p.id), p.isUserCreated ? () => deleteUserPigment(p.id) : null));
+    });
+    const add = document.createElement('div');
+    add.className = 'add-new-pigment-pan';
+    add.innerText = '+';
+    add.onclick = triggerAddUserPigment;
+    libG.appendChild(add);
+  } else {
+    libS.style.display = 'none';
+  }
 }
 function createPanElement(p, click, icon, read) { const i = document.createElement('div'); i.className='pigment-pan-item'; if(read) i.style.cursor='default';
 const pan = document.createElement('div'); pan.className='pigment-pan'; const c = document.createElement('div'); c.className='pigment-pan-color'; c.style.backgroundColor=p.hex; pan.appendChild(c);
 const l = document.createElement('span'); l.className='pigment-pan-label'; l.innerText=p.name; i.appendChild(pan); i.appendChild(l);
-if(!read && icon) { const ic = document.createElement('div'); ic.className=`pan-action-icon ${icon}`; ic.innerText=icon==='action-remove'?'-':'+'; i.appendChild(ic); }
+if(!read && icon && p.id !== 'titanium-white') { const ic = document.createElement('div'); ic.className=`pan-action-icon ${icon}`; ic.innerText=icon==='action-remove'?'-':'+'; i.appendChild(ic); }
 i.onclick=click; return i; }
 function createSelectablePan(p, sel, click, del) { const i = document.createElement('div'); i.className=`pigment-select-item ${sel?'selected':''}`;
 if(del){ const d = document.createElement('div'); d.className='pan-delete-user-icon'; d.innerText='×'; d.onclick=(e)=>{e.stopPropagation();del()}; i.appendChild(d); }
@@ -514,19 +1105,112 @@ if (i === 0) { createGuideLabel("配方色", tx, ty-15, tx + 25, ty - 45, w); } 
 // === 图片加载与手势逻辑 ===
 const fileInput=document.getElementById('fileInput'), imgElement=document.getElementById('paletteImg'), imgWrapper=document.getElementById('imgWrapper'), crosshair=document.getElementById('crosshair'), offC=document.createElement('canvas'), offCtx=offC.getContext('2d');
 let state={x:0,y:0,scale:1}, crossPos={x:0,y:0}, isM=/Android|iPhone|iPad/i.test(navigator.userAgent);
+/** Gallery 封面候选（写死小池，启动随机；仅 URL，不写入用户图 IDB） */
+const DEMO_COVER_PATHS = [
+  'docs/galleryIMG/当粉帽遇见暖阳/1.jpg',
+  'docs/galleryIMG/笑把时光揉成暖/1.jpg',
+  'docs/galleryIMG/水纹织就的亲昵/1.jpg',
+  'docs/galleryIMG/红温柔裹住清眸/1.jpg',
+  'docs/galleryIMG/指尖偷吻了春风/1.jpg',
+  'docs/galleryIMG/落在肩上的绿/1.jpg',
+  'docs/galleryIMG/每天爱你多一点/1.jpg',
+  'docs/galleryIMG/绿意的呢喃/1.jpg',
+  'docs/galleryIMG/掌心里的笑响/1.jpg',
+  'docs/galleryIMG/她与臂弯的约定/1.jpg',
+  'docs/galleryIMG/肩背的温度/1.jpg',
+  'docs/galleryIMG/爱米莉的快乐/1.jpg'
+];
+const XSTUDIO_IDB_NAME = 'xstudio', XSTUDIO_IDB_STORE = 'images', XSTUDIO_IDB_KEY = 'lastUserImage';
+let _lastObjectUrl = null;
+function openXstudioIdb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(XSTUDIO_IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(XSTUDIO_IDB_STORE)) db.createObjectStore(XSTUDIO_IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('idb open failed'));
+  });
+}
+function saveLastUserImage(blob) {
+  return openXstudioIdb().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(XSTUDIO_IDB_STORE, 'readwrite');
+    tx.objectStore(XSTUDIO_IDB_STORE).put({ blob: blob, mime: blob.type || 'image/jpeg', savedAt: Date.now() }, XSTUDIO_IDB_KEY);
+    tx.oncomplete = () => { try { db.close(); } catch (_e) {} resolve(); };
+    tx.onerror = () => { try { db.close(); } catch (_e) {} reject(tx.error); };
+  }));
+}
+function loadLastUserImage() {
+  return openXstudioIdb().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(XSTUDIO_IDB_STORE, 'readonly');
+    const req = tx.objectStore(XSTUDIO_IDB_STORE).get(XSTUDIO_IDB_KEY);
+    req.onsuccess = () => { try { db.close(); } catch (_e) {} resolve(req.result || null); };
+    req.onerror = () => { try { db.close(); } catch (_e) {} reject(req.error); };
+  }));
+}
+function applyImageFromSrc(src, opts) {
+  opts = opts || {};
+  globalSession.targetRGB = null; globalSession.targetHex = null; globalSession.currentRecipe = [];
+  imgElement.onload = () => {
+    document.getElementById('uploadContainer').style.display = 'none';
+    imgElement.style.display = 'block';
+    const trayContainer = document.getElementById('focusContainer');
+    trayContainer.innerHTML = '<div id="trayHint" style="color:var(--text-secondary);font-size:13px;font-weight:500;margin-top:16px;opacity:0.8;text-align:center;line-height:1.5;max-width:280px;">拖动准心或双指移动取色</div>';
+    document.getElementById('mainActionGroup').style.display = 'flex';
+    document.getElementById('stageHint').classList.add('visible');
+    offC.width = imgElement.naturalWidth; offC.height = imgElement.naturalHeight;
+    offCtx.clearRect(0, 0, offC.width, offC.height);
+    try { offCtx.drawImage(imgElement, 0, 0); } catch (err) { console.warn('offscreen draw failed', err); }
+    state = { x: 0, y: 0, scale: 1 }; crossPos = { x: 0, y: 0 };
+    setTimeout(() => { resetV(); upRP(); }, 50);
+    crosshair.style.display = 'block';
+    document.getElementById('pickBtn').style.display = 'flex';
+    setTimeout(() => crosshair.classList.add('guide-active'), 100);
+  };
+  imgElement.onerror = () => {
+    if (opts._retried) { showToast('图片加载失败'); return; }
+    const pool = DEMO_COVER_PATHS.filter(p => p !== src);
+    const fb = (opts.fallbackSrc) || (pool.length ? pool[Math.floor(Math.random() * pool.length)] : DEMO_COVER_PATHS[0]);
+    if (fb && fb !== src) applyImageFromSrc(fb, { _retried: true });
+    else showToast('图片加载失败');
+  };
+  if (_lastObjectUrl) { try { URL.revokeObjectURL(_lastObjectUrl); } catch (_e) {} _lastObjectUrl = null; }
+  if (String(src).indexOf('blob:') === 0) _lastObjectUrl = src;
+  imgElement.src = src;
+}
+async function bootStudioImage() {
+  try {
+    const rec = await loadLastUserImage();
+    if (rec && rec.blob) {
+      applyImageFromSrc(URL.createObjectURL(rec.blob));
+      return;
+    }
+  } catch (_e) { /* 无用户图或 IDB 不可用 → 走默认作品 */ }
+  const path = DEMO_COVER_PATHS[Math.floor(Math.random() * DEMO_COVER_PATHS.length)];
+  applyImageFromSrc(path);
+}
+window.saveLastUserImage = saveLastUserImage;
+window.loadLastUserImage = loadLastUserImage;
+window.applyImageFromSrc = applyImageFromSrc;
+window.bootStudioImage = bootStudioImage;
 function setMode(m){currentMode=m;localStorage.setItem('currentMode',m);document.getElementById('modeWatercolor').className=m==='watercolor'?'mode-opt active':'mode-opt';document.getElementById('modeOil').className=m==='oil'?'mode-opt active':'mode-opt';showToast(`切至${m==='watercolor'?'水彩':'油画/丙烯'}`);updateActivePigments();updateGlobalSessionPool();renderManualBar()}
-fileInput.onchange=(e)=>{ const f=e.target.files[0]; if(!f)return; globalSession.targetRGB = null; globalSession.targetHex = null; globalSession.currentRecipe = []; const r=new FileReader(); r.onload=(ev)=>{ // 关键修正：确保 onload 先定义，再赋值 src
-imgElement.onload=()=>{ document.getElementById('uploadContainer').style.display='none'; imgElement.style.display='block';
-const trayContainer = document.getElementById('focusContainer'); trayContainer.innerHTML = '<div id=\"trayHint\" style=\"color:var(--text-secondary);font-size:13px;font-weight:500;margin-top:16px;opacity:0.8;text-align:center;line-height:1.5;max-width:280px;\">拖动准心或双指移动取色</div>';
-      document.getElementById('mainActionGroup').style.display='flex'; document.getElementById('stageHint').classList.add('visible');
-      offC.width=imgElement.naturalWidth; offC.height=imgElement.naturalHeight; offCtx.clearRect(0,0,offC.width,offC.height); offCtx.drawImage(imgElement,0,0);
-      state = {x:0, y:0, scale:1}; crossPos = {x:0, y:0}; setTimeout(()=>resetV(),50); 
-      crosshair.style.display='block'; document.getElementById('pickBtn').style.display='flex';
-      setTimeout(() => crosshair.classList.add('guide-active'), 100);
-    }; imgElement.src=ev.target.result;
-  }; r.readAsDataURL(f); e.target.value = '';
+fileInput.onchange=(e)=>{
+  const f = e.target.files[0]; if (!f) return;
+  applyImageFromSrc(URL.createObjectURL(f));
+  saveLastUserImage(f).catch(() => {});
+  e.target.value = '';
 };
-function resetV(){const r=imgWrapper.getBoundingClientRect();if(r.width===0)return;const ir=imgElement.naturalWidth/imgElement.naturalHeight,sr=r.width/r.height;state.scale=ir>sr?(r.width*0.9)/imgElement.naturalWidth:(r.height*0.9)/imgElement.naturalHeight;state.x=(r.width-imgElement.naturalWidth*state.scale)/2;state.y=(r.height-imgElement.naturalHeight*state.scale)/2;crossPos={x:0,y:0};upC();upT()}
+function resetV(){
+  const r = imgWrapper.getBoundingClientRect();
+  if (r.width === 0 || !imgElement.naturalWidth) return;
+  // 左右顶足画布（fit width）；上下可留白或裁切
+  state.scale = r.width / imgElement.naturalWidth;
+  state.x = 0;
+  state.y = (r.height - imgElement.naturalHeight * state.scale) / 2;
+  crossPos = { x: 0, y: 0 };
+  upC(); upT();
+}
 function upT(){imgElement.style.transform=`translate3d(${state.x}px,${state.y}px,0) scale(${state.scale})`}
 function upC(){crosshair.style.transform=`translate(calc(-50% + ${crossPos.x}px),calc(-50% + ${crossPos.y}px))`}
 let isD=false,sX=0,sY=0,iX=0,iY=0,iDist=0,iScale=1,pX=0,pY=0,isDC=false;
@@ -567,7 +1251,20 @@ function renderPM(tCol,minE){
   const b=document.createElement('div');b.className='focus-blob preview-mode';b.style.setProperty('--target-color',tCol);w.appendChild(b);con.appendChild(w);
   document.getElementById('manualBar').style.display='flex';document.getElementById('manualBarHeader').style.display='flex';
 }
-function showInfo(){ location.href = 'docs/AboutXStudio.html'; }
+function showInfo(){
+  const el = document.getElementById('aboutOverlay');
+  if (el) el.classList.add('active');
+  document.body.classList.add('modal-open');
+}
+function closeAbout(){
+  const el = document.getElementById('aboutOverlay');
+  if (el) el.classList.remove('active');
+  // 若颜料配置弹窗仍开着，保持滚动锁
+  const pigmentOpen = document.getElementById('pigmentModal') && document.getElementById('pigmentModal').classList.contains('active');
+  if (!pigmentOpen) document.body.classList.remove('modal-open');
+}
+window.showInfo = showInfo;
+window.closeAbout = closeAbout;
 // === 分享与截图 ===
 function triggerShare() {
   document.body.classList.add('capture-mode');
@@ -648,7 +1345,7 @@ function triggerShare() {
   });
 }
 function closeShareOverlay() { document.getElementById('shareResultOverlay').classList.remove('active'); }
-window.addEventListener('DOMContentLoaded', () => initApp());
+window.addEventListener('DOMContentLoaded', () => { initApp(); bootStudioImage(); });
 document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
 document.addEventListener('dblclick', function(e) { e.preventDefault(); }, { passive: false });
 </script>
