@@ -2218,7 +2218,8 @@
         }
         try {
         thumbnail = await (async function solidCreateCaptureCropThumbnail() {
-        const OUT = 256;
+        // 列表展示约 132(手机)/200(PC)：160 兼顾清晰度与 dataURL 体积（原 256 偏浪费带宽）
+        const OUT = 160;
         const tCanvas = document.createElement('canvas'); tCanvas.width = OUT; tCanvas.height = OUT;
         const ctx = tCanvas.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
         const h2cBase = { windowWidth: vw, windowHeight: vh, scrollX: 0, scrollY: 0, useCORS: true, allowTaint: true, logging: false, backgroundColor: null, scale: 1, foreignObjectRendering: false };
@@ -2417,7 +2418,7 @@
         } else {
         if (window.PluginManager) window.PluginManager.trigger('onDrawSnapshot', { ctx: ctx, rect: snapRect, camera: camera });
         }
-        return tCanvas.toDataURL('image/jpeg', 0.85);
+        return tCanvas.toDataURL('image/jpeg', 0.78);
         })();
         } catch (e) {
         console.warn('[SolidCreate] 缩略图异常，回退 WebGL+标注重绘:', e);
@@ -2425,11 +2426,11 @@
         const buX = canvasEl.width / Math.max(1, cR.width), buY = canvasEl.height / Math.max(1, cR.height);
         const sx = Math.max(0, (cropLeft - cR.left) * buX), sy = Math.max(0, (cropTop - cR.top) * buY);
         const sw = Math.max(1, Math.min(cropW * buX, canvasEl.width - sx)), sh = Math.max(1, Math.min(cropH * buY, canvasEl.height - sy));
-        const tCanvas = document.createElement('canvas'); tCanvas.width = 256; tCanvas.height = 256; const ctx = tCanvas.getContext('2d');
+        const tCanvas = document.createElement('canvas'); tCanvas.width = 160; tCanvas.height = 160; const ctx = tCanvas.getContext('2d');
         ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-        solidCreateBlitSquareCover(ctx, canvasEl, sx, sy, sw, sh, 256);
+        solidCreateBlitSquareCover(ctx, canvasEl, sx, sy, sw, sh, 160);
         if (window.PluginManager) window.PluginManager.trigger('onDrawSnapshot', { ctx: ctx, rect: snapRect, camera: camera });
-        thumbnail = tCanvas.toDataURL('image/jpeg', 0.85);
+        thumbnail = tCanvas.toDataURL('image/jpeg', 0.78);
         } finally { try { solidCreateRestoreCoverHideUi(); } catch (_eUi) { if (cboxEl) cboxEl.style.visibility = prevCropVis; } }
         } else {
         let keepHandle = window.currentFileHandle || null;
@@ -2472,8 +2473,55 @@
         if(!window.targetMasterFilename) { window.showToast("请先勾选一个目标作为【统合JSON】！", true); return; }
         try { let files = []; for await (const entry of window.workDirHandle.values()) { if(entry.kind === 'file' && entry.name.endsWith('.json') && /^\d+/.test(entry.name)) files.push(entry); }
         files.sort((a,b) => a.name.localeCompare(b.name, 'zh-CN', {numeric: true})); if(files.length === 0) { window.showToast("未找到以数字开头的场景文件！", true); return; }
-        let mergedData = []; for(const fileHandle of files) { if(fileHandle.name === window.targetMasterFilename) continue; const file = await fileHandle.getFile(); const text = await file.text();
-        try { const data = JSON.parse(text); mergedData.push(data); } catch(e) { window.hwLog(fileHandle.name + " 解析跳过"); } }
+        let mergedData = []; let mergedNames = []; for(const fileHandle of files) { if(fileHandle.name === window.targetMasterFilename) continue; const file = await fileHandle.getFile(); const text = await file.text();
+        try { const data = JSON.parse(text); mergedData.push(data); mergedNames.push(fileHandle.name); } catch(e) { window.hwLog(fileHandle.name + " 解析跳过"); } }
+        // uid：文件名前缀全局唯一（几何/肖像）→ 用文件号；前缀撞号（头部造型多模同课）→ 保留三位数补齐，切勿用文件号冲掉
+        try {
+            const fileNumOf = (name) => { const m = String(name || '').match(/^(\d{1,10})/); return m ? m[1] : ''; };
+            const nums = mergedNames.map(fileNumOf);
+            const freq = new Map();
+            for (const n of nums) { if (!n) continue; freq.set(n, (freq.get(n) || 0) + 1); }
+            const uniquePrefix = nums.length > 0 && nums.every((n) => n && freq.get(n) === 1);
+            if (uniquePrefix) {
+                for (let i = 0; i < mergedData.length; i++) {
+                    const sc = mergedData[i]; if (!sc || typeof sc !== 'object') continue;
+                    const cur = sc.uid != null ? String(sc.uid).trim() : '';
+                    if (!cur && nums[i]) sc.uid = nums[i];
+                }
+            } else {
+                const used = new Set();
+                const pad3 = (n) => String(n).padStart(3, '0');
+                const parseUid = (v) => { const s = String(v == null ? '' : v).trim(); if (!/^\d{3}$/.test(s)) return 0; const n = parseInt(s, 10); return (n >= 1 && n <= 999) ? n : 0; };
+                for (const sc of mergedData) { const n = parseUid(sc && sc.uid); if (n) { if (used.has(n)) { try { delete sc.uid; } catch (_e) {} } else used.add(n); } }
+                const nextFree = () => { for (let i = 1; i <= 999; i++) if (!used.has(i)) return i; throw new Error('uid 空间已满'); };
+                for (const sc of mergedData) {
+                    if (!sc || typeof sc !== 'object') continue;
+                    if (parseUid(sc.uid)) continue;
+                    const n = nextFree(); used.add(n); sc.uid = pad3(n);
+                }
+            }
+            // 肖像「人物其它」无材质时兜底为画室常用（不改已有石膏/真人标签）
+            for (const sc of mergedData) {
+                if (!sc || typeof sc !== 'object') continue;
+                if (!sc.meta || typeof sc.meta !== 'object') sc.meta = {};
+                const m = sc.meta;
+                if (m.material === '画室常用' || m.material === '石膏' || m.material === '真人') continue;
+                if (m.category === '画室常用' || m.category === '石膏' || m.category === '真人') continue;
+                let bn = '';
+                try {
+                    const items = Array.isArray(sc.items) ? sc.items : [];
+                    for (const it of items) {
+                        if (it && it.type === 'glb' && it.url) {
+                            const u = String(it.url).split('?')[0].replace(/\\/g, '/');
+                            const slash = u.lastIndexOf('/');
+                            bn = slash >= 0 ? u.slice(slash + 1) : u;
+                            break;
+                        }
+                    }
+                } catch (_eBn) {}
+                if (/人物其它/.test(bn)) { m.material = '画室常用'; m.category = '画室常用'; }
+            }
+        } catch (_eUid) { window.hwLog('统合 uid 补齐跳过: ' + (_eUid && _eUid.message ? _eUid.message : _eUid)); }
         const targetHandle = await window.workDirHandle.getFileHandle(window.targetMasterFilename, {create: true}); const writable = await targetHandle.createWritable(); await writable.write(JSON.stringify(mergedData)); await writable.close();
         window.showToast(`成功合并 ${files.length} 个文件！`); } catch(e) { window.showToast("合并失败: " + e.message, true); } };
         window.createNewScene = function() { window._editorSceneLoadGen++; try { const _h = _solidInitFirstFrameHintController(); if (_h && _h.disarm) _h.disarm(); } catch (_eHintDis) {} transformControl.detach(); if(window.AnnotationManager) window.AnnotationManager.clearAll(); const children = [...editorGroup.children]; children.forEach(child => { if (window.PluginManager) window.PluginManager.Memory.disposeHierarchy(child); else editorGroup.remove(child); }); document.getElementById('scene-name-input').value = ''; const _d = document.getElementById('scene-meta-detail-input'); if (_d) _d.value = ''; try { solidCreateSetMetaCategory(''); } catch (_eCat) {} try { solidCreateSyncKeyPointsEditorFromMeta({}); } catch (_eKp) {} window.currentFileHandle = null; if(document.getElementById('file-list-container').children.length > 0) { Array.from(document.getElementById('file-list-container').children).forEach(el => el.style.borderLeft = 'none'); } document.getElementById('btn-save-direct').innerText = '💾 保存新场景'; const cb = document.getElementById('crop-box'); cb.style.display = 'none'; const cachedCrop = localStorage.getItem('solidCropBoxCache'); if(cachedCrop) { const c = JSON.parse(cachedCrop); cb.style.left = c.left; cb.style.top = c.top; cb.style.width = c.width; cb.style.height = c.height; } else { cb.style.left = 'calc(50% - 128px)'; cb.style.top = 'calc(50% - 128px)'; cb.style.width = '256px'; cb.style.height = '256px'; }

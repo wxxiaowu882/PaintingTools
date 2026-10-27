@@ -18,7 +18,9 @@
   model-viewer, #ink-overlay { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; outline: none; background: transparent; display: block; }
   #ink-overlay { z-index: auto; pointer-events: none; }
   /* 画布尺寸由 applyViewerLayout 即时写入（不用 transition，避免量尺寸/构图错位） */
-  #loading-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #050508; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.8s ease; pointer-events: none; opacity: 0; }
+  /* 首屏默认可见：进站立刻是加载界面，避免先空黑屏再等 JS */
+  #loading-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #050508; z-index: 10050; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.45s ease; pointer-events: auto; opacity: 1; }
+  #loading-screen.is-hidden { opacity: 0; pointer-events: none; }
   .spinner { width: 40px; height: 40px; border: 2px solid rgba(212, 175, 55, 0.2); border-top-color: var(--theme-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   #top-bar { position: absolute; top: 0; left: 0; width: 100%; height: 80px; box-sizing: border-box; z-index: 50; background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%); pointer-events: none; transition: background 0.6s cubic-bezier(0.16, 1, 0.3, 1), height 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease; }
@@ -124,7 +126,7 @@
   </style> 
   <script src="./docs/js/GlobalMenu.js?v=menuhigh2"></script>
   <script type="module" src="./docs/js/model-viewer.min.js"></script> </head> <body> <div id="loading-screen">
-  <div class="spinner"></div> <div style="color:var(--text-sub); font-size:12px; letter-spacing:2px;">构建场景中...</div> <div id="loading-percent" style="color:var(--theme-color); font-size:14px; margin-top:8px; font-weight:bold; font-family:monospace;">0%</div> </div>
+  <div class="spinner"></div> <div id="loading-main-text" style="color:var(--text-sub); font-size:12px; letter-spacing:2px;">正在打开课程列表…</div> <div id="loading-percent" style="color:var(--theme-color); font-size:14px; margin-top:8px; font-weight:bold; font-family:monospace;">请稍候</div> </div>
   <div id="top-bar" style="display: none; opacity: 0;"> 
     <div class="brand">童画师吴晓</div> 
     <button class="gallery-trigger-btn" onclick="window.openCourseGallery()" title="切换课程" aria-haspopup="dialog">
@@ -138,7 +140,7 @@
     </div>
   </div>
   
-  <div id="course-gallery-modal" class="show">
+  <div id="course-gallery-modal">
     <div class="gallery-header">
       <div class="gallery-title">互动解剖课程</div>
       <button class="gallery-close" onclick="window.closeCourseGallery()">×</button>
@@ -191,47 +193,94 @@
       ];
   }
 
+  function setPortraitBootLoader(on, mainText, pctText) {
+      const ld = document.getElementById('loading-screen');
+      const mainEl = document.getElementById('loading-main-text');
+      const pctEl = document.getElementById('loading-percent');
+      if (!ld) return;
+      if (mainEl && mainText != null) mainEl.textContent = mainText;
+      if (pctEl && pctText != null) pctEl.textContent = pctText;
+      if (on) {
+          ld.classList.remove('is-hidden');
+          ld.style.opacity = '1';
+          ld.style.pointerEvents = 'auto';
+      } else {
+          ld.classList.add('is-hidden');
+          ld.style.opacity = '0';
+          ld.style.pointerEvents = 'none';
+      }
+  }
+  const PORTRAIT_CARD_CATALOG = libType === 'facial'
+      ? 'docs/js/portrait-course-cards-facial.json'
+      : 'docs/js/portrait-course-cards-anatomy.json';
+  const PLACEHOLDER_THUMB = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiMyMDIyMjYiLz48L3N2Zz4=';
+  function escapeAttr(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  }
+  async function loadCourseCardsForGallery() {
+      // 优先轻量目录（仅封面+计数，约几十 KB）；失败再并行拉整课 JSON（兼容旧部署）
+      try {
+          const res = await fetch(PORTRAIT_CARD_CATALOG, { cache: 'force-cache' });
+          if (!res.ok) throw new Error('catalog http ' + res.status);
+          const pack = await res.json();
+          if (pack && Array.isArray(pack.cards) && pack.cards.length) {
+              return pack.cards.map(function (c) {
+                  const url = c.url && c.url.indexOf('./') === 0 ? c.url : ('./' + String(c.url || '').replace(/^\.\//, ''));
+                  return {
+                      name: c.name,
+                      url: url,
+                      thumbSrc: c.mainThumbnail || PLACEHOLDER_THUMB,
+                      ptCount: +c.ptCount || 0,
+                      snapCount: +c.snapCount || 0
+                  };
+              });
+          }
+      } catch (_eCat) { /* fallback */ }
+      const settled = await Promise.all(courseConfig.map(async function (course) {
+          let thumbSrc = PLACEHOLDER_THUMB, ptCount = 0, snapCount = 0;
+          try {
+              const res = await fetch(course.url);
+              const data = await res.json();
+              if (data.mainThumbnail) thumbSrc = data.mainThumbnail;
+              else if (data.snapshots && data.snapshots.length > 0) thumbSrc = data.snapshots[0].thumb;
+              if (data.pointsData) ptCount = data.pointsData.length;
+              if (data.snapshots) snapCount = data.snapshots.length;
+          } catch (_e) { console.warn('解析缩略图失败: ' + course.name); }
+          return { name: course.name, url: course.url, thumbSrc: thumbSrc, ptCount: ptCount, snapCount: snapCount };
+      }));
+      return settled;
+  }
   window.openCourseGallery = async function() {
       const modal = document.getElementById('course-gallery-modal');
-      modal.classList.add('show');
       const grid = document.getElementById('gallery-grid');
-      
-      // 动态修改画廊标题；未选课前顶栏显示「选择课程」
       const titleEl = document.querySelector('.gallery-title');
       if (titleEl) titleEl.innerText = galleryTitleText;
       const sel = document.getElementById('model-selector-text');
       if (sel && (typeof currentData === 'undefined' || !currentData)) sel.innerText = '选择课程';
-      
-      // 只有第一次打开时去动态解析提取封面图，避免重复请求
+
+      // 列表未就绪：保持加载层盖住空黑底，不先露出空画廊
       if (grid.children.length === 0) {
-          grid.innerHTML = '<div style="color:#888; grid-column: 1/-1; text-align:center; padding: 50px; letter-spacing: 2px;">正在连接云端解析图鉴数据...</div>';
-          
-          let cardsHtml = '';
-          for(let course of courseConfig) {
-              let thumbSrc = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiMyMDIyMjYiLz48L3N2Zz4='; 
-              let ptCount = 0; let snapCount = 0;
-              try {
-                  // 轻量级抓取，提取缩略图和数量
-                  const res = await fetch(course.url);
-                  const data = await res.json();
-                  if(data.mainThumbnail) thumbSrc = data.mainThumbnail; // 优先使用我们在生产端指定的封面
-                  else if(data.snapshots && data.snapshots.length > 0) thumbSrc = data.snapshots[0].thumb; // 降级取第一张图
-                  
-                  if(data.pointsData) ptCount = data.pointsData.length;
-                  if(data.snapshots) snapCount = data.snapshots.length;
-              } catch(e) { console.warn('解析缩略图失败: ' + course.name); }
-              
-              cardsHtml += `
-                  <div class="course-card" onclick="window.selectCourse('${course.name}', '${course.url}')">
-                      <div class="course-thumb-wrap"><img src="${thumbSrc}" class="course-thumb" alt=""></div>
-                      <div class="course-info">
-                          <div class="course-name">${course.name}</div>
-                          <div class="course-meta">${ptCount} 结构点 · ${snapCount} 解析</div>
-                      </div>
-                  </div>
-              `;
+          setPortraitBootLoader(true, '正在打开课程列表…', '请稍候');
+          try {
+              const cards = await loadCourseCardsForGallery();
+              let cardsHtml = '';
+              for (let i = 0; i < cards.length; i++) {
+                  const c = cards[i];
+                  cardsHtml += '<div class="course-card" onclick="window.selectCourse(\'' + escapeAttr(c.name) + '\', \'' + escapeAttr(c.url) + '\')">'
+                      + '<div class="course-thumb-wrap"><img src="' + c.thumbSrc + '" class="course-thumb" alt=""></div>'
+                      + '<div class="course-info"><div class="course-name">' + escapeAttr(c.name) + '</div>'
+                      + '<div class="course-meta">' + c.ptCount + ' 结构点 · ' + c.snapCount + ' 解析</div></div></div>';
+              }
+              grid.innerHTML = cardsHtml || '<div style="color:#888;grid-column:1/-1;text-align:center;padding:50px;">暂无课程</div>';
+          } catch (e) {
+              console.warn(e);
+              grid.innerHTML = '<div style="color:#888;grid-column:1/-1;text-align:center;padding:50px;">课程列表加载失败</div>';
           }
-          grid.innerHTML = cardsHtml;
+      }
+      modal.classList.add('show');
+      // 未选课时：列表就绪后收起启动加载层；已选课再开列表则不打断场景
+      if (typeof currentData === 'undefined' || !currentData) {
+          setPortraitBootLoader(false);
       }
   };
 
@@ -953,6 +1002,8 @@
   window.tourState.currentIndex = (window.tourState.currentIndex - 1 + window.tourState.list.length) % window.tourState.list.length; playCurrentNode(); });
   document.getElementById('tour-next').addEventListener('click', () => { window.tourState.currentIndex = (window.tourState.currentIndex + 1) % window.tourState.list.length; playCurrentNode(); });
   async function loadSceneData(url) { if(!url) return; 
+  setPortraitBootLoader(true, '构建场景中…', '0%');
+  loading.classList.remove('is-hidden');
   loading.style.opacity = '1'; loading.style.pointerEvents = 'auto'; if(percentEl) percentEl.innerText = '0%'; if(window.tourState.isActive) window.stopTour();
   try { const res = await fetch(url); const data = await res.json(); currentData = data; const isSameSrc = viewer.getAttribute('src') === data.modelSrc;
   viewer.setAttribute('src', data.modelSrc); if(data.settings) { defaultColor = data.settings.defaultColor || defaultColor; defaultOpacity = data.settings.defaultOpacity || defaultOpacity;
@@ -968,7 +1019,7 @@
   rememberCourseCamera(data.camera || null);
   viewer.querySelectorAll('.preview-hotspot, .ink-anchor').forEach(el => el.remove()); data.pointsData.forEach(p => { p.hidden = false; window.AnnotationPluginManager.dispatchMountDOM(p, viewer); });
   window._hasAppliedSnapshot = false; _authoredSnapshotFovDeg = null; clearTimeout(_fovLockTimer); applyInitialShowText(); renderLists(); const hideLoading = () => {
-  setTimeout(() => { loading.style.opacity = '0'; loading.style.pointerEvents = 'none';
+  setTimeout(() => { setPortraitBootLoader(false); loading.classList.add('is-hidden');
   document.getElementById('control-panel').style.display = 'flex'; 
   const tb = document.getElementById('top-bar'); tb.style.display = 'block'; tb.offsetHeight; tb.style.opacity = '1'; /* 模型加载完后才物理呈现菜单栏 */
   /* 进页占满：面板可见后多趟重算（手机上 getDimensions 常晚于首帧） */
@@ -989,7 +1040,7 @@
   setTimeout(runFill, 1400);
   }, 500); }; if(isSameSrc) { hideLoading(); }
   else { viewer.addEventListener('load', hideLoading, {once: true}); setTimeout(hideLoading, 8000); } } catch(err) { console.error("数据加载失败:", err); 
-  loading.style.opacity = '0'; loading.style.pointerEvents = 'none'; 
+  setPortraitBootLoader(false); loading.classList.add('is-hidden');
   const tb = document.getElementById('top-bar'); tb.style.display = 'block'; tb.offsetHeight; tb.style.opacity = '1';
   document.getElementById('control-panel').style.display = 'none'; 
   alert("数据获取失败，请检查网络或路径。"); } }

@@ -1495,7 +1495,8 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
         dstCtx.drawImage(src, sx0, sy0, sw0, sh0, 0, 0, outW, outH);
     }
     async function captureCoverFromCrop() {
-        const OUT_W = 480, OUT_H = Math.round(OUT_W / ANNO_COVER_AR);
+        // 消费端列表：手机双列约 170px 宽、桌面卡约 260px；240×320(3:4) ≈ 1.5~2x，体积远小于原 480×640
+        const OUT_W = 240, OUT_H = Math.round(OUT_W / ANNO_COVER_AR);
         const cropBox = document.getElementById('anno-crop-box');
         const prevVis = cropBox ? cropBox.style.visibility : '';
         if (cropBox) cropBox.style.visibility = 'hidden';
@@ -1539,7 +1540,7 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
             const oCtx = out.getContext('2d');
             oCtx.imageSmoothingEnabled = true; oCtx.imageSmoothingQuality = 'high';
             annoBlitCoverRect(oCtx, srcCvs, sx, sy, sw, sh, OUT_W, OUT_H);
-            return out.toDataURL('image/jpeg', 0.85);
+            return out.toDataURL('image/jpeg', 0.78);
         } finally {
             if (cropBox) cropBox.style.visibility = prevVis;
         }

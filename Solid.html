@@ -2274,9 +2274,11 @@
         function solidPortraitMaterialOf(sceneData) {
             try {
                 const m = sceneData && sceneData.meta ? sceneData.meta : {};
+                // meta 优先：画室常用教具即使 glb 名含「石膏」也不进石膏 Tab
                 if (m.material === '画室常用' || m.material === '石膏' || m.material === '真人') return m.material;
                 if (m.category === '画室常用' || m.category === '石膏' || m.category === '真人') return m.category;
                 const bn = solidPortraitPrimaryGlbBase(sceneData);
+                if (/人物其它/.test(bn)) return '画室常用';
                 if (/真人/.test(bn)) return '真人';
                 if (/石膏|David|Caesar|Homer/i.test(bn)) return '石膏';
             } catch (_e) {}

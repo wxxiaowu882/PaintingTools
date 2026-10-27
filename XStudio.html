@@ -686,9 +686,9 @@ function openPigmentModal() {
   modalState.viewingTabId = appState.currentTabId;
   modalState.tempMyBoxes = deepClone(appState.myBoxes);
   modalState.tempUserAdded = deepClone(appState.userAddedPigments || []);
-  renderModalContent(); document.getElementById('modalBackdrop').classList.add('active');
-  document.getElementById('pigmentModal').classList.add('active'); document.body.classList.add('modal-open');
-  setTimeout(() => { const a = document.querySelector('.tab-chip.active'); if(a) a.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center'}); }, 100);
+renderModalContent(); document.getElementById('modalBackdrop').classList.add('active');
+document.getElementById('pigmentModal').classList.add('active'); document.body.classList.add('modal-open');
+setTimeout(() => { const a = document.querySelector('.tab-chip.active'); if(a) a.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center'}); }, 100);
 }
 function closePigmentModal() {
   document.getElementById('modalBackdrop').classList.remove('active');
@@ -1041,7 +1041,7 @@ function renderModalContent() {
       grid.appendChild(createPanElement(p, isC ? () => toggleCustomPigment(p.id) : () => {}, canRemove ? 'action-remove' : '', !isC));
     }
   });
-  const libS = document.getElementById('librarySection'), libG = document.getElementById('fullLibraryGrid');
+const libS = document.getElementById('librarySection'), libG = document.getElementById('fullLibraryGrid');
   if (isC) {
     libS.style.display = 'block';
     libG.innerHTML = '';
@@ -1178,7 +1178,7 @@ function refineRecipePureDeltaE(tRGB, recipe, diluentPigment) {
   };
   let bestE = costOf(best);
   const polishPairwise = (steps) => {
-    let changed = true, iter = 0;
+let changed = true, iter = 0;
     while (changed && iter < 250) {
       changed = false; iter++;
       for (let i = 0; i < best.length; i++) {
@@ -1767,7 +1767,7 @@ function applyImageFromSrc(src, opts) {
     setTimeout(() => { resetV(); upRP(); }, 50);
     crosshair.style.display = 'block';
     document.getElementById('pickBtn').style.display = 'flex';
-    setTimeout(() => crosshair.classList.add('guide-active'), 100);
+      setTimeout(() => crosshair.classList.add('guide-active'), 100);
     setImgNavVisible(true);
     pokeImgNavIdle();
   };

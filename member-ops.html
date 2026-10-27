@@ -244,14 +244,14 @@
             </div>
             <div>
               <div id="acct-result" class="tip">从左侧点选账号查看详情。</div>
-              <div id="acct-actions" class="hidden" style="margin-top:12px">
-                <label>微信备注
-                  <input id="acct-note" type="text" maxlength="40" style="width:100%;max-width:320px">
-                </label>
-                <div class="row" style="margin-top:8px">
-                  <button type="button" class="secondary" id="btn-acct-note">保存备注</button>
+          <div id="acct-actions" class="hidden" style="margin-top:12px">
+            <label>微信备注
+              <input id="acct-note" type="text" maxlength="40" style="width:100%;max-width:320px">
+            </label>
+            <div class="row" style="margin-top:8px">
+              <button type="button" class="secondary" id="btn-acct-note">保存备注</button>
                   <button type="button" class="secondary" id="btn-acct-copy-script">复制回复话术</button>
-                </div>
+            </div>
                 <div class="row" style="margin-top:10px;align-items:flex-end">
                   <label>延期（天）
                     <input id="acct-extend-days" type="number" min="1" max="3660" value="30" style="width:88px">
@@ -260,13 +260,13 @@
                   <button type="button" class="secondary" id="btn-acct-revoke">取消高级</button>
                 </div>
                 <div id="acct-devices" class="tip" style="margin-top:10px"></div>
-                <label style="display:block;margin-top:12px">新密码（至少 6 位）
-                  <input id="acct-new-pwd" type="text" autocomplete="off" style="width:100%;max-width:320px" placeholder="重置后请私下告知用户">
-                </label>
-                <div class="row" style="margin-top:8px">
-                  <button type="button" id="btn-acct-reset">重置密码</button>
-                </div>
-              </div>
+            <label style="display:block;margin-top:12px">新密码（至少 6 位）
+              <input id="acct-new-pwd" type="text" autocomplete="off" style="width:100%;max-width:320px" placeholder="重置后请私下告知用户">
+            </label>
+            <div class="row" style="margin-top:8px">
+              <button type="button" id="btn-acct-reset">重置密码</button>
+            </div>
+          </div>
             </div>
           </div>
         </section>
@@ -1107,7 +1107,7 @@
       setMsg($('acct-msg'), '', true);
       if (data.account) {
         patchAcctCache(data.account);
-        showAcct(data.account);
+      showAcct(data.account);
       }
     };
 

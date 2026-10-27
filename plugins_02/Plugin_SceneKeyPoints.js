@@ -11,10 +11,209 @@
     const BTN_ID = 'solid-scene-keypoints-btn';
     const MODAL_ID = 'solid-scene-keypoints-modal';
     const BODY_ID = 'solid-scene-keypoints-body';
+    const LS_PC_POS = 'solid_kp_panel_pc_v1';
+    const LS_MOBILE_H = 'solid_kp_panel_mobile_h_v1';
 
     let _inited = false;
     let _hasContent = false;
-    let _orbitWasEnabled = null;
+    let _dragBound = false;
+
+    function isMobileKpLayout() {
+        try {
+            return !!(window.matchMedia && window.matchMedia('(max-width: 899px)').matches);
+        } catch (_e) {
+            return (window.innerWidth || 0) < 900;
+        }
+    }
+
+    function loadPcPos() {
+        try {
+            const raw = localStorage.getItem(LS_PC_POS);
+            if (!raw) return null;
+            const o = JSON.parse(raw);
+            if (!o || typeof o !== 'object') return null;
+            const left = Number(o.left);
+            const top = Number(o.top);
+            if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+            return { left, top };
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    function savePcPos(left, top) {
+        try {
+            localStorage.setItem(LS_PC_POS, JSON.stringify({ left: Math.round(left), top: Math.round(top) }));
+        } catch (_e) {}
+    }
+
+    function loadMobileHeight() {
+        try {
+            const n = Number(localStorage.getItem(LS_MOBILE_H));
+            if (Number.isFinite(n) && n >= 120) return n;
+        } catch (_e) {}
+        return null;
+    }
+
+    function saveMobileHeight(h) {
+        try {
+            localStorage.setItem(LS_MOBILE_H, String(Math.round(h)));
+        } catch (_e) {}
+    }
+
+    function clampPanelToViewport(panel, left, top) {
+        const rect = panel.getBoundingClientRect();
+        const w = rect.width || 360;
+        const h = rect.height || 240;
+        const vw = window.innerWidth || 800;
+        const vh = window.innerHeight || 600;
+        const margin = 8;
+        const maxL = Math.max(margin, vw - w - margin);
+        const maxT = Math.max(margin, vh - h - margin);
+        return {
+            left: Math.min(maxL, Math.max(margin, left)),
+            top: Math.min(maxT, Math.max(margin, top))
+        };
+    }
+
+    /** 打开时应用记忆位置 / 默认靠右；手机应用记忆高度 */
+    function applyPanelLayout(panel) {
+        if (!panel) return;
+        if (isMobileKpLayout()) {
+            panel.style.left = '0';
+            panel.style.right = '0';
+            panel.style.top = 'auto';
+            panel.style.bottom = '0';
+            panel.style.width = '100%';
+            panel.style.transform = 'none';
+            const mh = loadMobileHeight();
+            const vh = window.innerHeight || 600;
+            const minH = 120;
+            const maxH = Math.floor(vh * 0.88);
+            const defH = Math.floor(vh * 0.45);
+            let h = mh != null ? mh : defH;
+            h = Math.min(maxH, Math.max(minH, h));
+            panel.style.height = h + 'px';
+            panel.style.maxHeight = maxH + 'px';
+        } else {
+            panel.style.bottom = 'auto';
+            panel.style.right = 'auto';
+            panel.style.width = '';
+            panel.style.height = '';
+            panel.style.maxHeight = '';
+            panel.style.transform = 'none';
+            const saved = loadPcPos();
+            if (saved) {
+                const c = clampPanelToViewport(panel, saved.left, saved.top);
+                panel.style.left = c.left + 'px';
+                panel.style.top = c.top + 'px';
+            } else {
+                // 默认靠右：先用 CSS，再按实测尺寸纠正，避免越界
+                panel.style.left = 'auto';
+                panel.style.right = '20px';
+                panel.style.top = 'max(72px, calc(env(safe-area-inset-top, 0px) + 56px))';
+                requestAnimationFrame(function () {
+                    try {
+                        const r = panel.getBoundingClientRect();
+                        const c = clampPanelToViewport(panel, r.left, r.top);
+                        panel.style.right = 'auto';
+                        panel.style.left = c.left + 'px';
+                        panel.style.top = c.top + 'px';
+                    } catch (_e) {}
+                });
+            }
+        }
+    }
+
+    function bindPanelInteract(modal, panel) {
+        if (_dragBound || !panel) return;
+        _dragBound = true;
+        const header = panel.querySelector('.solid-kp-header');
+        if (!header) return;
+
+        let mode = null; // 'move' | 'resize'
+        let startX = 0, startY = 0, startLeft = 0, startTop = 0, startH = 0;
+
+        const onMove = function (e) {
+            if (!mode) return;
+            const cx = e.clientX != null ? e.clientX : (e.touches && e.touches[0] && e.touches[0].clientX);
+            const cy = e.clientY != null ? e.clientY : (e.touches && e.touches[0] && e.touches[0].clientY);
+            if (cx == null || cy == null) return;
+            if (mode === 'move') {
+                const c = clampPanelToViewport(panel, startLeft + (cx - startX), startTop + (cy - startY));
+                panel.style.left = c.left + 'px';
+                panel.style.top = c.top + 'px';
+                panel.style.right = 'auto';
+                panel.style.bottom = 'auto';
+            } else if (mode === 'resize') {
+                // 底部沉底：向上拖增高（clientY 变小 → height 变大）
+                const vh = window.innerHeight || 600;
+                const minH = 120;
+                const maxH = Math.floor(vh * 0.88);
+                const next = Math.min(maxH, Math.max(minH, startH + (startY - cy)));
+                panel.style.height = next + 'px';
+                panel.style.bottom = '0';
+                panel.style.top = 'auto';
+            }
+            if (e.cancelable) e.preventDefault();
+        };
+
+        const onEnd = function () {
+            if (!mode) return;
+            if (mode === 'move') {
+                const r = panel.getBoundingClientRect();
+                savePcPos(r.left, r.top);
+            } else if (mode === 'resize') {
+                const h = panel.getBoundingClientRect().height;
+                saveMobileHeight(h);
+            }
+            mode = null;
+            try {
+                document.removeEventListener('pointermove', onMove, true);
+                document.removeEventListener('pointerup', onEnd, true);
+                document.removeEventListener('pointercancel', onEnd, true);
+            } catch (_e) {}
+        };
+
+        header.addEventListener('pointerdown', function (e) {
+            if (e.button != null && e.button !== 0) return;
+            // 点关闭按钮不拖
+            if (e.target && e.target.closest && e.target.closest('.solid-kp-close')) return;
+            const r = panel.getBoundingClientRect();
+            startX = e.clientX;
+            startY = e.clientY;
+            if (isMobileKpLayout()) {
+                mode = 'resize';
+                startH = r.height;
+            } else {
+                mode = 'move';
+                startLeft = r.left;
+                startTop = r.top;
+                panel.style.right = 'auto';
+                panel.style.bottom = 'auto';
+                panel.style.left = r.left + 'px';
+                panel.style.top = r.top + 'px';
+            }
+            try { header.setPointerCapture(e.pointerId); } catch (_e) {}
+            document.addEventListener('pointermove', onMove, true);
+            document.addEventListener('pointerup', onEnd, true);
+            document.addEventListener('pointercancel', onEnd, true);
+            e.preventDefault();
+            e.stopPropagation();
+        }, { passive: false });
+
+        // 方向变化时重新套布局（避免 PC 记忆 left 带到手机）
+        try {
+            if (window.matchMedia) {
+                const mq = window.matchMedia('(max-width: 899px)');
+                const onMq = function () {
+                    if (api.isOpen()) applyPanelLayout(panel);
+                };
+                if (mq.addEventListener) mq.addEventListener('change', onMq);
+                else if (mq.addListener) mq.addListener(onMq);
+            }
+        } catch (_eMq) {}
+    }
 
     function plainText(str) {
         // 旧脚本偶发把 keyPoints 写成数组；String(arr) 会变成逗号拼接、丢掉换行
@@ -262,26 +461,33 @@
                 opacity: 0 !important;
                 pointer-events: none !important;
             }
+            /* 无全屏遮罩：容器不拦指针，仅面板可点，便于边看解析边转视角 */
             #${MODAL_ID} {
                 display: none;
                 position: fixed;
                 inset: 0;
                 z-index: 7100;
-                background: rgba(0, 0, 0, 0.55);
-                align-items: center;
-                justify-content: center;
-                padding: 16px;
+                background: transparent;
+                pointer-events: none;
+                padding: 0;
+                margin: 0;
                 box-sizing: border-box;
                 opacity: 0;
-                transition: opacity 0.25s ease;
+                transition: opacity 0.2s ease;
             }
             #${MODAL_ID}.solid-kp-open {
-                display: flex;
+                display: block;
                 opacity: 1;
             }
             #${MODAL_ID} .solid-kp-panel {
-                position: relative;
-                width: min(92vw, 440px);
+                pointer-events: auto;
+                position: fixed;
+                top: max(72px, calc(env(safe-area-inset-top, 0px) + 56px));
+                right: max(16px, env(safe-area-inset-right, 0px));
+                left: auto;
+                bottom: auto;
+                width: min(400px, 38vw);
+                max-width: calc(100vw - 24px);
                 max-height: min(70vh, 560px);
                 background: rgba(18, 18, 20, 0.94);
                 border: 1px solid rgba(255, 255, 255, 0.12);
@@ -290,19 +496,23 @@
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
-                font-family: 'Inter', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+                font-family: 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
+                box-sizing: border-box;
             }
             @media (max-width: 899px) {
-                #${MODAL_ID} {
-                    align-items: flex-end;
-                    padding: 0;
-                }
                 #${MODAL_ID} .solid-kp-panel {
+                    left: 0;
+                    right: 0;
+                    top: auto;
+                    bottom: 0;
                     width: 100%;
                     max-width: none;
-                    max-height: 70vh;
+                    height: 45vh;
+                    max-height: 88vh;
+                    min-height: 120px;
                     border-radius: 14px 14px 0 0;
                     border-bottom: none;
+                    padding-bottom: env(safe-area-inset-bottom, 0px);
                 }
             }
             #${MODAL_ID} .solid-kp-header {
@@ -312,6 +522,32 @@
                 padding: 12px 14px 8px 16px;
                 flex-shrink: 0;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                cursor: grab;
+                touch-action: none;
+                user-select: none;
+                -webkit-user-select: none;
+            }
+            #${MODAL_ID} .solid-kp-header:active { cursor: grabbing; }
+            @media (max-width: 899px) {
+                #${MODAL_ID} .solid-kp-header {
+                    cursor: ns-resize;
+                }
+                #${MODAL_ID} .solid-kp-header::before {
+                    content: '';
+                    position: absolute;
+                    left: 50%;
+                    top: 6px;
+                    width: 36px;
+                    height: 4px;
+                    margin-left: -18px;
+                    border-radius: 2px;
+                    background: rgba(255, 255, 255, 0.28);
+                    pointer-events: none;
+                }
+                #${MODAL_ID} .solid-kp-header {
+                    position: relative;
+                    padding-top: 16px;
+                }
             }
             #${MODAL_ID} .solid-kp-title {
                 color: rgba(255, 255, 255, 0.88);
@@ -418,38 +654,20 @@
             modal.id = MODAL_ID;
             modal.setAttribute('aria-hidden', 'true');
             modal.innerHTML =
-                '<div class="solid-kp-panel" role="dialog" aria-modal="true" aria-labelledby="solid-kp-title">' +
-                '<div class="solid-kp-header">' +
+                '<div class="solid-kp-panel" role="dialog" aria-modal="false" aria-labelledby="solid-kp-title">' +
+                '<div class="solid-kp-header" title="拖动可移动（手机：拖顶栏调高度）">' +
                 '<span class="solid-kp-title" id="solid-kp-title">童画师解析</span>' +
                 '<button type="button" class="solid-kp-close" aria-label="关闭">×</button>' +
                 '</div>' +
                 '<div class="solid-kp-scroll"><div id="' + BODY_ID + '"></div></div>' +
                 '</div>';
-            modal.addEventListener('click', () => { api.close(); });
+            // 无遮罩：不在空白处点关闭，避免误关；仅关闭按钮
             const panel = modal.querySelector('.solid-kp-panel');
-            if (panel) panel.addEventListener('click', (e) => { e.stopPropagation(); });
             const closeBtn = modal.querySelector('.solid-kp-close');
             if (closeBtn) closeBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); api.close(); });
             document.body.appendChild(modal);
+            if (panel) bindPanelInteract(modal, panel);
         }
-    }
-
-    function pauseOrbitOnly() {
-        if (_orbitWasEnabled !== null) return;
-        try {
-            if (window.controls) {
-                _orbitWasEnabled = !!window.controls.enabled;
-                window.controls.enabled = false;
-            }
-        } catch (_e) {}
-    }
-
-    function resumeOrbitOnly() {
-        if (_orbitWasEnabled === null) return;
-        try {
-            if (window.controls) window.controls.enabled = _orbitWasEnabled;
-        } catch (_e) {}
-        _orbitWasEnabled = null;
     }
 
     function renderBody(meta) {
@@ -513,28 +731,27 @@
             ensureDom();
             const modal = document.getElementById(MODAL_ID);
             if (!modal) return;
-            pauseOrbitOnly();
-            modal.style.display = 'flex';
+            const panel = modal.querySelector('.solid-kp-panel');
+            // 不禁用轨道：用户需边读解析边对比画面
+            modal.style.display = 'block';
             modal.setAttribute('aria-hidden', 'false');
+            applyPanelLayout(panel);
             requestAnimationFrame(() => {
                 modal.classList.add('solid-kp-open');
+                applyPanelLayout(panel);
             });
         },
 
         close: function () {
             const modal = document.getElementById(MODAL_ID);
-            if (!modal) {
-                resumeOrbitOnly();
-                return;
-            }
+            if (!modal) return;
             modal.classList.remove('solid-kp-open');
             modal.setAttribute('aria-hidden', 'true');
-            resumeOrbitOnly();
             setTimeout(() => {
                 if (!modal.classList.contains('solid-kp-open')) {
                     modal.style.display = 'none';
                 }
-            }, 260);
+            }, 220);
         },
 
         toggle: function () {

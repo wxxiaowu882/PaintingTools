@@ -7,7 +7,7 @@ import {
   sandboxFromCatalogPath,
   loadFilteredCatalog
 } from '../../membership/policy.js';
-import { isMember, readEntitlementFromRequest } from '../../membership/session.js';
+import { accessLevel, readEntitlementFromRequest } from '../../membership/session.js';
 
 export async function onRequest(context) {
   const url = new URL(context.request.url);
@@ -26,17 +26,18 @@ export async function onRequest(context) {
 
   const sandbox = sandboxFromCatalogPath(pathname) || 'geometry';
   const ent = await readEntitlementFromRequest(context.request, context.env);
-  const member = isMember(ent);
+  const level = accessLevel(ent);
 
   try {
-    const scenes = await loadFilteredCatalog(context, sandbox, member);
+    const scenes = await loadFilteredCatalog(context, sandbox, level);
     const body = JSON.stringify(scenes);
     return new Response(context.request.method === 'HEAD' ? null : body, {
       status: 200,
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
         'Cache-Control': 'private, no-store',
-        'X-Membership-Catalog': member ? 'full' : 'filtered'
+        'X-Membership-Catalog': level,
+        'X-Membership-Access': level
       }
     });
   } catch (e) {
