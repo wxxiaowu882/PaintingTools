@@ -20,7 +20,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet"> <script async src="docs/js/es-module-shims.js"></script>
 <script type="importmap"> { "imports": { "three": "./docs/js/three/three.module.js", "three/addons/controls/OrbitControls.js": "./docs/js/three/OrbitControls.js",
 "@tweenjs/tween.js": "./docs/js/tween/tween.esm.js" } } </script> 
-<!-- 引入全局菜单组件 --> <script src="docs/js/GlobalMenu.js?v=menuhigh2"></script>
+<!-- 引入全局菜单组件 --> <script src="docs/js/GlobalMenu.js?v=menuhigh3"></script>
 <style>
 body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 /* 强制极细字体风格 */ .font-hairline { font-weight: 100; } .font-thin { font-weight: 200; }
@@ -173,9 +173,9 @@ VISI<div class="avatar-o" onclick="toggleAboutModal(true)" title="关于 · 分�
       <button type="button" class="index-about-share" onclick="shareSite()">分享给画友</button>
       <button type="button" class="index-about-fav" onclick="addSiteToFavorites()">收藏本站</button>
     </div>
-    <div class="index-about-app">
+    <div class="index-about-app" id="indexAboutAppBlock">
       <div class="index-about-app-title">手机 App</div>
-      <div class="index-about-app-body">安卓可安装桌面 App（网页套壳）。苹果手机暂时只有网页版，请用 Safari 打开本站，暂无 App。</div>
+      <div class="index-about-app-body">安卓可安装桌面 App。苹果手机暂时只有网页版，请用 Safari 打开本站，暂无 App。</div>
       <a href="/docs/app/">安卓 App 下载说明</a>
     </div>
     <div class="index-about-social">
@@ -392,11 +392,19 @@ setTimeout(function() { loader.style.display = 'none'; }, 1000); } }, 50); </scr
 <script>
 (function () {
   var _aboutHideTimer = null;
+  function hideAppDownloadInShell() {
+    try {
+      var inShell = !!(window.__SHELL_VERSION__ || (document.documentElement && document.documentElement.classList.contains('wuxiao-android-shell')));
+      var block = document.getElementById('indexAboutAppBlock');
+      if (block) block.style.display = inShell ? 'none' : '';
+    } catch (_e) {}
+  }
   window.toggleAboutModal = function (show) {
     var m = document.getElementById('indexAboutModal');
     if (!m) return;
     if (_aboutHideTimer) { clearTimeout(_aboutHideTimer); _aboutHideTimer = null; }
     if (show) {
+      hideAppDownloadInShell();
       m.style.display = 'flex';
       void m.offsetWidth;
       m.classList.add('active');

@@ -1,5 +1,6 @@
 /**
- * 安卓壳 APK 下载：强制 attachment，避免手机浏览器把包当空白页打开。
+ * 安卓 App APK 下载：强制 attachment，避免手机浏览器把包当空白页打开。
+ * 文件名带版本号（读 android-shell-update.json 的 versionName）。
  * GET/HEAD /api/android-apk
  */
 export async function onRequest(context) {
@@ -9,6 +10,27 @@ export async function onRequest(context) {
   }
 
   const origin = new URL(request.url).origin;
+
+  let versionName = '';
+  try {
+    const metaRes = await env.ASSETS.fetch(
+      new Request(new URL('/docs/app/android-shell-update.json', origin), {
+        method: 'GET',
+        headers: { 'Cache-Control': 'no-cache' }
+      })
+    );
+    if (metaRes && metaRes.ok) {
+      const meta = await metaRes.json();
+      if (meta && meta.versionName) versionName = String(meta.versionName).trim();
+    }
+  } catch (_e) {}
+
+  const displayBase = versionName ? `手绘工坊-${versionName}` : '手绘工坊';
+  const asciiFallback = versionName
+    ? `shouhui-gongfang-${versionName}.apk`
+    : 'shouhui-gongfang.apk';
+  const utf8Name = encodeURIComponent(`${displayBase}.apk`);
+
   const assetReq = new Request(new URL('/docs/app/wuxiao-workshop.apk', origin), {
     method: request.method,
     headers: request.headers
@@ -35,7 +57,7 @@ export async function onRequest(context) {
   headers.set('Content-Type', 'application/vnd.android.package-archive');
   headers.set(
     'Content-Disposition',
-    "attachment; filename=\"wuxiao-workshop.apk\"; filename*=UTF-8''%E7%AB%A5%E7%94%BB%E5%B8%88%E5%90%B4%E6%99%93.apk"
+    `attachment; filename="${asciiFallback}"; filename*=UTF-8''${utf8Name}`
   );
   headers.set('Cache-Control', 'public, max-age=120');
   headers.set('X-Content-Type-Options', 'nosniff');

@@ -2,6 +2,7 @@
  * 会员权限「涂色」：运营登录后在 Solid 课表 / 面板模块上点标签轮换档位（游客→会员→高级）。
  * 写入 /api/membership/admin/policy { set }；不改业务课表 JSON。
  * Tab 按钮本身不涂；环境光 / 空气透视 / 景深 / 色阶概括按模块涂。
+ * 仅测试/本机环境显示 FAB；生产站永不挂涂色按钮。
  */
 import '../docs/js/membership/MembershipAccess.js';
 
@@ -11,6 +12,53 @@ import '../docs/js/membership/MembershipAccess.js';
   var MA = window.MembershipAccess;
   if (!MA) {
     if (window.hwLog) window.hwLog('[MembershipPaint] MembershipAccess 未加载，跳过');
+    return;
+  }
+
+  function isPaintEnv() {
+    try {
+      var h = String((location && location.hostname) || '').toLowerCase();
+      if (!h || h === 'localhost' || h === '127.0.0.1') return true;
+      if (h === 'test.wuxiaoart.com') return true;
+      if (/\.workers\.dev$/i.test(h) && /staging/i.test(h)) return true;
+      return false;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function isAndroidShell() {
+    try {
+      if (window.__SHELL_VERSION__) return true;
+      if (document.documentElement && document.documentElement.classList.contains('wuxiao-android-shell')) return true;
+    } catch (_e) {}
+    return false;
+  }
+
+  function openMemberOps() {
+    try {
+      if (isAndroidShell()) {
+        location.assign('/member-ops');
+        return;
+      }
+      window.open('/member-ops', '_blank', 'noopener');
+    } catch (_e) {
+      try { location.assign('/member-ops'); } catch (_e2) {}
+    }
+  }
+
+  if (!isPaintEnv()) {
+    window.MembershipPaint = {
+      isOn: function () { return false; },
+      setOn: function () {},
+      toggle: function () {},
+      showToast: function () {},
+      makeChip: function () { return null; },
+      styleChip: function () {},
+      requireOf: function () { return 'public'; },
+      scheduleMark: function () {},
+      isPaintEnv: isPaintEnv
+    };
     return;
   }
 
@@ -267,10 +315,8 @@ import '../docs/js/membership/MembershipAccess.js';
     }
     MA.adminCheckSession().then(function (st) {
       if (!st.ok) {
-        showToast('请先打开 /member-ops 登录运营台（同站点）', true);
-        try {
-          window.open('/member-ops', '_blank', 'noopener');
-        } catch (_e) {}
+        showToast('请先打开运营台登录（同站点）', true);
+        openMemberOps();
         return;
       }
       setPaint(true);
@@ -322,6 +368,7 @@ import '../docs/js/membership/MembershipAccess.js';
     makeChip: makeChip,
     styleChip: styleChip,
     requireOf: requireOf,
-    scheduleMark: scheduleMark
+    scheduleMark: scheduleMark,
+    isPaintEnv: isPaintEnv
   };
 })();

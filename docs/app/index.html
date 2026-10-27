@@ -113,9 +113,9 @@
   </div>
 
   <main class="card">
-    <a class="back" href="/index">← 回首页</a>
+    <a class="back" href="/index" id="appBackLink">← 返回</a>
     <h1>安卓 App 下载</h1>
-    <p class="sub" id="lead">桌面一点打开「手绘工坊 · 童画师吴晓」。网页套壳：站点内容更新一般不用重装。</p>
+    <p class="sub" id="lead">安装后桌面一点即可打开「手绘工坊」。有新版本时请下载更新并安装。</p>
     <p class="meta" id="pkgMeta">正在检查安装包…</p>
     <div class="status" id="statusBox" role="status"></div>
 
@@ -128,7 +128,7 @@
         <ol>
           <li>点「下载安卓安装包」，等通知栏或文件 App 出现下载。</li>
           <li>打开下载好的 APK；若提示未知来源，允许本次安装。</li>
-          <li>桌面出现「童画师吴晓」即可打开（需联网）。</li>
+          <li>桌面出现「手绘工坊」即可打开（需联网）。</li>
         </ol>
       </div>
     </div>
@@ -150,11 +150,27 @@
   var APK_API = '/api/android-apk';
   var APK_DIRECT = '/docs/app/wuxiao-workshop.apk';
   var UPDATE_JSON = '/docs/app/android-shell-update.json';
+  var downloadFileName = '手绘工坊.apk';
 
   var ua = navigator.userAgent || '';
   var isWeChat = /MicroMessenger/i.test(ua);
   var isIOS = /iPhone|iPad|iPod/i.test(ua);
   var isAndroid = /Android/i.test(ua);
+
+  // 从哪进回哪：同站 referrer 用 history.back；否则回首页
+  (function setupBack() {
+    var a = document.getElementById('appBackLink');
+    if (!a) return;
+    a.addEventListener('click', function (ev) {
+      try {
+        var ref = document.referrer || '';
+        if (ref && ref.indexOf(location.origin) === 0 && history.length > 1) {
+          ev.preventDefault();
+          history.back();
+        }
+      } catch (_e) {}
+    });
+  })();
 
   var statusBox = document.getElementById('statusBox');
   var pkgMeta = document.getElementById('pkgMeta');
@@ -176,7 +192,7 @@
     // 用隐藏 iframe / 临时 a，比 location.href 更容易触发「下载」而不是空白页
     var a = document.createElement('a');
     a.href = url;
-    a.setAttribute('download', 'wuxiao-workshop.apk');
+    a.setAttribute('download', downloadFileName);
     a.rel = 'noopener';
     a.style.display = 'none';
     document.body.appendChild(a);
@@ -257,7 +273,10 @@
     var head = pair[0];
     var info = pair[1];
     var bits = [];
-    if (info && info.versionName) bits.push('壳版本 ' + info.versionName);
+    if (info && info.versionName) {
+      bits.push('版本 ' + info.versionName);
+      downloadFileName = '手绘工坊-' + String(info.versionName) + '.apk';
+    }
     if (head.len) {
       var mb = (Number(head.len) / (1024 * 1024)).toFixed(1);
       bits.push('约 ' + mb + ' MB');

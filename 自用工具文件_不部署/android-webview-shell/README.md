@@ -5,21 +5,22 @@
 
 | 项 | 值 |
 |----|-----|
-| 桌面名 | 童画师吴晓 |
+| 桌面名 | **手绘工坊** |
 | 包名 | `com.wuxiaoart.workshop` |
 | 最低安卓 | 7.0（API 24） |
 | 分发 | 学员群侧载（不上应用商店） |
 | 启动站 | **测试站** `https://test.wuxiaoart.com/`（`BuildConfig.START_URL`；正式包再改 `www`） |
-| 资源是否进包 | **否**。壳 ≈ 空壳 WebView；JS/CSS/GLB 全部现网拉取，**站点内容更新不用换 APK** |
-| 壳强制更新 | 启动读 `/docs/app/android-shell-update.json`；本机 versionCode 低于 `minVersionCode` 则拦进站并跳站点 APK 下载 |
-| 当前可测包 | `dist/童画师吴晓-1.0.7-debug.apk`；发测试站时同步 `docs/app/wuxiao-workshop.apk` |
-| 对外下载页 | 站点 `/docs/app/`（全局菜单「安卓 App 下载」；苹果说明在页内） |
+| 资源是否进包 | **否**。壳 ≈ 空壳 WebView；JS/CSS/GLB 全部现网拉取，**网页内容更新不用换 APK** |
+| App 强制更新 | 启动读 `/docs/app/android-shell-update.json`；本机 versionCode 低于 `minVersionCode` 则拦进站并跳 APK 下载（对外统称 App 更新） |
+| 当前可测包 | `dist/手绘工坊-1.0.8-debug.apk`；发测试站时同步 `docs/app/wuxiao-workshop.apk` |
+| 对外下载页 | 站点 `/docs/app/`（浏览器菜单「安卓 App 下载」；**App 内隐藏该入口**） |
 | 1.0.1 | 修复：相册选图、Cookie、blob/data；描摹可申请摄像头 |
 | 1.0.2 | 启动 URL 改为测试站 |
 | 1.0.3 | 壳强制更新（仅壳版本，不逼内容更新） |
 | 1.0.4 | 界面右下角显示壳版本；站点下载页与菜单入口 |
 | 1.0.6 | 关 WebView 系统缩放 + 关 overscroll，修复壳内课表列表滑动反向/不顺 |
 | 1.0.7 | 关 overview、去壳双重安全区留白、注入锁文档滚动；继续修壳内列表反向/卡顿 |
+| 1.0.8 | 桌面名「手绘工坊」；深色启动防白闪；关多窗口防涂色闪退；App 内隐藏下载入口；对外文案统称 App 更新 |
 
 ---
 
@@ -27,7 +28,7 @@
 
 1. 用微信/网盘收到 `.apk` 后，用**系统文件管理**打开（不要指望在微信里当网页用）。
 2. 若提示「未知来源 / 禁止安装」：到系统设置里允许该次安装来源。
-3. 安装后桌面出现「童画师吴晓」，**需联网**才能用。
+3. 安装后桌面出现「手绘工坊」，**需联网**才能用。
 4. 若 3D 场景黑屏：到应用商店更新 **Android System WebView** 与 **Chrome** 后再试。
 
 iPhone 不能装本 APK；请用 Safari 打开站点后「添加到主屏幕」（另说）。
@@ -55,7 +56,7 @@ iPhone 不能装本 APK；请用 Safari 打开站点后「添加到主屏幕」�
 # Windows（Git Bash / CMD），需本机已装 JDK 17 + Android SDK 35
 ./gradlew.bat assembleDebug
 # 产物：app/build/outputs/apk/debug/app-debug.apk
-# 亦可复制到 dist/童画师吴晓-1.0.0-debug.apk（APK 默认不入库）
+# 亦可复制到 dist/手绘工坊-1.0.8-debug.apk（APK 默认不入库）
 ```
 
 Gradle 发行包默认走腾讯云镜像（见 `gradle/wrapper/gradle-wrapper.properties`）。

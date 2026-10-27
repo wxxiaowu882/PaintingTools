@@ -1,11 +1,49 @@
 /**
  * 跨页权限涂色宿主（Portrait_c / GR / XStudio / ARSketch）。
  * 依赖先加载 MembershipAccess.js。Solid 仍用 Plugin_MembershipPaint。
+ * 仅测试/本机环境显示「权限涂色」；生产站永不挂 FAB。
  */
 (function (global) {
   'use strict';
   var MA = global.MembershipAccess;
   if (!MA) return;
+
+  /** 测站 / 本机才允许运营涂色 UI；www 正式站绝不出现 */
+  function isPaintEnv() {
+    try {
+      var h = String((global.location && location.hostname) || '').toLowerCase();
+      if (!h || h === 'localhost' || h === '127.0.0.1') return true;
+      if (h === 'test.wuxiaoart.com') return true;
+      if (/\.workers\.dev$/i.test(h) && /staging/i.test(h)) return true;
+      return false;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function isAndroidShell() {
+    try {
+      if (global.__SHELL_VERSION__) return true;
+      if (document.documentElement && document.documentElement.classList.contains('wuxiao-android-shell')) return true;
+    } catch (_e) {}
+    return false;
+  }
+
+  /** 壳内禁止 window.open（多窗口易闪退）；同页进运营台 */
+  function openMemberOps() {
+    try {
+      if (isAndroidShell()) {
+        global.location.assign('/member-ops');
+        return;
+      }
+      global.open('/member-ops', '_blank', 'noopener');
+    } catch (_e) {
+      try { global.location.assign('/member-ops'); } catch (_e2) {}
+    }
+  }
+
+  // 非涂色环境：不挂 FAB，但保留 guard / markLockedEl（正式站仍要门禁）
+  var _paintUiEnabled = isPaintEnv();
 
   var _paintOn = false;
   var _busy = false;
@@ -100,6 +138,7 @@
   }
 
   function ensureFab() {
+    if (!_paintUiEnabled) return null;
     if (_fab && _fab.isConnected) return _fab;
     if (!document.body) return null;
     var existing = document.getElementById('membership-paint-fab');
@@ -172,6 +211,7 @@
   }
 
   function togglePaint() {
+    if (!_paintUiEnabled) return;
     if (_paintOn) {
       setPaint(false);
       showToast('已结束涂色');
@@ -179,8 +219,8 @@
     }
     MA.adminCheckSession().then(function (st) {
       if (!st.ok) {
-        showToast('请先打开 /member-ops 登录运营台（同站点）', true);
-        try { global.open('/member-ops', '_blank', 'noopener'); } catch (_e) {}
+        showToast('请先打开运营台登录（同站点）', true);
+        openMemberOps();
         return;
       }
       setPaint(true);
@@ -232,6 +272,11 @@
   }
 
   function boot() {
+    if (!_paintUiEnabled) {
+      _booted = true;
+      MA.onChange(function () { applyTargets(); });
+      return;
+    }
     if (_booted) {
       // ready 早于 body 时上次可能空跑；允许补挂 FAB
       if (!ensureFab()) {
@@ -272,7 +317,8 @@
     guard: guard,
     markLockedEl: markLockedEl,
     requireOf: requireOf,
-    makeChip: makeChip
+    makeChip: makeChip,
+    isPaintEnv: isPaintEnv
   };
 
   MA.ready().then(boot);

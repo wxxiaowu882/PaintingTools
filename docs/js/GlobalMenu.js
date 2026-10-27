@@ -51,11 +51,42 @@
         { type: 'category', text: '游戏' },
         { id: '11', text: '色感训练 · 光谱行者', url: '/games/ChromaWalker', color: '#F59E0B' },
 
-        { type: 'category', text: '安装' },
-        { id: '12', text: '安卓 App 下载', url: '/docs/app/', color: '#94A3B8' },
+        { type: 'category', text: '安装', cat: 'install' },
+        { id: '12', text: '安卓 App 下载', url: '/docs/app/', color: '#94A3B8', hideInAndroidShell: true },
 
         { type: 'footer', text: '© 2026 手绘工坊 · 童画师吴晓' }
     ];
+
+    function isAndroidShell() {
+        try {
+            if (window.__SHELL_VERSION__) return true;
+            if (document.documentElement && document.documentElement.classList.contains('wuxiao-android-shell')) return true;
+        } catch (_e) {}
+        return false;
+    }
+
+    function menuItemsForEnv() {
+        if (!isAndroidShell()) return menuConfig;
+        // App 内已安装，不展示下载入口；若「安装」分类下无其它项则一并隐藏
+        var out = [];
+        for (var i = 0; i < menuConfig.length; i++) {
+            var it = menuConfig[i];
+            if (it && it.hideInAndroidShell) continue;
+            if (it && it.type === 'category' && it.cat === 'install') {
+                var hasChild = false;
+                for (var j = i + 1; j < menuConfig.length; j++) {
+                    var n = menuConfig[j];
+                    if (!n || n.type === 'category' || n.type === 'footer' || n.type === 'header') break;
+                    if (n.hideInAndroidShell) continue;
+                    hasChild = true;
+                    break;
+                }
+                if (!hasChild) continue;
+            }
+            out.push(it);
+        }
+        return out;
+    }
 
     // === 2. 动态样式注入 ===
     function injectStyles() {
@@ -69,6 +100,12 @@
             /* 全局菜单字体保护 */
             .global-menu-wrapper .nav-font-hairline { font-weight: 100 !important; font-family: 'Inter', sans-serif !important; }
             .global-menu-wrapper .nav-font-thin { font-weight: 200 !important; font-family: 'Inter', sans-serif !important; }
+
+            /* App 壳内：隐藏安卓下载入口（壳 class 可能晚于菜单构建） */
+            html.wuxiao-android-shell .menu-item[data-menu-url="/docs/app/"],
+            html.wuxiao-android-shell .menu-item[data-menu-url="/docs/app"],
+            html.wuxiao-android-shell .menu-category[data-menu-cat="install"],
+            html.wuxiao-android-shell .index-about-app { display: none !important; }
 
             /* 菜单遮罩层 */
             #global-menu-overlay {
@@ -296,7 +333,7 @@
         backArrow.innerHTML = '<svg width="60" height="24" viewBox="0 0 60 24" fill="none" style="display:block;"><path d="M0.5 12L10 1M0.5 12L60 12M0.5 12L10 23" stroke="currentColor" stroke-width="0.5"/></svg>';
         container.appendChild(backArrow);
 
-        menuConfig.forEach(item => {
+        menuItemsForEnv().forEach(item => {
             const el = document.createElement('div');
 
             if (item.type === 'header') {
@@ -305,6 +342,7 @@
             } else if (item.type === 'category') {
                 // 分类标题使用极细体
                 el.className = 'menu-category nav-font-hairline';
+                if (item.cat) el.setAttribute('data-menu-cat', item.cat);
                 el.innerText = item.text;
             } else if (item.type === 'footer') {
                 el.className = 'menu-footer nav-font-hairline';

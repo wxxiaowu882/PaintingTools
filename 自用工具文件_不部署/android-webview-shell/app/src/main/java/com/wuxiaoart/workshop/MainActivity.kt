@@ -76,10 +76,13 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        // 冷启动全程深色底，避免 WebView 默认白底闪一下
+        window.decorView.setBackgroundColor(0xFF050505.toInt())
         setContentView(R.layout.activity_main)
 
         webView = findViewById(R.id.webview)
         progressBar = findViewById(R.id.progress)
+        webView.setBackgroundColor(0xFF050505.toInt())
 
         // 全屏交给网页 CSS safe-area；根布局再垫 systemBars 会与 100dvh 叠出「整页可滚 1px」，
         // 与课表 overflow 列表抢手势（仅壳复现反向/卡顿；浏览器无此双重留白）
@@ -92,7 +95,7 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
         } else {
-            // 先查壳版本；站点业务更新不走这里
+            // 先查 App 版本；网页内容更新不走这里
             checkShellUpdateThenLoad()
         }
     }
@@ -132,9 +135,13 @@ class MainActivity : AppCompatActivity() {
                   s = document.createElement('style');
                   s.id = 'wuxiao-shell-scroll-fix';
                   s.textContent =
-                    'html.wuxiao-android-shell,html.wuxiao-android-shell body{overflow:hidden!important;overscroll-behavior:none!important;height:100%!important;width:100%!important;}' +
+                    'html.wuxiao-android-shell,html.wuxiao-android-shell body{overflow:hidden!important;overscroll-behavior:none!important;height:100%!important;width:100%!important;background:#050505!important;}' +
                     'html.wuxiao-android-shell .scene-grid{-webkit-overflow-scrolling:auto!important;}' +
-                    'html.wuxiao-android-shell #scene-grid-modal{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}';
+                    'html.wuxiao-android-shell #scene-grid-modal{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}' +
+                    'html.wuxiao-android-shell .index-about-app,' +
+                    'html.wuxiao-android-shell .menu-item[data-menu-url=\"/docs/app/\"],' +
+                    'html.wuxiao-android-shell .menu-item[data-menu-url=\"/docs/app\"],' +
+                    'html.wuxiao-android-shell .menu-category[data-menu-cat=\"install\"]{display:none!important;}';
                   (document.head || document.documentElement).appendChild(s);
                 }
                 try { window.scrollTo(0, 0); } catch (e0) {}
@@ -190,7 +197,7 @@ class MainActivity : AppCompatActivity() {
             val name = o.optString("versionName", "")
             val msg = o.optString(
                 "message",
-                "需要更新应用壳后才能继续使用。"
+                "发现新版本，请更新「手绘工坊」后继续使用。"
             )
             val apkPath = o.optString("apkPath", "/docs/app/wuxiao-workshop.apk")
             val download = when {
@@ -262,8 +269,9 @@ class MainActivity : AppCompatActivity() {
             // 相册选图返回 content://，须允许 WebView 读 content
             allowContentAccess = true
             allowFileAccess = false
-            javaScriptCanOpenWindowsAutomatically = true
-            setSupportMultipleWindows(true)
+            // 关闭多窗口：window.open/_blank 在壳内易闪退；由 shouldOverride 同页导航
+            javaScriptCanOpenWindowsAutomatically = false
+            setSupportMultipleWindows(false)
         }
 
         webView.webViewClient = object : WebViewClient() {
@@ -322,19 +330,6 @@ class MainActivity : AppCompatActivity() {
                     this@MainActivity.filePathCallback = null
                     false
                 }
-            }
-
-            /** target=_blank / window.open：同域留在本 WebView，勿丢到外部浏览器 */
-            override fun onCreateWindow(
-                view: WebView?,
-                isDialog: Boolean,
-                isUserGesture: Boolean,
-                resultMsg: android.os.Message?
-            ): Boolean {
-                val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
-                transport.webView = webView
-                resultMsg.sendToTarget()
-                return true
             }
 
             /** 描摹助手摄像头等 */

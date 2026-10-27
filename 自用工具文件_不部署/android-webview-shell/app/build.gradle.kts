@@ -20,11 +20,11 @@ android {
         applicationId = "com.wuxiaoart.workshop"
         minSdk = 24
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.0.7"
+        versionCode = 9
+        versionName = "1.0.8"
         // 验收期接测试站；发学员群正式包前改回 https://www.wuxiaoart.com/
         buildConfigField("String", "START_URL", "\"https://test.wuxiaoart.com/\"")
-        // 相对 START_URL 源站；站点内容更新不走此检查，仅壳 versionCode
+        // 相对 START_URL 源站；App 原生能力升级才走此检查（网页内容更新不用换包）
         buildConfigField(
             "String",
             "UPDATE_JSON_PATH",
