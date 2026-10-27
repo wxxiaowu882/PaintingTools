@@ -987,11 +987,12 @@
   viewer.querySelectorAll('.active').forEach(el => {
   if(el.classList.contains('preview-hotspot') || el.classList.contains('ink-mid')) el.classList.remove('active'); }); reframeViewport(80); }; async function playCurrentNode() {
   if (!window.tourState.isActive) return; window.tourState.playId++; const currentPlayId = window.tourState.playId; clearTimeout(window.tourState.timeoutId); const node = window.tourState.list[window.tourState.currentIndex];
-  const minPlayTime = 8000; const startTime = Date.now(); if (window.tourState.mode === 'pts') { window.triggerAnnotation(node.id, false); } else { window.applySnapshot(node); }
+  /* 童画师解析字幕：打字与最短停留均为原速 3 倍（间隔 ÷3） */
+  const minPlayTime = Math.round(8000 / 3); const startTime = Date.now(); if (window.tourState.mode === 'pts') { window.triggerAnnotation(node.id, false); } else { window.applySnapshot(node); }
   const titleText = window.tourState.mode === 'pts' ? node.text : node.name;
   const descText = node.desc || (window.tourState.mode === 'pts' ? '暂无详细解剖说明。' : '暂无详细说明。'); titleEl.innerText = '';
-  descEl.innerText = ''; await typeWriter(titleEl, titleText, currentPlayId, 400); if (window.tourState.playId !== currentPlayId) return; await typeWriter(descEl, descText, currentPlayId, 200);
-  if (window.tourState.playId !== currentPlayId) return; if (!window.tourState.isPaused) { const elapsedTime = Date.now() - startTime; const waitTime = Math.max(3000, minPlayTime - elapsedTime); window.tourState.timeoutId = setTimeout(() => {
+  descEl.innerText = ''; await typeWriter(titleEl, titleText, currentPlayId, Math.round(400 / 3)); if (window.tourState.playId !== currentPlayId) return; await typeWriter(descEl, descText, currentPlayId, Math.round(200 / 3));
+  if (window.tourState.playId !== currentPlayId) return; if (!window.tourState.isPaused) { const elapsedTime = Date.now() - startTime; const waitTime = Math.max(Math.round(3000 / 3), minPlayTime - elapsedTime); window.tourState.timeoutId = setTimeout(() => {
   if (!window.tourState.isActive || window.tourState.isPaused || window.tourState.playId !== currentPlayId) return; window.tourState.currentIndex = (window.tourState.currentIndex + 1) % window.tourState.list.length; playCurrentNode();
   }, waitTime); } }
   document.querySelectorAll('.auto-tour-btn').forEach(btn => { btn.addEventListener('click', function(e) { e.stopPropagation(); window.startTour(this.getAttribute('data-mode')); });

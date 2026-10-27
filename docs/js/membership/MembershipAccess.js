@@ -164,6 +164,69 @@
     return '';
   }
 
+  /** 涂色模式短标签：游客 / 会员 / 高级 */
+  function paintLabelForRequire(require) {
+    var req = normalizeRequire(require);
+    if (req === 'user') return '会员';
+    if (req === 'member') return '高级';
+    return '游客';
+  }
+
+  /** 点一下轮换：游客 → 会员 → 高级 → 游客 */
+  function nextRequireCycle(require) {
+    var req = normalizeRequire(require);
+    if (req === 'public') return 'user';
+    if (req === 'user') return 'member';
+    return 'public';
+  }
+
+  function setLocalPolicy(pol) {
+    if (!pol || typeof pol !== 'object') return _policy;
+    _policy = pol;
+    notify();
+    return _policy;
+  }
+
+  function adminCheckSession() {
+    return fetch('/api/membership/admin/overview', {
+      credentials: 'same-origin',
+      cache: 'no-cache'
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        return { ok: !!(r.ok && data && data.ok), status: r.status, data: data, needLogin: !!(data && data.needLogin) };
+      }).catch(function () {
+        return { ok: false, status: r.status, data: null, needLogin: r.status === 401 };
+      });
+    }).catch(function (e) {
+      return { ok: false, status: 0, data: null, error: String(e && e.message || e) };
+    });
+  }
+
+  /** 运营涂色：改单条资源档位（需已登录运营台 Cookie） */
+  function adminSetResourceRequire(resourceId, require, label) {
+    var id = String(resourceId || '').trim();
+    if (!id) return Promise.reject(new Error('缺少资源 id'));
+    var req = normalizeRequire(require);
+    return fetch('/api/membership/admin/policy', {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ set: { id: id, require: req, label: label || id } })
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok || !data || !data.ok) {
+          var err = new Error((data && data.error) || ('HTTP ' + r.status));
+          err.status = r.status;
+          err.needLogin = !!(data && data.needLogin);
+          err.data = data;
+          throw err;
+        }
+        if (data.policy) setLocalPolicy(data.policy);
+        return data;
+      });
+    });
+  }
+
   function notify() {
     var snap = getEntitlement();
     for (var i = 0; i < _listeners.length; i++) {
@@ -900,6 +963,11 @@
     meetsRequire: meetsRequire,
     normalizeRequire: normalizeRequire,
     badgeLabelForRequire: badgeLabelForRequire,
+    paintLabelForRequire: paintLabelForRequire,
+    nextRequireCycle: nextRequireCycle,
+    setLocalPolicy: setLocalPolicy,
+    adminCheckSession: adminCheckSession,
+    adminSetResourceRequire: adminSetResourceRequire,
     isMemberActive: isMemberActive,
     redeem: redeem,
     clearEntitlement: clearEntitlement,

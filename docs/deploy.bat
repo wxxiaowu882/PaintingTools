@@ -21,6 +21,7 @@ echo ========================================
 echo   Deploy soft-voice-f822 (Worker)
 echo ========================================
 echo   Log: %LOG%
+echo   0) sync membership policy staging -^> prod
 echo   1) build functions -^> dist/worker
 echo   2) wrangler deploy
 echo   Please wait; do not close this window.
@@ -32,6 +33,23 @@ if errorlevel 1 (
   >>"%LOG%" echo [ERROR] npx not found
   goto finish_fail
 )
+
+echo [0/2] Sync membership policy (staging KV -^> file + prod KV)...
+>>"%LOG%" echo [0/2] policy sync start
+if /i "%SKIP_POLICY_SYNC%"=="1" (
+  echo [0/2] SKIP_POLICY_SYNC=1, skip
+  >>"%LOG%" echo [0/2] skipped
+) else (
+  call node "docs\membership\sync-policy-staging-to-prod.mjs"
+  if errorlevel 1 (
+    echo [ERROR] policy sync failed
+    >>"%LOG%" echo [ERROR] policy sync failed
+    goto finish_fail
+  )
+  echo [0/2] policy sync OK
+  >>"%LOG%" echo [0/2] policy sync OK
+)
+echo.
 
 echo [1/2] Building Pages Functions...
 >>"%LOG%" echo [1/2] build start
