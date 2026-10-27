@@ -81,7 +81,7 @@ window.ControlPanel = {
                         <div id="btn-tab-light" class="tab-btn active" onclick="window.switchTab('light')">主光</div>
                         <div id="btn-tab-env" class="tab-btn" onclick="window.switchTab('env')">环境光</div>
                         <div id="btn-tab-atmos" class="tab-btn" onclick="window.switchTab('atmos')">氛围</div>
-                        <div id="btn-tab-assist" class="tab-btn" onclick="window.switchTab('assist')">辅助</div>
+                        <div id="btn-tab-assist" class="tab-btn" onclick="window.switchTab('assist')">色阶</div>
                     </div>
 
                     <div class="tab-container">
@@ -130,7 +130,7 @@ window.ControlPanel = {
                             </div>
                         </div>
 
-                        <div id="content-tab-env" class="tab-content">
+                        <div id="content-tab-env" class="tab-content" data-membership-mod="env" data-membership-label="环境光">
                             <div style="display:flex; flex-direction:row; align-items:center; justify-content:space-around; padding: 10px 4px; pointer-events:none;">
                                 <div style="display:flex; align-items:center; pointer-events:auto;">
                                     <label class="flex items-center cursor-pointer mb-0" style="margin-right:6px;" onmouseenter="const c=document.getElementById('wall-btn-checkbox'); if(c) c.checked=!!window.hasWall;">
@@ -153,7 +153,7 @@ window.ControlPanel = {
                         </div>
 
                         <div id="content-tab-atmos" class="tab-content">
-                            <div class="module-card">
+                            <div class="module-card" data-membership-mod="fog" data-membership-label="空气透视">
                                 <div class="flex items-center justify-between mb-2" style="position:relative; z-index:104;">
                                     <label class="module-title mb-0" style="margin-right:8px;">
                                         <input type="checkbox" id="fogEnable" onchange="window.toggleFogAdvanced(this.checked)" class="flat-checkbox" style="width:14px; height:14px; margin-right:6px;"> 空气透视
@@ -192,7 +192,7 @@ window.ControlPanel = {
                                 </div>
                             </div>
                             
-                            <div class="module-card">
+                            <div class="module-card" data-membership-mod="dof" data-membership-label="景深虚实">
                                 <div class="module-header mb-1">
                                     <label class="module-title mb-0">
                                         <input type="checkbox" id="dofEnable" onchange="window.toggleDoF(this.checked)" class="flat-checkbox" style="width:14px; height:14px; margin-right:6px;"> 景深虚实
@@ -216,7 +216,7 @@ window.ControlPanel = {
                         </div>
 
                         <div id="content-tab-assist" class="tab-content">
-                            <div class="module-card" style="display:flex; flex-direction:column; gap:12px;">
+                            <div class="module-card" style="display:flex; flex-direction:column; gap:12px;" data-membership-mod="posterize" data-membership-label="色阶概括">
                                 <div class="slider-row mb-0" style="align-items:center;">
                                     <label class="flex items-center cursor-pointer mb-0" style="width:auto; margin-right:4px;">
                                         <input type="checkbox" id="posterizeEnable" onchange="window.togglePosterize(this.checked)" class="flat-checkbox" style="width:14px; height:14px; margin-right:6px;"> 

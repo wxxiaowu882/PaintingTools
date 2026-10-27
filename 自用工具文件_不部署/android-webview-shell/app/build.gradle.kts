@@ -20,8 +20,8 @@ android {
         applicationId = "com.wuxiaoart.workshop"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.0.5"
+        versionCode = 8
+        versionName = "1.0.7"
         // 验收期接测试站；发学员群正式包前改回 https://www.wuxiaoart.com/
         buildConfigField("String", "START_URL", "\"https://test.wuxiaoart.com/\"")
         // 相对 START_URL 源站；站点内容更新不走此检查，仅壳 versionCode

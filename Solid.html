@@ -1,4 +1,14 @@
 <!DOCTYPE html> <html lang="zh-CN"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<script>
+/* 安卓 WebView 壳：尽早打标，避免课表内层滚与整页抢滑（浏览器 UA 无 ; wv) 不触发） */
+(function () {
+  try {
+    var ua = navigator.userAgent || '';
+    var isAndroidWv = /Android/i.test(ua) && (/;\s*wv\)/i.test(ua) || /\bwv\b/i.test(ua));
+    if (isAndroidWv || window.__SHELL_VERSION__) document.documentElement.classList.add('wuxiao-android-shell');
+  } catch (_e) {}
+})();
+</script>
 <title>几何光影与头部造型规律｜3D 场景课 - 童画师吴晓 · 手绘工坊</title>
 <meta name="description" content="手绘工坊 3D 场景课：几何体光影、头部造型规律（外轮廓与明暗交界）、肖像光影沙盒。童画师吴晓为水彩人物与肖像画学习设计的互动工具，永久免费。">
 <meta name="keywords" content="几何光影,头部造型规律,明暗交界,外轮廓,肖像光影,石膏素描,水彩人物教程,肖像画教程,童画师吴晓,手绘工坊">
@@ -59,13 +69,20 @@
     #scene-loader.solid-boot-indeterminate .scene-load-bar-fill{animation:solid-boot-bar-pulse 1.1s ease-in-out infinite;}
     @keyframes solid-boot-bar-pulse{0%,100%{opacity:0.45;}50%{opacity:0.95;}}
     /* 可视化场景网格弹窗 UI */
-    #scene-grid-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9000; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); flex-direction:column; box-sizing:border-box; min-height:100vh; min-height:-webkit-fill-available; min-height:100dvh; padding:max(30px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(30px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px)); }
+    /* overflow:hidden + overscroll contain：避免列表惯性滚到父层/整页回弹，表现为「反向滑」 */
+    #scene-grid-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9000; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); flex-direction:column; box-sizing:border-box; min-height:100vh; min-height:-webkit-fill-available; min-height:100dvh; padding:max(30px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(30px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px)); overflow:hidden; overscroll-behavior:none; }
     .modal-header { display:flex; justify-content:space-between; align-items:center; color:#fff; margin-bottom:20px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.1); }
     .modal-title { font-size:16px; font-weight:300; letter-spacing:2px; }
     .modal-close { cursor:pointer; width:32px; height:32px; flex-shrink:0; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.08); border:none; border-radius:10px; font-size:18px; line-height:1; position:relative; z-index:9001; pointer-events:auto; color:rgba(255,255,255,0.7); user-select:none; -webkit-tap-highlight-color:transparent; }
     .modal-close:hover { background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.9); }
-    .scene-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows:max-content; gap:15px; overflow-y:auto; flex:1; align-content:start; padding-bottom:30px; min-height:0; -webkit-overflow-scrolling:touch; }
-    .scene-item { background:rgba(20,20,20,0.8); border:1px solid rgba(255,255,255,0.05); border-radius:10px; cursor:pointer; transition:all 0.3s cubic-bezier(0.4,0,0.2,1); overflow:hidden; position:relative; display:flex; flex-direction:column; box-shadow:0 4px 15px rgba(0,0,0,0.5); align-self:start; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+    /* pan-y 对齐 Portrait_c 列表：明确纵向滑动手势，避免 manipulation 与滚动容器抢手势 */
+    .scene-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows:max-content; gap:15px; overflow-y:auto; flex:1; align-content:start; padding-bottom:30px; min-height:0; -webkit-overflow-scrolling:touch; touch-action:pan-y; overscroll-behavior-y:contain; }
+    .scene-item { background:rgba(20,20,20,0.8); border:1px solid rgba(255,255,255,0.05); border-radius:10px; cursor:pointer; transition:all 0.3s cubic-bezier(0.4,0,0.2,1); overflow:hidden; position:relative; display:flex; flex-direction:column; box-shadow:0 4px 15px rgba(0,0,0,0.5); align-self:start; touch-action:pan-y; -webkit-tap-highlight-color:transparent; }
+    /* 壳内 WebView：锁文档滚、关毛玻璃；列表改 touch-action:none + JS 直控滚动（原生快滑易反向） */
+    html.wuxiao-android-shell, html.wuxiao-android-shell body { overflow:hidden !important; overscroll-behavior:none !important; height:100% !important; width:100% !important; }
+    html.wuxiao-android-shell #scene-grid-modal { backdrop-filter:none !important; -webkit-backdrop-filter:none !important; min-height:100% !important; height:100% !important; }
+    html.wuxiao-android-shell .scene-grid { touch-action:none !important; -webkit-overflow-scrolling:auto !important; overscroll-behavior:none !important; }
+    html.wuxiao-android-shell .scene-item { touch-action:none !important; }
     .scene-item:hover, .scene-item.active { border-color:#fff; background:rgba(40,40,40,1); transform:translateY(-2px); box-shadow:0 8px 25px rgba(0,0,0,0.8); }
     .scene-thumb { width:100%; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; background:#111; flex-shrink:0; transition:opacity 0.28s ease; }
     .scene-thumb.solid-thumb-pending { opacity:0.22; }
@@ -2572,12 +2589,15 @@
                 if (moved) return;
                 _activate(e);
             }, { passive: true });
+            // 触控只走 touch*；pointer 再 reset moved 会与原生纵向滚动抢手势（表现为偶发反向/顿挫）
             el.addEventListener('pointerdown', (e) => {
+                if (e && e.pointerType === 'touch') return;
                 const p = _pt(e);
                 sx = Number(p.clientX || 0); sy = Number(p.clientY || 0);
                 moved = false;
             }, { passive: true });
             el.addEventListener('pointermove', (e) => {
+                if (e && e.pointerType === 'touch') return;
                 const p = _pt(e);
                 const dx = Math.abs(Number(p.clientX || 0) - sx);
                 const dy = Math.abs(Number(p.clientY || 0) - sy);
@@ -2637,6 +2657,114 @@
                 return true;
             } catch (_eStart) { return false; }
         };
+        // 手指按住/惯性滚动期间勿给缩略图赋 src：动量未停就解码会打断滚动（快滑更易「反向」）
+        window.__solidGridScrollBusyUntil = 0;
+        window.__solidEnsureGridScrollGuard = function () {
+            try {
+                if (window.__solidGridScrollGuardBound) return;
+                const grid = document.getElementById('scene-grid-container');
+                if (!grid) return;
+                window.__solidGridScrollGuardBound = true;
+                let settleTimer = null;
+                const bump = function (ms) {
+                    const until = Date.now() + (ms || 180);
+                    if (until > window.__solidGridScrollBusyUntil) window.__solidGridScrollBusyUntil = until;
+                };
+                const bumpUntilSettled = function () {
+                    bump(500);
+                    if (settleTimer) clearTimeout(settleTimer);
+                    settleTimer = setTimeout(function () {
+                        settleTimer = null;
+                        bump(120);
+                    }, 420);
+                };
+                grid.addEventListener('touchstart', function () { bump(500); }, { passive: true });
+                grid.addEventListener('touchmove', function () { bump(500); }, { passive: true });
+                grid.addEventListener('touchend', function () { bumpUntilSettled(); }, { passive: true });
+                grid.addEventListener('touchcancel', function () { bumpUntilSettled(); }, { passive: true });
+                grid.addEventListener('scroll', function () { bumpUntilSettled(); }, { passive: true });
+                try { if (typeof window.__solidBindAndroidShellListScroll === 'function') window.__solidBindAndroidShellListScroll(); } catch (_eBind0) {}
+            } catch (_eG) {}
+        };
+        /** 仅安卓壳：自管纵滑，吞掉 WebView 原生 fling（快滑时与整页抢滑会反向） */
+        window.__solidBindAndroidShellListScroll = function () {
+            try {
+                try {
+                    if (window.__SHELL_VERSION__) document.documentElement.classList.add('wuxiao-android-shell');
+                } catch (_eCls) {}
+                if (!document.documentElement.classList.contains('wuxiao-android-shell')) return;
+                const grid = document.getElementById('scene-grid-container');
+                if (!grid || grid.__solidShellScrollBound) return;
+                grid.__solidShellScrollBound = true;
+                let dragging = false;
+                let startY = 0;
+                let startScroll = 0;
+                let lastY = 0;
+                let lastT = 0;
+                let vel = 0;
+                let momRaf = 0;
+                const bumpBusy = function (ms) {
+                    const until = Date.now() + (ms || 400);
+                    if (until > (window.__solidGridScrollBusyUntil || 0)) window.__solidGridScrollBusyUntil = until;
+                };
+                const stopMom = function () {
+                    if (momRaf) {
+                        try { cancelAnimationFrame(momRaf); } catch (_eC) {}
+                        momRaf = 0;
+                    }
+                };
+                const clampScroll = function (v) {
+                    const max = Math.max(0, grid.scrollHeight - grid.clientHeight);
+                    if (v < 0) return 0;
+                    if (v > max) return max;
+                    return v;
+                };
+                grid.addEventListener('touchstart', function (e) {
+                    if (!e.touches || e.touches.length !== 1) return;
+                    stopMom();
+                    dragging = true;
+                    startY = lastY = e.touches[0].clientY;
+                    startScroll = grid.scrollTop;
+                    lastT = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                    vel = 0;
+                    bumpBusy(600);
+                }, { passive: true });
+                grid.addEventListener('touchmove', function (e) {
+                    if (!dragging || !e.touches || e.touches.length !== 1) return;
+                    try { if (e.cancelable) e.preventDefault(); } catch (_eP) {}
+                    const y = e.touches[0].clientY;
+                    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                    grid.scrollTop = clampScroll(startScroll - (y - startY));
+                    const dt = Math.max(8, now - lastT);
+                    // 手指上滑 → scrollTop 增大；vel 为 px/ms
+                    vel = (lastY - y) / dt;
+                    lastY = y;
+                    lastT = now;
+                    bumpBusy(600);
+                }, { passive: false });
+                const endDrag = function () {
+                    if (!dragging) return;
+                    dragging = false;
+                    bumpBusy(800);
+                    let v = vel * 16;
+                    if (Math.abs(v) < 0.4) return;
+                    const step = function () {
+                        if (Math.abs(v) < 0.25) {
+                            momRaf = 0;
+                            bumpBusy(200);
+                            return;
+                        }
+                        grid.scrollTop = clampScroll(grid.scrollTop + v);
+                        v *= 0.95;
+                        bumpBusy(400);
+                        momRaf = requestAnimationFrame(step);
+                    };
+                    momRaf = requestAnimationFrame(step);
+                };
+                grid.addEventListener('touchend', endDrag, { passive: true });
+                grid.addEventListener('touchcancel', endDrag, { passive: true });
+            } catch (_eBind) {}
+        };
         /** 重建列表后：从 customScenes 分帧给 pending 图赋 src（不经 innerHTML） */
         window.__solidScheduleThumbPaintFromMemory = function () {
             if (window.__solidThumbPaintQueued) return;
@@ -2644,10 +2772,19 @@
             const run = function () {
                 window.__solidThumbPaintQueued = false;
                 try {
+                    try { if (typeof window.__solidEnsureGridScrollGuard === 'function') window.__solidEnsureGridScrollGuard(); } catch (_eEg) {}
                     const modal = document.getElementById('scene-grid-modal');
                     if (!modal || modal.style.display === 'none') return;
                     if (window.isLoadingScene || window.__solidFetchingSceneDetail) return;
                     if (!Array.isArray(window.customScenes)) return;
+                    // 滑动中：延后补图，不改 DOM
+                    if (Date.now() < (window.__solidGridScrollBusyUntil || 0)) {
+                        window.__solidThumbPaintTimer = setTimeout(function () {
+                            window.__solidThumbPaintTimer = null;
+                            window.__solidScheduleThumbPaintFromMemory();
+                        }, 80);
+                        return;
+                    }
                     const nodes = document.querySelectorAll('#scene-grid-container .scene-item[data-scene-index] img.scene-thumb.solid-thumb-pending');
                     let painted = 0;
                     const maxPerFrame = 6;
@@ -2995,6 +3132,11 @@
                 touched[idx] = true;
             }
             if (skipDom) return;
+            // 滑动中只写内存：松手后再由 __solidScheduleThumbPaintFromMemory 上屏
+            if (Date.now() < (window.__solidGridScrollBusyUntil || 0)) {
+                try { if (typeof window.__solidScheduleThumbPaintFromMemory === 'function') window.__solidScheduleThumbPaintFromMemory(); } catch (_eDefer) {}
+                return;
+            }
             const nodes = document.querySelectorAll('#scene-grid-container .scene-item[data-scene-index]');
             for (let n = 0; n < nodes.length; n++) {
                 const el = nodes[n];
@@ -3260,8 +3402,10 @@
             try { if (Array.isArray(window.customScenes)) buildSceneGridUI(window.customScenes); } catch (_eBuild) {}
             const modal = document.getElementById('scene-grid-modal');
             if (modal) modal.style.display = 'flex';
+            try { if (typeof window.__solidEnsureGridScrollGuard === 'function') window.__solidEnsureGridScrollGuard(); } catch (_eGuard) {}
+            try { if (typeof window.__solidBindAndroidShellListScroll === 'function') window.__solidBindAndroidShellListScroll(); } catch (_eShellScr) {}
             try { if (typeof window.solidUpdateLessonNav === 'function') window.solidUpdateLessonNav(); } catch (_eNavOpen) {}
-            // 先显示再滚，避免 display:none 时 scrollIntoView 无效
+            // 先显示再滚，避免 display:none 时 scrollIntoView 无效；壳内自管滚动时仍用一次 nearest 对齐当前课
             requestAnimationFrame(function () {
                 requestAnimationFrame(function () {
                     try {

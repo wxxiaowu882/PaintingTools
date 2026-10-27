@@ -12,12 +12,14 @@
 | 启动站 | **测试站** `https://test.wuxiaoart.com/`（`BuildConfig.START_URL`；正式包再改 `www`） |
 | 资源是否进包 | **否**。壳 ≈ 空壳 WebView；JS/CSS/GLB 全部现网拉取，**站点内容更新不用换 APK** |
 | 壳强制更新 | 启动读 `/docs/app/android-shell-update.json`；本机 versionCode 低于 `minVersionCode` 则拦进站并跳站点 APK 下载 |
-| 当前可测包 | `dist/童画师吴晓-1.0.4-debug.apk`；发测试站时同步 `docs/app/wuxiao-workshop.apk` |
+| 当前可测包 | `dist/童画师吴晓-1.0.7-debug.apk`；发测试站时同步 `docs/app/wuxiao-workshop.apk` |
 | 对外下载页 | 站点 `/docs/app/`（全局菜单「安卓 App 下载」；苹果说明在页内） |
 | 1.0.1 | 修复：相册选图、Cookie、blob/data；描摹可申请摄像头 |
 | 1.0.2 | 启动 URL 改为测试站 |
 | 1.0.3 | 壳强制更新（仅壳版本，不逼内容更新） |
 | 1.0.4 | 界面右下角显示壳版本；站点下载页与菜单入口 |
+| 1.0.6 | 关 WebView 系统缩放 + 关 overscroll，修复壳内课表列表滑动反向/不顺 |
+| 1.0.7 | 关 overview、去壳双重安全区留白、注入锁文档滚动；继续修壳内列表反向/卡顿 |
 
 ---
 

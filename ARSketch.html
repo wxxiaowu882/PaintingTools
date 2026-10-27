@@ -21,6 +21,8 @@
 <!-- 引入极细字体 Inter -->
 <link rel="preconnect" href="https://fonts.googleapis.com"> <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300&display=swap" rel="stylesheet"> <script src="docs/js/GlobalMenu.js?v=menuhigh2"></script>
+<script src="docs/js/membership/MembershipAccess.js"></script>
+<script src="docs/js/membership/MembershipPaintHost.js"></script>
 <style>
     /* === 统一导航系统样式 === */
     .nav-font-hairline{font-weight:100!important;font-family:'Inter',sans-serif!important}
@@ -111,7 +113,7 @@ button.active { background: #007AFF; color: white; }
 <input type="range" id="rotateX" min="-60" max="60" step="1" value="0" oninput="updateVisuals()">
 </div> <div class="row"> <span class="label">视距</span>
 <input type="range" id="perspective" min="200" max="1800" step="10" value="1000" oninput="updateVisuals()">
-</div> <div class="row"> <div style="display: flex; align-items: center; gap: 6px;"> <span class="label" style="text-align: left; min-width: auto; color:#fff;">线稿</span>
+</div> <div class="row" id="ar-sketch-mod-row" data-membership-mod="sketch" style="position:relative;"> <div style="display: flex; align-items: center; gap: 6px;"> <span class="label" style="text-align: left; min-width: auto; color:#fff;">线稿</span>
 <input type="checkbox" id="sketch-toggle" class="sketch-switch" onchange="toggleSketchMode()"> </div> <div style="display: flex; align-items: center; gap: 6px; flex: 1; margin-left: 10px;">
 <span class="label" style="min-width: auto;">细节</span>
 <input type="range" id="lineStrength" min="0" max="100" step="1" value="50" oninput="updateCvThreshold()" disabled>
@@ -137,7 +139,9 @@ els.controls.style.display = show ? 'flex' : 'none'; els.restoreBtn.style.displa
 function toggleMore() { const moreDiv = document.getElementById('more-controls'); const btn = document.getElementById('btn-more');
 if (moreDiv.style.display === 'none' || moreDiv.style.display === '') { moreDiv.style.display = 'flex'; btn.innerText = "︿ 收起设置"; } else {
 moreDiv.style.display = 'none'; btn.innerText = "﹀ 更多设置 (视角/线稿)"; } }
-let processingTimer = null; function toggleSketchMode() { if (!cvReady) { alert("OpenCV 引擎加载中..."); els.sketchToggle.checked = false; return; }
+let processingTimer = null; function toggleSketchMode() {
+try { if (window.MembershipPaintHost && window.MembershipAccess) { var ridSk = window.MembershipAccess.uiResourceId('arsketch', 'ctrl:sketch'); if (!window.MembershipPaintHost.guard(ridSk, '线稿')) { els.sketchToggle.checked = !!state.sketchMode; return; } } } catch (_eSk) {}
+if (!cvReady) { alert("OpenCV 引擎加载中..."); els.sketchToggle.checked = false; return; }
 // 1. 立即锁定 Checkbox，防止用户在卡顿前兆时疯狂连击
 els.sketchToggle.disabled = true; state.sketchMode = els.sketchToggle.checked; els.inputs.lineStrength.disabled = !state.sketchMode;
 els.inputs.lineStrength.style.opacity = state.sketchMode ? "1" : "0.3"; if (state.sketchMode) { els.cvCanvas.style.display = 'block';
@@ -147,7 +151,7 @@ setTimeout(() => { processOpenCV(); loader.style.display = 'none'; els.sketchTog
 }, 50); } else { els.cvCanvas.style.display = 'none'; els.screenImg.style.opacity = state.opacity; els.sketchToggle.disabled = false; // 关闭线稿模式，直接解锁
 }
 updateVisuals(); }
-function updateCvThreshold() { if (!state.sketchMode) return; state.lineStrength = parseInt(els.inputs.lineStrength.value); if (processingTimer) clearTimeout(processingTimer); processingTimer = setTimeout(processOpenCV, 100); }
+function updateCvThreshold() { try { if (window.MembershipPaintHost && window.MembershipAccess) { var ridLs = window.MembershipAccess.uiResourceId('arsketch', 'ctrl:sketch'); if (!window.MembershipPaintHost.guard(ridLs, '线稿细节')) return; } } catch (_eLs) {} if (!state.sketchMode) return; state.lineStrength = parseInt(els.inputs.lineStrength.value); if (processingTimer) clearTimeout(processingTimer); processingTimer = setTimeout(processOpenCV, 100); }
 function processOpenCV() { if (!cvReady || !els.screenImg.src) return; try { let src = cv.imread(els.screenImg); let gray = new cv.Mat(); let edges = new cv.Mat(); let dst = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 let ksize = new cv.Size(3, 3); cv.GaussianBlur(gray, gray, ksize, 0, 0, cv.BORDER_DEFAULT); let blockSize = 3 + 2 * Math.floor((100 - state.lineStrength) / 7); if (blockSize < 3) blockSize = 3; let C = 2;
 cv.adaptiveThreshold(gray, edges, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, blockSize, C); cv.bitwise_not(edges, edges); let channels = new cv.MatVector(); let black = new cv.Mat.zeros(edges.rows, edges.cols, cv.CV_8UC1);
@@ -158,22 +162,39 @@ state.imageLoaded = true; els.btnStartCam.style.display = 'block'; const w = els
 els.wrapper.style.height = h + "px"; els.cvCanvas.width = w; els.cvCanvas.height = h; const padding = 40; const availableW = window.innerWidth - padding; const availableH = window.innerHeight * 0.40;
 let initialScale = Math.min(availableW / w, availableH / h); if (initialScale > 1) initialScale = 1; if (initialScale < 0.01) initialScale = 0.01; state.scale = initialScale; els.inputs.scale.value = initialScale; state.screenX = 0;
 state.screenY = 0; state.viewScale = 1; state.viewX = 0; state.viewY = 0; if (state.sketchMode) setTimeout(processOpenCV, 100); updateVisuals(); }; }); async function startApp() { if (!state.imageLoaded) return; 
-    // [新增] 安全环境与设备兼容性拦截
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("无法调用摄像头 📷\n\n原因：当前不在安全环境(HTTPS)或浏览器不支持。\n请在本地 localhost 或通过 HTTPS 域名访问此页面。");
+    // 分清：非安全上下文 / API 不可用 / 权限拒绝（勿一律报 HTTPS；壳内已是 https 仍可能缺 mediaDevices）
+    var secure = false;
+    try { secure = !!(window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1'); } catch (_eSec) {}
+    var md = navigator.mediaDevices;
+    if (!secure) {
+        alert("无法调用摄像头\n\n原因：当前页面不在安全环境（需要 HTTPS）。\n请用 https 域名或本机 localhost 打开。");
+        return;
+    }
+    if (!md || typeof md.getUserMedia !== 'function') {
+        // 部分 WebView 需先经权限手势；仍无 API 时说明能力/系统 WebView，勿误报 HTTPS
+        alert("无法调用摄像头\n\n原因：当前浏览器/应用壳未提供摄像头接口。\n请更新「Android System WebView」与 Chrome 后重试；或到系统设置里允许本应用使用相机。");
         return;
     }
     try {
 // 1. 先开启流获取权限
 let constraints = { audio: false, video: { facingMode: 'environment', width: { ideal: 3840 } } }; await initStream(constraints); // 2. 获取准确的设备列表
 const devices = await navigator.mediaDevices.enumerateDevices(); state.videoDevices = devices.filter(d => d.kind === 'videoinput');
-if (state.videoDevices.length > 1) els.btnSwitch.style.display = 'block'; // 3. 关键同步：此时 videoDevices 已有值，手动同步一次当前活跃轨道的设备索引
+if (state.videoDevices.length > 1) els.btnSwitch.style.display = 'block'; // 3. 状态同步：此时 videoDevices 已有值，手动同步一次当前活跃轨道的设备索引
 const settings = state.videoTrack.getSettings(); const currentIdx = state.videoDevices.findIndex(d => settings.deviceId && d.deviceId === settings.deviceId); if (currentIdx !== -1) state.currentDeviceIndex = currentIdx;
 // 4. 尝试寻找广角镜头
 const wideDevice = state.videoDevices.find(d => { const l = d.label.toLowerCase();
 return (l.includes('back') || l.includes('rear')) && (l.includes('wide') || l.includes('0.5')); }); if (wideDevice) {
 const wideConstraints = { audio: false, video: { deviceId: { exact: wideDevice.deviceId }, width: { ideal: 3840 }, facingMode: 'environment' } }; await initStream(wideConstraints); } } catch (err) {
-alert("摄像头错误: " + err.message); }
+var msg = (err && err.message) ? String(err.message) : String(err || '');
+var name = (err && err.name) ? String(err.name) : '';
+if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || /Permission|permission|denied|NotAllowed/i.test(msg)) {
+  alert("无法使用摄像头\n\n原因：相机权限被拒绝或未授予。\n请到系统设置 → 应用 → 童画师吴晓 → 权限，打开「相机」后重试。");
+} else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+  alert("无法使用摄像头\n\n原因：未检测到可用摄像头设备。");
+} else {
+  alert("摄像头错误: " + (msg || name || '未知'));
+}
+}
 els.startScreen.style.display = 'none'; els.screenLayer.style.display = 'block'; els.controls.style.display = 'flex'; updateVisuals(); }
 async function initStream(constraints) { if (state.videoTrack) { state.videoTrack.stop(); state.videoTrack = null; }
 const stream = await navigator.mediaDevices.getUserMedia(constraints); els.bgVideo.srcObject = stream; const track = stream.getVideoTracks()[0]; state.videoTrack = track; const settings = track.getSettings();
@@ -213,4 +234,6 @@ state.screenX = 0; state.screenY = 0; state.viewScale = 1; state.viewX = 0; stat
 function toggleLock() { state.locked = !state.locked; els.btnLock.innerText = state.locked ? "🔒 已锁定" : "🔓 锁定画面";
 els.btnLock.style.background = state.locked ? "#FF3B30" : "rgba(255,255,255,0.15)"; els.inputs.scale.disabled = state.locked; els.inputs.perspective.disabled = state.locked;
 els.inputs.rotateX.disabled = state.locked; }
-document.body.addEventListener('click', () => { if(els.bgVideo.paused) els.bgVideo.play(); }, {once:true}); </script> <!-- [新增] 统一导航菜单内容 --> </body> </html>
+document.body.addEventListener('click', () => { if(els.bgVideo.paused) els.bgVideo.play(); }, {once:true});
+(function bootArMembership(){function refresh(){try{if(!window.MembershipAccess||!window.MembershipPaintHost)return;var row=document.getElementById('ar-sketch-mod-row');var t=[];if(row){var rid=window.MembershipAccess.uiResourceId('arsketch','ctrl:sketch');t.push({el:row,rid:rid,label:'线稿'});window.MembershipPaintHost.markLockedEl(row,rid,'线稿');}window.MembershipPaintHost.setTargets(t);}catch(_e){}}if(window.MembershipPaintHost){window.MembershipPaintHost.boot();window.MembershipPaintHost.addMarkFn(refresh);if(window.MembershipAccess&&window.MembershipAccess.onChange)window.MembershipAccess.onChange(refresh);setTimeout(refresh,300);}})();
+</script> <!-- [新增] 统一导航菜单内容 --> </body> </html>

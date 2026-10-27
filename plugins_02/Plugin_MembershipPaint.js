@@ -1,6 +1,7 @@
 /**
- * 会员权限「涂色」：运营登录后在 Solid 课表/Tab 上点按轮换档位（游客→会员→高级）。
+ * 会员权限「涂色」：运营登录后在 Solid 课表 / 面板模块上点标签轮换档位（游客→会员→高级）。
  * 写入 /api/membership/admin/policy { set }；不改业务课表 JSON。
+ * Tab 按钮本身不涂；环境光 / 空气透视 / 景深 / 色阶概括按模块涂。
  */
 import '../docs/js/membership/MembershipAccess.js';
 
@@ -20,11 +21,11 @@ import '../docs/js/membership/MembershipAccess.js';
   var _fab = null;
   var _toast = null;
 
-  var TAB_DEFS = [
-    { tab: 'light', label: '主光', keepPublic: true },
-    { tab: 'env', label: '环境光' },
-    { tab: 'atmos', label: '氛围' },
-    { tab: 'assist', label: '辅助' }
+  var MOD_DEFS = [
+    { mod: 'env', label: '环境光' },
+    { mod: 'fog', label: '空气透视' },
+    { mod: 'dof', label: '景深虚实' },
+    { mod: 'posterize', label: '色阶概括' }
   ];
 
   function log(msg) {
@@ -65,7 +66,7 @@ import '../docs/js/membership/MembershipAccess.js';
     _fab.type = 'button';
     _fab.id = 'membership-paint-fab';
     _fab.textContent = '权限涂色';
-    _fab.title = '运营：点开后在课表/面板上点标签轮换档位（游客→会员→高级）';
+    _fab.title = '运营：点开后在课表/面板模块上点标签轮换档位（游客→会员→高级）';
     _fab.style.cssText =
       'position:fixed;right:12px;bottom:72px;z-index:10040;padding:8px 12px;border-radius:20px;' +
       'border:1px solid rgba(255,255,255,0.25);background:rgba(30,30,30,0.82);color:#f0f0f0;' +
@@ -122,13 +123,8 @@ import '../docs/js/membership/MembershipAccess.js';
     var el = ev.currentTarget;
     var rid = el.getAttribute('data-paint-id');
     if (!rid) return;
-    var keepPublic = el.getAttribute('data-keep-public') === '1';
     var cur = el.getAttribute('data-require') || requireOf(rid);
     var next = MA.nextRequireCycle(cur);
-    if (keepPublic && next !== 'public') {
-      showToast('主光建议保持游客可见', true);
-      return;
-    }
     var label = el.getAttribute('data-paint-label') || rid;
     _busy = true;
     el.style.opacity = '0.55';
@@ -178,14 +174,22 @@ import '../docs/js/membership/MembershipAccess.js';
     }
   }
 
-  function markTabChips() {
-    TAB_DEFS.forEach(function (d) {
-      var btn = document.getElementById('btn-tab-' + d.tab);
-      if (!btn) return;
-      var rid = MA.tabResourceId(d.tab);
-      var wrap = btn.parentElement;
-      var host = wrap && wrap.style ? wrap : btn;
-      var chip = host.querySelector && host.querySelector('.membership-paint-chip[data-paint-tab="' + d.tab + '"]');
+  function clearLegacyTabChips() {
+    try {
+      document.querySelectorAll('.membership-paint-chip[data-paint-tab]').forEach(function (c) {
+        c.remove();
+      });
+    } catch (_e) {}
+  }
+
+  function markModChips() {
+    clearLegacyTabChips();
+    MOD_DEFS.forEach(function (d) {
+      var host = document.querySelector('[data-membership-mod="' + d.mod + '"]');
+      if (!host) return;
+      var rid = MA.modResourceId ? MA.modResourceId(d.mod) : ('ui:solid:mod:' + d.mod);
+      var label = host.getAttribute('data-membership-label') || d.label;
+      var chip = host.querySelector('.membership-paint-chip[data-paint-mod="' + d.mod + '"]');
       if (!_paintOn) {
         if (chip) chip.remove();
         return;
@@ -195,15 +199,16 @@ import '../docs/js/membership/MembershipAccess.js';
       } catch (_e) {}
       var req = requireOf(rid);
       if (!chip) {
-        chip = makeChip(rid, d.label, req);
-        chip.setAttribute('data-paint-tab', d.tab);
-        if (d.keepPublic) chip.setAttribute('data-keep-public', '1');
-        chip.style.top = '-2px';
-        chip.style.left = '50%';
-        chip.style.transform = 'translateX(-50%)';
-        chip.style.position = 'absolute';
+        chip = makeChip(rid, label, req);
+        chip.setAttribute('data-paint-mod', d.mod);
+        chip.style.top = '4px';
+        chip.style.right = '4px';
+        chip.style.left = 'auto';
+        chip.style.maxWidth = '42%';
         host.appendChild(chip);
       } else {
+        chip.setAttribute('data-paint-id', rid);
+        chip.setAttribute('data-paint-label', label);
         styleChip(chip, req);
       }
     });
@@ -214,7 +219,7 @@ import '../docs/js/membership/MembershipAccess.js';
     _markTimer = setTimeout(function () {
       _markTimer = null;
       markSceneChips();
-      markTabChips();
+      markModChips();
     }, 60);
   }
 
@@ -224,7 +229,6 @@ import '../docs/js/membership/MembershipAccess.js';
     if (t && t.closest && t.closest('.membership-paint-chip')) return;
     var card = t && t.closest && t.closest('.scene-item[data-scene-index]');
     if (!card) return;
-    // 涂色模式下点卡片不进课，避免误进；请点左上角标签改档
     ev.preventDefault();
     ev.stopPropagation();
     showToast('涂色中：请点卡片左上角标签改档');
@@ -251,7 +255,7 @@ import '../docs/js/membership/MembershipAccess.js';
       } catch (_e) {}
     } else {
       markSceneChips();
-      markTabChips();
+      markModChips();
     }
   }
 
@@ -285,7 +289,8 @@ import '../docs/js/membership/MembershipAccess.js';
     var t = setInterval(function () {
       n++;
       var grid = document.getElementById('scene-grid-container');
-      if (grid || n > 100) {
+      var panel = document.getElementById('main-panel');
+      if ((grid && panel) || n > 100) {
         clearInterval(t);
         if (grid && _mo) {
           try { _mo.observe(grid, { childList: true, subtree: false }); } catch (_e) {}
@@ -312,6 +317,11 @@ import '../docs/js/membership/MembershipAccess.js';
   window.MembershipPaint = {
     isOn: function () { return _paintOn; },
     setOn: setPaint,
-    toggle: togglePaint
+    toggle: togglePaint,
+    showToast: showToast,
+    makeChip: makeChip,
+    styleChip: styleChip,
+    requireOf: requireOf,
+    scheduleMark: scheduleMark
   };
 })();

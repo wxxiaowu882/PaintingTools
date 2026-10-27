@@ -66,44 +66,110 @@ import '../docs/js/membership/MembershipAccess.js';
     return true;
   }
 
+  /** Tab 本身不门禁（可自由切换查看）；收费在模块控件上 */
   function wrapSwitchTab() {
     if (typeof window.switchTab !== 'function') return false;
-    if (window.switchTab.__membershipWrapped) return true;
-    var orig = window.switchTab;
-    window.switchTab = function (tabName) {
-      try {
-        var rid = MA.tabResourceId(tabName);
-        var gate = MA.canAccess(rid);
-        if (!gate.ok) {
-          if (window.hwLog) window.hwLog('[MembershipGate] 拦截 Tab ' + rid);
-          MA.promptUpgrade(gate);
-          return;
-        }
-      } catch (e) {
-        if (window.hwLog) window.hwLog('[MembershipGate] switchTab 检查异常: ' + (e && e.message));
-      }
-      return orig.apply(this, arguments);
-    };
     window.switchTab.__membershipWrapped = true;
     return true;
   }
 
-  function markLockedTabs() {
+  function modId(key) {
+    return MA.modResourceId ? MA.modResourceId(key) : ('ui:solid:mod:' + key);
+  }
+
+  function guardMod(modKey, label) {
     try {
+      var gate = MA.canAccess(modId(modKey));
+      if (!gate.ok) {
+        if (window.hwLog) window.hwLog('[MembershipGate] 拦截模块 ' + modKey);
+        MA.promptUpgrade(Object.assign({}, gate, {
+          rule: Object.assign({}, gate.rule || {}, { label: label || (gate.rule && gate.rule.label) || modKey })
+        }));
+        return false;
+      }
+    } catch (e) {
+      if (window.hwLog) window.hwLog('[MembershipGate] 模块检查异常: ' + (e && e.message));
+    }
+    return true;
+  }
+
+  function wrapNamed(fnName, modKey, label) {
+    if (typeof window[fnName] !== 'function') return false;
+    if (window[fnName].__membershipWrapped) return true;
+    var orig = window[fnName];
+    window[fnName] = function () {
+      if (!guardMod(modKey, label)) return;
+      return orig.apply(this, arguments);
+    };
+    window[fnName].__membershipWrapped = true;
+    return true;
+  }
+
+  function wrapPanelMods() {
+    var ok = true;
+    ok = wrapNamed('toggleFogAdvanced', 'fog', '空气透视') && ok;
+    ok = wrapNamed('toggleDoF', 'dof', '景深虚实') && ok;
+    ok = wrapNamed('togglePosterize', 'posterize', '色阶概括') && ok;
+    ok = wrapNamed('onFogSliderInput', 'fog', '空气透视') && ok;
+    ok = wrapNamed('updateFogUI', 'fog', '空气透视') && ok;
+    ok = wrapNamed('selectFogType', 'fog', '空气透视') && ok;
+    ok = wrapNamed('onDoFSliderInput', 'dof', '景深虚实') && ok;
+    ok = wrapNamed('onPosterizeSliderInput', 'posterize', '色阶概括') && ok;
+    ok = wrapNamed('toggleWall', 'env', '环境光') && ok;
+    ok = wrapNamed('setEnvColor', 'env', '环境光') && ok;
+    return ok;
+  }
+
+  function markLockedMods() {
+    try {
+      ['env', 'fog', 'dof', 'posterize'].forEach(function (mod) {
+        var host = document.querySelector('[data-membership-mod="' + mod + '"]');
+        if (!host) return;
+        var gate = MA.canAccess(modId(mod));
+        var badge = host.querySelector('.membership-mod-badge');
+        if (gate.ok) {
+          host.classList.remove('membership-mod-locked');
+          host.style.opacity = '';
+          if (badge) badge.remove();
+          return;
+        }
+        host.classList.add('membership-mod-locked');
+        host.style.opacity = '0.55';
+        var text = badgeText(gate);
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'membership-mod-badge';
+          badge.style.cssText =
+            'position:absolute;top:4px;right:4px;z-index:3;font-size:10px;padding:2px 6px;border-radius:4px;' +
+            'background:rgba(0,0,0,0.65);color:#f5d76e;pointer-events:none;';
+          try {
+            if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+          } catch (_ePos) {}
+          host.appendChild(badge);
+        }
+        badge.textContent = text;
+      });
+      // 清掉旧 Tab 灰显
       ['env', 'atmos', 'assist', 'light'].forEach(function (tab) {
         var btn = document.getElementById('btn-tab-' + tab);
         if (!btn) return;
-        var gate = MA.canAccess(MA.tabResourceId(tab));
-        if (!gate.ok) {
-          btn.style.opacity = '0.55';
-          btn.title = (gate.rule && gate.rule.label ? gate.rule.label + ' · ' : '') + badgeText(gate);
-        } else {
-          btn.style.opacity = '';
-          if (btn.title && (btn.title.indexOf('会员') >= 0 || btn.title.indexOf('尊享') >= 0)) {
-            btn.title = '';
-          }
-        }
+        btn.style.opacity = '';
+        if (btn.title && (btn.title.indexOf('会员') >= 0 || btn.title.indexOf('尊享') >= 0)) btn.title = '';
       });
+    } catch (_e) {}
+  }
+
+  function onLockedModPointer(ev) {
+    try {
+      if (document.body && document.body.classList.contains('membership-paint-on')) return;
+      var t = ev.target;
+      var host = t && t.closest && t.closest('[data-membership-mod]');
+      if (!host || !host.classList.contains('membership-mod-locked')) return;
+      var mod = host.getAttribute('data-membership-mod');
+      if (!mod) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      guardMod(mod, host.getAttribute('data-membership-label') || mod);
     } catch (_e) {}
   }
 
@@ -169,19 +235,22 @@ import '../docs/js/membership/MembershipAccess.js';
   function tryWrap() {
     var a = wrapSwitchScene();
     var b = wrapSwitchTab();
+    var c = wrapPanelMods();
     if (a && b) {
-      markLockedTabs();
-      return true;
+      markLockedMods();
+      return c;
     }
     return false;
   }
 
   var plugin = {
     onUpdate: function () {
-      if (!window.switchTab || !window.switchTab.__membershipWrapped ||
-          !window.switchScene || !window.switchScene.__membershipWrapped) {
+      if (!window.switchScene || !window.switchScene.__membershipWrapped) {
         tryWrap();
+      } else {
+        wrapPanelMods();
       }
+      markLockedMods();
     }
   };
 
@@ -191,9 +260,13 @@ import '../docs/js/membership/MembershipAccess.js';
       n++;
       if (tryWrap() || n > 80) clearInterval(timer);
     }, 100);
-    markLockedTabs();
+    markLockedMods();
+    try {
+      document.addEventListener('click', onLockedModPointer, true);
+      document.addEventListener('change', onLockedModPointer, true);
+    } catch (_eCap) {}
     MA.onChange(function () {
-      markLockedTabs();
+      markLockedMods();
       scheduleMarkLockedScenes();
     });
   });

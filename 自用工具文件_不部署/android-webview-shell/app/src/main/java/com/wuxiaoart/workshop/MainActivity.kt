@@ -25,7 +25,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -82,12 +81,10 @@ class MainActivity : AppCompatActivity() {
         webView = findViewById(R.id.webview)
         progressBar = findViewById(R.id.progress)
 
+        // 全屏交给网页 CSS safe-area；根布局再垫 systemBars 会与 100dvh 叠出「整页可滚 1px」，
+        // 与课表 overflow 列表抢手势（仅壳复现反向/卡顿；浏览器无此双重留白）
         val root = findViewById<View>(R.id.root)
-        ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.updatePadding(bars.left, bars.top, bars.right, bars.bottom)
-            insets
-        }
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets -> insets }
 
         setupWebView()
         setupBackPress()
@@ -100,14 +97,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 仅首页显示版本：右下角「V1.0.x」（网页读 window.__SHELL_VERSION__）。 */
-    private fun injectShellVersionToHome(url: String?) {
-        val path = (Uri.parse(url ?: return).path ?: "").lowercase()
+    /**
+     * 每页注入：锁文档滚动 + 壳标记（减轻内层列表与 WebView 整页抢滑）。
+     * 首页额外显示右下角「V1.0.x」（网页可读 window.__SHELL_VERSION__）。
+     */
+    private fun injectShellPageHelpers(url: String?) {
+        val path = (Uri.parse(url ?: "").path ?: "").lowercase()
         val isHome = path.isEmpty() || path == "/" || path == "/index" || path.endsWith("/index.html")
-        if (!isHome) return
         val verLiteral = JSONObject.quote(BuildConfig.VERSION_NAME)
-        val js = """
-            (function(){
+        val homeBadgeJs = if (isHome) {
+            """
               try {
                 window.__SHELL_VERSION__ = $verLiteral;
                 var el = document.getElementById('shell-version-badge');
@@ -119,6 +118,29 @@ class MainActivity : AppCompatActivity() {
                   (document.body || document.documentElement).appendChild(el);
                 }
                 el.textContent = 'V' + window.__SHELL_VERSION__;
+              } catch (eBadge) {}
+            """.trimIndent()
+        } else {
+            "try { window.__SHELL_VERSION__ = $verLiteral; } catch (eVer) {}"
+        }
+        val js = """
+            (function(){
+              try {
+                document.documentElement.classList.add('wuxiao-android-shell');
+                var s = document.getElementById('wuxiao-shell-scroll-fix');
+                if (!s) {
+                  s = document.createElement('style');
+                  s.id = 'wuxiao-shell-scroll-fix';
+                  s.textContent =
+                    'html.wuxiao-android-shell,html.wuxiao-android-shell body{overflow:hidden!important;overscroll-behavior:none!important;height:100%!important;width:100%!important;}' +
+                    'html.wuxiao-android-shell .scene-grid{-webkit-overflow-scrolling:auto!important;}' +
+                    'html.wuxiao-android-shell #scene-grid-modal{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}';
+                  (document.head || document.documentElement).appendChild(s);
+                }
+                try { window.scrollTo(0, 0); } catch (e0) {}
+                try { document.documentElement.scrollTop = 0; } catch (e1) {}
+                try { if (document.body) document.body.scrollTop = 0; } catch (e2) {}
+                $homeBadgeJs
               } catch (e) {}
             })();
         """.trimIndent()
@@ -219,6 +241,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        // 关系统 overscroll：否则内层 overflow 列表惯性滚时，外层回弹易被感知成「反向滑」
+        webView.overScrollMode = View.OVER_SCROLL_NEVER
+        webView.isVerticalScrollBarEnabled = false
+        webView.isHorizontalScrollBarEnabled = false
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -227,9 +253,11 @@ class MainActivity : AppCompatActivity() {
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             useWideViewPort = true
-            loadWithOverviewMode = true
-            setSupportZoom(true)
-            builtInZoomControls = true
+            // overview 缩放布局易与内层列表纵向滑抢手势（1.0.6 关 zoom 后仍有反向，本版关掉）
+            loadWithOverviewMode = false
+            // 站内页已 user-scalable=no，看大图靠页面自管；开系统缩放会与课表纵向滑抢手势（仅壳复现）
+            setSupportZoom(false)
+            builtInZoomControls = false
             displayZoomControls = false
             // 相册选图返回 content://，须允许 WebView 读 content
             allowContentAccess = true
@@ -259,7 +287,7 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 progressBar.visibility = View.GONE
                 CookieManager.getInstance().flush()
-                injectShellVersionToHome(url)
+                injectShellPageHelpers(url)
             }
         }
 

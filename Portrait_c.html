@@ -125,6 +125,8 @@
   }
   </style> 
   <script src="./docs/js/GlobalMenu.js?v=menuhigh2"></script>
+  <script src="./docs/js/membership/MembershipAccess.js"></script>
+  <script src="./docs/js/membership/MembershipPaintHost.js"></script>
   <script type="module" src="./docs/js/model-viewer.min.js"></script> </head> <body> <div id="loading-screen">
   <div class="spinner"></div> <div id="loading-main-text" style="color:var(--text-sub); font-size:12px; letter-spacing:2px;">正在打开课程列表…</div> <div id="loading-percent" style="color:var(--theme-color); font-size:14px; margin-top:8px; font-weight:bold; font-family:monospace;">请稍候</div> </div>
   <div id="top-bar" style="display: none; opacity: 0;"> 
@@ -266,7 +268,7 @@
               let cardsHtml = '';
               for (let i = 0; i < cards.length; i++) {
                   const c = cards[i];
-                  cardsHtml += '<div class="course-card" onclick="window.selectCourse(\'' + escapeAttr(c.name) + '\', \'' + escapeAttr(c.url) + '\')">'
+                  cardsHtml += '<div class="course-card" data-course-name="' + escapeAttr(c.name) + '" data-course-url="' + escapeAttr(c.url) + '" onclick="window.selectCourse(\'' + escapeAttr(c.name) + '\', \'' + escapeAttr(c.url) + '\')">'
                       + '<div class="course-thumb-wrap"><img src="' + c.thumbSrc + '" class="course-thumb" alt=""></div>'
                       + '<div class="course-info"><div class="course-name">' + escapeAttr(c.name) + '</div>'
                       + '<div class="course-meta">' + c.ptCount + ' 结构点 · ' + c.snapCount + ' 解析</div></div></div>';
@@ -278,6 +280,7 @@
           }
       }
       modal.classList.add('show');
+      try { if (typeof window.__portraitRefreshMembership === 'function') window.__portraitRefreshMembership(); } catch (_eMem) {}
       // 未选课时：列表就绪后收起启动加载层；已选课再开列表则不打断场景
       if (typeof currentData === 'undefined' || !currentData) {
           setPortraitBootLoader(false);
@@ -299,10 +302,48 @@
   };
 
   window.selectCourse = function(name, url) {
+      try {
+          if (window.MembershipAccess && window.MembershipPaintHost) {
+              if (document.body.classList.contains('membership-paint-on')) {
+                  if (window.MembershipPaintHost.showToast) window.MembershipPaintHost.showToast('涂色中：请点卡片标签改档');
+                  return;
+              }
+              var rid = window.MembershipAccess.sceneResourceId(libType, { name: name });
+              if (rid && !window.MembershipPaintHost.guard(rid, name)) return;
+          }
+      } catch (_eGate) {}
       document.getElementById('model-selector-text').innerText = name;
       window.closeCourseGallery(true); // 传入 true 参数，明确告知系统“我是因为选了图谱才关的”，拦截系统菜单弹出
       loadSceneData(url);
   };
+  (function bootPortraitMembership() {
+      function refresh() {
+          try {
+              if (!window.MembershipAccess || !window.MembershipPaintHost) return;
+              var grid = document.getElementById('gallery-grid');
+              if (!grid) return;
+              var cards = grid.querySelectorAll('.course-card[data-course-name]');
+              var targets = [];
+              for (var i = 0; i < cards.length; i++) {
+                  var el = cards[i];
+                  var name = el.getAttribute('data-course-name') || '';
+                  var rid = window.MembershipAccess.sceneResourceId(libType, { name: name });
+                  if (!rid) continue;
+                  targets.push({ el: el, rid: rid, label: name });
+                  window.MembershipPaintHost.markLockedEl(el, rid, name);
+              }
+              window.MembershipPaintHost.setTargets(targets);
+          } catch (_e) {}
+      }
+      window.__portraitRefreshMembership = refresh;
+      if (window.MembershipPaintHost) {
+          window.MembershipPaintHost.boot();
+          window.MembershipPaintHost.addMarkFn(function () { refresh(); });
+          if (window.MembershipAccess && window.MembershipAccess.onChange) {
+              window.MembershipAccess.onChange(refresh);
+          }
+      }
+  })();
   // 与 Solid 对齐：关全局菜单且未选课时回到课程列表（GlobalMenu 会调此名）
   window.__solidOnGlobalMenuClosed = function () {
       try {

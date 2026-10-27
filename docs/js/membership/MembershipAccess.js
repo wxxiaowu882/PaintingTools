@@ -380,6 +380,19 @@
     return 'ui:solid:tab:' + String(tabName || '');
   }
 
+  /** Solid 控制面板模块（环境光 / 空气透视 / 景深 / 色阶概括），非 Tab 按钮 */
+  function modResourceId(modKey) {
+    return 'ui:solid:mod:' + String(modKey || '');
+  }
+
+  function featureResourceId(page, key) {
+    return 'feature:' + String(page || '') + ':' + String(key || '');
+  }
+
+  function uiResourceId(page, key) {
+    return 'ui:' + String(page || '') + ':' + String(key || '');
+  }
+
   function currentSandbox() {
     try {
       var u = new URL(global.location.href);
@@ -990,6 +1003,9 @@
     filterScenesClientSide: filterScenesClientSide,
     sceneResourceId: sceneResourceId,
     tabResourceId: tabResourceId,
+    modResourceId: modResourceId,
+    featureResourceId: featureResourceId,
+    uiResourceId: uiResourceId,
     currentSandbox: currentSandbox,
     getPolicy: function () { return _policy; },
     getTiers: function () { return _tiers; },

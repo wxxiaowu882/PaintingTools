@@ -17,6 +17,8 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"晓色 · 调色助手","description":"从图片提取颜色并自动匹配水彩/油画颜料配方","url":"https://www.wuxiaoart.com/XStudio","author":{"@type":"Person","name":"童画师吴晓"},"applicationCategory":"DesignApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"CNY"}}</script>
 <!-- ========== SEO结束 ========== --> 
 <script src="docs/js/GlobalMenu.js?v=menuhigh2"></script>
+<script src="docs/js/membership/MembershipAccess.js"></script>
+<script src="docs/js/membership/MembershipPaintHost.js"></script>
 <script src="docs/js/culori.min.js"></script>
 <script src="docs/js/html2canvas.min.js"></script> <style> :root { --accent-color: #5E5CE6; --crosshair-guide: #7A9EB0; --crosshair-guide-rgb: 122, 158, 176; --bg-body: #F2F2F7; --surface-glass: rgba(255, 255, 255, 0.85); --surface-panel: #F7F8FA; --surface-opaque: #FFFFFF; --text-primary: #1C1C1E;
 --text-secondary: #8E8E93; --success: #34C759; --warning: #FF9500; --danger: #FF3B30; --border-light: rgba(0,0,0,0.06); --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
@@ -710,7 +712,20 @@ function confirmPigmentSet() {
   } catch(e){ console.error(e); }
   finally { closePigmentModal(); }
 }
-function switchModalTab(id) { modalState.viewingTabId = id; renderModalContent(); }
+function switchModalTab(id) {
+  try {
+    if (window.MembershipAccess && window.MembershipPaintHost) {
+      const free = id === 'basic' || isMyBoxId(id, modalState.tempMyBoxes || appState.myBoxes);
+      if (!free) {
+        const rid = window.MembershipAccess.uiResourceId('xstudio', 'palette:' + id);
+        const tab = PRESET_TABS.find(t => t.id === id);
+        if (!window.MembershipPaintHost.guard(rid, (tab && tab.name) || id)) return;
+      }
+    }
+  } catch (_eTab) {}
+  modalState.viewingTabId = id;
+  renderModalContent();
+}
 function getTempViewBox() { return findBoxById(modalState.viewingTabId, modalState.tempMyBoxes); }
 let _confirmAction = null;
 function showConfirmAction(opts) {
@@ -814,6 +829,12 @@ function confirmRenameBox() {
   renderModalContent();
 }
 function openShareBoxOverlay() {
+  try {
+    if (window.MembershipPaintHost && window.MembershipAccess) {
+      const rid = window.MembershipAccess.featureResourceId('xstudio', 'shareBox');
+      if (!window.MembershipPaintHost.guard(rid, '分享颜料盒')) return;
+    }
+  } catch (_eSh) {}
   const el = document.getElementById('shareBoxOverlay');
   if (el) el.classList.add('active');
 }
@@ -857,6 +878,12 @@ function downloadCurrentBoxShare() {
   }
 }
 function openImportBoxOverlay() {
+  try {
+    if (window.MembershipPaintHost && window.MembershipAccess) {
+      const rid = window.MembershipAccess.featureResourceId('xstudio', 'importBox');
+      if (!window.MembershipPaintHost.guard(rid, '导入颜料盒')) return;
+    }
+  } catch (_eIm) {}
   const el = document.getElementById('importBoxOverlay');
   const ta = document.getElementById('importBoxTextarea');
   if (ta) ta.value = '';
@@ -1017,9 +1044,11 @@ function renderModalContent() {
     const c = document.createElement('div');
     c.className = 'tab-chip' + (t.id === modalState.viewingTabId ? ' active' : '');
     c.innerText = t.name;
+    c.setAttribute('data-palette-id', t.id);
     c.onclick = () => switchModalTab(t.id);
     tabs.appendChild(c);
   });
+  try { if (typeof window.__xstudioRefreshMembership === 'function') window.__xstudioRefreshMembership(); } catch (_eXm) {}
   const isC = isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes);
   const box = getTempViewBox();
   const curT = PRESET_TABS.find(t => t.id === modalState.viewingTabId);
@@ -2085,5 +2114,43 @@ function closeShareOverlay() { document.getElementById('shareResultOverlay').cla
 window.addEventListener('DOMContentLoaded', () => { initApp(); bootStudioImage(); });
 document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
 document.addEventListener('dblclick', function(e) { e.preventDefault(); }, { passive: false });
+(function bootXstudioMembership() {
+  function refresh() {
+    try {
+      if (!window.MembershipAccess || !window.MembershipPaintHost) return;
+      var targets = [];
+      var importBtn = document.getElementById('modalImportBoxBtn');
+      var shareBtn = document.getElementById('shareBoxInlineBtn');
+      if (importBtn) {
+        var rImp = window.MembershipAccess.featureResourceId('xstudio', 'importBox');
+        targets.push({ el: importBtn, rid: rImp, label: '导入颜料盒' });
+        window.MembershipPaintHost.markLockedEl(importBtn, rImp, '导入颜料盒');
+      }
+      if (shareBtn) {
+        var rSh = window.MembershipAccess.featureResourceId('xstudio', 'shareBox');
+        targets.push({ el: shareBtn, rid: rSh, label: '分享颜料盒' });
+        window.MembershipPaintHost.markLockedEl(shareBtn, rSh, '分享颜料盒');
+      }
+      var chips = document.querySelectorAll('#modalTabs .tab-chip[data-palette-id]');
+      for (var i = 0; i < chips.length; i++) {
+        var c = chips[i];
+        var pid = c.getAttribute('data-palette-id');
+        // 不涂：基础三色 + 两个自定义盒（与 switchModalTab 门禁白名单一致）
+        if (!pid || pid === 'basic' || isMyBoxId(pid, modalState.tempMyBoxes || appState.myBoxes)) continue;
+        var rid = window.MembershipAccess.uiResourceId('xstudio', 'palette:' + pid);
+        var tab = PRESET_TABS.find(function (t) { return t.id === pid; });
+        targets.push({ el: c, rid: rid, label: (tab && tab.name) || pid, chipStyle: { top: '2px', left: '2px', fontSize: '10px', maxWidth: '90%' } });
+        window.MembershipPaintHost.markLockedEl(c, rid, (tab && tab.name) || pid);
+      }
+      window.MembershipPaintHost.setTargets(targets);
+    } catch (_e) {}
+  }
+  window.__xstudioRefreshMembership = refresh;
+  if (window.MembershipPaintHost) {
+    window.MembershipPaintHost.boot();
+    window.MembershipPaintHost.addMarkFn(refresh);
+    if (window.MembershipAccess && window.MembershipAccess.onChange) window.MembershipAccess.onChange(refresh);
+  }
+})();
 </script>
 </body> </html>
