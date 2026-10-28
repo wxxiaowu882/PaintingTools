@@ -625,7 +625,8 @@
 
   /**
    * 分批拉取缩略图；每批回调 onBatch(items)，便于 UI 逐批上屏。
-   * 批较小、批间让出约 40ms，避免与进课/列表滚动抢主线程。
+   * 缩略图为小 dataURL（约 3KB），慢主要来自「按课表顺序串行分批」而非单张过大。
+   * 批略加大、批间让出约 20ms：加快后半段上屏，仍避免与进课/滚动抢主线程。
    */
   function hydrateCatalogThumbs(sandbox, onBatch) {
     var sb = sandbox || currentSandbox();
@@ -635,7 +636,8 @@
 
     function step() {
       if (cancelled) return Promise.resolve();
-      var limit = first ? 6 : 6;
+      // 首批略小保证尽快出图；后续加大以减少肖像长课表的串行轮数
+      var limit = first ? 8 : 16;
       first = false;
       return fetchCatalogThumbsBatch(sb, offset, limit).then(function (batch) {
         if (cancelled) return;
@@ -646,7 +648,7 @@
         offset = batch.nextOffset != null ? batch.nextOffset : offset + (batch.items ? batch.items.length : 0);
         // 让出主线程，方便浏览器先画上本批图、响应进课点击
         return new Promise(function (resolve) {
-          setTimeout(function () { resolve(step()); }, 40);
+          setTimeout(function () { resolve(step()); }, 20);
         });
       });
     }
@@ -892,8 +894,14 @@
 
   function promptUpgrade(detail) {
     var now = Date.now();
-    // 列表卡片可能 pointerup+click 连点两次；短窗内只弹一次
-    if (now - _upgradePromptAt < 800) return;
+    // 弹窗已开 / 短窗连点：只保留一次；勿因 debounce 导致「只闪一下没框」
+    try {
+      if (_upgradeModalEl && _upgradeModalEl.isConnected &&
+          global.getComputedStyle(_upgradeModalEl).display === 'flex') {
+        return;
+      }
+    } catch (_eOpen) {}
+    if (now - _upgradePromptAt < 450) return;
     _upgradePromptAt = now;
 
     var need = normalizeRequire(
@@ -904,6 +912,7 @@
     var label = (detail && detail.rule && detail.rule.label) ? String(detail.rule.label) : '';
     var nameHint = (detail && detail.sceneName) ? String(detail.sceneName) : '';
     var subject = label || nameHint || '此内容';
+    var onDismiss = detail && typeof detail.onDismiss === 'function' ? detail.onDismiss : null;
     var title;
     var body;
     var okText;
@@ -927,10 +936,22 @@
       global.location.href = '/member' + q + '#' + hash;
     }
 
+    function fireDismiss() {
+      if (!onDismiss) return;
+      try { onDismiss(); } catch (_eD) {}
+      onDismiss = null;
+    }
+
     try {
       var modal = ensureUpgradeModal();
       if (!modal) {
-        if (global.confirm(title + ' 前往会员页？')) goMember();
+        // confirm 取消也要回课表；延后到下一任务，避免与列表同一次手势抢点
+        global.setTimeout(function () {
+          var ok = false;
+          try { ok = !!global.confirm(title + ' 前往会员页？'); } catch (_eC) { ok = false; }
+          if (ok) goMember();
+          else fireDismiss();
+        }, 0);
         return;
       }
       var eye = modal.querySelector('.mu-eyebrow');
@@ -938,31 +959,74 @@
       modal.querySelector('.mu-title').textContent = title;
       modal.querySelector('.mu-body').textContent = body;
       var okBtn = modal.querySelector('.mu-ok');
+      var cancelBtn = modal.querySelector('.mu-cancel');
       okBtn.textContent = okText;
+      // 挡住同一指/鼠标抬起误点「前往开通」，避免未确认就跳会员页
+      modal.style.pointerEvents = 'none';
+      okBtn.style.pointerEvents = 'none';
+      cancelBtn.style.pointerEvents = 'none';
       modal.style.display = 'flex';
 
-      var cancelBtn = modal.querySelector('.mu-cancel');
-      function onOk() { cleanup(); goMember(); }
-      function onCancel() { cleanup(); }
-      function onBackdrop(e) { if (e.target === modal) cleanup(); }
-      function onKey(e) { if (e.key === 'Escape') cleanup(); }
-      function cleanup() {
+      var armed = false;
+      var armTimer = null;
+      function onOk(e) {
+        if (!armed) {
+          try { if (e) { e.preventDefault(); e.stopPropagation(); } } catch (_e) {}
+          return;
+        }
+        cleanup(false);
+        goMember();
+      }
+      function onCancel(e) {
+        if (!armed) {
+          try { if (e) { e.preventDefault(); e.stopPropagation(); } } catch (_e) {}
+          return;
+        }
+        cleanup(true);
+      }
+      function onBackdrop(e) {
+        if (!armed) return;
+        if (e.target === modal) cleanup(true);
+      }
+      function onKey(e) { if (armed && e.key === 'Escape') cleanup(true); }
+      function cleanup(dismissed) {
+        if (armTimer) {
+          try { global.clearTimeout(armTimer); } catch (_eT) {}
+          armTimer = null;
+        }
         hideUpgradeModal();
-        okBtn.removeEventListener('click', onOk);
-        cancelBtn.removeEventListener('click', onCancel);
+        modal.style.pointerEvents = '';
+        okBtn.style.pointerEvents = '';
+        cancelBtn.style.pointerEvents = '';
+        okBtn.removeEventListener('click', onOk, true);
+        cancelBtn.removeEventListener('click', onCancel, true);
         modal.removeEventListener('click', onBackdrop);
         global.document.removeEventListener('keydown', onKey);
+        if (dismissed) fireDismiss();
       }
-      okBtn.addEventListener('click', onOk);
-      cancelBtn.addEventListener('click', onCancel);
+      okBtn.addEventListener('click', onOk, true);
+      cancelBtn.addEventListener('click', onCancel, true);
       modal.addEventListener('click', onBackdrop);
       global.document.addEventListener('keydown', onKey);
-      try { okBtn.focus(); } catch (_f) {}
+      armTimer = global.setTimeout(function () {
+        armed = true;
+        modal.style.pointerEvents = '';
+        okBtn.style.pointerEvents = '';
+        cancelBtn.style.pointerEvents = '';
+        armTimer = null;
+      }, 420);
     } catch (_e2) {
       try {
-        if (global.confirm(title + ' 前往会员页？')) goMember();
-      } catch (_e3) {
-        goMember();
+        global.setTimeout(function () {
+          try {
+            if (global.confirm(title + ' 前往会员页？')) goMember();
+            else fireDismiss();
+          } catch (_e3) {
+            fireDismiss();
+          }
+        }, 0);
+      } catch (_e4) {
+        fireDismiss();
       }
     }
   }

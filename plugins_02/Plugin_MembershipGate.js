@@ -16,15 +16,59 @@ import '../docs/js/membership/MembershipAccess.js';
     return;
   }
 
-  function badgeText(gate, sceneData) {
-    var req =
+  function badgeRequire(gate, sceneData) {
+    return (
       (gate && gate.needLevel) ||
       (gate && gate.rule && gate.rule.require) ||
       (sceneData && sceneData.__require) ||
       (sceneData && sceneData.meta && sceneData.meta.require) ||
-      'member';
+      'member'
+    );
+  }
+
+  function badgeText(gate, sceneData) {
+    var req = badgeRequire(gate, sceneData);
     if (MA.badgeLabelForRequire) return MA.badgeLabelForRequire(req) || '会员';
     return req === 'user' ? '会员免费' : '高级会员尊享';
+  }
+
+  /** 模块旁：会员免费=绿字，高级=黄字 */
+  function badgeStyle(req, kind) {
+    var isUser = MA.normalizeRequire ? MA.normalizeRequire(req) === 'user' : req === 'user';
+    var ink = isUser ? 'rgba(168, 214, 186, 0.95)' : 'rgba(232, 210, 150, 0.95)';
+    var ribbonBg = isUser
+      ? 'linear-gradient(180deg,rgba(52,92,68,0.92),rgba(28,48,36,0.96))'
+      : 'linear-gradient(180deg,rgba(92,74,36,0.92),rgba(48,38,18,0.96))';
+    if (kind === 'mod') {
+      return (
+        'display:inline-block;margin-left:8px;vertical-align:middle;flex:none;' +
+        'font-size:10px;font-weight:400;padding:0;border:none;border-radius:0;background:transparent;' +
+        'color:' + ink + ';pointer-events:none;letter-spacing:0;white-space:nowrap;'
+      );
+    }
+    // 课表：列表项右下角斜角丝带（贴在卡片上，不盖缩略图）
+    return (
+      'position:absolute;right:-34px;bottom:14px;left:auto;top:auto;z-index:3;' +
+      'width:112px;padding:4px 0;text-align:center;' +
+      'font-size:9px;line-height:1.2;font-weight:500;letter-spacing:0.04em;' +
+      'color:' + ink + ';background:' + ribbonBg + ';' +
+      'border:none;border-radius:0;box-shadow:0 1px 0 rgba(255,255,255,0.08) inset,0 2px 8px rgba(0,0,0,0.35);' +
+      'transform:rotate(-45deg);transform-origin:center center;' +
+      'pointer-events:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+    );
+  }
+
+  /** 课表点锁课后会先关 modal；拦截进景时立刻加取消时都要恢复，避免「空场景」观感 */
+  function restoreSceneGridUi() {
+    try {
+      var modal = document.getElementById('scene-grid-modal');
+      if (modal) modal.style.display = 'flex';
+      var cards = document.querySelectorAll('#scene-grid-container .scene-item');
+      for (var i = 0; i < cards.length; i++) {
+        cards[i].style.opacity = '';
+        cards[i].style.filter = '';
+      }
+    } catch (_e) {}
   }
 
   function wrapSwitchScene() {
@@ -41,10 +85,12 @@ import '../docs/js/membership/MembershipAccess.js';
             data.__require ||
             (data.meta && data.meta.require) ||
             'member';
+          restoreSceneGridUi();
           MA.promptUpgrade({
             needLevel: req,
             rule: { label: (data && data.name) || '场景', require: req },
-            sceneName: data && data.name
+            sceneName: data && data.name,
+            onDismiss: restoreSceneGridUi
           });
           return;
         }
@@ -53,7 +99,8 @@ import '../docs/js/membership/MembershipAccess.js';
           var gate = MA.canAccess(rid);
           if (!gate.ok) {
             if (window.hwLog) window.hwLog('[MembershipGate] 拦截场景 ' + rid);
-            MA.promptUpgrade(gate);
+            restoreSceneGridUi();
+            MA.promptUpgrade(Object.assign({}, gate, { onDismiss: restoreSceneGridUi }));
             return;
           }
         }
@@ -136,18 +183,20 @@ import '../docs/js/membership/MembershipAccess.js';
         host.classList.add('membership-mod-locked');
         host.style.opacity = '0.55';
         var text = badgeText(gate);
+        var req = badgeRequire(gate);
         if (!badge) {
           badge = document.createElement('span');
           badge.className = 'membership-mod-badge';
-          badge.style.cssText =
-            'position:absolute;top:4px;right:4px;z-index:3;font-size:10px;padding:2px 6px;border-radius:4px;' +
-            'background:rgba(0,0,0,0.65);color:#f5d76e;pointer-events:none;';
-          try {
-            if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
-          } catch (_ePos) {}
-          host.appendChild(badge);
+          var titleEl =
+            host.querySelector('.module-title') ||
+            host.querySelector('label.module-title') ||
+            host.querySelector('label');
+          if (titleEl) titleEl.appendChild(badge);
+          else host.appendChild(badge);
         }
+        badge.style.cssText = badgeStyle(req, 'mod');
         badge.textContent = text;
+        badge.title = text;
       });
       // 清掉旧 Tab 灰显
       ['env', 'atmos', 'assist', 'light'].forEach(function (tab) {
@@ -204,16 +253,29 @@ import '../docs/js/membership/MembershipAccess.js';
         }
         el.classList.add('membership-locked');
         var text = badgeText(gate, sc);
+        var reqSc = badgeRequire(gate, sc);
         if (!badge) {
           badge = document.createElement('span');
           badge.className = 'membership-badge';
-          badge.style.cssText =
-            'position:absolute;top:6px;right:6px;z-index:2;font-size:11px;padding:2px 6px;border-radius:4px;' +
-            'background:rgba(0,0,0,0.65);color:#f5d76e;pointer-events:none;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-          if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+          try {
+            if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+          } catch (_ePos) {}
+          // 旧版曾挂在缩略图 wrap 上：统一挂到列表项右下角
           el.appendChild(badge);
+        } else if (badge.parentElement !== el) {
+          try { el.appendChild(badge); } catch (_eRe) {}
         }
+        try {
+          // 斜角丝带需露出卡片右下角，避免被 overflow:hidden 裁切
+          if (el.style.overflow === 'hidden' || !el.style.overflow) {
+            var ov = '';
+            try { ov = getComputedStyle(el).overflow; } catch (_eOv) {}
+            if (ov === 'hidden') el.style.overflow = 'visible';
+          }
+        } catch (_eOv2) {}
+        badge.style.cssText = badgeStyle(reqSc, 'scene');
         badge.textContent = text;
+        badge.title = text;
       });
     } catch (_e) {
     } finally {

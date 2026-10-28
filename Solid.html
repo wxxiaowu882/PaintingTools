@@ -77,6 +77,14 @@
     .modal-close:hover { background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.9); }
     /* pan-y 对齐 Portrait_c 列表：明确纵向滑动手势，避免 manipulation 与滚动容器抢手势 */
     .scene-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows:max-content; gap:15px; overflow-y:auto; flex:1; align-content:start; padding-bottom:30px; min-height:0; -webkit-overflow-scrolling:touch; touch-action:pan-y; overscroll-behavior-y:contain; }
+    /* PC 课表滚动条：低调深灰，避免系统默认死白滑块抢戏 */
+    @media (hover: hover) and (pointer: fine) {
+      .scene-grid { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
+      .scene-grid::-webkit-scrollbar { width: 5px; }
+      .scene-grid::-webkit-scrollbar-track { background: transparent; }
+      .scene-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; border: 1px solid transparent; background-clip: padding-box; }
+      .scene-grid::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); background-clip: padding-box; }
+    }
     .scene-item { background:rgba(20,20,20,0.8); border:1px solid rgba(255,255,255,0.05); border-radius:10px; cursor:pointer; transition:all 0.3s cubic-bezier(0.4,0,0.2,1); overflow:hidden; position:relative; display:flex; flex-direction:column; box-shadow:0 4px 15px rgba(0,0,0,0.5); align-self:start; touch-action:pan-y; -webkit-tap-highlight-color:transparent; }
     /* 壳内 WebView：锁文档滚、关毛玻璃；列表改 touch-action:none + JS 直控滚动（原生快滑易反向） */
     html.wuxiao-android-shell, html.wuxiao-android-shell body { overflow:hidden !important; overscroll-behavior:none !important; height:100% !important; width:100% !important; }
@@ -123,11 +131,16 @@
     /* 单列卡片宽度：占列宽 90%，居中对齐 */
     html.solid-scene-list-v2 .scene-item { padding: 12px; width: 90%; margin: 0 auto; }
     html.solid-scene-list-v2 .scene-thumb { width:200px; height:200px; }
-    /* PC 端：字号更大，标题与描述间距更大 */
+    /* PC 端：字号更大，标题与描述间距更大；筛选芯片与卡片标题比例对齐 */
     html.solid-scene-list-v2 .scene-meta { gap: 14px; }
     html.solid-scene-list-v2 .scene-title { font-size:17px; }
     html.solid-scene-list-v2 .scene-detail { font-size:12.5px; line-height: 1.62; }
-    html.solid-scene-list-v2 .scene-empty { font-size:13px; } .scene-fav-btn { width:30px; height:30px; } }
+    html.solid-scene-list-v2 .scene-empty { font-size:13px; } .scene-fav-btn { width:30px; height:30px; }
+    .scene-tab { font-size:14px; padding:7px 14px; }
+    .scene-subtab { font-size:13px; padding:6px 12px; }
+    .scene-tabbar { gap:10px; }
+    .scene-subtabbar { gap:8px; }
+    }
 
     /* 旧的 JS 强制单列逻辑已废弃：改由 grid auto-fit 自适应回落 */
     /* 写生练习模式提示（隐藏标注后触发）：贴近控制面板上方，柔和渐显/渐隐 */
@@ -265,7 +278,14 @@
     import { createSolidRasterLightRig } from './plugins_02/SolidRasterLightRigShared.js';
     import { createSolidRasterPreviewComposer } from './plugins_02/SolidRasterPreviewComposer.js';
     import { createSolidPathTracerSyncController } from './plugins_02/SolidPathTracerSyncShared.js';
-    import { solidIsInRasterPreviewBridge, solidShouldBlockSamplingWhenPending, solidShouldContinueSampling } from './plugins_02/SolidRenderLoopShared.js';
+    import {
+        solidIsInRasterPreviewBridge,
+        solidShouldBlockSamplingWhenPending,
+        solidShouldContinueSampling,
+        solidShouldProbeBlankOutput,
+        solidIsNearBlackSampleSet,
+        solidBlankOutputProbePoints,
+    } from './plugins_02/SolidRenderLoopShared.js';
     import { createSolidFrameStageScheduler } from './plugins_02/SolidFrameStageSchedulerShared.js';
     import { attachSolidBuiltinSphereShadowCore } from './plugins_02/solidBuiltinSphereShadowCore.js';
     import { installSolidEnvHostBindings } from './plugins_02/SolidEnvControlShared.js';
@@ -409,7 +429,7 @@
     // 默认不自动开启渲染：初次进入为预览模式，需用户点击「开始渲染」再尝试开启完整效果
     window.useAdvancedRender = false;
     window._solidUserStoppedRender = true;
-    window.perfTestDone = false; window.isTestingPerformance = true; window.isLoadingScene = false; window._solidHardwareUnsupported = false; window._solidPerfSoftFail = false; window._solidSampleTimeout = false; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
+    window.perfTestDone = false; window.isTestingPerformance = true; window.isLoadingScene = false; window._solidHardwareUnsupported = false; window._solidPerfSoftFail = false; window._solidSampleTimeout = false; window._solidBlankOutputFail = false; window._solidBlankProbeDisabled = false; window._solidBlankProbeHits = 0; window._solidBlankProbeLastAt = 0; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
     window.__solidJsonLoadStarted = false; window.__solidPendingSwitchSceneIndex = null; window.__solidPerfBgActive = false;
     window.__solidInitRenderReady = false; window.__solidPerfKickStarted = false; window.__solidPerfWantBackground = false; window.__solidPerfDeferred = false;
     window.__solidNoInterModelShadow = false;
@@ -472,6 +492,9 @@
                 _solidContextLost: !!window._solidContextLost,
                 _solidHardwareUnsupported: !!window._solidHardwareUnsupported,
                 _solidSampleTimeout: !!window._solidSampleTimeout,
+                _solidBlankOutputFail: !!window._solidBlankOutputFail,
+                _solidBlankProbeDisabled: !!window._solidBlankProbeDisabled,
+                _solidBlankProbeHits: Number(window._solidBlankProbeHits || 0) || 0,
                 _solidPerfSoftFail: !!window._solidPerfSoftFail,
                 perfTestDone: !!window.perfTestDone,
                 isTestingPerformance: !!window.isTestingPerformance,
@@ -903,6 +926,107 @@
     const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0';
     syncRenderButtons();
     };
+    function _solidGetBlankOutputProbeCfg() {
+        const raw = (_solidPtCfg && _solidPtCfg.blankOutputProbe) ? _solidPtCfg.blankOutputProbe : {};
+        return {
+            enabledMobile: raw.enabledMobile !== false,
+            enabledDesktop: raw.enabledDesktop === true,
+            minSamples: Math.max(1, Number(raw.minSamples || 8)),
+            minMs: Math.max(0, Number(raw.minMs || 1500)),
+            intervalMs: Math.max(200, Number(raw.intervalMs || 600)),
+            lumaMax: Math.max(0, Number(raw.lumaMax != null ? raw.lumaMax : 10)),
+            consecutiveHits: Math.max(1, Number(raw.consecutiveHits || 2)),
+            pointInset: Number(raw.pointInset != null ? raw.pointInset : 0.18),
+            minNearBlackPoints: Math.max(1, Number(raw.minNearBlackPoints || 4)),
+        };
+    }
+    /** 假进度黑屏：samples 已涨但默认帧缓冲近黑 → 退回光栅（节流 readPixels，禁区对齐取色插件）。 */
+    function _solidTryBlankOutputProbeAndFallback(currentSamples) {
+        try {
+            const cfg = _solidGetBlankOutputProbeCfg();
+            const enabled = isMobile ? cfg.enabledMobile : cfg.enabledDesktop;
+            if (!solidShouldProbeBlankOutput({
+                enabled,
+                disabled: !!window._solidBlankProbeDisabled,
+                alreadyFailed: !!window._solidBlankOutputFail,
+                useAdvancedRender: !!window.useAdvancedRender,
+                isLoadingScene: !!window.isLoadingScene,
+                documentHidden: !!(typeof document !== 'undefined' && document.hidden),
+                pageUnloading: !!window.__isPageUnloading,
+                orbitInteracting: !!window._orbitInteracting,
+                contextLost: !!(typeof _solidIsGlContextLost === 'function' && _solidIsGlContextLost()),
+                samples: currentSamples,
+                minSamples: cfg.minSamples,
+                now: performance.now(),
+                lastResetAt: window.__solidLastResetAt,
+                minMs: cfg.minMs,
+                lastProbeAt: window._solidBlankProbeLastAt,
+                intervalMs: cfg.intervalMs,
+            })) return false;
+            if (!renderer || typeof renderer.getContext !== 'function') return false;
+            const gl = renderer.getContext();
+            if (!gl || (typeof gl.isContextLost === 'function' && gl.isContextLost())) return false;
+            const canvas = renderer.domElement;
+            const w = (canvas && canvas.width) ? canvas.width : 0;
+            const h = (canvas && canvas.height) ? canvas.height : 0;
+            if (w < 8 || h < 8) return false;
+            window._solidBlankProbeLastAt = performance.now();
+            const pts = solidBlankOutputProbePoints(w, h, cfg.pointInset);
+            const pix = (window.__solidBlankProbePixBuf && window.__solidBlankProbePixBuf.length >= 4)
+                ? window.__solidBlankProbePixBuf
+                : (window.__solidBlankProbePixBuf = new Uint8Array(4));
+            const samples = [];
+            try { gl.bindFramebuffer(gl.FRAMEBUFFER, null); } catch (_eFb) {}
+            // WebGL 默认 FBO 原点在左下；canvas.width/height 已是 backing store
+            for (let i = 0; i < pts.length; i++) {
+                const p = pts[i];
+                gl.readPixels(p.x, p.y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pix);
+                samples.push({ r: pix[0], g: pix[1], b: pix[2] });
+            }
+            const nearBlack = solidIsNearBlackSampleSet(samples, {
+                lumaMax: cfg.lumaMax,
+                minNearBlackPoints: cfg.minNearBlackPoints,
+            });
+            if (!nearBlack) {
+                window._solidBlankProbeHits = 0;
+                return false;
+            }
+            window._solidBlankProbeHits = (Number(window._solidBlankProbeHits) || 0) + 1;
+            if (window._solidBlankProbeHits < cfg.consecutiveHits) {
+                try { window.hwLog('[BlankOutput] near-black hit ' + window._solidBlankProbeHits + '/' + cfg.consecutiveHits + ' samples=' + currentSamples); } catch (_eH) {}
+                return false;
+            }
+            window._solidBlankOutputFail = true;
+            window.useAdvancedRender = false;
+            window._solidUserStoppedRender = true;
+            if (pathTracer) {
+                const _ptDrop = pathTracer;
+                pathTracer = null;
+                setTimeout(function() { try { safeDispose(_ptDrop); } catch (_e) {} }, 0);
+            }
+            try { _solidCommitStandardRasterFallback('blank_output'); } catch (_eRf) {}
+            window.hwLog('[animate] 空输出保底：采样已前进但画面近黑，切换光栅模式 samples=' + currentSamples);
+            (function() {
+                const t = document.getElementById('render-toast');
+                if (!t) return;
+                t.textContent = '高级渲染画面异常，已切回预览。可点「开始渲染」重试';
+                t.style.opacity = '1';
+                t.style.transform = 'translateY(0px)';
+                if (t.__hideTimer) clearTimeout(t.__hideTimer);
+                t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 4000);
+            })();
+            try { if (typeof window.solidSetPersistentWarning === 'function') window.solidSetPersistentWarning('高级渲染画面异常，已切回预览。可点「开始渲染」重试', true); } catch (_ePw) {}
+            try { syncRenderButtons(); } catch (_eBtn) {}
+            try { const pBar = document.getElementById('render-progress-bar'); if (pBar) pBar.style.opacity = '0'; } catch (_ePb) {}
+            const _br = document.getElementById('btn-rerender'); if (_br) { _br.style.display = ''; _br.style.opacity = '0.8'; }
+            if (renderer && renderer.domElement) renderer.domElement.style.filter = '';
+            return true;
+        } catch (e) {
+            window._solidBlankProbeDisabled = true;
+            try { window.hwLog('[BlankOutput] 探针异常已停用本会话: ' + (e && e.message ? e.message : e)); } catch (_eL) {}
+            return false;
+        }
+    }
     function _solidCommitStandardRasterFallback(reason) {
     try {
     if (typeof _solidIsGlContextLost === 'function' && _solidIsGlContextLost()) {
@@ -962,7 +1086,7 @@
     onPathTracerReady(pt) { try { pt.updateMaterials(); pt.updateLights(); } catch(_eUp) {} },
     resetReason: 'light_moved',
     });
-    if (_entered && pathTracer) { window.isUnsupported = false; window._solidContextLost = false; window._solidSampleTimeout = false; window._solidPerfSoftFail = false;
+    if (_entered && pathTracer) { window.isUnsupported = false; window._solidContextLost = false; window._solidSampleTimeout = false; window._solidBlankOutputFail = false; window._solidBlankProbeHits = 0; window._solidBlankProbeLastAt = 0; window._solidPerfSoftFail = false;
     if (window.PluginManager) window.PluginManager.trigger('onSkyEnvSync', { scene, solidMainLightType: lightType }); }
     syncRenderButtons();
     hwLog("已尝试开启渲染并重建状态");
@@ -1107,6 +1231,7 @@
         let _pwMsg = '未能开启高级渲染。需要时可点「开始渲染」再试';
         if (window._solidHardwareUnsupported) _pwMsg = '当前设备暂不支持高级渲染，仍可正常观察模型与标注';
         else if (window._solidSampleTimeout) _pwMsg = '高级渲染超时已暂停。可点「开始渲染」重试';
+        else if (window._solidBlankOutputFail) _pwMsg = '高级渲染画面异常，已切回预览。可点「开始渲染」重试';
         else if (window._solidPerfSoftFail) _pwMsg = '未能开启高级渲染。需要时可点「开始渲染」再试';
         if (typeof window.solidSetPersistentWarning === 'function') window.solidSetPersistentWarning(_pwMsg, true);
     } catch (_eAckPw) {}
@@ -1938,10 +2063,14 @@
                 : ('场景加载失败：' + (_eSceneFetch && _eSceneFetch.message ? _eSceneFetch.message : _eSceneFetch)), true);
             if (_eSceneFetch && _eSceneFetch.locked && window.MembershipAccess && window.MembershipAccess.promptUpgrade) {
                 var _scName = (window.customScenes[index] && window.customScenes[index].name) || '场景';
+                var _restoreGrid = function () {
+                    try { document.getElementById('scene-grid-modal').style.display = 'flex'; } catch (_eRg) {}
+                };
                 window.MembershipAccess.promptUpgrade({
                     needLevel: _eSceneFetch.needLevel || (_eSceneFetch.message === 'need_user' ? 'user' : 'member'),
                     rule: { label: _scName, require: _eSceneFetch.needLevel || 'member' },
-                    sceneName: _scName
+                    sceneName: _scName,
+                    onDismiss: _restoreGrid
                 });
             }
         } catch (_eMsg) {}
@@ -2565,7 +2694,39 @@
                 const now = Date.now();
                 if (now - lastActAt < 450) return;
                 lastActAt = now;
-                // 点击瞬间先压暗本项 + 关列表（switchScene 内还会出加载遮罩）；勿调 closeSceneGridModal（async 进课未改 index 时会被判成未选课误开全局菜单）
+                // 锁课：先弹升级框，不关课表、不压暗（避免「闪一下 / 同手势误点前往开通」）
+                try {
+                    const MA = window.MembershipAccess;
+                    const sc = (Array.isArray(window.customScenes) && window.customScenes[idx]) ? window.customScenes[idx] : null;
+                    if (MA && sc) {
+                        if (sc.__membershipLocked) {
+                            const req = sc.__require || (sc.meta && sc.meta.require) || 'member';
+                            if (typeof MA.promptUpgrade === 'function') {
+                                MA.promptUpgrade({
+                                    needLevel: req,
+                                    rule: { label: sc.name || '场景', require: req },
+                                    sceneName: sc.name
+                                });
+                            }
+                            return;
+                        }
+                        if (typeof MA.sceneResourceId === 'function' && typeof MA.canAccess === 'function') {
+                            const rid = MA.sceneResourceId(MA.currentSandbox ? MA.currentSandbox() : (window.__solidSandboxKey || 'geometry'), sc);
+                            if (rid) {
+                                const gate = MA.canAccess(rid);
+                                if (gate && !gate.ok) {
+                                    if (typeof MA.promptUpgrade === 'function') {
+                                        MA.promptUpgrade(Object.assign({}, gate, {
+                                            rule: Object.assign({}, gate.rule || {}, { label: (gate.rule && gate.rule.label) || sc.name || '场景' })
+                                        }));
+                                    }
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                } catch (_eGate) {}
+                // 可进课：点击瞬间先压暗本项 + 关列表（switchScene 内还会出加载遮罩）；勿调 closeSceneGridModal（async 进课未改 index 时会被判成未选课误开全局菜单）
                 try {
                     el.style.opacity = '0.55';
                     el.style.filter = 'brightness(1.15)';
@@ -4023,6 +4184,8 @@
         })();
         { const _er = _solidPt.expRamp, _elo = _solidPt.expLo, _ehi = _solidPt.expHi; renderer.toneMappingExposure = currentSamples >= _er ? _ehi : _elo + (_ehi - _elo) * (currentSamples / _er); }
         if (solidShouldContinueSampling(currentSamples, targetSamples)) { const _uiBlk = window.solidPathTraceUiBlocksSample && window.solidPathTraceUiBlocksSample(); if (!_uiBlk) { const dofOn = window.DoFManager ? window.DoFManager.enabled : false; if (window.AtmosphereManager && (window.isFogEnabled || dofOn)) window.AtmosphereManager.render(pathTracer, renderer, scene, camera); else pathTracer.renderSample(); } }
+        // 【空输出保底·假进度黑屏】：samples 已涨但画布仍近黑（MatePad/Mali 等），退回光栅
+        try { if (_solidTryBlankOutputProbeAndFallback(pathTracer ? pathTracer.samples : currentSamples)) return; } catch (_eBlank) {}
         window._solidAnimErrCount = 0;
         if (window.refreshIosPosterizeOverlayFromWebGL) window.refreshIosPosterizeOverlayFromWebGL();
         if (window.PluginManager) window.PluginManager.trigger('onPostRender', { renderer });
