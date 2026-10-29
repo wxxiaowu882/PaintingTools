@@ -2,11 +2,13 @@ package com.wuxiaoart.workshop
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.animation.DecelerateInterpolator
@@ -26,10 +28,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -56,23 +60,49 @@ class MainActivity : AppCompatActivity() {
 
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var pendingPermissionRequest: PermissionRequest? = null
+    /** 拍照写入的 cache Uri；系统相机返回 RESULT_OK 且 data 为空时用它回传 WebView */
+    private var cameraImageUri: Uri? = null
+    private var pendingFileChooserParams: WebChromeClient.FileChooserParams? = null
+    private var pendingFileChooserAfterCamPerm = false
     /** 强制更新弹窗打开时，返回键直接退出，不进站 */
     private var forceUpdateBlocking = false
     private var splashStartedAt = 0L
     private var splashHidden = false
     private var firstPageFinished = false
+    /** 最近一次注入的顶栏安全区（CSS px）；旋转/inset 变化时用于判断是否重注 */
+    private var lastShellSafeTopCss = -1.0
 
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val cb = filePathCallback
             filePathCallback = null
+            val camUri = cameraImageUri
+            cameraImageUri = null
             if (cb == null) return@registerForActivityResult
-            val uris = WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
-            cb.onReceiveValue(uris)
+            if (result.resultCode != Activity.RESULT_OK) {
+                cb.onReceiveValue(null)
+                return@registerForActivityResult
+            }
+            val dataUri = result.data?.data
+            when {
+                dataUri != null -> cb.onReceiveValue(arrayOf(dataUri))
+                camUri != null -> cb.onReceiveValue(arrayOf(camUri))
+                else -> cb.onReceiveValue(
+                    WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
+                )
+            }
         }
 
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (pendingFileChooserAfterCamPerm) {
+                pendingFileChooserAfterCamPerm = false
+                val params = pendingFileChooserParams
+                pendingFileChooserParams = null
+                // 拒绝拍照权限仍可走相册/文件
+                launchImageChooser(params, includeCamera = granted)
+                return@registerForActivityResult
+            }
             val req = pendingPermissionRequest
             pendingPermissionRequest = null
             if (req == null) return@registerForActivityResult
@@ -99,10 +129,18 @@ class MainActivity : AppCompatActivity() {
         splashCredit = findViewById(R.id.splash_credit)
         webView.setBackgroundColor(0xFF050505.toInt())
 
-        // 全屏交给网页 CSS safe-area；根布局再垫 systemBars 会与 100dvh 叠出「整页可滚 1px」，
-        // 与课表 overflow 列表抢手势（仅壳复现反向/卡顿；浏览器无此双重留白）
+        // 全屏交给网页；根布局不垫 systemBars（垫了会与 100dvh 叠出「整页可滚 1px」）。
+        // 状态栏高度改由 injectShellPageHelpers 注入 --app-safe-top，只挪顶栏控件。
         val root = findViewById<View>(R.id.root)
-        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets -> insets }
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            if (firstPageFinished && ::webView.isInitialized) {
+                val next = shellSafeTopCssPx()
+                if (kotlin.math.abs(next - lastShellSafeTopCss) >= 0.5) {
+                    injectShellPageHelpers(webView.url)
+                }
+            }
+            insets
+        }
 
         setupWebView()
         setupBackPress()
@@ -196,16 +234,41 @@ class MainActivity : AppCompatActivity() {
             p.contains("member-ops")
     }
 
+    /**
+     * 状态栏高度 → CSS px；至少 20（对齐晓阶顶空保底）。
+     * 只用于注入顶栏偏移，不垫 WebView 根布局。
+     */
+    private fun shellSafeTopCssPx(): Double {
+        val density = resources.displayMetrics.density.coerceAtLeast(0.5f)
+        val root = findViewById<View>(R.id.root)
+        val topPx = ViewCompat.getRootWindowInsets(root)
+            ?.getInsets(WindowInsetsCompat.Type.statusBars())
+            ?.top
+            ?: 0
+        val css = topPx.toDouble() / density.toDouble()
+        return maxOf(css, 20.0)
+    }
+
+    /**
+     * 壳注入必须可解析：禁止在 JS 字符串拼接末尾残留 `+`（1.0.16/17 曾因此整段静默失败，
+     * 表现为无版本角标、无顶栏安全区）。版本角标与安全区 CSS 分两次注入，互不影响。
+     */
     private fun injectShellPageHelpers(url: String?) {
         val path = (Uri.parse(url ?: "").path ?: "").lowercase()
         val isHome = path.isEmpty() || path == "/" || path == "/index" || path.endsWith("/index.html")
         val docScroll = isDocumentScrollPath(path)
-        // 作品集等靠 WebView 滚整页；课表页关滚动条以免与内层列表抢手势观感
         webView.isVerticalScrollBarEnabled = docScroll
+        val safeTop = shellSafeTopCssPx()
+        lastShellSafeTopCss = safeTop
+        val safeTopLiteral = String.format(java.util.Locale.US, "%.2f", safeTop)
         val verLiteral = JSONObject.quote(BuildConfig.VERSION_NAME)
-        val homeBadgeJs = if (isHome) {
+
+        // 1) 版本号：独立注入，失败也不影响安全区
+        val badgeJs = if (isHome) {
             """
+            (function(){
               try {
+                document.documentElement.classList.add('wuxiao-android-shell');
                 window.__SHELL_VERSION__ = $verLiteral;
                 var el = document.getElementById('shell-version-badge');
                 if (!el) {
@@ -216,43 +279,93 @@ class MainActivity : AppCompatActivity() {
                   (document.body || document.documentElement).appendChild(el);
                 }
                 el.textContent = 'V' + window.__SHELL_VERSION__;
-              } catch (eBadge) {}
+                window.__SHELL_INJECT_BADGE_OK__ = true;
+              } catch (e) { try { window.__SHELL_INJECT_BADGE_OK__ = false; } catch (_e) {} }
+            })();
             """.trimIndent()
         } else {
-            "try { window.__SHELL_VERSION__ = $verLiteral; } catch (eVer) {}"
+            """
+            (function(){
+              try {
+                document.documentElement.classList.add('wuxiao-android-shell');
+                window.__SHELL_VERSION__ = $verLiteral;
+                window.__SHELL_INJECT_BADGE_OK__ = true;
+              } catch (e) { try { window.__SHELL_INJECT_BADGE_OK__ = false; } catch (_e) {} }
+            })();
+            """.trimIndent()
         }
-        // 文档滚：允许 overflow-y；课表锁：overflow hidden + height 100%（既有 Solid 约定）
+        webView.evaluateJavascript(badgeJs, null)
+
         val bodyScrollCss = if (docScroll) {
             "html.wuxiao-android-shell,html.wuxiao-android-shell body{overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;width:100%!important;background:#050505!important;height:auto!important;min-height:100%!important;}"
         } else {
             "html.wuxiao-android-shell,html.wuxiao-android-shell body{overflow:hidden!important;overscroll-behavior:none!important;height:100%!important;width:100%!important;background:#050505!important;}"
         }
-        val js = """
+
+        // 2) 安全区 / 滚动：Kotlin 侧拼好整段 CSS，避免 JS 尾部 `+` 语法错误
+        val safeCss = buildString {
+            append(bodyScrollCss)
+            append("html.wuxiao-android-shell .scene-grid{-webkit-overflow-scrolling:auto!important;}")
+            append("html.wuxiao-android-shell #scene-grid-modal{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}")
+            append("html.wuxiao-android-shell .index-about-app,")
+            append("html.wuxiao-android-shell .menu-item[data-menu-url=\"/docs/app/\"],")
+            append("html.wuxiao-android-shell .menu-item[data-menu-url=\"/docs/app\"],")
+            append("html.wuxiao-android-shell .menu-category[data-menu-cat=\"install\"]{display:none!important;}")
+            append("html.wuxiao-android-shell{--app-safe-top:").append(safeTopLiteral).append("px;}")
+            append("html.wuxiao-android-shell #menu-trigger-overlay,")
+            append("html.wuxiao-android-shell #top-left-scene-btn,")
+            append("html.wuxiao-android-shell #solid-global-help-btn{")
+            append("transform:none!important;top:calc(var(--app-safe-top) + 8px)!important;}")
+            append("html.wuxiao-android-shell #solid-scene-keypoints-btn{")
+            append("transform:none!important;top:calc(var(--app-safe-top) + 52px)!important;}")
+            append("html.wuxiao-android-shell .pt-id-chrome--bar{top:calc(var(--app-safe-top) + 12px)!important;}")
+            append("html.wuxiao-android-shell .brand-bar{padding-top:calc(var(--app-safe-top) + 10px)!important;}")
+            append("html.wuxiao-android-shell .status-badge-container,")
+            append("html.wuxiao-android-shell .action-group{top:calc(var(--app-safe-top) + 8px)!important;}")
+            append("html.wuxiao-android-shell .backdrop,")
+            append("html.wuxiao-android-shell .about-overlay,")
+            append("html.wuxiao-android-shell .pigment-modal{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}")
+            append("html.wuxiao-android-shell body.modal-open{overflow:hidden!important;touch-action:none!important;}")
+            append("html.wuxiao-android-shell body.modal-open .app-container{pointer-events:none!important;}")
+            append("html.wuxiao-android-shell body.modal-open #pigmentModal,")
+            append("html.wuxiao-android-shell body.modal-open #modalBackdrop,")
+            append("html.wuxiao-android-shell body.modal-open #aboutOverlay,")
+            append("html.wuxiao-android-shell body.modal-open #pickerOverlay,")
+            append("html.wuxiao-android-shell body.modal-open #nameInputOverlay,")
+            append("html.wuxiao-android-shell body.modal-open #renameBoxOverlay,")
+            append("html.wuxiao-android-shell body.modal-open #confirmActionOverlay{pointer-events:auto!important;}")
+            append("html.wuxiao-android-shell #pigmentModal.active{")
+            append("top:calc(var(--app-safe-top) + 72px)!important;pointer-events:auto!important;}")
+            append("html.wuxiao-android-shell #pigmentModal .close-modal{z-index:70!important;}")
+            append("html.wuxiao-android-shell #pigmentModal .modal-footer{position:relative;z-index:56!important;}")
+            append("html.wuxiao-android-shell #pigmentModalBusy{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:rgba(247,248,250,0.88)!important;}")
+        }
+        val safeCssLiteral = JSONObject.quote(safeCss)
+        val safeJs = """
             (function(){
               try {
                 document.documentElement.classList.add('wuxiao-android-shell');
-                var s = document.getElementById('wuxiao-shell-scroll-fix');
+                window.__SHELL_SAFE_TOP_PX__ = $safeTopLiteral;
+                var css = $safeCssLiteral;
+                var s = document.getElementById('wuxiao-shell-inject-css');
                 if (!s) {
                   s = document.createElement('style');
-                  s.id = 'wuxiao-shell-scroll-fix';
+                  s.id = 'wuxiao-shell-inject-css';
                   (document.head || document.documentElement).appendChild(s);
                 }
-                s.textContent =
-                  '$bodyScrollCss' +
-                  'html.wuxiao-android-shell .scene-grid{-webkit-overflow-scrolling:auto!important;}' +
-                  'html.wuxiao-android-shell #scene-grid-modal{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}' +
-                  'html.wuxiao-android-shell .index-about-app,' +
-                  'html.wuxiao-android-shell .menu-item[data-menu-url=\"/docs/app/\"],' +
-                  'html.wuxiao-android-shell .menu-item[data-menu-url=\"/docs/app\"],' +
-                  'html.wuxiao-android-shell .menu-category[data-menu-cat=\"install\"]{display:none!important;}';
+                s.textContent = css;
+                try { var old1 = document.getElementById('wuxiao-shell-scroll-fix'); if (old1) old1.remove(); } catch (_o1) {}
+                try { var old2 = document.getElementById('wuxiao-shell-safe-top'); if (old2) old2.remove(); } catch (_o2) {}
                 try { window.scrollTo(0, 0); } catch (e0) {}
                 try { document.documentElement.scrollTop = 0; } catch (e1) {}
                 try { if (document.body) document.body.scrollTop = 0; } catch (e2) {}
-                $homeBadgeJs
-              } catch (e) {}
+                window.__SHELL_INJECT_SAFE_OK__ = true;
+              } catch (e) {
+                try { window.__SHELL_INJECT_SAFE_OK__ = false; window.__SHELL_INJECT_ERR__ = String(e && e.message || e); } catch (_e) {}
+              }
             })();
         """.trimIndent()
-        webView.evaluateJavascript(js, null)
+        webView.evaluateJavascript(safeJs, null)
     }
 
     /**
@@ -411,7 +524,7 @@ class MainActivity : AppCompatActivity() {
                 progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
             }
 
-            // GR / XStudio / ARSketch：网页 input[type=file][accept=image]
+            // GR / XStudio / ARSketch：相册 + 拍照（iOS Safari 自带拍照项；安卓 WebView 须壳侧拼 Chooser）
             override fun onShowFileChooser(
                 webView: WebView?,
                 filePathCallback: ValueCallback<Array<Uri>>?,
@@ -419,23 +532,26 @@ class MainActivity : AppCompatActivity() {
             ): Boolean {
                 this@MainActivity.filePathCallback?.onReceiveValue(null)
                 this@MainActivity.filePathCallback = filePathCallback
-                val intent = try {
-                    fileChooserParams?.createIntent()
-                        ?: Intent(Intent.ACTION_GET_CONTENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "image/*"
-                        }
-                } catch (_: Exception) {
-                    this@MainActivity.filePathCallback = null
-                    return false
+                cameraImageUri = null
+                val acceptTypes = fileChooserParams?.acceptTypes
+                val wantsImage = acceptTypes.isNullOrEmpty() ||
+                    acceptTypes.any {
+                        it.isNullOrBlank() || it == "*/*" ||
+                            it.contains("image", ignoreCase = true)
+                    }
+                val canCamera = wantsImage && deviceHasCamera()
+                if (canCamera &&
+                    ContextCompat.checkSelfPermission(
+                        this@MainActivity,
+                        Manifest.permission.CAMERA
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    pendingFileChooserAfterCamPerm = true
+                    pendingFileChooserParams = fileChooserParams
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    return true
                 }
-                return try {
-                    fileChooserLauncher.launch(intent)
-                    true
-                } catch (_: Exception) {
-                    this@MainActivity.filePathCallback = null
-                    false
-                }
+                return launchImageChooser(fileChooserParams, includeCamera = canCamera)
             }
 
             /** 描摹助手摄像头等 */
@@ -459,6 +575,85 @@ class MainActivity : AppCompatActivity() {
                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                 }
             }
+        }
+    }
+
+    private fun deviceHasCamera(): Boolean {
+        return packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY) ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA)
+    }
+
+    /**
+     * 系统选择器：相册/文件 +（可选）拍照。
+     * 仅 createIntent() 时多数平板没有「拍照」项，故用 EXTRA_INITIAL_INTENTS 补上。
+     */
+    private fun launchImageChooser(
+        params: WebChromeClient.FileChooserParams?,
+        includeCamera: Boolean
+    ): Boolean {
+        val contentIntent = try {
+            params?.createIntent()
+                ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "image/*"
+                }
+        } catch (_: Exception) {
+            filePathCallback?.onReceiveValue(null)
+            filePathCallback = null
+            return false
+        }
+
+        val initialIntents = ArrayList<Intent>()
+        if (includeCamera) {
+            try {
+                val photoFile = File.createTempFile("wuxiao_cap_", ".jpg", cacheDir)
+                val uri = FileProvider.getUriForFile(
+                    this,
+                    "$packageName.fileprovider",
+                    photoFile
+                )
+                cameraImageUri = uri
+                val takePicture = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                    putExtra(MediaStore.EXTRA_OUTPUT, uri)
+                    addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val resInfo = packageManager.queryIntentActivities(
+                    takePicture,
+                    PackageManager.MATCH_DEFAULT_ONLY
+                )
+                for (ri in resInfo) {
+                    grantUriPermission(
+                        ri.activityInfo.packageName,
+                        uri,
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+                if (resInfo.isNotEmpty()) {
+                    initialIntents.add(takePicture)
+                } else {
+                    cameraImageUri = null
+                }
+            } catch (_: Exception) {
+                cameraImageUri = null
+            }
+        }
+
+        val chooser = Intent(Intent.ACTION_CHOOSER).apply {
+            putExtra(Intent.EXTRA_INTENT, contentIntent)
+            putExtra(Intent.EXTRA_TITLE, "选择图片或拍照")
+            if (initialIntents.isNotEmpty()) {
+                putExtra(Intent.EXTRA_INITIAL_INTENTS, initialIntents.toTypedArray())
+            }
+        }
+        return try {
+            fileChooserLauncher.launch(chooser)
+            true
+        } catch (_: Exception) {
+            filePathCallback?.onReceiveValue(null)
+            filePathCallback = null
+            cameraImageUri = null
+            false
         }
     }
 

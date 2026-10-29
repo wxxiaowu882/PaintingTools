@@ -293,7 +293,8 @@
     if (!hostEl) return null;
     var req = normalizeRequire(require);
     var isUser = req === 'user';
-    var ink = badgeInk(req, 'dark');
+    // 会员字色贴灰绿底、再降对比，勿近白抢眼，不得盖过 Pro 暖金
+    var ink = isUser ? 'rgba(152, 176, 162, 0.78)' : badgeInk(req, 'dark');
     var ribbonBg = isUser ? 'rgba(36, 48, 40, 0.82)' : 'rgba(52, 44, 28, 0.86)';
     var pc = ribbonScalePc();
     var box = pc ? 64 : 48;

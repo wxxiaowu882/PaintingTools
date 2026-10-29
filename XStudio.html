@@ -98,10 +98,21 @@ margin-top: -24px; border-top-left-radius: 32px; border-top-right-radius: 32px; 
 .adjust-chip.is-water .adjust-chip-color { background: #fff; border: 1px solid #eee; display: flex; align-items: center; justify-content: center; font-size: 14px; }
 .adjust-chip-label { font-size: 10px; color: var(--text-secondary); margin-top: 3px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 56px; margin-left: 0; }
 .flying-drop { position: fixed; width: 24px; height: 24px; border-radius: 50%; pointer-events: none; z-index: 999; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: none; }
-.pigment-modal { position: fixed; bottom: 0; left: 0; right: 0; top: 100px; background: var(--bg-body); border-top-left-radius: 24px; border-top-right-radius: 24px; z-index: 100; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column; }
-.pigment-modal.active { transform: translateY(0); }
-.modal-header { background: var(--surface-opaque); padding: 20px 24px; border-radius: 24px 24px 0 0; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); }
-.modal-title { font-size: 18px; font-weight: 700; color: var(--text-primary); } .close-modal { font-size: 28px; color: var(--text-secondary); cursor: pointer; padding: 4px; line-height: 1; }
+.pigment-modal { position: fixed; bottom: 0; left: 0; right: 0; top: 100px; background: var(--bg-body); border-top-left-radius: 24px; border-top-right-radius: 24px; z-index: 100; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); transform: translateY(100%); transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column; pointer-events: none; will-change: transform; }
+.pigment-modal.active { transform: translateY(0); pointer-events: auto; }
+/* 首次/冷启动加载锁：挡住 Tab 与正文误点；× / 底栏取消保持可点 */
+.pigment-modal-busy { display: none; position: absolute; inset: 0; z-index: 50; border-radius: inherit; background: rgba(247, 248, 250, 0.72); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); align-items: center; justify-content: center; pointer-events: auto; }
+.pigment-modal-busy.active { display: flex; }
+.pigment-modal-busy-card { width: min(240px, 70%); padding: 16px 18px; border-radius: 14px; background: rgba(255,255,255,0.92); box-shadow: 0 8px 28px rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.06); }
+.pigment-modal-busy-label { font-size: 13px; font-weight: 600; color: var(--text-primary); text-align: center; margin-bottom: 12px; }
+.pigment-modal-busy-track { height: 4px; border-radius: 2px; background: rgba(0,0,0,0.06); overflow: hidden; position: relative; }
+.pigment-modal-busy-bar { height: 100%; width: 8%; border-radius: 2px; background: #8E8E93; transition: width 0.25s ease; position: relative; overflow: hidden; }
+/* 进度条不确定段：避免长时间停在某一档像卡住 */
+.pigment-modal-busy.active .pigment-modal-busy-bar::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent); transform: translateX(-120%); animation: pigment-busy-sheen 1.1s ease-in-out infinite; }
+@keyframes pigment-busy-sheen { 0% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+.modal-header { background: var(--surface-opaque); padding: 20px 24px; border-radius: 24px 24px 0 0; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); position: relative; z-index: 56; }
+.modal-footer { position: relative; z-index: 56; }
+.modal-title { font-size: 18px; font-weight: 700; color: var(--text-primary); } .close-modal { font-size: 28px; color: var(--text-secondary); cursor: pointer; padding: 4px; line-height: 1; position: relative; z-index: 60; -webkit-tap-highlight-color: transparent; } .close-modal::after { content: ''; position: absolute; inset: -14px; }
 .tabs-container { background: var(--surface-opaque); padding: 14px 20px 12px; overflow-x: auto; white-space: nowrap; display: flex; gap: 12px; flex-shrink: 0; border-bottom: 1px solid var(--border-light); -ms-overflow-style: none; scrollbar-width: none; }
 .tabs-container::-webkit-scrollbar { display: none; }
 .tab-chip-wrap { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
@@ -184,6 +195,8 @@ margin-top: -24px; border-top-left-radius: 32px; border-top-right-radius: 32px; 
 .name-input-field { width: 100%; padding: 12px; border: 1px solid #E5E5EA; border-radius: 12px; font-size: 14px; background: #F2F2F7; color: var(--text-primary); }
 .name-input-error { font-size: 12px; color: var(--danger); min-height: 16px; text-align: center; } .name-input-btns { display: flex; gap: 10px; }
 .name-input-btns button { flex: 1; padding: 12px; border-radius: 12px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; } .btn-cancel-name { background: #F2F2F7; color: var(--text-primary); }
+.confirm-action-discard { width: 100%; margin-top: 2px; padding: 10px; border: none; background: transparent; color: #8E8E93; font-size: 13px; font-weight: 600; cursor: pointer; border-radius: 10px; }
+.confirm-action-discard:active { background: rgba(0,0,0,0.04); }
 .btn-confirm-name { background: var(--text-primary); color: #fff; opacity: 0.5; pointer-events: none; } .btn-confirm-name.active { opacity: 1; pointer-events: auto; }
 .color-picker-row { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
 .preview-swatch { width: 44px; height: 44px; border-radius: 12px; border: 1px solid #E5E5EA; background: #F2F2F7; flex-shrink: 0; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); }
@@ -280,7 +293,7 @@ border-radius: 8px; border: 1px solid rgba(0,0,0,0.03); padding-right: 8px; /* �
 <div style="display:flex; align-items:center; gap:10px;"><span>当前颜料盒</span></div> <button class="pick-btn" id="practiceBtn" style="height: 28px; font-size: 12px; padding: 0 12px;" onclick="triggerPractice()">调色练习</button>
 </div> <div class="manual-adjust-bar" id="manualBar" style="display:none;"></div> <div class="app-footer">晓色 · 调色助手</div> </div> </div>
 <input type="file" id="fileInput" accept="image/*" style="display:none">
-<div class="backdrop" id="modalBackdrop" onclick="closePigmentModal()"></div>
+<div class="backdrop" id="modalBackdrop" onclick="if(event.target===this && !isPigmentModalBusy())closePigmentModal()"></div>
 <div class="backdrop" id="gamutBackdrop" style="z-index: 2050;" onclick="closeGamutPopover()"></div>
 <div class="gamut-popover" id="gamutPopover"><h4 id="gamutTitle">色域说明</h4><div id="gamutDesc" style="font-size: 13px; line-height: 1.6; color: var(--text-secondary);"></div></div>
 <div class="pigment-modal" id="pigmentModal">
@@ -289,7 +302,7 @@ border-radius: 8px; border: 1px solid rgba(0,0,0,0.03); padding-right: 8px; /* �
     <div class="modal-title">配置我的颜料盒</div>
     <button type="button" class="modal-import-btn" id="modalImportBoxBtn" title="导入后会新建一个颜料盒" onclick="openImportBoxOverlay()">导入颜料盒</button>
   </div>
-  <div class="close-modal" onclick="closePigmentModal()">×</div>
+  <div class="close-modal" onclick="event.stopPropagation();closePigmentModal();" role="button" aria-label="关闭" tabindex="0">×</div>
 </div>
 <div class="tabs-container" id="modalTabs"></div>
 <div class="modal-body"> <div id="setDescription" class="section-desc"></div>
@@ -305,7 +318,7 @@ border-radius: 8px; border: 1px solid rgba(0,0,0,0.03); padding-right: 8px; /* �
 <div class="name-input-overlay" id="nameInputOverlay"> <div class="name-input-box"> <h3>添加新颜料</h3>
 <input type="text" id="newPigmentNameInput" class="name-input-field" placeholder="请输入颜料名称(5字内)" maxlength="5">
 <div class="color-picker-row"> <div id="previewSwatch" class="preview-swatch"></div>
-<button class="btn-outline" style="flex:1; border-radius:12px; padding:12px; font-weight:600; color:var(--text-primary);" onclick="document.getElementById('pickerFileInput').click()">📷 拍照/上传图片取色</button>
+<button type="button" class="btn-outline" style="flex:1; border-radius:12px; padding:12px; font-weight:600; color:var(--text-primary);" onclick="document.getElementById('pickerFileInput').click()">📷 拍照/上传图片取色</button>
 <input type="file" id="pickerFileInput" accept="image/*" style="display:none" onchange="handlePickerFile(this)"> </div>
 <div id="nameInputError" class="name-input-error"></div> <div class="name-input-btns"> <button class="btn-cancel-name" onclick="hideNameInputOverlay()">取消</button>
 <button id="confirmAddBtn" class="btn-confirm-name" onclick="finalSubmit()">确认添加</button> </div> </div> </div>
@@ -327,13 +340,20 @@ border-radius: 8px; border: 1px solid rgba(0,0,0,0.03); padding-right: 8px; /* �
     <h3 id="confirmActionTitle">确认操作</h3>
     <p class="rename-box-hint" id="confirmActionDesc"></p>
     <div class="name-input-btns">
-      <button type="button" class="btn-cancel-name" onclick="hideConfirmAction()">取消</button>
+      <button type="button" class="btn-cancel-name" id="confirmActionCancelBtn" onclick="hideConfirmAction()">取消</button>
       <button type="button" id="confirmActionOkBtn" class="btn-confirm-name always-on" onclick="runConfirmAction()">确认</button>
     </div>
+    <button type="button" id="confirmActionDiscardBtn" class="confirm-action-discard" style="display:none" onclick="runConfirmDiscard()">放弃改动</button>
   </div>
 </div>
 </div>
 <div class="modal-footer"><button class="btn-footer btn-outline" onclick="closePigmentModal()">取消</button><button class="btn-footer btn-primary" onclick="confirmPigmentSet()">使用此方案</button></div>
+<div id="pigmentModalBusy" class="pigment-modal-busy" aria-hidden="true">
+  <div class="pigment-modal-busy-card">
+    <div class="pigment-modal-busy-label">正在准备颜料盒…</div>
+    <div class="pigment-modal-busy-track"><div id="pigmentModalBusyBar" class="pigment-modal-busy-bar"></div></div>
+  </div>
+</div>
 </div>
 <div class="about-overlay" id="aboutOverlay" onclick="if(event.target===this)closeAbout()">
   <div class="about-sheet" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="aboutSheetTitle">
@@ -515,6 +535,31 @@ let currentMode = 'watercolor', globalSession = { targetRGB: null, targetHex: nu
 window.globalSession = globalSession;
 
 function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+/** 配置弹层会话拷贝：比 JSON deepClone 轻（只拷盒子结构） */
+function cloneModalSessionBoxes(boxes) {
+  const src = boxes || [];
+  const out = new Array(src.length);
+  for (let i = 0; i < src.length; i++) {
+    const b = src[i];
+    out[i] = { id: b.id, name: b.name, ids: (b.ids || []).slice() };
+  }
+  return out;
+}
+function cloneModalUserPigments(list) {
+  const src = list || [];
+  const out = new Array(src.length);
+  for (let i = 0; i < src.length; i++) {
+    const p = src[i];
+    out[i] = {
+      id: p.id,
+      name: p.name,
+      hex: p.hex,
+      rgb: p.rgb ? p.rgb.slice() : p.rgb,
+      isUserCreated: !!p.isUserCreated
+    };
+  }
+  return out;
+}
 function defaultStdIds(key) { const t = PRESET_TABS.find(x => x.id === key); return t ? [...t.ids] : []; }
 function normalizeLegacyBoxName(name) {
   const s = String(name || '').trim();
@@ -685,28 +730,193 @@ ids.forEach(id => { let p = all.find(x=>x.id===id); if(p) { let n = JSON.parse(J
 persistMyBoxes();
 localStorage.setItem('userAddedPigments', JSON.stringify(appState.userAddedPigments));
 }
-function openPigmentModal() {
-  // 先出壳（立刻可看见动画），数据与网格分两帧灌，避免点齿轮卡死
-  document.getElementById('modalBackdrop').classList.add('active');
-  document.getElementById('pigmentModal').classList.add('active');
+let _modalFillGen = 0;
+/** 颜料配置弹层：加载锁 + 关而不毁（避免未就绪误点 backdrop / 二次打开重灌竞态） */
+var _pigmentModalUi = {
+  openSeq: 0,
+  busy: false,
+  cacheReady: false,
+  contentKey: '',
+  sessionDirty: false
+};
+try { window._pigmentModalUi = _pigmentModalUi; } catch (_eUi) {}
+function pigmentModalContentKey() {
+  // 轻量指纹：禁止在点齿轮同步路径里 JSON.stringify 整份颜料数据（会卡死首帧弹出）
+  try {
+    var boxes = appState.myBoxes || [];
+    var user = appState.userAddedPigments || [];
+    var parts = [String(appState.currentTabId || ''), String(boxes.length), String(user.length)];
+    for (var i = 0; i < boxes.length; i++) {
+      var b = boxes[i];
+      var ids = b.ids || [];
+      parts.push(String(b.id), String(b.name || ''), String(ids.length), String(ids[0] || ''), String(ids[ids.length - 1] || ''));
+    }
+    for (var j = 0; j < user.length; j++) {
+      var p = user[j];
+      parts.push(String(p.id), String(p.hex || ''));
+    }
+    return parts.join('\u0001');
+  } catch (_e) {
+    return String(Date.now());
+  }
+}
+function isPigmentModalBusy() {
+  return !!(!_pigmentModalUi || _pigmentModalUi.busy);
+}
+function markPigmentModalDirty() {
+  _pigmentModalUi.sessionDirty = true;
+}
+function setPigmentModalBusy(on, pct) {
+  _pigmentModalUi.busy = !!on;
+  var el = document.getElementById('pigmentModalBusy');
+  var bar = document.getElementById('pigmentModalBusyBar');
+  var footer = document.querySelector('#pigmentModal .modal-footer');
+  var importBtn = document.getElementById('modalImportBoxBtn');
+  if (el) {
+    el.classList.toggle('active', !!on);
+    el.setAttribute('aria-hidden', on ? 'false' : 'true');
+  }
+  if (bar && typeof pct === 'number' && !isNaN(pct)) {
+    var next = Math.max(4, Math.min(100, pct));
+    // 只前进不回退，避免进度条「倒回去」
+    var prev = parseFloat(bar.style.width) || 0;
+    if (next >= prev || !on) bar.style.width = next + '%';
+  }
+  // 加载中只保留 × 可点；底栏「使用此方案」与导入勿半成品提交
+  if (footer) footer.style.pointerEvents = on ? 'none' : '';
+  if (importBtn) importBtn.style.pointerEvents = on ? 'none' : '';
+  try { window.__pigmentModalBusy = !!on; } catch (_w) {}
+}
+function showPigmentModalShell() {
+  var backdrop = document.getElementById('modalBackdrop');
+  var modalEl = document.getElementById('pigmentModal');
+  if (backdrop) backdrop.classList.add('active');
+  if (modalEl) {
+    modalEl.classList.add('active');
+    try { modalEl.style.pointerEvents = 'auto'; } catch (_pe) {}
+  }
   document.body.classList.add('modal-open');
+}
+function hidePigmentModalShell() {
+  var backdrop = document.getElementById('modalBackdrop');
+  var modalEl = document.getElementById('pigmentModal');
+  if (backdrop) backdrop.classList.remove('active');
+  if (modalEl) {
+    modalEl.classList.remove('active');
+    try { modalEl.style.pointerEvents = ''; } catch (_pe2) {}
+  }
+  document.body.classList.remove('modal-open');
+}
+function finishPigmentModalReady(seq, key) {
+  if (seq !== _pigmentModalUi.openSeq) return;
+  var m = document.getElementById('pigmentModal');
+  if (!m || !m.classList.contains('active')) return;
+  setPigmentModalBusy(true, 88);
+  try { if (typeof window.__xstudioRefreshMembership === 'function') window.__xstudioRefreshMembership(); } catch (_eXm) {}
+  var a = document.querySelector('#modalTabs .tab-chip.active');
+  if (a) {
+    try { a.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' }); } catch (_e) {}
+  }
+  _pigmentModalUi.cacheReady = true;
+  _pigmentModalUi.contentKey = key;
+  _pigmentModalUi.sessionDirty = false;
+  setPigmentModalBusy(false, 100);
+}
+function openPigmentModal() {
+  // 硬性顺序：点齿轮 → 立刻出壳+进度条动画 → 再算数据。禁止任何重活挡在 show 之前。
+  var seq = ++_pigmentModalUi.openSeq;
+  showPigmentModalShell();
+  setPigmentModalBusy(true, 12);
+  var bar = document.getElementById('pigmentModalBusyBar');
+  if (bar) bar.style.width = '12%';
+  // 强制同步布局，催浏览器本帧画出弹层（否则重活会把首帧挤掉）
+  try {
+    var m0 = document.getElementById('pigmentModal');
+    if (m0) void m0.offsetWidth;
+  } catch (_eForce) {}
+
   setTimeout(function () {
+    if (seq !== _pigmentModalUi.openSeq) return;
+    var key = pigmentModalContentKey();
+    var tabCount = document.querySelectorAll('#modalTabs .tab-chip').length;
+    var warm = _pigmentModalUi.cacheReady && !_pigmentModalUi.sessionDirty && _pigmentModalUi.contentKey === key && tabCount >= 3;
+    if (warm) {
+      setPigmentModalBusy(false);
+      if (modalState.viewingTabId !== appState.currentTabId) {
+        modalState.viewingTabId = appState.currentTabId;
+        syncModalTabActiveUI(modalState.viewingTabId);
+        renderModalContent({ rebuildTabs: false, refreshMembership: false, deferLibrary: true, deferGrid: false, unlockBeforeLibrary: true });
+        return;
+      }
+      try {
+        if (isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes)) {
+          var libN = document.querySelectorAll('#fullLibraryGrid .pigment-select-item').length;
+          if (libN < 8) {
+            var gen = ++_modalFillGen;
+            fillModalLibraryChunked(gen);
+          }
+        }
+      } catch (_eLib) {}
+      return;
+    }
+    _pigmentModalUi.cacheReady = false;
+    _pigmentModalUi.sessionDirty = false;
+    setPigmentModalBusy(true, 22);
     modalState.viewingTabId = appState.currentTabId;
-    modalState.tempMyBoxes = deepClone(appState.myBoxes);
-    modalState.tempUserAdded = deepClone(appState.userAddedPigments || []);
-    renderModalContent({ deferLibrary: true, deferGrid: true });
-    setTimeout(function () {
-      const a = document.querySelector('.tab-chip.active');
-      if (a) a.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }, 60);
+    modalState.tempMyBoxes = cloneModalSessionBoxes(appState.myBoxes);
+    modalState.tempUserAdded = cloneModalUserPigments(appState.userAddedPigments || []);
+    setPigmentModalBusy(true, 36);
+    renderModalContent({
+      rebuildTabs: true,
+      refreshMembership: false,
+      deferLibrary: true,
+      deferGrid: false,
+      unlockBeforeLibrary: true,
+      onProgress: function (p) {
+        if (seq !== _pigmentModalUi.openSeq) return;
+        setPigmentModalBusy(true, p);
+      },
+      onComplete: function () {
+        finishPigmentModalReady(seq, key);
+      }
+    });
   }, 0);
 }
-function closePigmentModal() {
-  document.getElementById('modalBackdrop').classList.remove('active');
-  document.getElementById('pigmentModal').classList.remove('active');
-  document.body.classList.remove('modal-open');
-  closeImportBoxOverlay();
-  hideRenameBoxOverlay();
+function promptUnsavedPigmentModalClose() {
+  showConfirmAction({
+    title: '有未保存的改动',
+    desc: '要先保存并换用当前这个颜料盒吗？也可以放弃改动直接关闭。',
+    okText: '保存并使用',
+    cancelText: '继续编辑',
+    discardText: '放弃改动',
+    onOk: function () { confirmPigmentSet(); },
+    onDiscard: function () { closePigmentModal(true); }
+  });
+}
+function closePigmentModal(force) {
+  var doForce = force === true;
+  if (!doForce && _pigmentModalUi.sessionDirty) {
+    var modalEl = document.getElementById('pigmentModal');
+    if (modalEl && modalEl.classList.contains('active')) {
+      promptUnsavedPigmentModalClose();
+      return;
+    }
+  }
+  _pigmentModalUi.openSeq++;
+  _modalFillGen++;
+  if (_pigmentModalUi.sessionDirty) {
+    // 放弃未保存改动：下次打开必须按 appState 重灌
+    _pigmentModalUi.cacheReady = false;
+    _pigmentModalUi.contentKey = '';
+    _pigmentModalUi.sessionDirty = false;
+  }
+  setPigmentModalBusy(false);
+  hidePigmentModalShell();
+  try { hideConfirmAction(); } catch (_e0) {}
+  try { closeImportBoxOverlay(); } catch (_e1) {}
+  try { closeShareBoxOverlay(); } catch (_e1b) {}
+  try { hideRenameBoxOverlay(); } catch (_e2) {}
+  try { hideNameInputOverlay(); } catch (_e3) {}
 }
 function confirmPigmentSet() {
   try {
@@ -718,8 +928,11 @@ function confirmPigmentSet() {
     appState.currentTabId = modalState.viewingTabId;
     updateActivePigments(); updateGlobalSessionPool(); renderManualBar();
     showToast("颜料箱配置已更新");
+    _pigmentModalUi.sessionDirty = false;
+    _pigmentModalUi.cacheReady = true;
+    _pigmentModalUi.contentKey = pigmentModalContentKey();
   } catch(e){ console.error(e); }
-  finally { closePigmentModal(); }
+  finally { closePigmentModal(true); }
 }
 function switchModalTab(id) {
   try {
@@ -732,8 +945,44 @@ function switchModalTab(id) {
       }
     }
   } catch (_eTab) {}
+  if (modalState.viewingTabId === id) return;
   modalState.viewingTabId = id;
-  renderModalContent();
+  // 切 Tab：只改高亮 + 正文网格，禁止整排 Tab 重建与会员角标重涂（主因卡顿）
+  syncModalTabActiveUI(id);
+  renderModalContent({ rebuildTabs: false, refreshMembership: false, deferLibrary: true, deferGrid: false });
+}
+function syncModalTabActiveUI(activeId) {
+  const tabs = document.getElementById('modalTabs');
+  if (!tabs) return;
+  const chips = tabs.querySelectorAll('.tab-chip');
+  for (let i = 0; i < chips.length; i++) {
+    const chip = chips[i];
+    const id = chip.getAttribute('data-box-id') || chip.getAttribute('data-palette-id') || '';
+    const on = id === activeId;
+    chip.classList.toggle('active', on);
+    const wrap = chip.parentElement && chip.parentElement.classList.contains('tab-chip-wrap')
+      ? chip.parentElement : null;
+    if (wrap) {
+      wrap.classList.toggle('is-active', on);
+      let pen = wrap.querySelector('.tab-rename-btn');
+      const isMy = !!chip.getAttribute('data-box-id');
+      if (on && isMy) {
+        if (!pen) {
+          pen = document.createElement('button');
+          pen.type = 'button';
+          pen.className = 'tab-rename-btn';
+          pen.title = '改名';
+          pen.setAttribute('aria-label', '改名');
+          pen.innerText = '✎';
+          const boxId = id;
+          pen.onclick = (e) => { e.stopPropagation(); renameMyBox(boxId); };
+          wrap.appendChild(pen);
+        }
+      } else if (pen) {
+        pen.remove();
+      }
+    }
+  }
 }
 function getTempViewBox() { return findBoxById(modalState.viewingTabId, modalState.tempMyBoxes); }
 let _confirmAction = null;
@@ -744,6 +993,8 @@ function showConfirmAction(opts) {
   const desc = document.getElementById('confirmActionDesc');
   const swatch = document.getElementById('confirmActionSwatch');
   const okBtn = document.getElementById('confirmActionOkBtn');
+  const cancelBtn = document.getElementById('confirmActionCancelBtn');
+  const discardBtn = document.getElementById('confirmActionDiscardBtn');
   if (title) title.innerText = (opts && opts.title) || '确认操作';
   if (desc) desc.innerText = (opts && opts.desc) || '';
   if (swatch) {
@@ -754,15 +1005,30 @@ function showConfirmAction(opts) {
     okBtn.innerText = (opts && opts.okText) || '确认';
     okBtn.className = 'btn-confirm-name always-on' + ((opts && opts.danger) ? ' btn-confirm-danger' : '');
   }
+  if (cancelBtn) cancelBtn.innerText = (opts && opts.cancelText) || '取消';
+  if (discardBtn) {
+    const hasDiscard = !!(opts && opts.discardText && typeof opts.onDiscard === 'function');
+    discardBtn.style.display = hasDiscard ? 'block' : 'none';
+    discardBtn.innerText = hasDiscard ? opts.discardText : '放弃改动';
+  }
   if (overlay) overlay.classList.add('active');
 }
 function hideConfirmAction() {
   const overlay = document.getElementById('confirmActionOverlay');
   if (overlay) overlay.classList.remove('active');
+  const cancelBtn = document.getElementById('confirmActionCancelBtn');
+  const discardBtn = document.getElementById('confirmActionDiscardBtn');
+  if (cancelBtn) cancelBtn.innerText = '取消';
+  if (discardBtn) discardBtn.style.display = 'none';
   _confirmAction = null;
 }
 function runConfirmAction() {
   const fn = _confirmAction && _confirmAction.onOk;
+  hideConfirmAction();
+  if (typeof fn === 'function') fn();
+}
+function runConfirmDiscard() {
+  const fn = _confirmAction && _confirmAction.onDiscard;
   hideConfirmAction();
   if (typeof fn === 'function') fn();
 }
@@ -787,13 +1053,17 @@ function toggleCustomPigment(id) {
         if (!b) return;
         const idx = b.ids.indexOf(id);
         if (idx > -1) b.ids.splice(idx, 1);
-        renderModalContent();
+        markPigmentModalDirty();
+        lightRefreshAfterPigmentEdit();
+        syncLibraryItemSelected(id, false);
         showToast('已移出「' + p.name + '」');
       }
     });
   } else {
+    markPigmentModalDirty();
     box.ids.push(id);
-    renderModalContent();
+    lightRefreshAfterPigmentEdit();
+    syncLibraryItemSelected(id, true);
   }
 }
 function resetCustomSet() {
@@ -802,7 +1072,11 @@ function resetCustomSet() {
   if (!confirm("确定要重置吗？")) return;
   const fallback = (box.id === 'my_custom2') ? 'std12' : 'std24';
   box.ids = defaultStdIds(fallback);
-  renderModalContent();
+  markPigmentModalDirty();
+  // 只刷当前盒网格 + 同步后备库勾选，禁止整表重灌
+  lightRefreshAfterPigmentEdit();
+  syncAllLibrarySelectedFromBox();
+  showToast('已重置为默认色');
 }
 let _renameBoxId = null;
 function renameMyBox(boxId) {
@@ -831,11 +1105,17 @@ function confirmRenameBox() {
   if (!name) { if (err) err.innerText = '名称不能为空'; return; }
   if (name.length > 16) { if (err) err.innerText = '最多 16 个字'; return; }
   const next = uniqueBoxName(name, modalState.tempMyBoxes, box.id);
+  const boxId = box.id;
   box.name = next;
+  // 先关弹层给反馈，再改 Tab 文案（勿整表重绘）
   hideRenameBoxOverlay();
+  markPigmentModalDirty();
   if (next !== name) showToast('名称已存在，已改为「' + next + '」');
   else showToast('已改名');
-  renderModalContent();
+  try {
+    const chip = document.querySelector('#modalTabs .tab-chip[data-box-id="' + String(boxId).replace(/"/g, '') + '"]');
+    if (chip) chip.innerText = next;
+  } catch (_eRename) {}
 }
 function openShareBoxOverlay() {
   try {
@@ -945,6 +1225,7 @@ function confirmImportBoxShare() {
     modalState.tempMyBoxes.unshift({ id: newId, name, ids });
     modalState.viewingTabId = newId;
     closeImportBoxOverlay();
+    markPigmentModalDirty();
     renderModalContent();
     showToast(name === (data.name || '导入的颜料盒')
       ? '已加入配置，点「使用此方案」后生效'
@@ -958,7 +1239,8 @@ let tempNewPigmentHex = null; // 新的：全屏拍照取色逻辑
 let pickerState = { x:0, y:0, scale:1 };
 const pickerImage = document.getElementById('pickerImage'), pickerStage = document.getElementById('pickerStageArea'), pickerCrosshair = document.getElementById('pickerCrosshair');
 const pickerOffC = document.createElement('canvas'), pickerOffCtx = pickerOffC.getContext('2d'); let isPD = false, pSX = 0, pSY = 0, pCX = 0, pCY = 0;
-let isPDI = false, pSXI = 0, pSYI = 0, pDI = 0, pSI = 1, ppXI = 0, ppYI = 0, piXI = 0, piYI = 0; function triggerAddUserPigment() {
+let isPDI = false, pSXI = 0, pSYI = 0, pDI = 0, pSI = 1, ppXI = 0, ppYI = 0, piXI = 0, piYI = 0;
+function triggerAddUserPigment() {
 const overlay = document.getElementById('nameInputOverlay'), input = document.getElementById('newPigmentNameInput'), error = document.getElementById('nameInputError'), preview = document.getElementById('previewSwatch'), confirmBtn = document.getElementById('confirmAddBtn');
 input.value = ""; error.innerText = ""; tempNewPigmentHex = null; preview.style.backgroundColor = '#F2F2F7'; confirmBtn.classList.remove('active'); overlay.classList.add('active');
 setTimeout(() => input.focus(), 150); }
@@ -969,11 +1251,13 @@ pickerImage.onload = () => { initPickerStage(); document.getElementById('pickerO
 function initPickerStage() { const r = pickerStage.getBoundingClientRect(), ir = pickerImage.naturalWidth / pickerImage.naturalHeight, sr = r.width / r.height;
 pickerState.scale = ir > sr ? (r.width * 0.95) / pickerImage.naturalWidth : (r.height * 0.95) / pickerImage.naturalHeight; pickerState.x = (r.width - pickerImage.naturalWidth * pickerState.scale) / 2;
 pickerState.y = (r.height - pickerImage.naturalHeight * pickerState.scale) / 2; pCX = 0; pCY = 0; pickerOffC.width = pickerImage.naturalWidth; pickerOffC.height = pickerImage.naturalHeight;
-pickerOffCtx.drawImage(pickerImage, 0, 0); pickerCrosshair.style.display = 'block'; updatePickerView(); }
+pickerOffCtx.drawImage(pickerImage, 0, 0); pickerCrosshair.style.display = 'block';
+try { pickerCrosshair.classList.add('guide-active'); } catch (_eG) {}
+updatePickerView(); }
 function updatePickerView() { pickerImage.style.transform = `translate3d(${pickerState.x}px, ${pickerState.y}px, 0) scale(${pickerState.scale})`; pickerCrosshair.style.transform = `translate(calc(-50% + ${pCX}px), calc(-50% + ${pCY}px))`; }
 // 核心手势逻辑：隔离判断
-pickerCrosshair.addEventListener('touchstart', (e) => { if(e.touches.length === 1) { e.preventDefault(); e.stopPropagation(); isPD=true; pSX=e.touches[0].clientX - pCX; pSY=e.touches[0].clientY - pCY; }
-}, {passive:false}); pickerCrosshair.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); isPD=true; pSX=e.clientX - pCX; pSY=e.clientY - pCY; });
+pickerCrosshair.addEventListener('touchstart', (e) => { if(e.touches.length === 1) { e.preventDefault(); e.stopPropagation(); try { pickerCrosshair.classList.remove('guide-active'); } catch (_e) {} isPD=true; pSX=e.touches[0].clientX - pCX; pSY=e.touches[0].clientY - pCY; }
+}, {passive:false}); pickerCrosshair.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); try { pickerCrosshair.classList.remove('guide-active'); } catch (_e2) {} isPD=true; pSX=e.clientX - pCX; pSY=e.clientY - pCY; });
 pickerStage.addEventListener('touchstart', (e) => { if(e.touches.length === 2) { e.preventDefault(); isPDI = false; isPD = false;
 pDI = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); pSI = pickerState.scale;
 const r = pickerStage.getBoundingClientRect(), cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
@@ -1008,7 +1292,20 @@ const np = { id:'u_'+Date.now()+'_'+Math.floor(Math.random()*1000), name:n, hex:
 modalState.tempUserAdded.push(np);
 const box = getTempViewBox();
 if (box) box.ids.push(np.id);
-renderModalContent(); showToast("已成功添加新颜料"); hideNameInputOverlay(); }
+markPigmentModalDirty();
+hideNameInputOverlay();
+showToast("已成功添加新颜料");
+lightRefreshAfterPigmentEdit();
+try {
+  const g = document.getElementById('fullLibraryGrid');
+  if (g) {
+    const addBtn = g.querySelector('.add-new-pigment-pan');
+    const node = createSelectablePan(np, true, () => toggleCustomPigment(np.id), () => deleteUserPigment(np.id));
+    if (addBtn) g.insertBefore(node, addBtn);
+    else g.appendChild(node);
+  }
+} catch (_eIns) {}
+}
 function deleteUserPigment(id) {
   const p = (modalState.tempUserAdded || []).find(x => x.id === id) || { id: id, name: '此颜料', hex: '#E5E5EA' };
   showConfirmAction({
@@ -1020,23 +1317,27 @@ function deleteUserPigment(id) {
     onOk: () => {
       modalState.tempUserAdded = (modalState.tempUserAdded || []).filter(x => x.id !== id);
       modalState.tempMyBoxes.forEach(b => { b.ids = b.ids.filter(x => x !== id); });
-      renderModalContent();
+      markPigmentModalDirty();
+      try {
+        const el = document.querySelector('#fullLibraryGrid .pigment-select-item[data-pigment-id="' + String(id).replace(/"/g, '') + '"]');
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      } catch (_eRm) {}
+      lightRefreshAfterPigmentEdit();
       showToast('已删除「' + p.name + '」');
     }
   });
 }
-function renderModalContent(opts) {
-  opts = opts || {};
-  const deferGrid = !!opts.deferGrid;
-  const deferLibrary = opts.deferLibrary !== false;
+function rebuildModalTabs() {
   const tabs = document.getElementById('modalTabs');
-  tabs.innerHTML = '';
+  if (!tabs) return;
+  const frag = document.createDocumentFragment();
   (modalState.tempMyBoxes || []).forEach(b => {
     const isActive = b.id === modalState.viewingTabId;
     const wrap = document.createElement('div');
     wrap.className = 'tab-chip-wrap' + (isActive ? ' is-active' : '');
     const c = document.createElement('div');
     c.className = 'tab-chip' + (isActive ? ' active' : '');
+    c.setAttribute('data-box-id', b.id);
     c.innerText = b.name;
     c.onclick = () => switchModalTab(b.id);
     wrap.appendChild(c);
@@ -1050,7 +1351,7 @@ function renderModalContent(opts) {
       pen.onclick = (e) => { e.stopPropagation(); renameMyBox(b.id); };
       wrap.appendChild(pen);
     }
-    tabs.appendChild(wrap);
+    frag.appendChild(wrap);
   });
   PRESET_TABS.forEach(t => {
     const c = document.createElement('div');
@@ -1058,12 +1359,97 @@ function renderModalContent(opts) {
     c.innerText = t.name;
     c.setAttribute('data-palette-id', t.id);
     c.onclick = () => switchModalTab(t.id);
-    tabs.appendChild(c);
+    frag.appendChild(c);
   });
-  try { if (typeof window.__xstudioRefreshMembership === 'function') window.__xstudioRefreshMembership(); } catch (_eXm) {}
+  tabs.innerHTML = '';
+  tabs.appendChild(frag);
+}
+function fillModalCurrentGrid() {
+  const g = document.getElementById('currentSetGrid');
+  if (!g) return;
+  const curIds = getBoxIdsForTab(modalState.viewingTabId, modalState.tempMyBoxes);
+  const idSet = new Set(curIds);
+  const custom = isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes);
+  const byId = new Map();
+  getAllAvailablePigments().forEach(p => { byId.set(p.id, p); });
+  const frag = document.createDocumentFragment();
+  curIds.forEach(id => {
+    const p = byId.get(id);
+    if (!p) return;
+    const canRemove = custom && p.id !== 'titanium-white';
+    frag.appendChild(createPanElement(p, custom ? () => toggleCustomPigment(p.id) : () => {}, canRemove ? 'action-remove' : '', !custom));
+  });
+  g.innerHTML = '';
+  g.appendChild(frag);
+}
+function fillModalLibraryChunked(gen, onDone, onProgress) {
+  const libS = document.getElementById('librarySection');
+  const g = document.getElementById('fullLibraryGrid');
+  if (!isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes)) {
+    if (libS) libS.style.display = 'none';
+    if (g) g.innerHTML = '';
+    if (typeof onDone === 'function') onDone();
+    return;
+  }
+  if (libS) libS.style.display = 'block';
+  if (!g) {
+    if (typeof onDone === 'function') onDone();
+    return;
+  }
+  g.innerHTML = '';
+  const boxIds = new Set(getBoxIdsForTab(modalState.viewingTabId, modalState.tempMyBoxes));
+  const list = getAllAvailablePigments().filter(p => p.id !== 'titanium-white');
+  let i = 0;
+  const CHUNK = 48;
+  const total = Math.max(1, list.length);
+  function step() {
+    if (gen !== _modalFillGen) return;
+    const modalEl = document.getElementById('pigmentModal');
+    if (!modalEl || !modalEl.classList.contains('active')) return;
+    if (!isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes)) {
+      if (typeof onDone === 'function') onDone();
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    const end = Math.min(i + CHUNK, list.length);
+    for (; i < end; i++) {
+      const p = list[i];
+      frag.appendChild(createSelectablePan(p, boxIds.has(p.id), () => toggleCustomPigment(p.id), p.isUserCreated ? () => deleteUserPigment(p.id) : null));
+    }
+    g.appendChild(frag);
+    if (typeof onProgress === 'function') {
+      onProgress(48 + Math.round((i / total) * 36));
+    }
+    if (i < list.length) {
+      setTimeout(step, 0);
+      return;
+    }
+    const add = document.createElement('div');
+    add.className = 'add-new-pigment-pan';
+    add.innerText = '+';
+    add.onclick = triggerAddUserPigment;
+    g.appendChild(add);
+    if (typeof onDone === 'function') onDone();
+  }
+  step();
+}
+function renderModalContent(opts) {
+  opts = opts || {};
+  const rebuildTabs = opts.rebuildTabs !== false;
+  const refreshMembership = opts.refreshMembership !== false;
+  const deferGrid = !!opts.deferGrid;
+  const deferLibrary = opts.deferLibrary !== false;
+  const unlockBeforeLibrary = !!opts.unlockBeforeLibrary;
+  const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
+  let onComplete = typeof opts.onComplete === 'function' ? opts.onComplete : null;
+  const gen = ++_modalFillGen;
+  if (rebuildTabs) rebuildModalTabs();
+  if (onProgress) onProgress(28);
+  if (refreshMembership) {
+    try { if (typeof window.__xstudioRefreshMembership === 'function') window.__xstudioRefreshMembership(); } catch (_eXm) {}
+  }
   const isC = isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes);
   const curT = PRESET_TABS.find(t => t.id === modalState.viewingTabId);
-  const ids = getBoxIdsForTab(modalState.viewingTabId, modalState.tempMyBoxes);
   const desc = isC
     ? '这是当前颜料盒，可自由增删颜料、改名，并用右侧「分享颜料盒」发给画友。改动需点「使用此方案」后保存。新建盒子请用标题旁的「导入颜料盒」。'
     : (curT ? curT.desc : '');
@@ -1073,62 +1459,53 @@ function renderModalContent(opts) {
   document.getElementById('currentGroupTitle').innerText = isC ? '这个颜料盒中的颜料：' : '包含颜料';
   document.getElementById('resetCustomBtn').style.display = isC ? 'block' : 'none';
   const grid = document.getElementById('currentSetGrid');
-  const libS = document.getElementById('librarySection'), libG = document.getElementById('fullLibraryGrid');
-  function fillCurrentGrid() {
-    const g = document.getElementById('currentSetGrid');
-    if (!g) return;
-    g.innerHTML = '';
-    const all = getAllAvailablePigments();
-    const curIds = getBoxIdsForTab(modalState.viewingTabId, modalState.tempMyBoxes);
-    const custom = isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes);
-    all.forEach(p => {
-      if (curIds.includes(p.id)) {
-        const canRemove = custom && p.id !== 'titanium-white';
-        g.appendChild(createPanElement(p, custom ? () => toggleCustomPigment(p.id) : () => {}, canRemove ? 'action-remove' : '', !custom));
-      }
-    });
-  }
-  function fillLibrary() {
-    if (!isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes)) {
-      if (libS) libS.style.display = 'none';
-      return;
+  const libS = document.getElementById('librarySection');
+  const libG = document.getElementById('fullLibraryGrid');
+  function fireComplete(pct) {
+    if (gen !== _modalFillGen) return;
+    if (onProgress && typeof pct === 'number') onProgress(pct);
+    if (onComplete) {
+      const fn = onComplete;
+      onComplete = null;
+      fn();
     }
-    if (libS) libS.style.display = 'block';
-    const g = document.getElementById('fullLibraryGrid');
-    if (!g) return;
-    g.innerHTML = '';
-    const boxIds = getBoxIdsForTab(modalState.viewingTabId, modalState.tempMyBoxes);
-    getAllAvailablePigments().forEach(p => {
-      if (p.id === 'titanium-white') return;
-      g.appendChild(createSelectablePan(p, boxIds.includes(p.id), () => toggleCustomPigment(p.id), p.isUserCreated ? () => deleteUserPigment(p.id) : null));
-    });
-    const add = document.createElement('div');
-    add.className = 'add-new-pigment-pan';
-    add.innerText = '+';
-    add.onclick = triggerAddUserPigment;
-    g.appendChild(add);
+  }
+  function runGrids() {
+    if (gen !== _modalFillGen) return;
+    fillModalCurrentGrid();
+    if (onProgress) onProgress(55);
+    // 冷启动：Tab+当前盒就绪即可交互；后备库后台续灌（最大耗时点）
+    if (unlockBeforeLibrary) {
+      fireComplete(90);
+    }
+    if (deferLibrary) {
+      if (isC) {
+        if (libS) libS.style.display = 'block';
+        if (libG) libG.innerHTML = '';
+        setTimeout(function () {
+          fillModalLibraryChunked(gen, function () {
+            if (!unlockBeforeLibrary) fireComplete(100);
+          }, unlockBeforeLibrary ? null : onProgress);
+        }, 0);
+      } else {
+        if (libS) libS.style.display = 'none';
+        if (libG) libG.innerHTML = '';
+        if (!unlockBeforeLibrary) fireComplete(100);
+      }
+    } else {
+      fillModalLibraryChunked(gen, function () {
+        if (!unlockBeforeLibrary) fireComplete(100);
+      }, unlockBeforeLibrary ? null : onProgress);
+    }
   }
   if (deferGrid) {
     if (grid) grid.innerHTML = '';
     if (libG) libG.innerHTML = '';
     if (isC && libS) libS.style.display = 'block';
     else if (libS) libS.style.display = 'none';
-    setTimeout(function () {
-      var modalEl = document.getElementById('pigmentModal');
-      if (!modalEl || !modalEl.classList.contains('active')) return;
-      fillCurrentGrid();
-      if (deferLibrary) setTimeout(fillLibrary, 0);
-      else fillLibrary();
-    }, 0);
+    setTimeout(runGrids, 0);
   } else {
-    fillCurrentGrid();
-    if (isC) {
-      if (deferLibrary) {
-        if (libS) libS.style.display = 'block';
-        if (libG) libG.innerHTML = '';
-        setTimeout(fillLibrary, 0);
-      } else fillLibrary();
-    } else if (libS) libS.style.display = 'none';
+    runGrids();
   }
 }
 function createPanElement(p, click, icon, read) { const i = document.createElement('div'); i.className='pigment-pan-item'; if(read) i.style.cursor='default';
@@ -1137,10 +1514,32 @@ const l = document.createElement('span'); l.className='pigment-pan-label'; l.inn
 if(!read && icon && p.id !== 'titanium-white') { const ic = document.createElement('div'); ic.className=`pan-action-icon ${icon}`; ic.innerText=icon==='action-remove'?'-':'+'; i.appendChild(ic); }
 i.onclick=click; return i; }
 function createSelectablePan(p, sel, click, del) { const i = document.createElement('div'); i.className=`pigment-select-item ${sel?'selected':''}`;
+i.setAttribute('data-pigment-id', p.id);
 if(del){ const d = document.createElement('div'); d.className='pan-delete-user-icon'; d.innerText='×'; d.onclick=(e)=>{e.stopPropagation();del()}; i.appendChild(d); }
 const pan = document.createElement('div'); pan.className='pigment-pan'; const c = document.createElement('div'); c.className='pigment-pan-color'; c.style.backgroundColor=p.hex; pan.appendChild(c);
 const ch = document.createElement('div'); ch.className='select-check'; ch.innerText='✓'; i.appendChild(ch);
 const l = document.createElement('span'); l.className='pigment-pan-label'; l.innerText=p.name; i.appendChild(pan); i.appendChild(l); i.onclick=click; return i; }
+function syncLibraryItemSelected(id, selected) {
+  try {
+    const el = document.querySelector('#fullLibraryGrid .pigment-select-item[data-pigment-id="' + String(id).replace(/"/g, '') + '"]');
+    if (el) el.classList.toggle('selected', !!selected);
+  } catch (_e) {}
+}
+function syncAllLibrarySelectedFromBox() {
+  try {
+    const box = getTempViewBox();
+    const idSet = new Set((box && box.ids) || []);
+    const items = document.querySelectorAll('#fullLibraryGrid .pigment-select-item[data-pigment-id]');
+    for (let i = 0; i < items.length; i++) {
+      const id = items[i].getAttribute('data-pigment-id');
+      items[i].classList.toggle('selected', idSet.has(id));
+    }
+  } catch (_e) {}
+}
+/** 增删改后不整表重灌：只刷当前盒 + 点状更新后备库，避免「确认/移出」卡顿 */
+function lightRefreshAfterPigmentEdit() {
+  try { fillModalCurrentGrid(); } catch (_e1) {}
+}
 function rgbToHsl(r,g,b){r/=255;g/=255;b/=255;const max=Math.max(r,g,b),min=Math.min(r,g,b);let h,s,l=(max+min)/2;if(max===min)h=s=0;else{const d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;}h*=360}return {h,s,l}}
 /** 标准 RGB→CMYK（修复旧版误除 (1-K)^2） */
 function rgbToCmyk(r, g, b) {
@@ -2155,7 +2554,17 @@ function triggerShare() {
   });
 }
 function closeShareOverlay() { document.getElementById('shareResultOverlay').classList.remove('active'); }
-window.addEventListener('DOMContentLoaded', () => { initApp(); bootStudioImage(); });
+window.addEventListener('DOMContentLoaded', () => {
+  initApp();
+  bootStudioImage();
+  try {
+    var pm = document.getElementById('pigmentModal');
+    if (pm && !pm.getAttribute('data-stop-bubble')) {
+      pm.setAttribute('data-stop-bubble', '1');
+      pm.addEventListener('click', function (e) { e.stopPropagation(); }, false);
+    }
+  } catch (_eBubble) {}
+});
 document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
 document.addEventListener('dblclick', function(e) { e.preventDefault(); }, { passive: false });
 (function bootXstudioMembership() {

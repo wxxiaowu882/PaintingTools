@@ -1,0 +1,14 @@
+---
+description: 安卓壳 inject / 晓色配置弹层改完必须验收，防版本角标与安全区静默丢失
+alwaysApply: true
+---
+
+# 安卓壳注入与晓色弹层验收
+
+改 `MainActivity.injectShellPageHelpers` 或晓色齿轮配置弹层后：
+
+1. **禁止**在注入 JS 里写未收尾的字符串 `+`；CSS 在 Kotlin 拼好再用 `JSONObject.quote`。
+2. 版本角标与安全区 **分两次** `evaluateJavascript`。
+3. 交付前跑：`node .cursor/browser-automation/scripts/xstudio-modal-twice-qa.js`（含注入语法检查 + **打开→关→再开**）。
+4. 平板冒烟：首页 `V*`、Solid/晓色顶栏离状态栏。
+5. 细则见 `自用工具文件_不部署/android-webview-shell/SHELL_INJECT_CHECKLIST.md`。

@@ -12,7 +12,7 @@
 | 启动站 | **测试站** `https://test.wuxiaoart.com/`（`BuildConfig.START_URL`；正式包再改 `www`） |
 | 资源是否进包 | **否**。壳 ≈ 空壳 WebView；JS/CSS/GLB 全部现网拉取，**网页内容更新不用换 APK** |
 | App 强制更新 | 启动读 `/docs/app/android-shell-update.json`；本机 versionCode 低于 `minVersionCode` 则拦进站并跳 APK 下载（对外统称 App 更新） |
-| 当前可测包 | `dist/手绘工坊-1.0.14-debug.apk`；发测试站时同步 `docs/app/wuxiao-workshop.apk` |
+| 当前可测包 | `dist/手绘工坊-1.0.20-debug.apk`；发测试站时同步 `docs/app/wuxiao-workshop.apk` |
 | 对外下载页 | 站点 `/docs/app/`（浏览器菜单「安卓 App 下载」；**App 内隐藏该入口**） |
 | 1.0.1 | 修复：相册选图、Cookie、blob/data；描摹可申请摄像头 |
 | 1.0.2 | 启动 URL 改为测试站 |
@@ -94,6 +94,12 @@ keytool -genkeypair -v -keystore release.keystore -alias wuxiao \
 - 启动 URL：测试站 `https://test.wuxiaoart.com/`（`BuildConfig.START_URL`）
 - **未**把 `docs/js`、页面 HTML、模型打进 APK；体积小，内容跟线上走
 - **壳更新 vs 站更新**：改网页/场景 → 只发站；改壳 → 升 versionCode、打 APK、更新 `docs/app/` 的 json+apk 再发站
+- **顶栏安全区（1.0.15+）**：沉浸式全屏不垫 WebView；页面加载后注入 `--app-safe-top`（状态栏高度，至少 20px），仅下移 Solid/晓色顶栏与菜单游客条。浏览器打开站点不受影响
+- **1.0.16**：Solid「童画师解析」与三杠错开；晓色品牌栏顶空；配置弹层禁 blur、锁背后滚动
+- **1.0.17**：× 恢复无边框原样（仅扩大透明热区）；配置页打开/切 Tab 性能重做；壳侧不再改 × 外观
+- **1.0.18**：修复注入 JS 尾部 `+` 语法错误（曾导致无 V 角标、无顶栏安全区）；注入拆分；晓色弹层二次打开加固。见 `SHELL_INJECT_CHECKLIST.md`
+- **1.0.19**：× z-index 抬高；App 内加载蒙版不用 blur（防点空）；配合晓色「加载锁 + 关而不毁」
+- **1.0.20**：文件选择器增加「拍照」（FileProvider）；配合晓色拍照/相册分钮
 - 同域（`*.wuxiaoart.com`）留在壳内；外链 / 邮件 / 电话走系统浏览器或对应 App
 - 返回键：站内有历史则后退，否则退出；强制更新弹窗时返回即退出
 - 硬件加速开启，便于 WebGL（Three.js）

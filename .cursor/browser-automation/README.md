@@ -18,6 +18,12 @@
 - 若必须装 Playwright 自带浏览器：放到 `D:/tools/ms-playwright`（`PLAYWRIGHT_BROWSERS_PATH`），`source env.playwright.sh && npx playwright install chromium`。
 - Node 脚本可先 `require('./_playwright-browsers-path')`（须在 `require('playwright')` 之前）。
 
+## 壳注入 / 晓色配置弹层
+
+- 脚本：`scripts/xstudio-modal-twice-qa.js`（打开→关→再开至少 2 轮 + 注入语法冒烟）。
+- 防再犯清单：`自用工具文件_不部署/android-webview-shell/SHELL_INJECT_CHECKLIST.md`。
+- Agent 规则：`.cursor/rules/android-shell-inject-qa.mdc`。
+
 ## 已验证经验
 
 1. 打开仓库页面时，优先使用本地 HTTP 服务，不要直接走 `file://`。
