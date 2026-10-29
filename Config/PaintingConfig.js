@@ -74,6 +74,19 @@ export const SOLID_PATH_TRACER_QUALITY = {
     // pathTracer.reset 最小间隔（毫秒）：合并高频事件，避免样本反复清零。
     resetMinIntervalMs: 160,
     debugResetLog: false,
+    bridgeMs: 260, // 追光切换时的短暂光栅过渡窗；挡不住「采样在涨但画面仍黑」的 Mali 假进度，见 blankOutputProbe。
+    // 假进度黑屏保底（MatePad/Mali 等）：samples 已涨但画布近黑 → 退回光栅。仅现象检测，不靠 UA 点名机型。
+    blankOutputProbe: {
+      enabledMobile: true,
+      enabledDesktop: false,
+      minSamples: 8,
+      minMs: 1500,
+      intervalMs: 600,
+      lumaMax: 10,
+      consecutiveHits: 2,
+      pointInset: 0.18,
+      minNearBlackPoints: 4,
+    },
     // 两套质量档：可按业务诉求在 default / antiSpeckle 之间切换。
     profiles: {
       // 默认均衡档：速度与画质折中。

@@ -21,6 +21,7 @@
 <script type="importmap"> { "imports": { "three": "./docs/js/three/three.module.js", "three/addons/controls/OrbitControls.js": "./docs/js/three/OrbitControls.js",
 "@tweenjs/tween.js": "./docs/js/tween/tween.esm.js" } } </script> 
 <!-- 引入全局菜单组件 --> <script src="docs/js/GlobalMenu.js?v=menuhigh3"></script>
+<script src="docs/js/IndexAndroidColorPanel.js?v=acp1"></script>
 <style>
 body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 /* 强制极细字体风格 */ .font-hairline { font-weight: 100; } .font-thin { font-weight: 200; }
@@ -44,7 +45,7 @@ display: none; flex-direction: column; align-items: flex-end; padding: 20px 30px
 /* === VISION DIMENSIONS 标题样式 (分行版) === */ .site-title { position: absolute; top: 5vh; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
 text-align: center; width: 100%; gap: 0; } .title-line { font-size: 28px; font-weight: 100; letter-spacing: 0.2em; line-height: 1.3; color: rgba(255, 255, 255, 0.75); text-transform: uppercase; background: linear-gradient(135deg,
 rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.65) 50%, rgba(255, 255, 255, 0.4) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: flex; align-items: center;
-justify-content: center; } .title-line.title-brand { flex-direction: column; gap: 0.12em; background: none; -webkit-text-fill-color: initial; color: inherit; } .title-line .title-dim { display: block; font-size: 11px; letter-spacing: 0.42em; font-weight: 100; line-height: 1.2; color: rgba(255, 255, 255, 0.26); -webkit-text-fill-color: rgba(255, 255, 255, 0.26); background: none; text-transform: uppercase; } .title-line .title-zh { display: block; font-size: 28px; letter-spacing: 0.2em; font-weight: 100; line-height: 1.3; text-transform: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 50%, rgba(255, 255, 255, 0.45) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; } .subtitle { font-size: 10px; color: rgba(255, 255, 255, 0.4); letter-spacing: 0.5em; margin-top: 14px; font-weight: 200; text-transform: uppercase; }
+justify-content: center; } .title-line.title-brand { flex-direction: column; gap: 0.12em; background: none; -webkit-text-fill-color: initial; color: inherit; } .title-line .title-dim { display: block; font-size: 11px; letter-spacing: 0.42em; font-weight: 100; line-height: 1.2; color: rgba(255, 255, 255, 0.26); -webkit-text-fill-color: rgba(255, 255, 255, 0.26); background: none; text-transform: uppercase; } .title-line .title-zh { display: block; font-size: 28px; letter-spacing: 0.2em; font-weight: 100; line-height: 1.3; text-transform: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 50%, rgba(255, 255, 255, 0.45) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; pointer-events: auto; cursor: pointer; } .title-line .title-zh:hover { filter: brightness(1.12); } .subtitle { font-size: 10px; color: rgba(255, 255, 255, 0.4); letter-spacing: 0.5em; margin-top: 14px; font-weight: 200; text-transform: uppercase; }
 /* 嵌入文字中的头像圆圈 */ .avatar-o { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%;
 background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05)); border: 1px solid rgba(255, 255, 255, 0.35); backdrop-filter: blur(6px); box-shadow: 0 0 20px rgba(255,255,255,0.15); margin: 0 0.15em; position: relative;
 -webkit-text-fill-color: initial; background-clip: border-box; color: white; pointer-events: auto; cursor: pointer; overflow: hidden; transition: transform 0.3s ease, border-color 0.3s; } .avatar-o:hover { transform: scale(1.1);
@@ -148,7 +149,7 @@ var ua = navigator.userAgent.toLowerCase(); if(ua.match(/MicroMessenger/i)=="mic
 <div class="text">为了更好的体验<br>请点击右上角菜单<br>选择 <strong>在浏览器中打开</strong> 🌍</div> </div> <!-- UI 层 --> <div id="ui-layer" class="fixed inset-0 z-10 pointer-events-none">
 <!-- 1. 顶部居中：身份印记 --> <div class="site-title"> <div class="title-line">
 VISI<div class="avatar-o" onclick="toggleAboutModal(true)" title="关于 · 分享"><img src="docs/img/wuxiao_s.jpg" alt="童画师吴晓" class="avatar-img"></div>N
-</div> <div class="title-line title-brand"><span class="title-dim">DIMENSIONS</span><span class="title-zh">手绘工坊</span></div> <div class="subtitle">工具• 教程 <br/>互动场景课</div> </div> <!-- 2. 右上角：总控菜单开关 (尺寸缩小，颜色调暗，位置贴近边缘) -->
+</div> <div class="title-line title-brand"><span class="title-dim">DIMENSIONS</span><span class="title-zh" role="button" tabindex="0" title="打开菜单" onclick="toggleMenu()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleMenu();}">手绘工坊</span></div> <div class="subtitle">工具• 教程 <br/>互动场景课</div> </div> <!-- 2. 右上角：总控菜单开关 (尺寸缩小，颜色调暗，位置贴近边缘) -->
 <div id="menu-trigger" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center cursor-pointer pointer-events-auto group z-50 transition-all duration-300 animate-pulse hover:animate-none hover:bg-white/25" style="animation-duration: 4s;" onclick="toggleMenu()">
     <div class="relative w-6 h-3 flex flex-col justify-between items-end transition-all duration-300 group-hover:h-4">
         <!-- 三条极细线 -->
@@ -340,8 +341,21 @@ const arrowGeo = new THREE.ConeGeometry(0.3, 1.2, 16); const arrowMesh = new THR
 function createSelectionMarker() { const group = new THREE.Group(); group.add(new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffffff })));
 const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, side: THREE.DoubleSide }); group.add(new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.05, 16, 64), ringMat));
 const ring2 = new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.02, 16, 64), ringMat); ring2.rotation.x = Math.PI / 2; group.add(ring2); selectionMarker = group; selectionMarker.visible = false; scene.add(selectionMarker); }
-function setupUI() { const picker = document.getElementById('colorPicker'); const preview = document.getElementById('colorPreview'); picker.addEventListener('input', (e) => {
-selectedColor.set(e.target.value); preview.style.backgroundColor = e.target.value; const hsl = {}; selectedColor.getHSL(hsl); update3DSelection(hsl); }); 
+function setupUI() { const picker = document.getElementById('colorPicker'); const preview = document.getElementById('colorPreview');
+function applyPickedHex(hex) {
+  selectedColor.set(hex); preview.style.backgroundColor = hex; const hsl = {}; selectedColor.getHSL(hsl); update3DSelection(hsl);
+}
+picker.addEventListener('input', (e) => { applyPickedHex(e.target.value); });
+// 安卓：系统色盘过简，改用自研 HSV 面板；Win/iOS 仍用原生
+try {
+  if (window.IndexAndroidColorPanel && window.IndexAndroidColorPanel.isAndroid()) {
+    window.IndexAndroidColorPanel.attach({
+      nativeInput: picker,
+      hotspot: picker.parentElement,
+      onColor: applyPickedHex
+    });
+  }
+} catch (_eColorUi) {} 
 // Zoom & Navigate Animation
 window.zoomAndNavigate = function(url) { isAnimatingCamera = true; controls.autoRotate = false; controls.enabled = false; var __navDone=false; function __goNav(){ if(__navDone)return; __navDone=true; window.location.href=url; } setTimeout(__goNav, 1000); // 1. Hide UI immediately
 document.getElementById('ui-layer').style.opacity = '0'; const go = document.getElementById('global-menu-overlay'); if(go){ go.classList.remove('active'); go.classList.remove('instant'); }

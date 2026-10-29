@@ -511,6 +511,14 @@
         document.querySelectorAll('#menu-trigger, #menu-trigger-overlay, .menu-open').forEach(btn => btn.classList.remove('menu-open'));
         _globalMenuUiOpen = false;
 
+        // Portrait / Solid 等自带首屏加载层：禁止整页淡出变黑，否则用户会先看一会儿纯黑再见到进度条
+        var u = String(url || '');
+        var skipFade = /\/Portrait_c(\?|$)/i.test(u) || /\/Solid(\?|$)/i.test(u) || /\/Portrait(\?|$)/i.test(u);
+        if (skipFade) {
+            window.location.href = url;
+            return;
+        }
+
         document.body.style.transition = "opacity 0.5s ease";
         document.body.style.opacity = "0";
         
