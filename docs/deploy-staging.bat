@@ -24,8 +24,11 @@ echo ========================================
 echo   Log: %LOG%
 echo   1) build functions -^> dist/worker
 echo   2) wrangler deploy --env staging
+echo   NOTE: does NOT write MEMBERSHIP_KV policy_live / tiers_live
+echo         (staging paint policy stays in KV; deploy never overwrites it)
 echo   Please wait; do not close this window.
 echo.
+>>"%LOG%" echo NOTE: staging deploy must not touch policy_live / tiers_live
 
 where npx >nul 2>&1
 if errorlevel 1 (
