@@ -253,10 +253,13 @@ import '../docs/js/membership/MembershipAccess.js';
         chip.style.right = '4px';
         chip.style.left = 'auto';
         chip.style.maxWidth = '42%';
+        // 空气透视标题行 z-index:104（雾类型下拉），标签须更高才能点到
+        chip.style.zIndex = '120';
         host.appendChild(chip);
       } else {
         chip.setAttribute('data-paint-id', rid);
         chip.setAttribute('data-paint-label', label);
+        chip.style.zIndex = '120';
         styleChip(chip, req);
       }
     });

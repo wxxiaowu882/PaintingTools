@@ -91,6 +91,25 @@
     html.wuxiao-android-shell #scene-grid-modal { backdrop-filter:none !important; -webkit-backdrop-filter:none !important; min-height:100% !important; height:100% !important; }
     html.wuxiao-android-shell .scene-grid { touch-action:none !important; -webkit-overflow-scrolling:auto !important; overscroll-behavior:none !important; }
     html.wuxiao-android-shell .scene-item { touch-action:none !important; }
+    /* 壳内 WebView：避免列表行高塌成细条（min-content / 缩略图高度偶发失效） */
+    html.wuxiao-android-shell.solid-scene-list-v2 .scene-item {
+      min-height: 152px !important;
+      align-items: flex-start !important;
+      flex-direction: row !important;
+    }
+    html.wuxiao-android-shell.solid-scene-list-v2 .scene-thumb {
+      width: 132px !important;
+      height: 132px !important;
+      min-width: 132px !important;
+      min-height: 132px !important;
+      flex-shrink: 0 !important;
+      object-fit: cover !important;
+    }
+    html.wuxiao-android-shell.solid-scene-list-v2 .scene-meta {
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+    }
     .scene-item:hover, .scene-item.active { border-color:#fff; background:rgba(40,40,40,1); transform:translateY(-2px); box-shadow:0 8px 25px rgba(0,0,0,0.8); }
     .scene-thumb { width:100%; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; background:#111; flex-shrink:0; transition:opacity 0.28s ease; }
     .scene-thumb.solid-thumb-pending { opacity:0.22; }
@@ -122,8 +141,9 @@
     html.solid-scene-list-v2 .scene-item.active::after { inset:1px; }
     /* 移动端：避免 flex + overflow:hidden 裁切多行详情；全宽卡片；缩略图单独圆角裁剪；标题自动换行 */
     @media (max-width: 899px) {
-    html.solid-scene-list-v2 .scene-item { align-self:stretch; width:100%; box-sizing:border-box; overflow:visible; min-height:min-content; }
-    html.solid-scene-list-v2 .scene-thumb { overflow:hidden; flex-shrink:0; }
+    /* overflow:hidden：会员斜角丝带裁在卡片内；标题在内边距里换行即可，勿改回 visible 导致角标外溢 */
+    html.solid-scene-list-v2 .scene-item { align-self:stretch; width:100%; box-sizing:border-box; overflow:hidden; min-height:152px; }
+    html.solid-scene-list-v2 .scene-thumb { overflow:hidden; flex-shrink:0; width:132px; height:132px; min-width:132px; min-height:132px; }
     html.solid-scene-list-v2 .scene-title { white-space:normal; overflow:visible; text-overflow:unset; word-break:break-word; line-height:1.45; }
     }
     /* PC 端：能放下两列就两列；右端碰到浏览器边界就自动回落单列（纯 CSS，无 JS 判定） */

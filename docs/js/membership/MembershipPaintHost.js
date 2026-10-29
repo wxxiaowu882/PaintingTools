@@ -241,34 +241,171 @@
     return true;
   }
 
-  function markLockedEl(el, rid, label) {
+  /**
+   * 锁态短标：不置灰宿主。
+   * opts.place: 'tr' 按钮右上描边 | 'ribbon' 课表斜角丝带（与 Solid 一致） | 'br' 兼容旧信息区描边
+   */
+  function clearCornerPad(el) {
+    if (!el || !el.getAttribute) return;
+    if (!el.getAttribute('data-membership-pad')) return;
+    try {
+      var orig = el.getAttribute('data-membership-pad-orig');
+      if (orig == null || orig === '') el.style.paddingRight = '';
+      else el.style.paddingRight = orig;
+    } catch (_e) {}
+    try {
+      el.removeAttribute('data-membership-pad');
+      el.removeAttribute('data-membership-pad-orig');
+    } catch (_e2) {}
+  }
+
+  /** 右上角描边短标预留内边距，避免压住按钮/芯片文字 */
+  function ensureCornerPad(el, compact) {
+    if (!el || el.getAttribute('data-membership-pad')) return;
+    try {
+      var cs = getComputedStyle(el);
+      var cur = cs.paddingRight || '0px';
+      el.setAttribute('data-membership-pad-orig', el.style.paddingRight || '');
+      el.setAttribute('data-membership-pad', '1');
+      var px = parseFloat(cur) || 0;
+      // 角内叠标更吃右侧空间，多留一点避免压末字
+      el.style.paddingRight = px + (compact ? 28 : 38) + 'px';
+    } catch (_e) {}
+  }
+
+  function markLockedEl(el, rid, label, opts) {
     if (!el || !rid) return;
     var gate = MA.canAccess(rid);
-    var badge = el.querySelector && el.querySelector('.membership-page-badge');
+    var pageBadge = el.querySelector && el.querySelector('.membership-page-badge');
+    var ribbon = el.querySelector && el.querySelector('.membership-badge');
     if (gate.ok) {
       el.classList.remove('membership-locked');
       el.style.opacity = '';
-      if (badge) badge.remove();
+      if (pageBadge) pageBadge.remove();
+      if (ribbon) ribbon.remove();
+      clearCornerPad(el);
       return;
     }
     el.classList.add('membership-locked');
-    el.style.opacity = '0.55';
+    el.style.opacity = '';
+    var need = gate.needLevel || (gate.rule && gate.rule.require) || 'member';
     var text = MA.badgeLabelForRequire
-      ? (MA.badgeLabelForRequire(gate.needLevel || (gate.rule && gate.rule.require)) || '会员')
+      ? (MA.badgeLabelForRequire(need) || '会员')
       : '会员';
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className = 'membership-page-badge';
-      badge.style.cssText =
-        'position:absolute;top:6px;right:6px;z-index:2;font-size:10px;padding:2px 6px;border-radius:4px;' +
-        'background:rgba(0,0,0,0.65);color:#f5d76e;pointer-events:none;';
+    var place = (opts && opts.place) || 'tr';
+    var title = MA.badgeTitleForLabel ? MA.badgeTitleForLabel(text) : (text === 'Pro' ? '高级会员尊享' : '会员免费');
+
+    // Portrait / 课表：与 Solid 同款角内斜带
+    if (place === 'ribbon' && MA.attachLockRibbon) {
+      if (pageBadge) pageBadge.remove();
       try {
-        if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
-      } catch (_e) {}
-      el.appendChild(badge);
+        if (el.style.overflow === 'visible') el.style.overflow = '';
+      } catch (_eOv) {}
+      MA.attachLockRibbon(el, text, need);
+      return;
     }
-    badge.textContent = text;
-    badge.title = label || rid;
+
+    var mount = el;
+    if (place === 'br') {
+      var info = el.querySelector && el.querySelector('.course-info');
+      if (info) mount = info;
+    }
+    if (ribbon) ribbon.remove();
+    var isChip = !!(mount && mount.classList && mount.classList.contains('tab-chip'));
+    var useInline = place === 'inline' || !!(opts && opts.inline);
+    var surface = (opts && opts.surface) || 'light';
+    var compact = !!(opts && opts.compact) || isChip;
+    // 默认：NEW 感右上角叠标（可探出边框）；仅显式 inline 时行内
+    var useSticker = !useInline && place !== 'br';
+
+    if (!pageBadge) {
+      pageBadge = document.createElement('span');
+      pageBadge.className = 'membership-page-badge';
+      mount.appendChild(pageBadge);
+    } else if (pageBadge.parentElement !== mount) {
+      try { mount.appendChild(pageBadge); } catch (_e3) {}
+    }
+
+    if (useInline) {
+      clearCornerPad(mount);
+      if (MA.outlineBadgeCss) {
+        pageBadge.style.cssText = MA.outlineBadgeCss(need, 'inline', { surface: surface });
+      } else {
+        pageBadge.style.cssText =
+          'display:inline;margin-left:4px;font-size:9px;font-weight:600;background:transparent;border:none;' +
+          'color:rgba(70,118,98,0.96);pointer-events:none;white-space:nowrap;';
+      }
+    } else if (useSticker) {
+      // 晓阶 app-shell 裁切 → 角内；晓色/芯片等默认右上外侧，勿 padding 撑大按钮
+      var insetStrict = !!(opts && opts.insetStrict);
+      if (!insetStrict && mount.classList) {
+        if (
+          mount.classList.contains('btn-cta') ||
+          mount.classList.contains('btn-secondary') ||
+          mount.id === 'btn-save-four-panel' ||
+          mount.id === 'btn-save-poster'
+        ) {
+          insetStrict = true;
+        }
+      }
+      var floatOut =
+        !insetStrict &&
+        (!!(opts && opts.floatOut) ||
+          !!(mount.classList && (
+            mount.classList.contains('ar-sketch-chk-host') ||
+            mount.classList.contains('modal-import-btn') ||
+            mount.classList.contains('box-inline-share-btn') ||
+            mount.classList.contains('tab-chip')
+          )));
+      // 仅角内叠标才加右侧 padding；外侧小标禁止撑长按钮
+      if (insetStrict) ensureCornerPad(mount, compact);
+      else clearCornerPad(mount);
+      try {
+        if (getComputedStyle(mount).position === 'static') mount.style.position = 'relative';
+      } catch (_e) {}
+      try {
+        mount.style.overflow = 'visible';
+      } catch (_eOv) {}
+      try {
+        var p = mount.parentElement;
+        if (p && p.classList) {
+          if (p.classList.contains('tabs-container') || p.id === 'modalTabs') {
+            var pt = parseFloat(getComputedStyle(p).paddingTop) || 0;
+            if (pt < 10) p.style.paddingTop = '10px';
+          } else if (p.classList.contains('bottom-actions') || p.classList.contains('modal-header-left') || p.classList.contains('modal-header')) {
+            if (getComputedStyle(p).overflow === 'hidden') p.style.overflow = 'visible';
+          }
+        }
+      } catch (_eP) {}
+      try {
+        if (mount.classList && (mount.classList.contains('modal-import-btn') || mount.classList.contains('box-inline-share-btn'))) {
+          mount.style.overflow = 'visible';
+        }
+      } catch (_eBtn) {}
+      if (MA.outlineBadgeCss) {
+        pageBadge.style.cssText = MA.outlineBadgeCss(need, 'sticker', {
+          surface: surface,
+          compact: compact,
+          inset: !floatOut,
+          insetStrict: insetStrict,
+          floatOut: floatOut
+        });
+      } else {
+        pageBadge.style.cssText =
+          'position:absolute;right:-8px;top:-8px;z-index:8;font-size:10px;font-weight:700;' +
+          'background:rgba(120,94,40,0.5);border:none;color:#fffef8;' +
+          'pointer-events:none;white-space:nowrap;transform:none;';
+      }
+    } else {
+      try {
+        if (getComputedStyle(mount).position === 'static') mount.style.position = 'relative';
+      } catch (_e2) {}
+      if (MA.outlineBadgeCss) {
+        pageBadge.style.cssText = MA.outlineBadgeCss(need, 'br', { surface: surface });
+      }
+    }
+    pageBadge.textContent = text;
+    pageBadge.title = title;
   }
 
   function boot() {

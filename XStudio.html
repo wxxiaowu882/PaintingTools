@@ -102,7 +102,7 @@ margin-top: -24px; border-top-left-radius: 32px; border-top-right-radius: 32px; 
 .pigment-modal.active { transform: translateY(0); }
 .modal-header { background: var(--surface-opaque); padding: 20px 24px; border-radius: 24px 24px 0 0; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); }
 .modal-title { font-size: 18px; font-weight: 700; color: var(--text-primary); } .close-modal { font-size: 28px; color: var(--text-secondary); cursor: pointer; padding: 4px; line-height: 1; }
-.tabs-container { background: var(--surface-opaque); padding: 12px 20px; overflow-x: auto; white-space: nowrap; display: flex; gap: 12px; flex-shrink: 0; border-bottom: 1px solid var(--border-light); -ms-overflow-style: none; scrollbar-width: none; }
+.tabs-container { background: var(--surface-opaque); padding: 14px 20px 12px; overflow-x: auto; white-space: nowrap; display: flex; gap: 12px; flex-shrink: 0; border-bottom: 1px solid var(--border-light); -ms-overflow-style: none; scrollbar-width: none; }
 .tabs-container::-webkit-scrollbar { display: none; }
 .tab-chip-wrap { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .tab-chip { display: inline-block; padding: 8px 16px; border-radius: 18px; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: #F2F2F7; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; }
@@ -112,7 +112,7 @@ margin-top: -24px; border-top-left-radius: 32px; border-top-right-radius: 32px; 
 .tab-chip-wrap.is-active .tab-rename-btn { background: #E5E5EA; color: #1C1C1E; }
 /* 次级分享操作：权重低于 Tab，放在说明文案下方 */
 .section-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.box-inline-share-btn { display: none; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.08); background: #F2F2F7; color: var(--text-primary); cursor: pointer; white-space: nowrap; }
+.box-inline-share-btn { display: none; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.08); background: #F2F2F7; color: var(--text-primary); cursor: pointer; white-space: nowrap; position: relative; overflow: visible; }
 .confirm-action-swatch { width: 48px; height: 40px; border-radius: 10px; margin: 4px auto 0; box-shadow: inset 0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.06); }
 .btn-confirm-danger { background: #FF3B30 !important; color: #fff !important; opacity: 1 !important; pointer-events: auto !important; }
 .rename-box-hint { font-size: 12px; color: var(--text-secondary); text-align: center; margin: -4px 0 0; line-height: 1.4; }
@@ -120,7 +120,8 @@ margin-top: -24px; border-top-left-radius: 32px; border-top-right-radius: 32px; 
 .top-gear-btn { width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.03); background: #F2F2F7; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #1C1C1E; flex-shrink: 0; padding: 0; box-shadow: none; }
 .top-gear-btn svg { display: block; }
 .modal-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
-.modal-import-btn { flex-shrink: 0; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.08); background: #F2F2F7; color: var(--text-primary); cursor: pointer; white-space: nowrap; }
+.modal-import-btn { flex-shrink: 0; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.08); background: #F2F2F7; color: var(--text-primary); cursor: pointer; white-space: nowrap; position: relative; overflow: visible; }
+.modal-header, .modal-header-left { overflow: visible; }
 .share-export-stack { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 4px; }
 .share-export-stack button { width: 100%; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 14px; border: 1px solid #E5E5EA; background: #F7F7F8; color: var(--text-primary); cursor: pointer; }
 .share-export-stack button.primary { background: #1C1C1E; color: #fff; border-color: #1C1C1E; }
@@ -685,12 +686,20 @@ persistMyBoxes();
 localStorage.setItem('userAddedPigments', JSON.stringify(appState.userAddedPigments));
 }
 function openPigmentModal() {
-  modalState.viewingTabId = appState.currentTabId;
-  modalState.tempMyBoxes = deepClone(appState.myBoxes);
-  modalState.tempUserAdded = deepClone(appState.userAddedPigments || []);
-renderModalContent(); document.getElementById('modalBackdrop').classList.add('active');
-document.getElementById('pigmentModal').classList.add('active'); document.body.classList.add('modal-open');
-setTimeout(() => { const a = document.querySelector('.tab-chip.active'); if(a) a.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center'}); }, 100);
+  // 先出壳（立刻可看见动画），数据与网格分两帧灌，避免点齿轮卡死
+  document.getElementById('modalBackdrop').classList.add('active');
+  document.getElementById('pigmentModal').classList.add('active');
+  document.body.classList.add('modal-open');
+  setTimeout(function () {
+    modalState.viewingTabId = appState.currentTabId;
+    modalState.tempMyBoxes = deepClone(appState.myBoxes);
+    modalState.tempUserAdded = deepClone(appState.userAddedPigments || []);
+    renderModalContent({ deferLibrary: true, deferGrid: true });
+    setTimeout(function () {
+      const a = document.querySelector('.tab-chip.active');
+      if (a) a.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }, 60);
+  }, 0);
 }
 function closePigmentModal() {
   document.getElementById('modalBackdrop').classList.remove('active');
@@ -1016,7 +1025,10 @@ function deleteUserPigment(id) {
     }
   });
 }
-function renderModalContent() {
+function renderModalContent(opts) {
+  opts = opts || {};
+  const deferGrid = !!opts.deferGrid;
+  const deferLibrary = opts.deferLibrary !== false;
   const tabs = document.getElementById('modalTabs');
   tabs.innerHTML = '';
   (modalState.tempMyBoxes || []).forEach(b => {
@@ -1050,7 +1062,6 @@ function renderModalContent() {
   });
   try { if (typeof window.__xstudioRefreshMembership === 'function') window.__xstudioRefreshMembership(); } catch (_eXm) {}
   const isC = isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes);
-  const box = getTempViewBox();
   const curT = PRESET_TABS.find(t => t.id === modalState.viewingTabId);
   const ids = getBoxIdsForTab(modalState.viewingTabId, modalState.tempMyBoxes);
   const desc = isC
@@ -1062,29 +1073,62 @@ function renderModalContent() {
   document.getElementById('currentGroupTitle').innerText = isC ? '这个颜料盒中的颜料：' : '包含颜料';
   document.getElementById('resetCustomBtn').style.display = isC ? 'block' : 'none';
   const grid = document.getElementById('currentSetGrid');
-  grid.innerHTML = '';
-  const all = getAllAvailablePigments();
-  all.forEach(p => {
-    if (ids.includes(p.id)) {
-      const canRemove = isC && p.id !== 'titanium-white';
-      grid.appendChild(createPanElement(p, isC ? () => toggleCustomPigment(p.id) : () => {}, canRemove ? 'action-remove' : '', !isC));
-    }
-  });
-const libS = document.getElementById('librarySection'), libG = document.getElementById('fullLibraryGrid');
-  if (isC) {
-    libS.style.display = 'block';
-    libG.innerHTML = '';
+  const libS = document.getElementById('librarySection'), libG = document.getElementById('fullLibraryGrid');
+  function fillCurrentGrid() {
+    const g = document.getElementById('currentSetGrid');
+    if (!g) return;
+    g.innerHTML = '';
+    const all = getAllAvailablePigments();
+    const curIds = getBoxIdsForTab(modalState.viewingTabId, modalState.tempMyBoxes);
+    const custom = isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes);
     all.forEach(p => {
+      if (curIds.includes(p.id)) {
+        const canRemove = custom && p.id !== 'titanium-white';
+        g.appendChild(createPanElement(p, custom ? () => toggleCustomPigment(p.id) : () => {}, canRemove ? 'action-remove' : '', !custom));
+      }
+    });
+  }
+  function fillLibrary() {
+    if (!isMyBoxId(modalState.viewingTabId, modalState.tempMyBoxes)) {
+      if (libS) libS.style.display = 'none';
+      return;
+    }
+    if (libS) libS.style.display = 'block';
+    const g = document.getElementById('fullLibraryGrid');
+    if (!g) return;
+    g.innerHTML = '';
+    const boxIds = getBoxIdsForTab(modalState.viewingTabId, modalState.tempMyBoxes);
+    getAllAvailablePigments().forEach(p => {
       if (p.id === 'titanium-white') return;
-      libG.appendChild(createSelectablePan(p, ids.includes(p.id), () => toggleCustomPigment(p.id), p.isUserCreated ? () => deleteUserPigment(p.id) : null));
+      g.appendChild(createSelectablePan(p, boxIds.includes(p.id), () => toggleCustomPigment(p.id), p.isUserCreated ? () => deleteUserPigment(p.id) : null));
     });
     const add = document.createElement('div');
     add.className = 'add-new-pigment-pan';
     add.innerText = '+';
     add.onclick = triggerAddUserPigment;
-    libG.appendChild(add);
+    g.appendChild(add);
+  }
+  if (deferGrid) {
+    if (grid) grid.innerHTML = '';
+    if (libG) libG.innerHTML = '';
+    if (isC && libS) libS.style.display = 'block';
+    else if (libS) libS.style.display = 'none';
+    setTimeout(function () {
+      var modalEl = document.getElementById('pigmentModal');
+      if (!modalEl || !modalEl.classList.contains('active')) return;
+      fillCurrentGrid();
+      if (deferLibrary) setTimeout(fillLibrary, 0);
+      else fillLibrary();
+    }, 0);
   } else {
-    libS.style.display = 'none';
+    fillCurrentGrid();
+    if (isC) {
+      if (deferLibrary) {
+        if (libS) libS.style.display = 'block';
+        if (libG) libG.innerHTML = '';
+        setTimeout(fillLibrary, 0);
+      } else fillLibrary();
+    } else if (libS) libS.style.display = 'none';
   }
 }
 function createPanElement(p, click, icon, read) { const i = document.createElement('div'); i.className='pigment-pan-item'; if(read) i.style.cursor='default';
@@ -2124,12 +2168,12 @@ document.addEventListener('dblclick', function(e) { e.preventDefault(); }, { pas
       if (importBtn) {
         var rImp = window.MembershipAccess.featureResourceId('xstudio', 'importBox');
         targets.push({ el: importBtn, rid: rImp, label: '导入颜料盒' });
-        window.MembershipPaintHost.markLockedEl(importBtn, rImp, '导入颜料盒');
+        window.MembershipPaintHost.markLockedEl(importBtn, rImp, '导入颜料盒', { surface: 'light', floatOut: true });
       }
       if (shareBtn) {
         var rSh = window.MembershipAccess.featureResourceId('xstudio', 'shareBox');
         targets.push({ el: shareBtn, rid: rSh, label: '分享颜料盒' });
-        window.MembershipPaintHost.markLockedEl(shareBtn, rSh, '分享颜料盒');
+        window.MembershipPaintHost.markLockedEl(shareBtn, rSh, '分享颜料盒', { surface: 'light', floatOut: true });
       }
       var chips = document.querySelectorAll('#modalTabs .tab-chip[data-palette-id]');
       for (var i = 0; i < chips.length; i++) {
@@ -2139,8 +2183,9 @@ document.addEventListener('dblclick', function(e) { e.preventDefault(); }, { pas
         if (!pid || pid === 'basic' || isMyBoxId(pid, modalState.tempMyBoxes || appState.myBoxes)) continue;
         var rid = window.MembershipAccess.uiResourceId('xstudio', 'palette:' + pid);
         var tab = PRESET_TABS.find(function (t) { return t.id === pid; });
-        targets.push({ el: c, rid: rid, label: (tab && tab.name) || pid, chipStyle: { top: '2px', left: '2px', fontSize: '10px', maxWidth: '90%' } });
-        window.MembershipPaintHost.markLockedEl(c, rid, (tab && tab.name) || pid);
+        targets.push({ el: c, rid: rid, label: (tab && tab.name) || pid });
+        // 浅底芯片：右上角描边短标
+        window.MembershipPaintHost.markLockedEl(c, rid, (tab && tab.name) || pid, { surface: 'light' });
       }
       window.MembershipPaintHost.setTargets(targets);
     } catch (_e) {}

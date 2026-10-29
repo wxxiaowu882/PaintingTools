@@ -157,11 +157,182 @@
     return getAccessLevel() === 'member';
   }
 
+  /** 列表/按钮短标；完整说明只在 promptUpgrade 弹窗里 */
   function badgeLabelForRequire(require) {
     var req = normalizeRequire(require);
-    if (req === 'user') return '会员免费';
-    if (req === 'member') return '高级会员尊享';
+    // 短于 Member，与 Pro 同为克制短标
+    if (req === 'user') return '会员';
+    if (req === 'member') return 'Pro';
     return '';
+  }
+
+  /** surface: dark（黑按钮/深底）| light（白按钮/浅底） */
+  function badgeInk(require, surface) {
+    var isUser = normalizeRequire(require) === 'user';
+    var dark = surface === 'dark';
+    // 叠标：字色与描边强对比。深底用浅字（近白/亮金），浅底用深字
+    if (isUser) {
+      return dark ? '#f3fff8' : '#146b45';
+    }
+    return dark ? '#fff4c8' : '#7a5c0a';
+  }
+
+  function badgeTitleForLabel(text) {
+    if (text === 'Pro') return '高级会员尊享';
+    if (text === '会员') return '会员免费';
+    return text || '';
+  }
+
+  /** 细描边（行内短标用）；勿写 text-shadow spread（非法会被整条丢弃） */
+  function badgeStrokeShadow(surface) {
+    if (surface === 'dark') {
+      return (
+        '-0.7px -0.7px 0 rgba(0,0,0,0.9),0.7px -0.7px 0 rgba(0,0,0,0.9),' +
+        '-0.7px 0.7px 0 rgba(0,0,0,0.9),0.7px 0.7px 0 rgba(0,0,0,0.9),' +
+        '0 1px 2px rgba(0,0,0,0.45)'
+      );
+    }
+    return (
+      '-0.55px -0.55px 0 #fff,0.55px -0.55px 0 #fff,' +
+      '-0.55px 0.55px 0 #fff,0.55px 0.55px 0 #fff,' +
+      '0 0.5px 1.5px rgba(50,46,40,0.18)'
+    );
+  }
+
+  /** 按钮叠标：半透明低饱和底 + 白字（类 NEW，不旋转；宁淡勿厚） */
+  function stickerFillCss(require) {
+    var isUser = normalizeRequire(require) === 'user';
+    // 会员灰绿 / Pro 暖金；再透一档（约 0.5），避免厚价签感
+    var bg = isUser ? 'rgba(48, 82, 66, 0.5)' : 'rgba(120, 94, 40, 0.5)';
+    var border = isUser ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.4)';
+    return {
+      bg: bg,
+      border: border,
+      color: '#fffef8'
+    };
+  }
+
+  /**
+   * 描边短标 / 叠标
+   * place: tr|br|inline|sticker
+   * sticker/tr：右上角可探出的小色底标签；inline：Solid 行内仍用描边字
+   */
+  function outlineBadgeCss(require, place, opts) {
+    var surface = (opts && opts.surface) || (place === 'inline' ? 'dark' : 'light');
+    var compact = !!(opts && opts.compact);
+    if (place === 'inline') {
+      var color = badgeInk(require, surface);
+      var thin = badgeStrokeShadow(surface);
+      return (
+        'position:static;display:inline;margin:0 0 0 4px;padding:0;border:none;border-radius:0;' +
+        'background:transparent !important;vertical-align:baseline;' +
+        'font-size:10px;line-height:1.15;font-weight:600;letter-spacing:0.06em;' +
+        'font-family:inherit;color:' + color + ';' +
+        'text-shadow:' + thin + ';' +
+        'pointer-events:none;white-space:nowrap;flex:none;box-shadow:none;'
+      );
+    }
+    if (place === 'sticker' || place === 'tr') {
+      var fill = stickerFillCss(require);
+      var size = compact ? '9px' : '10px';
+      var pad = compact ? '1px 5px' : '2px 6px';
+      // inset：略探出；insetStrict：完全角内（晓阶 app-shell 防裁切）
+      // floatOut / compact：往右上外侧探，避免压住 checkbox 本体
+      var inset = !!(opts && opts.inset) || compact;
+      var top = inset ? (compact ? '-6px' : '-4px') : '-7px';
+      var right = inset ? (compact ? '-10px' : '-4px') : '-6px';
+      if (opts && opts.insetStrict) {
+        top = compact ? '2px' : '3px';
+        right = compact ? '2px' : '4px';
+      }
+      if (opts && opts.floatOut) {
+        top = '-10px';
+        right = '-14px';
+      }
+      if (compact) {
+        size = '8px';
+        pad = '1px 4px';
+      }
+      return (
+        'position:absolute;right:' + right + ';top:' + top + ';left:auto;bottom:auto;z-index:8;' +
+        'font-size:' + size + ';line-height:1.15;font-weight:600;letter-spacing:0.04em;' +
+        'font-family:inherit;padding:' + pad + ';margin:0;' +
+        'border:1px solid ' + fill.border + ';border-radius:3px;' +
+        'background:' + fill.bg + ' !important;' +
+        'color:' + fill.color + ';' +
+        '-webkit-text-stroke:0;text-shadow:0 0.5px 1px rgba(0,0,0,0.22);' +
+        'box-shadow:0 1px 2px rgba(0,0,0,0.1);' +
+        'pointer-events:none;white-space:nowrap;transform:none;'
+      );
+    }
+    var pos = 'right:8px;bottom:6px;left:auto;top:auto;';
+    var ink = badgeInk(require, surface);
+    var shadow = badgeStrokeShadow(surface);
+    return (
+      'position:absolute;' + pos + 'z-index:6;' +
+      'font-size:10px;line-height:1;font-weight:600;letter-spacing:0.1em;' +
+      'font-family:inherit;padding:0;margin:0;border:none;border-radius:0;' +
+      'background:transparent !important;box-shadow:none;' +
+      'color:' + ink + ';' +
+      'text-shadow:' + shadow + ';' +
+      'pointer-events:none;white-space:nowrap;transform:none;'
+    );
+  }
+
+  /** PC 宽屏课表丝带略放大；移动端保持原尺寸（特性检测，不用 UA） */
+  function ribbonScalePc() {
+    try {
+      return !!(global.matchMedia && global.matchMedia('(min-width: 900px)').matches);
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  /** Solid / Portrait 课表：角内裁切盒 + 斜角丝带 */
+  function attachLockRibbon(hostEl, text, require) {
+    if (!hostEl) return null;
+    var req = normalizeRequire(require);
+    var isUser = req === 'user';
+    var ink = badgeInk(req, 'dark');
+    var ribbonBg = isUser ? 'rgba(36, 48, 40, 0.82)' : 'rgba(52, 44, 28, 0.86)';
+    var pc = ribbonScalePc();
+    var box = pc ? 64 : 48;
+    var stripW = pc ? 86 : 68;
+    var stripRight = pc ? -26 : -20;
+    var stripBottom = pc ? 10 : 8;
+    var fontPx = pc ? 10 : 8;
+    var badge = hostEl.querySelector('.membership-badge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'membership-badge';
+      try {
+        if (getComputedStyle(hostEl).position === 'static') hostEl.style.position = 'relative';
+      } catch (_ePos) {}
+      hostEl.appendChild(badge);
+    } else if (badge.parentElement !== hostEl) {
+      try { hostEl.appendChild(badge); } catch (_eRe) {}
+    }
+    badge.style.cssText =
+      'position:absolute;right:0;bottom:0;left:auto;top:auto;z-index:3;' +
+      'width:' + box + 'px;height:' + box + 'px;padding:0;margin:0;border:none;border-radius:0;' +
+      'background:transparent;overflow:hidden;pointer-events:none;box-shadow:none;';
+    var strip = badge.querySelector('.membership-badge-strip');
+    if (!strip) {
+      strip = document.createElement('span');
+      strip.className = 'membership-badge-strip';
+      badge.appendChild(strip);
+    }
+    strip.style.cssText =
+      'position:absolute;right:' + stripRight + 'px;bottom:' + stripBottom + 'px;left:auto;top:auto;' +
+      'width:' + stripW + 'px;padding:2px 0;text-align:center;' +
+      'font-size:' + fontPx + 'px;line-height:1.15;font-weight:500;letter-spacing:0.04em;' +
+      'color:' + ink + ';background:' + ribbonBg + ';' +
+      'border:none;border-radius:0;box-shadow:none;' +
+      'transform:rotate(-45deg);transform-origin:center center;' +
+      'pointer-events:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    strip.textContent = text || '';
+    badge.title = badgeTitleForLabel(text);
+    return badge;
   }
 
   /** 涂色模式短标签：游客 / 会员 / 高级 */
@@ -497,6 +668,11 @@
           if (!sc || typeof sc !== 'object') return sc;
           // 本地回退也按列表卡裁剪，行为与线上一致
           var locked = !!sc.__membershipLocked || !!(sc.meta && sc.meta.locked);
+          // 锁课档位必须带到列表卡：否则点进弹窗会默认成高级会员文案
+          var needReq =
+            sc.__require ||
+            (sc.meta && sc.meta.require) ||
+            null;
           var card = {
             name: sc.name,
             thumbnail: '',
@@ -514,11 +690,15 @@
                   gender: sc.meta.gender,
                   age: sc.meta.age,
                   region: sc.meta.region,
-                  locked: locked ? true : sc.meta.locked
+                  locked: locked ? true : sc.meta.locked,
+                  require: needReq || sc.meta.require
                 }
-              : (locked ? { locked: true } : {}),
+              : (locked
+                ? { locked: true, require: needReq || undefined }
+                : {}),
             __listOnly: true,
-            __membershipLocked: locked ? true : undefined
+            __membershipLocked: locked ? true : undefined,
+            __require: needReq || undefined
           };
           if (sc.uid != null && String(sc.uid).trim() !== '') card.uid = String(sc.uid).trim();
           if (sc.id != null && String(sc.id).trim() !== '') card.id = String(sc.id).trim();
@@ -1040,6 +1220,9 @@
     meetsRequire: meetsRequire,
     normalizeRequire: normalizeRequire,
     badgeLabelForRequire: badgeLabelForRequire,
+    badgeTitleForLabel: badgeTitleForLabel,
+    outlineBadgeCss: outlineBadgeCss,
+    attachLockRibbon: attachLockRibbon,
     paintLabelForRequire: paintLabelForRequire,
     nextRequireCycle: nextRequireCycle,
     setLocalPolicy: setLocalPolicy,

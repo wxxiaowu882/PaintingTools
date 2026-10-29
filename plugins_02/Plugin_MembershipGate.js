@@ -29,33 +29,89 @@ import '../docs/js/membership/MembershipAccess.js';
   function badgeText(gate, sceneData) {
     var req = badgeRequire(gate, sceneData);
     if (MA.badgeLabelForRequire) return MA.badgeLabelForRequire(req) || '会员';
-    return req === 'user' ? '会员免费' : '高级会员尊享';
+    return req === 'user' ? '会员' : 'Pro';
   }
 
-  /** 模块旁：会员免费=绿字，高级=黄字 */
-  function badgeStyle(req, kind) {
-    var isUser = MA.normalizeRequire ? MA.normalizeRequire(req) === 'user' : req === 'user';
-    var ink = isUser ? 'rgba(168, 214, 186, 0.95)' : 'rgba(232, 210, 150, 0.95)';
-    var ribbonBg = isUser
-      ? 'linear-gradient(180deg,rgba(52,92,68,0.92),rgba(28,48,36,0.96))'
-      : 'linear-gradient(180deg,rgba(92,74,36,0.92),rgba(48,38,18,0.96))';
-    if (kind === 'mod') {
-      return (
-        'display:inline-block;margin-left:8px;vertical-align:middle;flex:none;' +
-        'font-size:10px;font-weight:400;padding:0;border:none;border-radius:0;background:transparent;' +
-        'color:' + ink + ';pointer-events:none;letter-spacing:0;white-space:nowrap;'
-      );
+  function badgeTitle(text) {
+    if (MA.badgeTitleForLabel) return MA.badgeTitleForLabel(text);
+    return text === 'Pro' ? '高级会员尊享' : '会员免费';
+  }
+
+  /** 文本/标题外包一层（防重复套娃，否则 tab 多切会 DOM 爆炸崩溃） */
+  function ensureTextHost(el) {
+    if (!el) return null;
+    if (el.classList && el.classList.contains('membership-txt-host')) return el;
+    var p = el.parentElement;
+    if (p && p.classList && p.classList.contains('membership-txt-host')) return p;
+    var wrap = document.createElement('span');
+    wrap.className = 'membership-txt-host';
+    wrap.style.cssText =
+      'position:relative;display:inline-flex;align-items:center;vertical-align:middle;flex:none;';
+    try {
+      el.parentNode.insertBefore(wrap, el);
+      wrap.appendChild(el);
+    } catch (_e) {
+      return el;
     }
-    // 课表：列表项右下角斜角丝带（贴在卡片上，不盖缩略图）
-    return (
-      'position:absolute;right:-34px;bottom:14px;left:auto;top:auto;z-index:3;' +
-      'width:112px;padding:4px 0;text-align:center;' +
-      'font-size:9px;line-height:1.2;font-weight:500;letter-spacing:0.04em;' +
-      'color:' + ink + ';background:' + ribbonBg + ';' +
-      'border:none;border-radius:0;box-shadow:0 1px 0 rgba(255,255,255,0.08) inset,0 2px 8px rgba(0,0,0,0.35);' +
-      'transform:rotate(-45deg);transform-origin:center center;' +
-      'pointer-events:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
-    );
+    return wrap;
+  }
+
+  /**
+   * 标题文案右上角色底小标（不压 checkbox / 滑条）。
+   * opts.floatOut：略向右上外侧探出，少挡字。
+   */
+  function ensureCornerBadge(mountEl, key, text, req, opts) {
+    if (!mountEl) return;
+    var sel = '.membership-mod-badge[data-mod-slot="' + key + '"]';
+    try {
+      document.querySelectorAll(sel).forEach(function (b) {
+        if (b.parentElement !== mountEl) b.remove();
+      });
+    } catch (_eC) {}
+    // 卸掉旧版挂在 checkbox 上的宿主，避免挡点击
+    try {
+      var stale = mountEl.querySelector && mountEl.querySelector('.membership-chk-host');
+      if (stale && stale.parentNode) {
+        while (stale.firstChild) stale.parentNode.insertBefore(stale.firstChild, stale);
+        stale.remove();
+      }
+    } catch (_eU) {}
+    var badge = mountEl.querySelector(sel);
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'membership-mod-badge';
+      badge.setAttribute('data-mod-slot', key);
+      mountEl.appendChild(badge);
+    }
+    try {
+      if (getComputedStyle(mountEl).position === 'static') mountEl.style.position = 'relative';
+      mountEl.style.overflow = 'visible';
+    } catch (_eP) {}
+    var floatOut = !(opts && opts.floatOut === false);
+    badge.style.cssText = MA.outlineBadgeCss
+      ? MA.outlineBadgeCss(req, 'sticker', {
+          surface: 'dark',
+          compact: true,
+          inset: true,
+          floatOut: floatOut
+        })
+      : 'position:absolute;right:-12px;top:-9px;font-size:8px;padding:1px 4px;border-radius:3px;' +
+        'background:rgba(120,94,40,0.5);color:#fffef8;pointer-events:none;';
+    badge.textContent = text;
+    badge.title = badgeTitle(text);
+  }
+
+  function ensureInlineBadge(anchorEl, key, text, req, opts) {
+    ensureCornerBadge(anchorEl, key, text, req, opts);
+  }
+
+  function clearModCornerBadges(host) {
+    if (!host) return;
+    try {
+      host.querySelectorAll('.membership-mod-badge:not([data-mod-slot])').forEach(function (b) {
+        b.remove();
+      });
+    } catch (_e) {}
   }
 
   /** 课表点锁课后会先关 modal；拦截进景时立刻加取消时都要恢复，避免「空场景」观感 */
@@ -153,51 +209,103 @@ import '../docs/js/membership/MembershipAccess.js';
   }
 
   function wrapPanelMods() {
+    // 只拦滑条等用户手势；勿包 updateFogUI / toggleFog* / setEnvColor
+    // （进公开课灌参会同步 UI，否则会误弹「空气透视」）
     var ok = true;
-    ok = wrapNamed('toggleFogAdvanced', 'fog', '空气透视') && ok;
-    ok = wrapNamed('toggleDoF', 'dof', '景深虚实') && ok;
-    ok = wrapNamed('togglePosterize', 'posterize', '色阶概括') && ok;
     ok = wrapNamed('onFogSliderInput', 'fog', '空气透视') && ok;
-    ok = wrapNamed('updateFogUI', 'fog', '空气透视') && ok;
-    ok = wrapNamed('selectFogType', 'fog', '空气透视') && ok;
     ok = wrapNamed('onDoFSliderInput', 'dof', '景深虚实') && ok;
     ok = wrapNamed('onPosterizeSliderInput', 'posterize', '色阶概括') && ok;
-    ok = wrapNamed('toggleWall', 'env', '环境光') && ok;
-    ok = wrapNamed('setEnvColor', 'env', '环境光') && ok;
     return ok;
+  }
+
+  function clearInlineSlots(keys) {
+    keys.forEach(function (key) {
+      try {
+        document.querySelectorAll('.membership-mod-badge[data-mod-slot="' + key + '"]').forEach(function (b) {
+          b.remove();
+        });
+      } catch (_e) {}
+    });
   }
 
   function markLockedMods() {
     try {
-      ['env', 'fog', 'dof', 'posterize'].forEach(function (mod) {
-        var host = document.querySelector('[data-membership-mod="' + mod + '"]');
+      // env：色块旁三处；fog/dof/posterize：标题文案旁
+      var envHost = document.querySelector('[data-membership-mod="env"]');
+      var fogHost = document.querySelector('[data-membership-mod="fog"]');
+      var dofHost = document.querySelector('[data-membership-mod="dof"]');
+      var postHost = document.querySelector('[data-membership-mod="posterize"]');
+
+      function setHostLocked(host, locked) {
         if (!host) return;
-        var gate = MA.canAccess(modId(mod));
-        var badge = host.querySelector('.membership-mod-badge');
-        if (gate.ok) {
+        if (locked) {
+          host.classList.add('membership-mod-locked');
+          host.style.opacity = '';
+          clearModCornerBadges(host);
+        } else {
           host.classList.remove('membership-mod-locked');
           host.style.opacity = '';
-          if (badge) badge.remove();
-          return;
+          clearModCornerBadges(host);
         }
-        host.classList.add('membership-mod-locked');
-        host.style.opacity = '0.55';
-        var text = badgeText(gate);
-        var req = badgeRequire(gate);
-        if (!badge) {
-          badge = document.createElement('span');
-          badge.className = 'membership-mod-badge';
-          var titleEl =
-            host.querySelector('.module-title') ||
-            host.querySelector('label.module-title') ||
-            host.querySelector('label');
-          if (titleEl) titleEl.appendChild(badge);
-          else host.appendChild(badge);
-        }
-        badge.style.cssText = badgeStyle(req, 'mod');
-        badge.textContent = text;
-        badge.title = text;
-      });
+      }
+
+      var envGate = MA.canAccess(modId('env'));
+      setHostLocked(envHost, !envGate.ok);
+      if (!envGate.ok) {
+        var envText = badgeText(envGate);
+        var envReq = badgeRequire(envGate);
+        // 背景墙：挂在「背景墙」文案上，不挡 checkbox
+        var wallTitle = null;
+        try {
+          var wallLab = envHost && envHost.querySelector('label');
+          wallTitle = wallLab && wallLab.querySelector('span');
+        } catch (_eW) {}
+        ensureCornerBadge(ensureTextHost(wallTitle), 'env-wall', envText, envReq);
+        var groundLabel = null;
+        try {
+          var spans = envHost ? envHost.querySelectorAll('span') : [];
+          for (var gi = 0; gi < spans.length; gi++) {
+            if ((spans[gi].textContent || '').trim() === '地面') {
+              groundLabel = spans[gi];
+              break;
+            }
+          }
+        } catch (_eG) {}
+        ensureCornerBadge(ensureTextHost(groundLabel), 'env-ground', envText, envReq);
+        var skyLabel = envHost && envHost.querySelector('.slider-label');
+        ensureCornerBadge(ensureTextHost(skyLabel), 'env-sky', envText, envReq);
+      } else {
+        clearInlineSlots(['env-wall', 'env-ground', 'env-sky']);
+      }
+
+      var fogGate = MA.canAccess(modId('fog'));
+      setHostLocked(fogHost, !fogGate.ok);
+      if (!fogGate.ok) {
+        // 挂在整段标题 label 右上（字尾外侧），不压 checkbox
+        var fogLabel = fogHost && fogHost.querySelector('label.module-title');
+        ensureCornerBadge(fogLabel, 'fog-title', badgeText(fogGate), badgeRequire(fogGate));
+      } else {
+        clearInlineSlots(['fog-title']);
+      }
+
+      var dofGate = MA.canAccess(modId('dof'));
+      setHostLocked(dofHost, !dofGate.ok);
+      if (!dofGate.ok) {
+        var dofLabel = dofHost && dofHost.querySelector('label.module-title');
+        ensureCornerBadge(dofLabel, 'dof-title', badgeText(dofGate), badgeRequire(dofGate));
+      } else {
+        clearInlineSlots(['dof-title']);
+      }
+
+      var postGate = MA.canAccess(modId('posterize'));
+      setHostLocked(postHost, !postGate.ok);
+      if (!postGate.ok) {
+        var postSpan = postHost && postHost.querySelector('label span');
+        ensureCornerBadge(ensureTextHost(postSpan), 'posterize-title', badgeText(postGate), badgeRequire(postGate));
+      } else {
+        clearInlineSlots(['posterize-title']);
+      }
+
       // 清掉旧 Tab 灰显
       ['env', 'atmos', 'assist', 'light'].forEach(function (tab) {
         var btn = document.getElementById('btn-tab-' + tab);
@@ -254,28 +362,19 @@ import '../docs/js/membership/MembershipAccess.js';
         el.classList.add('membership-locked');
         var text = badgeText(gate, sc);
         var reqSc = badgeRequire(gate, sc);
-        if (!badge) {
+        // 角内裁切盒 + 斜带，避免圆角处尖角外溢
+        try {
+          if (el.style.overflow === 'visible') el.style.overflow = '';
+        } catch (_eOv2) {}
+        if (MA.attachLockRibbon) {
+          MA.attachLockRibbon(el, text, reqSc);
+        } else if (!badge) {
           badge = document.createElement('span');
           badge.className = 'membership-badge';
-          try {
-            if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
-          } catch (_ePos) {}
-          // 旧版曾挂在缩略图 wrap 上：统一挂到列表项右下角
           el.appendChild(badge);
-        } else if (badge.parentElement !== el) {
-          try { el.appendChild(badge); } catch (_eRe) {}
+          badge.textContent = text;
+          badge.title = badgeTitle(text);
         }
-        try {
-          // 斜角丝带需露出卡片右下角，避免被 overflow:hidden 裁切
-          if (el.style.overflow === 'hidden' || !el.style.overflow) {
-            var ov = '';
-            try { ov = getComputedStyle(el).overflow; } catch (_eOv) {}
-            if (ov === 'hidden') el.style.overflow = 'visible';
-          }
-        } catch (_eOv2) {}
-        badge.style.cssText = badgeStyle(reqSc, 'scene');
-        badge.textContent = text;
-        badge.title = text;
       });
     } catch (_e) {
     } finally {
@@ -305,6 +404,15 @@ import '../docs/js/membership/MembershipAccess.js';
     return false;
   }
 
+  var _modMarkTimer = null;
+  function scheduleMarkLockedMods() {
+    if (_modMarkTimer) return;
+    _modMarkTimer = setTimeout(function () {
+      _modMarkTimer = null;
+      markLockedMods();
+    }, 160);
+  }
+
   var plugin = {
     onUpdate: function () {
       if (!window.switchScene || !window.switchScene.__membershipWrapped) {
@@ -312,7 +420,8 @@ import '../docs/js/membership/MembershipAccess.js';
       } else {
         wrapPanelMods();
       }
-      markLockedMods();
+      // 勿每帧同步 mark：曾导致 text-host 套娃 / 主线程打满 → 页面崩溃
+      scheduleMarkLockedMods();
     }
   };
 
@@ -331,6 +440,8 @@ import '../docs/js/membership/MembershipAccess.js';
       markLockedMods();
       scheduleMarkLockedScenes();
     });
+    // 策略 ready 后补打课表角标（避免网格先于 policy 出现时漏标）
+    scheduleMarkLockedScenes();
   });
 
   try {
