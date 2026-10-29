@@ -7,7 +7,9 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
@@ -16,7 +18,9 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.ImageView
 import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -45,11 +49,18 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var progressBar: ProgressBar
+    private lateinit var splash: View
+    private lateinit var splashMark: ImageView
+    private lateinit var splashTitle: TextView
+    private lateinit var splashCredit: TextView
 
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var pendingPermissionRequest: PermissionRequest? = null
     /** 强制更新弹窗打开时，返回键直接退出，不进站 */
     private var forceUpdateBlocking = false
+    private var splashStartedAt = 0L
+    private var splashHidden = false
+    private var firstPageFinished = false
 
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -82,6 +93,10 @@ class MainActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webview)
         progressBar = findViewById(R.id.progress)
+        splash = findViewById(R.id.splash)
+        splashMark = findViewById(R.id.splash_mark)
+        splashTitle = findViewById(R.id.splash_title)
+        splashCredit = findViewById(R.id.splash_credit)
         webView.setBackgroundColor(0xFF050505.toInt())
 
         // 全屏交给网页 CSS safe-area；根布局再垫 systemBars 会与 100dvh 叠出「整页可滚 1px」，
@@ -91,22 +106,102 @@ class MainActivity : AppCompatActivity() {
 
         setupWebView()
         setupBackPress()
+        startSplashIntro()
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
+            hideSplashSoon(force = true)
         } else {
             // 先查 App 版本；网页内容更新不走这里
             checkShellUpdateThenLoad()
         }
     }
 
+    /** 简短开场：色立体轻入 + 品牌字淡入，盖住 WebView 冷启动黑段 */
+    private fun startSplashIntro() {
+        splashStartedAt = System.currentTimeMillis()
+        splash.visibility = View.VISIBLE
+        splash.alpha = 1f
+        splashMark.alpha = 0f
+        splashMark.scaleX = 0.88f
+        splashMark.scaleY = 0.88f
+        splashTitle.alpha = 0f
+        splashCredit.alpha = 0f
+        val ease = DecelerateInterpolator()
+        splashMark.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(720)
+            .setInterpolator(ease)
+            .start()
+        splashTitle.animate()
+            .alpha(0.92f)
+            .setStartDelay(220)
+            .setDuration(560)
+            .setInterpolator(ease)
+            .start()
+        splashCredit.animate()
+            .alpha(1f)
+            .setStartDelay(380)
+            .setDuration(520)
+            .setInterpolator(ease)
+            .start()
+        // 最迟收起，避免断网/慢网一直盖住
+        splash.postDelayed({ hideSplashSoon(force = true) }, SPLASH_MAX_MS)
+    }
+
+    private fun hideSplashSoon(force: Boolean = false) {
+        if (splashHidden) return
+        val elapsed = System.currentTimeMillis() - splashStartedAt
+        val waitMin = (SPLASH_MIN_MS - elapsed).coerceAtLeast(0L)
+        if (!force && !firstPageFinished) return
+        if (!force && waitMin > 0) {
+            splash.postDelayed({ hideSplashSoon(force = true) }, waitMin)
+            return
+        }
+        if (splashHidden) return
+        splashHidden = true
+        splash.animate()
+            .alpha(0f)
+            .setDuration(380)
+            .setInterpolator(DecelerateInterpolator())
+            .withEndAction {
+                splash.visibility = View.GONE
+                splash.alpha = 1f
+            }
+            .start()
+    }
+
+    companion object {
+        private const val SPLASH_MIN_MS = 900L
+        private const val SPLASH_MAX_MS = 2400L
+    }
+
     /**
      * 每页注入：锁文档滚动 + 壳标记（减轻内层列表与 WebView 整页抢滑）。
      * 首页额外显示右下角「V1.0.x」（网页可读 window.__SHELL_VERSION__）。
      */
+    /**
+     * 整页 document 滚动的站内页（作品集、会员、工具长页等）。
+     * Solid / Portrait / 首页仍锁 html/body，避免与课表内层列表抢手势。
+     */
+    private fun isDocumentScrollPath(path: String): Boolean {
+        val p = path.trimEnd('/').lowercase()
+        return p.endsWith("/gallery") || p.endsWith("/gallery.html") ||
+            p.endsWith("/member") || p.endsWith("/member.html") ||
+            p.endsWith("/gr") || p.endsWith("/gr.html") ||
+            p.endsWith("/xstudio") || p.endsWith("/xstudio.html") ||
+            p.startsWith("/docs") ||
+            p.contains("member-ops")
+    }
+
     private fun injectShellPageHelpers(url: String?) {
         val path = (Uri.parse(url ?: "").path ?: "").lowercase()
         val isHome = path.isEmpty() || path == "/" || path == "/index" || path.endsWith("/index.html")
+        val docScroll = isDocumentScrollPath(path)
+        // 作品集等靠 WebView 滚整页；课表页关滚动条以免与内层列表抢手势观感
+        webView.isVerticalScrollBarEnabled = docScroll
         val verLiteral = JSONObject.quote(BuildConfig.VERSION_NAME)
         val homeBadgeJs = if (isHome) {
             """
@@ -126,6 +221,12 @@ class MainActivity : AppCompatActivity() {
         } else {
             "try { window.__SHELL_VERSION__ = $verLiteral; } catch (eVer) {}"
         }
+        // 文档滚：允许 overflow-y；课表锁：overflow hidden + height 100%（既有 Solid 约定）
+        val bodyScrollCss = if (docScroll) {
+            "html.wuxiao-android-shell,html.wuxiao-android-shell body{overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;width:100%!important;background:#050505!important;height:auto!important;min-height:100%!important;}"
+        } else {
+            "html.wuxiao-android-shell,html.wuxiao-android-shell body{overflow:hidden!important;overscroll-behavior:none!important;height:100%!important;width:100%!important;background:#050505!important;}"
+        }
         val js = """
             (function(){
               try {
@@ -134,16 +235,16 @@ class MainActivity : AppCompatActivity() {
                 if (!s) {
                   s = document.createElement('style');
                   s.id = 'wuxiao-shell-scroll-fix';
-                  s.textContent =
-                    'html.wuxiao-android-shell,html.wuxiao-android-shell body{overflow:hidden!important;overscroll-behavior:none!important;height:100%!important;width:100%!important;background:#050505!important;}' +
-                    'html.wuxiao-android-shell .scene-grid{-webkit-overflow-scrolling:auto!important;}' +
-                    'html.wuxiao-android-shell #scene-grid-modal{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}' +
-                    'html.wuxiao-android-shell .index-about-app,' +
-                    'html.wuxiao-android-shell .menu-item[data-menu-url=\"/docs/app/\"],' +
-                    'html.wuxiao-android-shell .menu-item[data-menu-url=\"/docs/app\"],' +
-                    'html.wuxiao-android-shell .menu-category[data-menu-cat=\"install\"]{display:none!important;}';
                   (document.head || document.documentElement).appendChild(s);
                 }
+                s.textContent =
+                  '$bodyScrollCss' +
+                  'html.wuxiao-android-shell .scene-grid{-webkit-overflow-scrolling:auto!important;}' +
+                  'html.wuxiao-android-shell #scene-grid-modal{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}' +
+                  'html.wuxiao-android-shell .index-about-app,' +
+                  'html.wuxiao-android-shell .menu-item[data-menu-url=\"/docs/app/\"],' +
+                  'html.wuxiao-android-shell .menu-item[data-menu-url=\"/docs/app\"],' +
+                  'html.wuxiao-android-shell .menu-category[data-menu-cat=\"install\"]{display:none!important;}';
                 try { window.scrollTo(0, 0); } catch (e0) {}
                 try { document.documentElement.scrollTop = 0; } catch (e1) {}
                 try { if (document.body) document.body.scrollTop = 0; } catch (e2) {}
@@ -170,6 +271,7 @@ class MainActivity : AppCompatActivity() {
                     showForceUpdateDialog(info)
                 } else {
                     webView.loadUrl(BuildConfig.START_URL)
+                    // 首屏未完成前保持开场；超时由 startSplashIntro 兜底
                 }
             }
         }.start()
@@ -214,30 +316,32 @@ class MainActivity : AppCompatActivity() {
     private fun showForceUpdateDialog(info: ShellUpdateInfo) {
         forceUpdateBlocking = true
         progressBar.visibility = View.GONE
+        hideSplashSoon(force = true)
         val title = if (info.versionName.isNotBlank()) {
             "需要更新到 ${info.versionName}"
         } else {
             "需要更新应用"
         }
-        AlertDialog.Builder(this)
-            .setTitle(title)
-            .setMessage(info.message)
+        val view = LayoutInflater.from(this).inflate(R.layout.dialog_force_update, null)
+        view.findViewById<TextView>(R.id.update_title).text = title
+        view.findViewById<TextView>(R.id.update_message).text = info.message
+        val dialog = AlertDialog.Builder(this, R.style.Theme_Wuxiao_ForceUpdateDialog)
+            .setView(view)
             .setCancelable(false)
-            .setPositiveButton("下载更新") { _, _ ->
-                try {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl)))
-                } catch (_: Exception) {
-                }
-                // 装完需重新打开；此处退出，避免旧壳继续用
-                finish()
+            .create()
+        view.findViewById<TextView>(R.id.btn_update_download).setOnClickListener {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl)))
+            } catch (_: Exception) {
             }
-            .setNegativeButton("退出") { _, _ -> finish() }
-            .setOnDismissListener {
-                if (forceUpdateBlocking) {
-                    // 系统仍可能关掉对话框；保持不进站
-                }
-            }
-            .show()
+            // 装完需重新打开；此处退出，避免旧壳继续用
+            finish()
+        }
+        view.findViewById<TextView>(R.id.btn_update_exit).setOnClickListener { finish() }
+        dialog.setOnShowListener {
+            dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        }
+        dialog.show()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -296,6 +400,8 @@ class MainActivity : AppCompatActivity() {
                 progressBar.visibility = View.GONE
                 CookieManager.getInstance().flush()
                 injectShellPageHelpers(url)
+                firstPageFinished = true
+                hideSplashSoon()
             }
         }
 

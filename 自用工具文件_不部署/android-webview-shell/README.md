@@ -12,7 +12,7 @@
 | 启动站 | **测试站** `https://test.wuxiaoart.com/`（`BuildConfig.START_URL`；正式包再改 `www`） |
 | 资源是否进包 | **否**。壳 ≈ 空壳 WebView；JS/CSS/GLB 全部现网拉取，**网页内容更新不用换 APK** |
 | App 强制更新 | 启动读 `/docs/app/android-shell-update.json`；本机 versionCode 低于 `minVersionCode` 则拦进站并跳 APK 下载（对外统称 App 更新） |
-| 当前可测包 | `dist/手绘工坊-1.0.8-debug.apk`；发测试站时同步 `docs/app/wuxiao-workshop.apk` |
+| 当前可测包 | `dist/手绘工坊-1.0.14-debug.apk`；发测试站时同步 `docs/app/wuxiao-workshop.apk` |
 | 对外下载页 | 站点 `/docs/app/`（浏览器菜单「安卓 App 下载」；**App 内隐藏该入口**） |
 | 1.0.1 | 修复：相册选图、Cookie、blob/data；描摹可申请摄像头 |
 | 1.0.2 | 启动 URL 改为测试站 |
@@ -21,6 +21,11 @@
 | 1.0.6 | 关 WebView 系统缩放 + 关 overscroll，修复壳内课表列表滑动反向/不顺 |
 | 1.0.7 | 关 overview、去壳双重安全区留白、注入锁文档滚动；继续修壳内列表反向/卡顿 |
 | 1.0.8 | 桌面名「手绘工坊」；深色启动防白闪；关多窗口防涂色闪退；App 内隐藏下载入口；对外文案统称 App 更新 |
+| 1.0.9 | 桌面图标换为 CS08 色立体（紫绿点云瓣）试看 |
+| 1.0.10 | 图标内缩安全区，圆角/圆形裁切下色立体完整可见 |
+| 1.0.11 | 更新弹窗对比度与深色卡片；冷启动开场动画；图标放大5%/饱和度+5% |
+| 1.0.12 | 图标饱和度/亮度再+3%、略下移；开场文案加 by 童画师吴晓 |
+| 1.0.13 | 色立体顶点压亮；Gallery 等整页滚恢复（Solid 课表仍锁 body） |
 
 ---
 
