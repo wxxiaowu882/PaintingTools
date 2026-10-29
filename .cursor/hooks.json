@@ -16,10 +16,17 @@
         "timeout": 10
       }
     ],
+    "afterShellExecution": [
+      {
+        "command": "node .cursor/hooks/after-shell-fail-mark.js",
+        "failClosed": false,
+        "timeout": 10
+      }
+    ],
     "stop": [
       {
         "command": "node .cursor/hooks/stop-cleanup-remind.js",
-        "loop_limit": 1,
+        "loop_limit": 2,
         "timeout": 10
       }
     ]
