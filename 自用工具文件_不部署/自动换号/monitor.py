@@ -31,6 +31,7 @@ class Monitor:
         self._tip_streak_count: int = 0
         self._conn_resume_until: float = 0.0
         self._resuming_conn = False
+        self._last_tip_hit: detect_tip.TipHit | None = None
 
     def in_grace(self) -> bool:
         return time.time() < self.grace_until
@@ -147,32 +148,38 @@ class Monitor:
         self._switching = True
         self.state = "换号中"
         cn = config.TIP_TYPE_CN.get(tip_kind, tip_kind)
+        tip_hint = self._last_tip_hit
         try:
             log(f"状态 换号中 触发={cn} 方式=无感换号")
-            try:
-                detect_tip.close_tip()
-            except Exception:
-                pass
+            # 换号前不再全量关 tip（detect 极慢）；切回后再快关
 
             ui_cursor.save_all()
             if not ui_manager.click_seamless_switch():
-                log("错误 换号流程中断 无感换号点击失败")
+                log("错误 换号流程中断 无感换号点击失败（未发继续语）")
                 self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
                 return
 
-            wait_s = float(getattr(config, "SEAMLESS_SWITCH_WAIT", 5.0))
-            log(f"换号 无感换号已点击 等待生效={wait_s:.1f}秒（不重启Cursor）")
-            time.sleep(max(0.5, wait_s))
-
-            # 回到工程窗；清挡路更新提示后发继续语
-            ui_cursor.bring_paintingtools_front_max()
-            ui_cursor.dismiss_update_recommended_dialog(timeout=2.5)
+            wait_s = float(getattr(config, "SEAMLESS_SWITCH_WAIT", 0.35))
+            after_s = float(getattr(config, "SEAMLESS_AFTER_FRONT", 0.08))
+            log(f"换号 已单击无感换号 立刻切回Cursor（不重试点击）")
+            time.sleep(max(0.1, wait_s))
+            # 点完马上离开管家，回到 Cursor
+            t_front = time.time()
+            ui_cursor.bring_paintingtools_front_max(fast=True)
+            time.sleep(max(0.02, after_s))
             try:
-                detect_tip.close_tip()
-            except Exception:
-                pass
-            time.sleep(0.4)
-            ok = ui_cursor.send_continue_in_chat()
+                # 硬规则：只关 ×，绝不点 Upgrade to Pro
+                detect_tip.close_tip_fast(hint=tip_hint)
+            except Exception as e:
+                log(f"换号 快关tip 异常 {e}")
+            ok = ui_cursor.send_continue_in_chat(fast=True)
+            if not ok:
+                try:
+                    detect_tip.close_tip_fast(hint=tip_hint)
+                except Exception:
+                    pass
+                ok = ui_cursor.send_continue_in_chat(fast=True)
+            log(f"换号 切回后到续写完成 耗时={time.time() - t_front:.2f}s")
             if ok:
                 log(f"续写 结果=成功 内容={config.CONTINUE_PROMPT}")
                 self.start_grace()
@@ -244,13 +251,24 @@ class Monitor:
             self.do_network_resume()
             return
 
-        if self.in_grace():
-            # 宽限内不处理 tip：续写后 chat 历史易误匹配，强行关 tip 还会提前结束宽限
-            log(f"提示 {cn} 动作=忽略 宽限中=是 分数={hit.score:.2f}")
-            self._reset_tip_streak()
-            return
         if time.time() < self._fail_cooldown_until:
             log(f"提示 {cn} 动作=暂缓 原因=换号失败冷却中")
+            self._reset_tip_streak()
+            return
+
+        # 宽限内：续写后又撞用量 → 继续换号循环；低分可能是 chat 历史误匹配则忽略
+        if self.in_grace():
+            grace_min = float(getattr(config, "GRACE_USAGE_RERUN_MIN_SCORE", 0.86))
+            if hit.kind in ("usage_limit", "error_resume") and hit.score >= grace_min:
+                log(
+                    f"提示 {cn} 动作=换号 原因=宽限内再次用量 "
+                    f"分数={hit.score:.2f}（续写→再换号循环）"
+                )
+                self._reset_tip_streak()
+                self._last_tip_hit = hit
+                self.do_switch(hit.kind)
+                return
+            log(f"提示 {cn} 动作=忽略 宽限中=是 分数={hit.score:.2f}")
             self._reset_tip_streak()
             return
 
@@ -269,6 +287,7 @@ class Monitor:
             return
 
         self._reset_tip_streak()
+        self._last_tip_hit = hit
         log(f"提示 {cn} 动作=换号 宽限中=否 连续确认={need} 分数={hit.score:.2f}")
         self.do_switch(hit.kind)
 
@@ -291,33 +310,44 @@ class Monitor:
         )
         poll_n = 0
         gc_every = int(getattr(config, "GC_EVERY_POLLS", 120))
+        # 关更新广告极易拖死轮询（曾卡数分钟导致永远检不到用量 tip）→ 降频+短超时
+        update_every = int(getattr(config, "UPDATE_DISMISS_EVERY_POLLS", 15))
+        update_timeout = float(getattr(config, "UPDATE_DISMISS_POLL_TIMEOUT", 0.35))
         _capture_warn_at = 0.0
         while True:
             try:
                 if self._switching or self._resuming_conn:
                     time.sleep(config.POLL_INTERVAL)
                     continue
-                # 更新提示 ≠ 用量 tip：只关闭、不换号、不点 Update
-                # 含右下 Update Available 快路径；超时略放宽以免高分屏扫不完
-                try:
-                    ui_cursor.dismiss_update_recommended_dialog(timeout=3.5)
-                except Exception as e:
-                    if self._is_capture_glitch(str(e)):
-                        now = time.time()
-                        if now - _capture_warn_at > 20:
-                            log(
-                                "截屏 暂时失败（常见于UAC提权框/锁屏），稍后自动重试"
-                            )
-                            _capture_warn_at = now
-                        time.sleep(3.0)
-                        continue
-                    log(f"对话框 更新提示 主循环异常 {e}")
+                # 先检用量 tip（主业），再偶尔扫更新广告
+                t_poll = time.time()
                 hit = detect_tip.detect_tip()
                 if hit is not None:
                     self.on_tip(hit)
                 else:
                     self._reset_tip_streak()
                 poll_n += 1
+                if update_every > 0 and poll_n % update_every == 0:
+                    try:
+                        ui_cursor.dismiss_update_recommended_dialog(
+                            timeout=update_timeout
+                        )
+                    except Exception as e:
+                        if self._is_capture_glitch(str(e)):
+                            now = time.time()
+                            if now - _capture_warn_at > 20:
+                                log(
+                                    "截屏 暂时失败（常见于UAC提权框/锁屏），稍后自动重试"
+                                )
+                                _capture_warn_at = now
+                            time.sleep(3.0)
+                            continue
+                        log(f"对话框 更新提示 主循环异常 {e}")
+                if poll_n % 10 == 0:
+                    log(
+                        f"心跳 轮询={poll_n} 本轮耗时={time.time() - t_poll:.2f}s "
+                        f"有tip={'是' if hit else '否'}"
+                    )
                 if gc_every > 0 and poll_n % gc_every == 0:
                     import gc
 

@@ -263,6 +263,9 @@ def dismiss_update_recommended_dialog(timeout: float = 3.0) -> str:
     只点 Close / × / Esc；绝不点 Update / Download Update / Install / Restart。
     与用量上限 tip 严格分离：不用 tip_usage_* / tip_upgrade_btn 作证据，不触发换号。
     """
+    # 主循环短超时：直接跳过，避免多尺度匹配拖死 tip 检测（曾卡数分钟无日志）
+    if timeout <= 0.8:
+        return "跳过"
     deadline = time.time() + timeout
     # 文案共现关键字（UIA）；禁止把 Upgrade / usage limit 当更新提示
     text_hints = (
@@ -979,17 +982,18 @@ def find_paintingtools_hwnd(timeout: float = 12.0):
     return None
 
 
-def bring_paintingtools_front_max() -> bool:
+def bring_paintingtools_front_max(fast: bool = False) -> bool:
     """把 PaintingTools 工程窗口置前并最大化，方便后续关 tip / 续写。"""
-    found = find_paintingtools_hwnd()
+    found = find_paintingtools_hwnd(timeout=1.2 if fast else 12.0)
     if not found:
         log("置前工程窗 结果=失败 原因=未找到")
         return False
     hwnd, title = found
     win_util.force_foreground(hwnd)
-    time.sleep(0.25)
-    zoomed = win_util.maximize(hwnd)
-    if not zoomed:
+    time.sleep(0.05 if fast else 0.25)
+    already = win_util.is_zoomed(hwnd)
+    zoomed = already or win_util.maximize(hwnd)
+    if not zoomed and not fast:
         try:
             import pyautogui
 
@@ -1000,7 +1004,7 @@ def bring_paintingtools_front_max() -> bool:
         except Exception:
             pass
     win_util.force_foreground(hwnd)
-    time.sleep(0.35)
+    time.sleep(0.05 if fast else 0.35)
     rect = win_util.get_rect(hwnd) or (0, 0, 0, 0)
     w, h = rect[2] - rect[0], rect[3] - rect[1]
     log(
@@ -1097,18 +1101,21 @@ def _type_unicode(text: str) -> None:
                 raise OSError(f"SendInput 失败 code={ctypes.get_last_error()}")
 
 
-def send_continue_in_chat(prompt: Optional[str] = None) -> bool:
+def send_continue_in_chat(
+    prompt: Optional[str] = None, fast: bool = False
+) -> bool:
     """
     底部 chat 输入框：点进去，输入续写文案，Ctrl+Enter 发送。
     优先剪贴板粘贴（中文稳）；失败再试 Unicode 直输。
+    fast=True：换号后路径，缩短落稳等待。
     """
-    found = find_paintingtools_hwnd(timeout=3.0)
+    found = find_paintingtools_hwnd(timeout=1.0 if fast else 3.0)
     if not found:
         log("续写 结果=失败 原因=未找到工程窗")
         return False
     hwnd, _title = found
     win_util.force_foreground(hwnd)
-    time.sleep(0.35)
+    time.sleep(0.06 if fast else 0.35)
     rect = win_util.get_rect(hwnd)
     if not rect:
         log("续写 结果=失败 原因=无窗口矩形")
@@ -1126,14 +1133,14 @@ def send_continue_in_chat(prompt: Optional[str] = None) -> bool:
 
         pyautogui.FAILSAFE = False
         detect_tip._click_screen(cx, cy)
-        time.sleep(0.45)
+        time.sleep(0.1 if fast else 0.45)
         # 清空输入框残留
         pyautogui.hotkey("ctrl", "a")
-        time.sleep(0.12)
+        time.sleep(0.04 if fast else 0.12)
         method = "clipboard"
         try:
             _set_clipboard(text)
-            time.sleep(0.15)
+            time.sleep(0.06 if fast else 0.15)
             pyautogui.hotkey("ctrl", "v")
         except Exception as e1:
             method = "unicode"
@@ -1142,9 +1149,9 @@ def send_continue_in_chat(prompt: Optional[str] = None) -> bool:
             except Exception as e2:
                 log(f"续写 结果=失败 原因=输入失败 clip={e1} unicode={e2}")
                 return False
-        time.sleep(0.35)
+        time.sleep(0.08 if fast else 0.35)
         pyautogui.hotkey("ctrl", "enter")
-        time.sleep(0.25)
+        time.sleep(0.06 if fast else 0.25)
         log(f"续写 结果=成功 坐标={cx},{cy} 内容={text} 方式={method} 发送=Ctrl+Enter")
         return True
     except Exception as e:

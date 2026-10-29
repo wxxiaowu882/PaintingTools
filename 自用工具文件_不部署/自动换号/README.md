@@ -61,13 +61,15 @@ python monitor.py
 | `dlg_force_close_body.png` | 「是否强制关闭…」正文（兜底） |
 | `btn_mgr_confirm_ok.png` | 弹窗蓝色「确定」 |
 | `tip_too_many_free.png` | 「Too many free trial accounts…」正文 |
-| `tip_usage_limit.png` | 「You've hit your usage limit」 |
-| `tip_upgrade_btn.png` | Upgrade to Pro（辅助） |
+| `tip_usage_limit.png` | 用量 tip 模板**兜底**（主路径已改 OCR） |
+| `tip_upgrade_btn.png` | Upgrade to Pro 模板兜底 |
 | `tip_error_resume.png` | 「Error resuming chat」 |
 | `tip_close_x.png` | tip 右上角关闭 |
 | `dlg_update_*.png` / `btn_*update*` | 更新提示只关不点 Update（见既有说明） |
 
 分辨率或管家皮肤变了导致匹配失败时：从新截图裁「无感换号」覆盖同名文件，必要时在 `config.py` 调 `SEAMLESS_SWITCH_THRESHOLD` / `SEAMLESS_SWITCH_WAIT`。
+
+**用量 tip 检测（已换技术路线）**：主路径为 **RapidOCR** 读右下 chat 区文案（如 `You've hit your usage limit` / `Upgrade to Pro`），按语义判定，不靠死模板像素；`tip_usage_*.png` 仅兜底。依赖见 `requirements.txt` 的 `rapidocr_onnxruntime`。
 
 旧「登录助手 / 刷新 Cursor」相关模板可保留，新流程不再调用。
 

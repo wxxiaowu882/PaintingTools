@@ -21,6 +21,9 @@ TipKind = str  # usage_limit | error_resume
 _TEMPLATE_CACHE: dict[str, Optional[np.ndarray]] = {}
 # 复用 mss 实例，减少反复创建
 _MSS = None
+# RapidOCR 单例（用量 tip 主路径：读文字，不靠死模板）
+_OCR_ENGINE = None
+_OCR_LOAD_TRIED = False
 
 
 @dataclass
@@ -235,6 +238,148 @@ def _detect_connection_error(
     return None
 
 
+def _get_ocr_engine():
+    """懒加载 RapidOCR；失败则返回 None（回退模板）。"""
+    global _OCR_ENGINE, _OCR_LOAD_TRIED
+    if _OCR_ENGINE is not None:
+        return _OCR_ENGINE
+    if _OCR_LOAD_TRIED:
+        return None
+    _OCR_LOAD_TRIED = True
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+
+        _OCR_ENGINE = RapidOCR()
+        log("检测 OCR引擎=RapidOCR 已加载（用量tip主路径）")
+        return _OCR_ENGINE
+    except Exception as e:
+        log(f"检测 OCR引擎加载失败 将回退模板 {e}")
+        return None
+
+
+def _classify_usage_ocr_line(text: str) -> Optional[str]:
+    """
+    语义分类 OCR 行：title / body / upgrade。
+    容忍空格、轻微识别误差（如 Upgrade toPo）。
+    """
+    t = (text or "").lower().strip()
+    if not t:
+        return None
+    compact = "".join(ch for ch in t if ch.isalnum())
+    if (
+        "usagelimit" in compact
+        or "hityourusage" in compact
+        or "youvehit" in compact
+        or "you've hit" in t
+        or "hit your usage" in t
+        or "usage limit" in t
+    ):
+        return "title"
+    if "upgrade" in t and "pro" in t:
+        return "upgrade"
+    if ("unlimited" in t and "tab" in t) or (
+        "cursor pro" in t and ("agent" in t or "usage" in t)
+    ):
+        return "body"
+    if "get cursor pro" in t or "more agent usage" in t:
+        return "body"
+    return None
+
+
+def _detect_usage_limit_ocr(
+    roi: np.ndarray,
+    mon_l: int,
+    mon_t: int,
+    x0: int,
+    y0: int,
+    screen_h: int,
+) -> Optional[TipHit]:
+    """
+    用量 tip 智能检测：对 chat 右下 ROI 做 OCR，按文案语义判定。
+    UI 微调（字号/阴影/按钮圆角）不再依赖像素模板。
+    """
+    ocr = _get_ocr_engine()
+    if ocr is None or roi is None or roi.size == 0:
+        return None
+    band = config.CHAT_TOAST_Y_BAND
+    # 只扫 ROI 中下部（toast 带），并缩到合适宽度加速
+    y_off = int(roi.shape[0] * float(getattr(config, "USAGE_OCR_Y_CROP", 0.20)))
+    sub = roi[y_off:, :]
+    if sub.shape[0] < 40 or sub.shape[1] < 80:
+        return None
+    max_w = int(getattr(config, "USAGE_OCR_MAX_WIDTH", 960))
+    scale = 1.0
+    work = sub
+    if sub.shape[1] > max_w:
+        scale = max_w / float(sub.shape[1])
+        work = cv2.resize(
+            sub,
+            (max_w, max(40, int(sub.shape[0] * scale))),
+            interpolation=cv2.INTER_AREA,
+        )
+    try:
+        result, _elapse = ocr(cv2.cvtColor(work, cv2.COLOR_BGR2RGB))
+    except Exception as e:
+        log(f"检测 OCR异常 {e}")
+        return None
+    if not result:
+        return None
+
+    parts: dict[str, list] = {"title": [], "body": [], "upgrade": []}
+    for box, text, score in result:
+        kind = _classify_usage_ocr_line(text)
+        if kind is None:
+            continue
+        xs = [float(p[0]) for p in box]
+        ys = [float(p[1]) for p in box]
+        # 还原到 roi 坐标
+        lx = int(min(xs) / scale)
+        ly = int(min(ys) / scale) + y_off
+        rx = int(max(xs) / scale)
+        by = int(max(ys) / scale) + y_off
+        parts[kind].append((float(score), lx, ly, rx, by, text))
+
+    if not parts["title"] and not (parts["body"] and parts["upgrade"]):
+        # 仅有 upgrade 文案不够（顶栏也可能有 Upgrade to Pro）
+        return None
+    if not parts["title"] and not parts["body"]:
+        return None
+
+    # 取标题优先，否则 body+upgrade 并集
+    boxes = parts["title"] or (parts["body"] + parts["upgrade"])
+    if parts["title"] and parts["upgrade"]:
+        boxes = parts["title"] + parts["upgrade"]
+    elif parts["title"] and parts["body"]:
+        boxes = parts["title"] + parts["body"]
+
+    score = max(b[0] for b in boxes)
+    lx = min(b[1] for b in boxes)
+    ly = min(b[2] for b in boxes)
+    rx = max(b[3] for b in boxes)
+    by = max(b[4] for b in boxes)
+    th = max(1, by - ly)
+    if not _match_y_in_band(ly, th, y0, screen_h, band):
+        return None
+
+    # 证据串便于日志
+    evidence = []
+    for k in ("title", "body", "upgrade"):
+        for _sc, _a, _b, _c, _d, tx in parts[k][:1]:
+            evidence.append(f"{k}:{tx[:40]}")
+    log(
+        f"检测 用量tip 方式=OCR 分数={score:.2f} "
+        f"证据={' | '.join(evidence) if evidence else '-'}"
+    )
+    return TipHit(
+        kind="usage_limit",
+        left=mon_l + x0 + lx,
+        top=mon_t + y0 + ly,
+        right=mon_l + x0 + rx,
+        bottom=mon_t + y0 + by,
+        score=score,
+    )
+
+
 def _detect_usage_limit(
     roi: np.ndarray,
     mon_l: int,
@@ -245,9 +390,16 @@ def _detect_usage_limit(
     thr: float,
 ) -> Optional[TipHit]:
     """
-    用量上限 toast 在 chat 输入框上方；禁止单独匹配 Upgrade 按钮（易与顶栏 Upgrade to Pro 混淆）。
-    使用多尺度匹配，适配新版 tip 样式。
+    用量上限：优先 OCR 语义检测；模板仅兜底。
+    禁止单独匹配顶栏 Upgrade 按钮。
     """
+    # 1) 智能 OCR（主路径）
+    if bool(getattr(config, "USAGE_OCR_ENABLED", True)):
+        ocr_hit = _detect_usage_limit_ocr(roi, mon_l, mon_t, x0, y0, screen_h)
+        if ocr_hit is not None:
+            return ocr_hit
+
+    # 2) 旧模板兜底（皮肤未变时仍可用）
     band = config.CHAT_TOAST_Y_BAND
     tpl_toast = _load_template("tip_usage_toast.png")
     hit = _match_scaled(roi, tpl_toast, max(thr, 0.72))
@@ -270,7 +422,6 @@ def _detect_usage_limit(
     if hit_u and hit_up:
         score_u, lx_u, ly_u, tw_u, th_u = hit_u
         score_up, lx_up, ly_up, tw_up, th_up = hit_up
-        # Upgrade 按钮在文案右侧，纵向接近
         if abs(ly_u - ly_up) < 55 and lx_up > lx_u - 40:
             if _match_y_in_band(ly_u, th_u, y0, screen_h, band):
                 score = max(score_u, score_up)
@@ -287,7 +438,6 @@ def _detect_usage_limit(
                     score=score,
                 )
 
-    # 蓝钮 + 位置带：文案模板失效时的兜底（须在 chat toast 带，避开顶栏 Upgrade）
     if hit_up:
         score_up, lx_up, ly_up, tw_up, th_up = hit_up
         if score_up >= 0.90 and _match_y_in_band(ly_up, th_up, y0, screen_h, band):
@@ -668,6 +818,181 @@ def _click_screen(x: int, y: int) -> None:
     pyautogui.click(x, y)
 
 
+def _is_forbidden_upgrade_click(
+    screen: np.ndarray,
+    mon_l: int,
+    mon_t: int,
+    cx: int,
+    cy: int,
+    upgrade_boxes: Optional[list] = None,
+) -> bool:
+    """
+    硬禁：禁止点到 Upgrade to Pro 蓝钮。
+    - 落在 OCR 识别的 upgrade 框（扩边）内 → 禁
+    - 落点邻域呈蓝色按钮色 → 禁
+    """
+    if upgrade_boxes:
+        for lx, ly, rx, by in upgrade_boxes:
+            pad = 10
+            if (lx - pad) <= cx <= (rx + pad) and (ly - pad) <= cy <= (by + pad):
+                return True
+    # 屏幕坐标 → 截图像素
+    px = int(cx - mon_l)
+    py = int(cy - mon_t)
+    h, w = screen.shape[:2]
+    if px < 2 or py < 2 or px >= w - 2 or py >= h - 2:
+        return True
+    patch = screen[py - 6 : py + 7, px - 10 : px + 11]
+    if patch.size == 0:
+        return True
+    hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
+    blue = (
+        (hsv[:, :, 0] >= 95)
+        & (hsv[:, :, 0] <= 130)
+        & (hsv[:, :, 1] >= 70)
+        & (hsv[:, :, 2] >= 100)
+    )
+    if float(np.count_nonzero(blue)) / float(blue.size) > 0.28:
+        return True
+    return False
+
+
+def _tip_close_xy_safe(
+    title_box: Optional[Tuple[int, int, int, int]],
+    upgrade_box: Optional[Tuple[int, int, int, int]],
+    hint: Optional[TipHit] = None,
+) -> Optional[Tuple[int, int]]:
+    """
+    只算 tip 卡片右上角 ×：必须在标题行高度、且高于 Upgrade 蓝钮。
+    绝不返回 Upgrade 按钮中心。
+    """
+    if title_box is not None:
+        tl, tt, tr, tb = title_box
+        if upgrade_box is not None:
+            ul, ut, ur, ub = upgrade_box
+            # × 在卡片右上：水平贴近 upgrade 右缘外侧或标题右缘更右者
+            cx = max(tr, ur) + 18
+            cy = tt + max(6, (tb - tt) // 2)
+            # 必须明显高于蓝钮顶边
+            if cy >= ut - 6:
+                cy = ut - 14
+            return int(cx), int(cy)
+        cx = tr + 160
+        cy = tt + max(6, (tb - tt) // 2)
+        return int(cx), int(cy)
+    if hint is not None and hint.kind == "usage_limit":
+        # hint 可能含 upgrade 并集：只取上沿 20% 高度当 × 行，右缘内侧
+        hh = max(1, hint.bottom - hint.top)
+        cx = hint.right - 18
+        cy = hint.top + max(8, int(hh * 0.18))
+        # 避开下半（蓝钮常在下半）
+        if cy > hint.top + int(hh * 0.40):
+            cy = hint.top + max(8, int(hh * 0.18))
+        return int(cx), int(cy)
+    return None
+
+
+def close_tip_fast(hint: Optional[TipHit] = None) -> str:
+    """
+    换号后专用快关 tip。
+    硬规则：只点右上 × / Esc；严禁点 Upgrade to Pro（曾误点属严重事故）。
+    """
+    t0 = time.time()
+    try:
+        import pyautogui
+
+        pyautogui.FAILSAFE = False
+        pyautogui.press("escape")
+    except Exception:
+        pass
+    time.sleep(0.05)
+
+    clicked = False
+    way = "仅Esc"
+    try:
+        screen, mon_l, mon_t = grab_screen_bgr()
+        h, w = screen.shape[:2]
+        x0, y0, x1, y1 = _roi_rect(h, w)
+        roi = screen[y0:y1, x0:x1]
+
+        title_box = None  # abs screen coords
+        upgrade_boxes_abs: list = []
+        ocr = _get_ocr_engine()
+        if ocr is not None:
+            y_off = int(roi.shape[0] * float(getattr(config, "USAGE_OCR_Y_CROP", 0.20)))
+            sub = roi[y_off:, :]
+            max_w = int(getattr(config, "USAGE_OCR_MAX_WIDTH", 960))
+            scale = 1.0
+            work = sub
+            if sub.shape[1] > max_w:
+                scale = max_w / float(sub.shape[1])
+                work = cv2.resize(
+                    sub,
+                    (max_w, max(40, int(sub.shape[0] * scale))),
+                    interpolation=cv2.INTER_AREA,
+                )
+            result, _ = ocr(cv2.cvtColor(work, cv2.COLOR_BGR2RGB))
+            if result:
+                for box, text, _sc in result:
+                    kind = _classify_usage_ocr_line(text)
+                    if kind is None:
+                        continue
+                    xs = [float(p[0]) for p in box]
+                    ys = [float(p[1]) for p in box]
+                    lx = mon_l + x0 + int(min(xs) / scale)
+                    ly = mon_t + y0 + int(min(ys) / scale) + y_off
+                    rx = mon_l + x0 + int(max(xs) / scale)
+                    by = mon_t + y0 + int(max(ys) / scale) + y_off
+                    if kind == "title" and title_box is None:
+                        title_box = (lx, ly, rx, by)
+                    elif kind == "upgrade":
+                        upgrade_boxes_abs.append((lx, ly, rx, by))
+
+        upgrade_box = upgrade_boxes_abs[0] if upgrade_boxes_abs else None
+        xy = _tip_close_xy_safe(title_box, upgrade_box, hint)
+        if xy is not None:
+            cx, cy = xy
+            if _is_forbidden_upgrade_click(
+                screen, mon_l, mon_t, cx, cy, upgrade_boxes_abs
+            ):
+                log(
+                    f"换号 快关tip 拒绝点击 原因=疑似Upgrade按钮 坐标={cx},{cy}"
+                )
+            else:
+                _click_screen(cx, cy)
+                clicked = True
+                way = "OCR定位×"
+                log(f"换号 快关tip 点× 坐标={cx},{cy} 方式={way}")
+        elif hint is not None:
+            # 无 OCR 时仅用 hint 上沿，仍过蓝钮禁区
+            xy2 = _tip_close_xy_safe(None, None, hint)
+            if xy2 is not None:
+                cx, cy = xy2
+                if not _is_forbidden_upgrade_click(
+                    screen, mon_l, mon_t, cx, cy, upgrade_boxes_abs
+                ):
+                    _click_screen(cx, cy)
+                    clicked = True
+                    way = "hint上沿×"
+                    log(f"换号 快关tip 点× 坐标={cx},{cy} 方式={way}")
+                else:
+                    log(
+                        f"换号 快关tip 拒绝点击 原因=hint落点疑似Upgrade "
+                        f"坐标={cx},{cy}"
+                    )
+        del screen
+        # 故意不再做窗相对坐标盲点（0.93/0.78 曾打中 Upgrade to Pro）
+    except Exception as e:
+        log(f"换号 快关tip 异常 {e}")
+
+    ms = (time.time() - t0) * 1000
+    log(
+        f"换号 快关tip 耗时={ms:.0f}ms 点击={'是' if clicked else '否'} "
+        f"方式={way} 禁点Upgrade=是"
+    )
+    return "快关"
+
+
 def close_tip(hit: Optional[TipHit] = None) -> str:
     """
     关闭 tip。返回中文结果：已关闭_… / 跳过 / 失败 / 无效（点了但仍检出）。
@@ -740,24 +1065,37 @@ def close_tip(hit: Optional[TipHit] = None) -> str:
                 cx = toast_box[2] - ox - 8
                 cy = toast_box[1] + oy + 4
             else:
-                cx = hit.right - ox
-                cy = hit.top + oy
-                if hit.kind == "usage_limit":
-                    # 标题模板偏左：× 约在 Upgrade 按钮上方
-                    cx = hit.left + 820
-                    cy = hit.top - 10
+                # 只用 tip 框右上沿；禁止 hit.left+820（易落在 Upgrade to Pro）
+                safe = _tip_close_xy_safe(None, None, hit)
+                if safe is not None:
+                    cx, cy = safe
+                else:
+                    cx = hit.right - ox
+                    cy = hit.top + oy
 
     try:
+        # 硬禁 Upgrade to Pro
+        if hit.kind == "usage_limit" and _is_forbidden_upgrade_click(
+            screen, mon_l, mon_t, int(cx), int(cy), None
+        ):
+            log(f"关闭提示 拒绝点击 原因=疑似Upgrade按钮 坐标={cx},{cy}")
+            # 改点更靠上沿
+            cx, cy = hit.right - 18, hit.top + 8
+            if _is_forbidden_upgrade_click(screen, mon_l, mon_t, int(cx), int(cy), None):
+                log("关闭提示 结果=跳过 原因=无法安全避开Upgrade")
+                return "跳过"
         _click_screen(int(cx), int(cy))
         time.sleep(0.35)
         still = detect_tip()
         cn = config.TIP_TYPE_CN.get(hit.kind, hit.kind)
         if still is not None and still.kind == hit.kind:
-            # 再试 toast 右上角硬点一次
+            # 再试 toast 右上角硬点一次（仍禁蓝钮）
             if toast_box:
-                _click_screen(int(toast_box[2] - 18), int(toast_box[1] + 14))
-                time.sleep(0.35)
-                still = detect_tip()
+                rx, ry = int(toast_box[2] - 18), int(toast_box[1] + 14)
+                if not _is_forbidden_upgrade_click(screen, mon_l, mon_t, rx, ry, None):
+                    _click_screen(rx, ry)
+                    time.sleep(0.35)
+                    still = detect_tip()
             if still is not None and still.kind == hit.kind:
                 return "无效"
         return f"已关闭_{cn}"

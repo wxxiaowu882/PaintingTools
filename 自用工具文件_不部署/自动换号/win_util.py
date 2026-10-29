@@ -243,3 +243,62 @@ def bring_and_maximize(hwnd: int) -> bool:
     maximize(hwnd)
     force_foreground(hwnd)
     return bool(is_zoomed(hwnd))
+
+
+MOUSEEVENTF_LEFTDOWN = 0x0002
+MOUSEEVENTF_LEFTUP = 0x0004
+MOUSEEVENTF_ABSOLUTE = 0x8000
+MOUSEEVENTF_MOVE = 0x0001
+WM_LBUTTONDOWN = 0x0201
+WM_LBUTTONUP = 0x0202
+MK_LBUTTON = 0x0001
+
+
+def click_screen_hard(x: int, y: int, hwnd: Optional[int] = None) -> None:
+    """
+    硬点击：SetCursorPos + mouse_event，再对落点/指定窗 PostMessage。
+    WebView 常吃掉普通 pyautogui.click，管家无感换号必须走这条。
+    """
+    import time as time_mod
+
+    sx, sy = int(x), int(y)
+    # 先置前目标窗，避免点到别的层
+    if hwnd:
+        try:
+            force_foreground(int(hwnd))
+            time_mod.sleep(0.08)
+        except Exception:
+            pass
+    user32.SetCursorPos(sx, sy)
+    time_mod.sleep(0.06)
+    user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+    time_mod.sleep(0.05)
+    user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+    # PostMessage 到落点子窗 + 顶层 hwnd（双保险）
+    targets = []
+    try:
+        # 64 位 WindowFromPoint 吃一个 LONG 打包的 POINT
+        packed = (sy << 32) | (sx & 0xFFFFFFFF)
+        try:
+            target = user32.WindowFromPoint(packed)
+        except Exception:
+            pt = wintypes.POINT(sx, sy)
+            user32.WindowFromPoint.argtypes = [wintypes.POINT]
+            user32.WindowFromPoint.restype = wintypes.HWND
+            target = user32.WindowFromPoint(pt)
+        if target:
+            targets.append(int(target))
+    except Exception:
+        pass
+    if hwnd and int(hwnd) not in targets:
+        targets.append(int(hwnd))
+    for target in targets:
+        try:
+            client = wintypes.POINT(sx, sy)
+            user32.ScreenToClient(target, ctypes.byref(client))
+            lp = (int(client.y) << 16) | (int(client.x) & 0xFFFF)
+            user32.PostMessageW(target, WM_LBUTTONDOWN, MK_LBUTTON, lp)
+            time_mod.sleep(0.03)
+            user32.PostMessageW(target, WM_LBUTTONUP, 0, lp)
+        except Exception:
+            continue

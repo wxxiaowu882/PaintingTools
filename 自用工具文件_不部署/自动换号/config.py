@@ -26,16 +26,36 @@ CURSOR_TITLE = "Cursor"
 CONFIRM_TITLE_HINTS = ("确认换号", "确认换号登录")
 # 无感换号按钮文案（WebView 无 UIA，实际靠 templates/btn_seamless_switch.png）
 SEAMLESS_SWITCH_LABEL = "无感换号"
-SEAMLESS_SWITCH_THRESHOLD = 0.74
-# 主阈值未过但分数够高时仍点（实机曾模板漂移导致「未匹配」）
-SEAMLESS_SWITCH_SOFT_OK = 0.68
-# 点无感换号后等待账号切换生效再续写（秒）；不重启 Cursor
-SEAMLESS_SWITCH_WAIT = 5.0
+SEAMLESS_SWITCH_THRESHOLD = 0.80
+# 近失放宽：曾用 0.68～0.72 误点窗底 y≈1374，现关闭（仅≥阈值才点）
+SEAMLESS_SWITCH_SOFT_OK = 0.92
+# 点无感换号后、切回 Cursor 前：极短暂等 token（秒）
+SEAMLESS_SWITCH_WAIT = 0.35
+# 切回 Cursor 后落稳（秒）；之后立刻快关 tip + 续写
+SEAMLESS_AFTER_FRONT = 0.08
+# 管家最大化后、点击前等待 WebView 就绪
+SEAMLESS_PRECLICK_WAIT = 0.45
+# 单击后等待「已切换」/账号变化
+SEAMLESS_VERIFY_WAIT = 1.4
+# 管家窗 OCR 最大宽
+MANAGER_OCR_MAX_WIDTH = 1200
+# 无感换号 Y：用「距底边比例」——同按钮在 1119 高窗约 0.19、在 1399 高窗约 0.35（相对顶会漂）
+# 拒中部发送条（距底>~0.45）与贴底假阳（距底<0.08）
+SEAMLESS_HIT_FROM_BOTTOM = (0.10, 0.42)
+# 蓝钮兜底：与 HIT 同距底带（v15.7.5 最大化时底钮约 from_b≈0.37，旧 0.30 会扫空）
+SEAMLESS_BLUE_FROM_BOTTOM = (0.10, 0.42)
+# 无感换号相对窗宽：右栏底钮左起第一颗约 0.51～0.63；拒「指定路径」(~0.75+)
+SEAMLESS_HIT_X_MIN = 0.45
+SEAMLESS_HIT_X_MAX = 0.72
+# OCR/模板均空时：再等 WebView 一拍后重截一次（不连点，只重定位）
+SEAMLESS_RELOCATE_WAIT = 0.7
 
 # 轮询与超时（秒）
 POLL_INTERVAL = 2.0
-# 换号成功并续写后的静默期
-GRACE_SECONDS = 120
+# 换号成功并续写后的短静默（防同一次 tip 连点）；期内高分用量 tip 仍会再换号
+GRACE_SECONDS = 12
+# 宽限内再次触发换号的最低分数（真实用量 tip，避开 chat 历史误匹配）
+GRACE_USAGE_RERUN_MIN_SCORE = 0.86
 # 用量 tip：检出即换号（1=立刻；曾用 2 防误匹配，现按业务要求立即执行）
 TIP_CONFIRM_POLLS = 1
 CONFIRM_WAIT_SECONDS = 20
@@ -53,6 +73,10 @@ MATCH_THRESHOLD = 0.82
 TIP_MATCH_THRESHOLD = 0.82
 # 主屏右下角 ROI（相对宽高比例），用于 tip 检测
 TIP_ROI_REL = (0.45, 0.55, 1.0, 0.98)  # left, top, right, bottom
+# 用量 tip：RapidOCR 语义检测（主路径）；模板仅兜底
+USAGE_OCR_ENABLED = True
+USAGE_OCR_Y_CROP = 0.20  # 只扫 tip ROI 中下部
+USAGE_OCR_MAX_WIDTH = 960  # OCR 输入最大宽，加速
 
 # tip 关闭：优先在 tip 命中框右侧搜 ×；偏移为相对 tip 框右上角的像素（回退）
 TIP_CLOSE_OFFSET = (12, 12)  # 从 tip 框右上角向内偏
@@ -98,8 +122,12 @@ CONN_BODY_ONLY_THRESHOLD = 0.78
 CONN_ICON_MIN_SCORE = 0.60
 # 模板来自截图放大，实机 DPI 可能略偏，做多尺度匹配
 # 常态只跑前 3 档；接近阈值时再补跑其余（省内存、加速无 tip 轮询）
-MATCH_SCALES = (1.0, 0.93, 1.08, 0.86, 0.78, 1.16)
-MATCH_SCALES_PRIMARY = 3
+# 含偏小尺度：压缩截图/不同 DPI 下 tip 可能只有模板的 ~0.45～0.7
+MATCH_SCALES = (1.0, 0.93, 1.08, 0.86, 0.78, 1.16, 0.70, 0.55, 0.48, 1.25)
+MATCH_SCALES_PRIMARY = 4
+# 主循环：每 N 轮才扫一次更新广告，且短超时，避免拖死 tip 检测
+UPDATE_DISMISS_EVERY_POLLS = 15
+UPDATE_DISMISS_POLL_TIMEOUT = 0.35
 # 1.0 尺度已明显高于阈值时早退，少做其它尺度
 MATCH_EARLY_EXIT_MARGIN = 0.04
 # 主档最高分距阈值这么近时，再试其余尺度
