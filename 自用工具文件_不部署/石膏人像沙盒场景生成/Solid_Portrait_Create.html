@@ -343,6 +343,7 @@
     <div class="mobile-frame-safe" id="mobile-frame-safe"></div> </div> </div>
     <script type="module"> import * as THREE from 'three'; import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; import { TransformControls } from 'three/addons/controls/TransformControls.js'; import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'; import { WebGLPathTracer } from 'three-gpu-pathtracer';
+    import { toGlbArrayBuffer } from '../../docs/js/model-crypto/ModelCrypto.js';
     import '../../plugins_02/PluginManager.js'; import '../../plugins_02/Plugin_SkyEnvLight.js'; import '../../plugins_02/Plugin_ControlPanel.js'; import '../../plugins_02/Plugin_Annotation.js'; import '../../plugins_02/Plugin_SceneKeyPoints.js'; import '../../plugins_02/Plugin_ColorSampleAnnotation.js'; import '../../plugins_02/Plugin_NormalArrow.js'; import '../../plugins_02/Plugin_Polygon3D.js'; import '../../plugins_02/Plugin_Prober.js'; import '../../plugins_02/Plugin_DashedLine.js'; import '../../plugins_02/Plugin_PosterizeShared.js';import '../../plugins_02/Plugin_Atmosphere.js';import '../../plugins_02/Plugin_DepthOfField.js'; import '../../plugins_02/Plugin_LightIndicator.js'; import '../../plugins_02/Plugin_GroundAxesHelper.js';
     import { createSolidPreviewLightingManager, solidRasterPreviewShouldSkipEnvProbe } from '../../plugins_02/SolidPreviewLighting.js';
     import { createSolidFirstFrameHintController } from '../../plugins_02/SolidFirstFrameHintShared.js';
@@ -1293,64 +1294,70 @@
     function solidCreateBuildModelUrlCandidates(url) {
         return buildSolidGlbFetchCandidates(url);
     }
+    // 与 Solid 消费端同轨：取 buffer → toGlbArrayBuffer（明文原样 / PTGL 解密）→ parseAsync
+    async function solidCreateFetchParseGlb(urlCandidates, pathKey, onProgress) {
+        let lastErr = null;
+        for (let i = 0; i < urlCandidates.length; i++) {
+            const currentUrl = urlCandidates[i];
+            try {
+                const res = await fetch(currentUrl, { cache: 'no-cache' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const raw = await res.arrayBuffer();
+                if (onProgress && raw && raw.byteLength) {
+                    try { onProgress({ lengthComputable: true, loaded: raw.byteLength, total: raw.byteLength }); } catch (_eP) {}
+                }
+                const buffer = await toGlbArrayBuffer(raw);
+                const gltf = await gltfLoader.parseAsync(buffer, pathKey || currentUrl);
+                try { gltf.__solidLoadedUrl = currentUrl; } catch (_eU) {}
+                return gltf;
+            } catch (e) {
+                lastErr = e;
+            }
+        }
+        throw lastErr || new Error('GLB 加载失败');
+    }
     function solidCreateLoadGlbWithFallback(url, onLoad, onError, onProgress) {
         const _run = () => new Promise((resolveQueue) => {
             const s = String(url || '').trim();
             if (!s) { if (onError) onError(new Error('GLB URL 为空')); resolveQueue(); return; }
             const cacheKey = normalizeSolidGlbCacheKey(s);
             const nonPersist = /^(https?:|data:|blob:|file:)/i.test(s);
-            if (nonPersist || !cacheKey.startsWith('/docs/model/')) {
+            if (nonPersist || !cacheKey.startsWith('/docs/m/')) {
                 const candidates = solidCreateBuildModelUrlCandidates(url);
-                solidCreateDebugLog(`[GLB-Fallback] 开始加载(非持久): ${String(url || '')}`);
-                let idx = 0;
-                const tryLoad = () => {
-                    const currentUrl = candidates[idx];
-                    gltfLoader.load(currentUrl, (gltf) => {
-                        try { gltf.__solidLoadedUrl = currentUrl; } catch (_e) {}
-                        if (onLoad) onLoad(gltf);
-                        resolveQueue();
-                    }, (evt) => { if (onProgress) onProgress(evt); }, (err) => {
-                        idx++;
-                        if (idx < candidates.length) { tryLoad(); return; }
-                        if (onError) onError(err || new Error('GLB 加载失败'));
-                        resolveQueue();
-                    });
-                };
-                tryLoad();
+                solidCreateDebugLog(`[GLB-Fallback] 开始加载(非持久/双轨): ${String(url || '')}`);
+                solidCreateFetchParseGlb(candidates, cacheKey || s, onProgress).then((gltf) => {
+                    if (onLoad) onLoad(gltf);
+                    resolveQueue();
+                }).catch((err) => {
+                    if (onError) onError(err || new Error('GLB 加载失败'));
+                    resolveQueue();
+                });
                 return;
             }
             const _persist = window.__solidGlbPersistCache;
             const _loadPersist = async () => {
                 try {
                     solidCreateDebugLog(`[GLB-Fallback] 开始加载: ${String(url || '')}`);
-                    const { buffer, cacheKey: ck } = await (_persist ? _persist.getOrFetchArrayBuffer(url, {
+                    const { buffer: _fetchedBuf, cacheKey: ck } = await (_persist ? _persist.getOrFetchArrayBuffer(url, {
                         onProgress,
                         tryCandidates: true,
                     }) : Promise.reject(new Error('no persist cache')));
+                    const buffer = await toGlbArrayBuffer(_fetchedBuf);
                     const gltf = await gltfLoader.parseAsync(buffer, ck || cacheKey);
                     try { gltf.__solidLoadedUrl = ck || cacheKey; } catch (_e) {}
                     solidCreateDebugLog(`[GLB-Fallback] 加载成功: ${gltf.__solidLoadedUrl || cacheKey}`);
                     if (onLoad) onLoad(gltf);
                 } catch (err) {
                     try { if (_persist && _persist.invalidate) await _persist.invalidate(cacheKey); } catch (_eInv) {}
-                    solidCreateDebugLog(`[GLB-Fallback] persist 失败，回退 load: ${String(url || '')}`);
-                    const candidates = solidCreateBuildModelUrlCandidates(url);
-                    let idx = 0;
-                    const tryLoad = () => {
-                        const currentUrl = candidates[idx];
-                        gltfLoader.load(currentUrl, (gltf) => {
-                            try { gltf.__solidLoadedUrl = currentUrl; } catch (_e) {}
-                            if (onLoad) onLoad(gltf);
-                            resolveQueue();
-                        }, (evt) => { if (onProgress) onProgress(evt); }, (loadErr) => {
-                            idx++;
-                            if (idx < candidates.length) { tryLoad(); return; }
-                            if (onError) onError(loadErr || err || new Error('GLB 加载失败'));
-                            resolveQueue();
-                        });
-                    };
-                    tryLoad();
-                    return;
+                    solidCreateDebugLog(`[GLB-Fallback] persist 失败，回退 fetch+解密: ${String(url || '')}`);
+                    try {
+                        const candidates = solidCreateBuildModelUrlCandidates(url);
+                        const gltf = await solidCreateFetchParseGlb(candidates, cacheKey, onProgress);
+                        solidCreateDebugLog(`[GLB-Fallback] 回退加载成功: ${gltf.__solidLoadedUrl || cacheKey}`);
+                        if (onLoad) onLoad(gltf);
+                    } catch (loadErr) {
+                        if (onError) onError(loadErr || err || new Error('GLB 加载失败'));
+                    }
                 }
                 resolveQueue();
             };
@@ -1360,18 +1367,19 @@
         if (_q) return _q.enqueue(_run);
         return _run();
     }
-    // 统一写入 JSON 的 GLB 路径：保存为站点根绝对（/docs/model/...），避免不同页面层级下相对路径漂移。
+    // 统一写入 JSON 的模型路径：站点根绝对（/docs/m/...）；旧 docs/model 归一到 docs/m。
     function solidCreateNormalizeModelUrlForJson(url) {
         try {
             const s = String(url || '').trim();
             if (!s) return s;
             if (/^(https?:|data:|blob:|file:)/i.test(s)) return s;
             let x = s.replace(/\\/g, '/');
-            x = x.replace(/^(\.\.\/)+docs\/model\//i, 'docs/model/');
+            x = x.replace(/\/docs\/model\//gi, '/docs/m/').replace(/(^|\/)docs\/model\//gi, '$1docs/m/');
+            x = x.replace(/^(\.\.\/)+docs\/m\//i, 'docs/m/');
             x = x.replace(/^\.\//, '');
-            if (x.startsWith('/docs/model/')) return x;
-            if (x.startsWith('docs/model/')) return '/' + x;
-            return '/docs/model/' + x.replace(/^\/+/, '');
+            if (x.startsWith('/docs/m/')) return x;
+            if (x.startsWith('docs/m/')) return '/' + x;
+            return '/docs/m/' + x.replace(/^\/+/, '');
         } catch (_e) {
             return url;
         }
@@ -3287,12 +3295,12 @@
         window.openGlbManagerModal = function() { const modal = document.getElementById('glb-manager-modal');
         const iframe = document.getElementById('glb-manager-iframe'); if (!iframe.src || iframe.src === window.location.href) { iframe.src = '../GBL管理器/Glb管理器.html'; }
         modal.style.display = 'flex'; }; window.closeGlbManagerModal = function() { document.getElementById('glb-manager-modal').style.display = 'none'; };
-        window.addEventListener('message', function(event) { if (event.data && event.data.type === 'INSERT_GLB') { window.closeGlbManagerModal(); const basePath = '../../docs/model/';
+        window.addEventListener('message', function(event) { if (event.data && event.data.type === 'INSERT_GLB') { window.closeGlbManagerModal(); const basePath = '../../docs/m/';
         const relPath = String(event.data.path || '').replace(/\\/g, '/').replace(/^\/+/, ''); const fullUrl = basePath + relPath; window.addEditorGLB(fullUrl); } }); window.addEditorGLB = function(url) { if (!url) return; const glbGen = ++window._editorGlbInsertGen; addHwLog("尝试从资产库加载 GLB: " + url); solidCreateLoadGlbWithFallback(url, (gltf) => {
         if (glbGen !== window._editorGlbInsertGen) { disposeLoadedGltfRoot(gltf.scene); return; }
         const model = gltf.scene; solidCreateStampGlbModelMaterials(model); const box = new THREE.Box3().setFromObject(model); const size = box.getSize(new THREE.Vector3()); if (size.y > 0.001) { const scaleFactor = 4.0 / size.y; model.scale.set(scaleFactor, scaleFactor, scaleFactor); }
         box.setFromObject(model); const center = box.getCenter(new THREE.Vector3()); const minY = box.min.y; model.position.x -= center.x; model.position.z -= center.z; model.position.y -= minY;
-        model.userData = { type: 'glb', url: solidCreateNormalizeModelUrlForJson(url) }; editorGroup.add(model); solidCreateApplyMatToNewRoot(model); transformControl.attach(model); window.selectedObj = model; solidCreateSyncMatPanelFromSelection(); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_glb'); } catch (_ePl) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }, (error) => { alert("模型加载失败，请检查路径是否对应 '../../docs/model/' 目录"); }); };
+        model.userData = { type: 'glb', url: solidCreateNormalizeModelUrlForJson(url) }; editorGroup.add(model); solidCreateApplyMatToNewRoot(model); transformControl.attach(model); window.selectedObj = model; solidCreateSyncMatPanelFromSelection(); lightMoved = true; try { if (window.__solidPreviewLighting && window.__solidPreviewLighting.onSceneChanged) window.__solidPreviewLighting.onSceneChanged('add_glb'); } catch (_ePl) {} try { model.updateMatrixWorld(true); } catch (_eMw) {} try { if (typeof window.solidCreateRefreshPreviewRasterShadowsAfterGlb === 'function') window.solidCreateRefreshPreviewRasterShadowsAfterGlb(); } catch (_eSh) {} }, (error) => { alert("模型加载失败，请检查路径是否对应 '../../docs/m/' 目录"); }); };
         window.currentEditorMode = 'translate';
         window.syncSolidAnnoDrawPassThrough = function(e) {
             const pm = window.PluginManager;

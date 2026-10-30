@@ -10,7 +10,7 @@ const path = require('path');
 
 const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const jsonDir = path.join(repoRoot, 'docs', 'json', '沙盒_头部造型规律');
-const MODEL_URL = '/docs/model/真人头像_男_光头亚裔侧脸01_opt.glb';
+const MODEL_URL = '/docs/m/真人头像_男_光头亚裔侧脸01_opt.glb';
 const MODEL_ID = 'male_bald_asian_01';
 const MODEL_LABEL = '光头亚裔';
 const SCALE = Number(process.env.SCALE || '5.8');

@@ -1971,7 +1971,7 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
     // 【核心修复1】：导入时智能补全路径，兼容并自动修复之前由于 Bug 导出导致的残缺路径
     let importSrc = parsed.modelSrc;
     if (importSrc && !importSrc.startsWith('../') && !importSrc.startsWith('http') && !importSrc.startsWith('blob:')) {
-        importSrc = '../docs/model/' + importSrc;
+        importSrc = '../docs/m/' + importSrc;
     }
     
     if(importSrc && currentRawSrc !== importSrc) {
@@ -2562,7 +2562,7 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
         if (targetPath) {
             // 【核心修复2】：收到管理器信号后，强制补齐相对路径前缀，确保导出为 JSON 时写入正确的寻址路径！
             if (!targetPath.startsWith('../') && !targetPath.startsWith('http') && !targetPath.startsWith('blob:')) {
-                targetPath = '../docs/model/' + targetPath;
+                targetPath = '../docs/m/' + targetPath;
             }
             
             window.logDebug("⚙️ 尝试解析模型数据...");

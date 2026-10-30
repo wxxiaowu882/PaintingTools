@@ -1,32 +1,42 @@
 ---
-description: 站点安全口径与已落地配置（防内嵌、模型防盗链 WAF、勿在 Worker 做防盗链）
+description: 站点安全口径：防内嵌、模型 WAF 防盗链、模型加密原则（统一包/双轨后缀）
 alwaysApply: true
 ---
 
 # 站点安全（AI 记忆）
 
-权威正文：`docs/站点安全配置.md`。争议以该文档 + 线上 Cloudflare 面板为准。
+权威正文：`docs/站点安全配置.md`（含 §6 模型加密原则）。争议以该文档 + 线上 Cloudflare 面板为准；原则变更先改文档再改代码。
 
 ## 硬性口径
 
 1. **单课 JSON 直链**：产品已定 **暂不修**，勿擅自做鉴权拦截。
-2. **防盗链只护模型外链挂载**：挡外站 Referer 拉 `/docs/model/`；**不声称**防下载。
+2. **防盗链只护模型外链挂载**：挡外站 Referer 拉 `/docs/m/`；**不声称**防下载。
 3. **防盗链实现**：只用 **Cloudflare Zone WAF 自定义规则**（规则名 **`Block model hotlink`**，zone `wuxiaoart.com`）。  
    **禁止**再在 `functions/` / `run_worker_first` 里做 Referer 防盗链（已回退；占免费 Worker 次数）。
 4. **图片路径不要默认加防盗链**（SEO / 收录）。
 5. **防内嵌**：根目录 `_headers`（`X-Frame-Options: SAMEORIGIN` + `frame-ancestors 'self'`）。安卓 App 整页打开，**不受影响**。
-6. **GLB 加密全工具链**：后置；先别当「下一优先」默认开工。
+6. **模型加密**：统一包已落地（`docs/js/model-crypto/`）；播放/工具双轨。第 5 步收紧口径：**3A** 测站冒烟后再删明文；**4A** 发版预检对残留 `.glb` 警告不阻断；**5A** 先测站。细则见 `docs/站点安全配置.md` §7。
+
+## 模型加密原则（摘要）
+
+- **统一加解密包**：浏览器 / 工具 / 批处理只调这一套，禁止第二套算法。
+- **`.glb` = 明文**：工具与播放器**必须仍能直接读播**（兼容）；存量加密后明文可暂留至 3A。
+- **`.png` = 密文（现行唯一假后缀）**：靠**魔数**识别（不是真 PNG 图）；导出到 `docs/m` **默认加密为 `.png`**；真图仍放 `docs/img` 等，勿与模型密文混目录。
+- 加载与伪装都重要：算法取快（如 AES）+ 流式解密；非常规放在容器/后缀/流程。
+- **第一版固定钥**（游客可播）；不承诺绝对防破解。
+- 与 WAF 防盗链叠用；不替代会员门禁。
+- 实现**仅**允许 `docs/js/model-crypto/`；其它处禁止第二套算法。规格见 `docs/站点安全配置.md` §8。
 
 ## 现网 WAF 规则要点（模型）
 
-- 路径：`/docs/model/`
+- 路径：`/docs/m/`
 - 有 Referer 且不含 `wuxiaoart.com`、不含 `soft-voice-f822` → Block
 - 空 Referer 放行（App 已验收可加载）
 
 ## 改 Cloudflare 面板时
 
 - 与用户 **同屏**：Cursor 浏览器已登录 Dashboard；每步确认画面一致再点。
-- 只按用户/同屏截图上的真实按钮文案指导，禁止臆造 Approve / Custom token Get started 等。
+- 只按用户/同屏截图上的真实按钮文案指导，禁止臆造按钮名。
 
 ## 相关
 

@@ -71,7 +71,7 @@ function seed107() {
     d.items = [
       {
         type: 'glb',
-        url: '/docs/model/石膏头像_男中青年_大本 蝙蝠侠 布鲁斯韦恩_头像_opt.glb',
+        url: '/docs/m/石膏头像_男中青年_大本 蝙蝠侠 布鲁斯韦恩_头像_opt.glb',
         pos: [0, 0, 0],
         rot: [0, 0, 0],
         scale: [5.8, 5.8, 5.8],

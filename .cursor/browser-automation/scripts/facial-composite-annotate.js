@@ -11,7 +11,7 @@ const base = process.env.BASE_URL || `http://127.0.0.1:${port}`;
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const outDir = path.join(__dirname, '..', 'runs', `${stamp}-facial-composite-annotate`);
 const jsonPath = path.join(repoRoot, 'docs', 'json', '结构_五官', '05 五官综合讲解.json');
-const MODEL = '../docs/model/石膏头像_女中青年_05_opt_石膏白.glb';
+const MODEL = '../docs/m/石膏头像_女中青年_05_opt_石膏白.glb';
 
 const COLORS = [
   '#E53935', '#1E88E5', '#43A047', '#FB8C00', '#8E24AA', '#00BCD4', '#FDD835', '#D81B60',

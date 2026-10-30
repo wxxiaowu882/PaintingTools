@@ -13,7 +13,7 @@ const base = process.env.BASE_URL || `http://127.0.0.1:${port}`;
 
 const SRC_JSON = path.join(repoRoot, 'docs', 'json', '结构_头骨骨点肌肉', '03 肌肉详解.json');
 const OUT_JSON = path.join(repoRoot, 'docs', 'json', '结构_头骨骨点肌肉', '03 肌肉详解_黄种人女V8.json');
-const NEW_MODEL_SRC = '../docs/model/头部肌肉_黄种人_女_V8_std_opt_20260905111512.glb';
+const NEW_MODEL_SRC = '../docs/m/头部肌肉_黄种人_女_V8_std_opt_20260905111512.glb';
 
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const outDir = path.join(__dirname, '..', 'runs', `${stamp}-precise-repick-v8`);

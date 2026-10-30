@@ -20,7 +20,7 @@ const outDir = path.join(runsRoot, `${stamp}-headform-205`);
 const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:18080';
 fs.mkdirSync(outDir, { recursive: true });
 
-const MODEL = '/docs/model/石膏头像_男中青年_大本 蝙蝠侠 布鲁斯韦恩_头像_opt.glb';
+const MODEL = '/docs/m/石膏头像_男中青年_大本 蝙蝠侠 布鲁斯韦恩_头像_opt.glb';
 
 /** 102 W 为解剖锚；③④ 经视觉前移出耳后大暗，仍保持头侧身份（待 Create 手调微灰） */
 const W_POINTS = [

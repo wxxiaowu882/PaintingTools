@@ -16,7 +16,9 @@ Cloudflare/
 自用工具文件_不部署/
 
 # 超大二进制（Workers 上限 25 MiB；需单独压缩后再放行）
-docs/model/石膏头像_男中青年_布鲁特斯_Bargello扫_opt.glb
+# 加密后同名 .png 体积几乎不变，须与 .glb 一并忽略，否则发版会卡 25MiB
+docs/m/石膏头像_男中青年_布鲁特斯_Bargello扫_opt.glb
+docs/m/石膏头像_男中青年_布鲁特斯_Bargello扫_opt.png
 *.blend
 *.blend1
 *.blend2
@@ -45,7 +47,203 @@ docs/membership/sync-policy-staging-to-prod.mjs
 docs/membership/prod-deploy-preflight.mjs
 docs/membership/prod-deploy-smoke.mjs
 docs/membership/gen-redeem-code.mjs
+docs/membership/sync-model-assetsignore.mjs
 docs/membership/DEPLOY.md
 docs/membership/README.md
 docs/site-version-bump.mjs
 
+# BEGIN AUTO model-deploy-allowlist
+# 由 docs/membership/sync-model-assetsignore.mjs 根据 docs/json 引用自动生成
+# docs/m 默认不上传；仅放行课表引用到的文件（Workers 单文件 ≤25MiB）
+docs/model/**
+docs/m/**
+!docs/m/
+!docs/m/动物_0328_std.png
+!docs/m/静物_车_玩具车Ford-f100_opt.png
+!docs/m/静物_车_Mercedes Benz 300 SL Gullwing_opt.png
+!docs/m/静物_车_OLD TRACTOR_opt.png
+!docs/m/静物_花_flower_bouquet_in_picture_frame_std_opt.png
+!docs/m/静物_瓶罐_antique_ceramic_vase_opt.png
+!docs/m/静物_瓶罐_broken_vase__lowpoly.png
+!docs/m/静物_瓶罐_Cocacola can prop_opt.png
+!docs/m/静物_瓶罐_Decorative Ceramic Vessel_20260324202354_opt.png
+!docs/m/静物_瓶罐_egyptian_lotus_vase_opt.png
+!docs/m/静物_瓶罐_jarnalderskruka__iron-age_pot_opt.png
+!docs/m/静物_瓶罐_jarra_romana__roman_jar_opt.png
+!docs/m/静物_瓶罐_Krug_opt.png
+!docs/m/静物_瓶罐_NMB&H, Hellenistic pottery- kantharos_opt.png
+!docs/m/静物_瓶罐_Pottery Jug_V9.9.2_Ultimate_opt.png
+!docs/m/静物_瓶罐_Shaws of Darwen Vase_opt.png
+!docs/m/静物_瓶罐_turquoise_ceramic_jug_floral_motif_opt.png
+!docs/m/静物_瓶罐_Vase.png
+!docs/m/静物_瓶罐_vases_opt.png
+!docs/m/静物_瓶罐_Глечик_opt.png
+!docs/m/静物_其它_Anubis Statue_20260324195120_opt.png
+!docs/m/静物_其它_Life with Louie_opt.png
+!docs/m/静物_其它_Modular Japanese Ceramic Shop & Cart_opt.png
+!docs/m/静物_其它_tavern_medieval_house_opt.png
+!docs/m/静物_水果_apple_20260324195226_opt.png
+!docs/m/静物_水果_avocado.png
+!docs/m/静物_水果_banana_20260324195547_std.png
+!docs/m/静物_水果_Bowl of Fruit_opt.png
+!docs/m/静物_水果_Fruit Basket_opt.png
+!docs/m/静物_水果_fruit_bowl_20260324203219_opt.png
+!docs/m/静物_水果_fruit_bowl_opt.png
+!docs/m/静物_水果_fruit_decay_opt.png
+!docs/m/静物_水果_fruit_on_the_table_opt.png
+!docs/m/静物_水果_Fruit.. Pineapple_opt.png
+!docs/m/静物_水果_Low Poly Fruit Bowl_opt.png
+!docs/m/静物_水果_Papaya 3D photogrammetry_opt.png
+!docs/m/静物_水果_photogrammetry_dragon_fruit_opt.png
+!docs/m/静物_水果_plum_opt.png
+!docs/m/静物_水果_pomegranate_fruit_opt.png
+!docs/m/静物_水果_star_fruit.png
+!docs/m/人物其它_断臂维纳斯_opt.png
+!docs/m/人物其它_伏尔泰胸像_opt.png
+!docs/m/石膏头像_2295-narodowe-museum-warsaw-woman-with-roses_BSpt_std_opt.png
+!docs/m/石膏头像_男老年_ Leeds - Goethe_opt.png
+!docs/m/石膏头像_男老年_大胡男子胸像01_opt.png
+!docs/m/石膏头像_男老年_裹头老农01_opt.png
+!docs/m/石膏头像_男老年_海盗 塞内卡 (Pseudo-Seneca)_opt.png
+!docs/m/石膏头像_男老年_荷马 (Homer)_opt.png
+!docs/m/石膏头像_男老年_胡须长者01_opt.png
+!docs/m/石膏头像_男老年_老年男子胸像01_opt.png
+!docs/m/石膏头像_男老年_摩西头_opt.png
+!docs/m/石膏头像_男老年_中线老年胸像01_opt.png
+!docs/m/石膏头像_男老年_Portrait of Michelangelo.png
+!docs/m/石膏头像_男老年_Portrait of Socrates.png
+!docs/m/石膏头像_男老年_repaired_11 - leeds university - snowden.png
+!docs/m/石膏头像_男老年_repaired_719135 - leeds - william pitt the younger.png
+!docs/m/石膏头像_男老年_smithsonian-andrew-jackson.png
+!docs/m/石膏头像_男老年_Tommy Lee Jones_opt.png
+!docs/m/石膏头像_男老年.png
+!docs/m/石膏头像_男童_Baby Head.png
+!docs/m/石膏头像_男童_head_model_of_a_child.png
+!docs/m/石膏头像_男童_jadyn-met-head-of-a-boy.png
+!docs/m/石膏头像_男童_thorvaldsen-a314-unknown-child.png
+!docs/m/石膏头像_男中青年_20260324183800_opt.png
+!docs/m/石膏头像_男中青年_20260324184341_opt.png
+!docs/m/石膏头像_男中青年_20260324184438_opt.png
+!docs/m/石膏头像_男中青年_20260324191654_opt.png
+!docs/m/石膏头像_男中青年_20260324192024_opt.png
+!docs/m/石膏头像_男中青年_20260324195635.png
+!docs/m/石膏头像_男中青年_20260324201124_opt.png
+!docs/m/石膏头像_男中青年_20260324201548.png
+!docs/m/石膏头像_男中青年_阿波罗 (Apollo)jadyn-christies-head-of-apollo_opt.png
+!docs/m/石膏头像_男中青年_阿波罗Belvedere头_opt.png
+!docs/m/石膏头像_男中青年_阿格里巴_smk-kas112-1-guiliano-de-medici-decimated_opt.png
+!docs/m/石膏头像_男中青年_安提诺乌斯_opt.png
+!docs/m/石膏头像_男中青年_奥古斯都_波士顿_opt.png
+!docs/m/石膏头像_男中青年_贝多芬_opt.png
+!docs/m/石膏头像_男中青年_蝙蝠侠罗伯特帕丁森__opt.png
+!docs/m/石膏头像_男中青年_表情_马赛曲战士 (La Marseillaise)_opt.png
+!docs/m/石膏头像_男中青年_表情_MichelangeloDavid_David_std_opt.png
+!docs/m/石膏头像_男中青年_表情_negan bust_opt.png
+!docs/m/石膏头像_男中青年_布鲁特斯_Michelangelo_opt.png
+!docs/m/石膏头像_男中青年_大本 蝙蝠侠 布鲁斯韦恩_头像_opt.png
+!docs/m/石膏头像_男中青年_大超亨利卡维尔_头像.png
+!docs/m/石膏头像_男中青年_短袖男青年01_opt.png
+!docs/m/石膏头像_男中青年_光滑男头01_opt.png
+!docs/m/石膏头像_男中青年_基努李维斯_头像_opt.png
+!docs/m/石膏头像_男中青年_杰克·尼克尔森小丑_头像_opt.png
+!docs/m/石膏头像_男中青年_杰昆小丑_头像_opt.png
+!docs/m/石膏头像_男中青年_经典超人头_opt.png
+!docs/m/石膏头像_男中青年_军装男青年01_opt.png
+!docs/m/石膏头像_男中青年_卡拉卡拉 (Caracalla)_opt.png
+!docs/m/石膏头像_男中青年_雷神索尔_opt.png
+!docs/m/石膏头像_男中青年_莫里哀_乌东_opt.png
+!docs/m/石膏头像_男中青年_托尼斯塔克_opt.png
+!docs/m/石膏头像_男中青年_胸像底座01_std_opt.png
+!docs/m/石膏头像_男中青年_蜘蛛侠汤姆·赫兰德_头像.png
+!docs/m/石膏头像_男中青年_桌上男青年01_opt.png
+!docs/m/石膏头像_男中青年_AARON PAUL_opt.png
+!docs/m/石膏头像_男中青年_ARNOLD SCHWARZENEGGER_opt.png
+!docs/m/石膏头像_男中青年_Farnese Caesar.png
+!docs/m/石膏头像_男中青年_Galen2V_opt.png
+!docs/m/石膏头像_男中青年_hercules-at-the-met-new-york_opt.png
+!docs/m/石膏头像_男中青年_IpMan2V_opt.png
+!docs/m/石膏头像_男中青年_Joaquin Phoenix as Joker_opt.png
+!docs/m/石膏头像_男中青年_Leeds - Nicholson_opt.png
+!docs/m/石膏头像_男中青年_portait_of_caesar_from_pantelleria_opt.png
+!docs/m/石膏头像_男中青年_repaired_gylptotek-1443-alexandre-dumas_opt.png
+!docs/m/石膏头像_男中青年01_opt.png
+!docs/m/石膏头像_女老年_20260324195414_opt.png
+!docs/m/石膏头像_女老年_头巾胸像01_opt.png
+!docs/m/石膏头像_女老年_opt.png
+!docs/m/石膏头像_女童_20260324184401_opt.png
+!docs/m/石膏头像_女童_20260324190454_opt.png
+!docs/m/石膏头像_女童_Louise Brongniart of 5 Years at The Réunion des Musées Nationaux, Paris.png
+!docs/m/石膏头像_女童_model-6213.png
+!docs/m/石膏头像_女童_museo-pietro-canonica-rome-2-bust-repaired_opt.png
+!docs/m/石膏头像_女童_opt.png
+!docs/m/石膏头像_女童_saam-la-petite-pensee_opt.png
+!docs/m/石膏头像_女中青年_01_opt_石膏白.png
+!docs/m/石膏头像_女中青年_02_opt_石膏白.png
+!docs/m/石膏头像_女中青年_03_opt_石膏白.png
+!docs/m/石膏头像_女中青年_04_opt_石膏白.png
+!docs/m/石膏头像_女中青年_05_opt_石膏白.png
+!docs/m/石膏头像_女中青年_06_opt_石膏白.png
+!docs/m/石膏头像_女中青年_20260324194904_opt.png
+!docs/m/石膏头像_女中青年_20260324205120.png
+!docs/m/石膏头像_女中青年_侧面低头女子01_opt.png
+!docs/m/石膏头像_女中青年_系带背心胸像01_opt.png
+!docs/m/石膏头像_女中青年_小丑女_opt.png
+!docs/m/石膏头像_女中青年_Bust of Iulia Titi.png
+!docs/m/石膏头像_女中青年_comtesse_BSpt_std.png
+!docs/m/石膏头像_女中青年_Female Head.png
+!docs/m/石膏头像_女中青年_glyptotek-min-1364-4mil-decimation.png
+!docs/m/石膏头像_女中青年_Head from a statue of an Amazon.png
+!docs/m/石膏头像_女中青年_Head of Hera.png
+!docs/m/石膏头像_女中青年_jadyn-sotheby-s-bust-of-a-young-woman_opt.png
+!docs/m/石膏头像_女中青年_marguerite-le-comte-no-pedestal.png
+!docs/m/石膏头像_女中青年_Minerva.png
+!docs/m/石膏头像_女中青年_nms-grh.png
+!docs/m/石膏头像_女中青年_opt.png
+!docs/m/石膏头像_女中青年_Part of the figurehead of HMS Bristol.png
+!docs/m/石膏头像_女中青年_Portrait of Julia Domna.png
+!docs/m/石膏头像_女中青年_Portrait of the Princess of Naples.png
+!docs/m/石膏头像_女中青年_portrait_of_antonia_minor_opt.png
+!docs/m/石膏头像_女中青年_saam-proserpine.png
+!docs/m/石膏头像_女中青年_smk-kasd24-nefertiti_opt.png
+!docs/m/石膏头像_女中青年_thorvaldsen-unknown-head.png
+!docs/m/石膏头像_女中青年_Z-word_头X部_opt.png
+!docs/m/天行者凯洛·伦_头像_opt.png
+!docs/m/头部分面体__石膏头像_男童_表情_Muscle man sections_Olivers_std_opt.png
+!docs/m/头部分面体_侧面基础01_opt.png
+!docs/m/头部肌肉_20260324204416_opt.png
+!docs/m/头部肌肉_黄种人_女_V8_std_opt_20260905111512.png
+!docs/m/头骨_Skull Parts_opt.png
+!docs/m/五官_鼻子.png
+!docs/m/五官_耳朵_石膏_新修改_opt_20260908195441.png
+!docs/m/五官_眼睛_石膏_09071632_opt_20260907164843.png
+!docs/m/五官_嘴巴_石膏_09071633_opt_20260907164845.png
+!docs/m/真人头像_儿童_男孩01_opt.png
+!docs/m/真人头像_儿童_男童01_opt.png
+!docs/m/真人头像_儿童_婴儿.png
+!docs/m/真人头像_儿童_幼儿面部扫描01_opt.png
+!docs/m/真人头像_划痕男头01_opt.png
+!docs/m/真人头像_男_白须闭目老人01_opt.png
+!docs/m/真人头像_男_戴眼镜中年男01_opt.png
+!docs/m/真人头像_男_光头亚裔侧脸01_opt.png
+!docs/m/真人头像_男_老年01_opt.png
+!docs/m/真人头像_男_青年02_opt_0819.png
+!docs/m/真人头像_男_头部扫描01_opt.png
+!docs/m/真人头像_男_秃顶仰视侧脸01_opt.png
+!docs/m/真人头像_男_西装绅士01_opt.png
+!docs/m/真人头像_男_Jason Statham_opt.png
+!docs/m/真人头像_男01_opt.png
+!docs/m/真人头像_男02_opt.png
+!docs/m/真人头像_男老年_胸像01_opt.png
+!docs/m/真人头像_女_带材质头像_opt.png
+!docs/m/真人头像_女_儿童_opt.png
+!docs/m/真人头像_女_青年01_opt_0819.png
+!docs/m/真人头像_女_青年02_opt.png
+!docs/m/真人头像_女_青年03_opt.png
+!docs/m/真人头像_女_长卷齐刘海01_opt.png
+!docs/m/真人头像_女_CDMR_Reference_Female_opt.png
+!docs/m/真人头像_女_Neutral Female Head_opt.png
+!docs/m/真人头像_女01_opt.png
+!docs/m/真人头像_女02_opt.png
+!docs/m/真人头像_女04_opt.png
+!docs/m/真人头像_opt.png
+# END AUTO model-deploy-allowlist

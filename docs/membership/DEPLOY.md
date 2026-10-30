@@ -89,7 +89,8 @@
 不要死磕 Workers 设置页里的 Variables。
 
 **发版注意（Worker 单文件 ≤25 MiB）：**  
-超大模型（如 `docs/model/石膏头像_男中青年_布鲁特斯_Bargello扫_opt.glb`）和整棵 `自用工具文件_不部署/` 已在 `.assetsignore` 里排除，否则上传会失败。若线上缺该石膏模型，需先压到 25 MiB 以下再放行。
+超大模型（Workers 单文件上限 25 MiB）不会进入发版白名单；整棵 `自用工具文件_不部署/` 已在 `.assetsignore` 排除。  
+**模型上传白名单**：发版 bat 会先跑 `docs/membership/sync-model-assetsignore.mjs`，按 `docs/json` 里出现的 `docs/m/…` 路径生成 `.assetsignore` 放行段——**课表没引用到的模型不上传 Cloudflare**（本地仓库仍可保留）。若线上缺某课模型，先查 JSON 路径是否写对、磁盘是否有对应密文 `.png`。
 
 ---
 

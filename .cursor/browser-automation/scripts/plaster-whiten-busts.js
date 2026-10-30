@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const modelDir = path.resolve(__dirname, '../../../docs/model');
+const modelDir = path.resolve(__dirname, '../../../docs/m');
 const PLASTER = [0.9, 0.9, 0.88, 1];
 const ROUGHNESS = 0.72;
 const METAL = 0;

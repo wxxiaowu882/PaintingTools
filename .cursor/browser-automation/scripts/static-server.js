@@ -601,6 +601,12 @@ try {
   });
 }
 
+function isModelAssetFileName(name) {
+  const n = String(name || '').toLowerCase();
+  // docs/m 密文假后缀 .png；明文仍 .glb。真图缩略图不进该目录。
+  return n.endsWith('.glb') || n.endsWith('.png');
+}
+
 function listGlbFilesUnder(rootAbs) {
   const root = path.normalize(rootAbs);
   const out = [];
@@ -617,7 +623,7 @@ function listGlbFilesUnder(rootAbs) {
       const childRel = rel ? `${rel}/${ent.name}` : ent.name;
       if (ent.isDirectory()) {
         walk(abs, childRel);
-      } else if (ent.isFile() && ent.name.toLowerCase().endsWith('.glb')) {
+      } else if (ent.isFile() && isModelAssetFileName(ent.name)) {
         try {
           const st = fs.statSync(abs);
           out.push({

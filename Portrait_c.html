@@ -175,6 +175,33 @@
   
   let courseConfig = [];
   let galleryTitleText = '';
+  // 与 Solid 同轨：model-viewer 只能吃明文 GLB；密文 .png(PTGL) 须先经统一包解密再 blob
+  let _portraitLogicalModelSrc = null;
+  let _portraitModelBlobUrl = null;
+  function portraitResolveModelUrl(src) {
+    const s = String(src || '').trim();
+    if (!s) return s;
+    if (/^(https?:|blob:|data:)/i.test(s)) return s;
+    let x = s.replace(/\\/g, '/');
+    x = x.replace(/^(\.\.\/)+/, '');
+    if (x.startsWith('./')) x = x.slice(2);
+    if (!x.startsWith('/')) x = '/' + x;
+    return x;
+  }
+  async function portraitModelSrcForViewer(modelSrc) {
+    const { toGlbArrayBuffer } = await import('./docs/js/model-crypto/ModelCrypto.js');
+    const fetchUrl = portraitResolveModelUrl(modelSrc);
+    const res = await fetch(fetchUrl, { cache: 'no-cache' });
+    if (!res.ok) throw new Error('模型 HTTP ' + res.status + ' ' + fetchUrl);
+    const glbBuf = await toGlbArrayBuffer(await res.arrayBuffer());
+    if (_portraitModelBlobUrl) {
+      try { URL.revokeObjectURL(_portraitModelBlobUrl); } catch (_e) {}
+      _portraitModelBlobUrl = null;
+    }
+    const blob = new Blob([glbBuf], { type: 'model/gltf-binary' });
+    _portraitModelBlobUrl = URL.createObjectURL(blob);
+    return _portraitModelBlobUrl + '#.glb';
+  }
   
   // 动态构建内容矩阵（头部造型规律已迁至 Solid?sandbox=headform）
   if (libType === 'anatomy') {
@@ -1062,8 +1089,13 @@
   setPortraitBootLoader(true, '构建场景中…', '0%');
   loading.classList.remove('is-hidden');
   loading.style.opacity = '1'; loading.style.pointerEvents = 'auto'; if(percentEl) percentEl.innerText = '0%'; if(window.tourState.isActive) window.stopTour();
-  try { const res = await fetch(url); const data = await res.json(); currentData = data; const isSameSrc = viewer.getAttribute('src') === data.modelSrc;
-  viewer.setAttribute('src', data.modelSrc); if(data.settings) { defaultColor = data.settings.defaultColor || defaultColor; defaultOpacity = data.settings.defaultOpacity || defaultOpacity;
+  try { const res = await fetch(url); const data = await res.json(); currentData = data; const isSameSrc = _portraitLogicalModelSrc === data.modelSrc && !!viewer.getAttribute('src');
+  _portraitLogicalModelSrc = data.modelSrc;
+  if (!isSameSrc) {
+    const viewerSrc = await portraitModelSrcForViewer(data.modelSrc);
+    viewer.setAttribute('src', viewerSrc);
+  }
+  if(data.settings) { defaultColor = data.settings.defaultColor || defaultColor; defaultOpacity = data.settings.defaultOpacity || defaultOpacity;
   envSettings.amb = data.settings.ambient ?? envSettings.amb; envSettings.aT = data.settings.ambientTemp ?? envSettings.aT; envSettings.aX = data.settings.ambientX ?? envSettings.aX; envSettings.aY = data.settings.ambientY ?? envSettings.aY;
   envSettings.spt = data.settings.spot ?? data.settings.exposure ?? envSettings.spt; envSettings.sT = data.settings.spotTemp ?? envSettings.sT;
   envSettings.sX = data.settings.spotX ?? data.settings.lightX ?? data.settings.lightRot ?? envSettings.sX; envSettings.sY = data.settings.spotY ?? data.settings.lightY ?? envSettings.sY;

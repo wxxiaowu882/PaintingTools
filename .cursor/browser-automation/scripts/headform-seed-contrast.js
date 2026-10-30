@@ -3,11 +3,11 @@
  *
  * 用法示例：
  *   MODEL_ID=female_euro_02 MODEL_LABEL=欧女 FILE_TOKEN=欧女 \
- *     MODEL_URL='/docs/model/石膏头像_女中青年_02_opt_石膏白.glb' \
+ *     MODEL_URL='/docs/m/石膏头像_女中青年_02_opt_石膏白.glb' \
  *     SCALE=5.8 node scripts/headform-seed-contrast.js
  *
  *   MODEL_ID=male_euro_aaron_01 MODEL_LABEL=欧男 FILE_TOKEN=欧男 \
- *     MODEL_URL='/docs/model/石膏头像_男中青年_AARON%20PAUL_opt.glb' \
+ *     MODEL_URL='/docs/m/石膏头像_男中青年_AARON%20PAUL_opt.glb' \
  *     SCALE=5.8 node scripts/headform-seed-contrast.js
  */
 const fs = require('fs');
@@ -26,12 +26,12 @@ const RE = /^(\d+[A-Za-z]?)_(.+)\.json$/i;
 /** Git Bash 会把 /docs/... 转成 D:/Git/docs/...；统一收成站点根路径 */
 function normalizeModelUrl(u) {
   let x = String(u || '').trim().replace(/\\/g, '/');
-  x = x.replace(/^[A-Za-z]:\/+Git\/docs\/model\//i, '/docs/model/');
-  x = x.replace(/^[A-Za-z]:\/+.*\/docs\/model\//i, '/docs/model/');
-  x = x.replace(/^(\.\.\/)+docs\/model\//i, '/docs/model/');
-  if (x.startsWith('docs/model/')) x = '/' + x;
-  if (!x.startsWith('/docs/model/')) {
-    throw new Error('MODEL_URL must be under /docs/model/, got: ' + u);
+  x = x.replace(/^[A-Za-z]:\/+Git\/docs\/model\//i, '/docs/m/');
+  x = x.replace(/^[A-Za-z]:\/+.*\/docs\/model\//i, '/docs/m/');
+  x = x.replace(/^(\.\.\/)+docs\/model\//i, '/docs/m/');
+  if (x.startsWith('docs/m/')) x = '/' + x;
+  if (!x.startsWith('/docs/m/')) {
+    throw new Error('MODEL_URL must be under /docs/m/, got: ' + u);
   }
   // JSON 里保留真实空格；浏览器会自行编码
   x = x.replace(/%20/g, ' ');

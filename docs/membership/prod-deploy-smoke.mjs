@@ -74,12 +74,35 @@ async function main() {
     );
   }
 
+  // 密文模型抽检（PTGL 魔数）；失败则阻断（5A 测站/正式都要能拿到密文）
+  const sampleName = '石膏头像_男中青年_IpMan2V_opt.png';
+  const sampleUrl =
+    BASE + '/docs/m/' + sampleName.split('/').map(encodeURIComponent).join('/');
+  try {
+    const mRes = await fetch(sampleUrl, { redirect: 'follow', cache: 'no-store' });
+    need(mRes.ok, '密文样例 HTTP ' + mRes.status + ' ' + sampleName, errors);
+    if (mRes.ok) {
+      const u8 = new Uint8Array(await mRes.arrayBuffer());
+      const isPtgl =
+        u8.byteLength >= 5 &&
+        u8[0] === 0x50 &&
+        u8[1] === 0x54 &&
+        u8[2] === 0x47 &&
+        u8[3] === 0x4c &&
+        u8[4] === 1;
+      need(isPtgl, '密文样例不是 PTGL 容器: ' + sampleName, errors);
+      if (isPtgl) console.log('[smoke] 密文样例 PTGL OK:', sampleName, 'bytes=', u8.byteLength);
+    }
+  } catch (e) {
+    need(false, '密文样例请求失败: ' + (e && e.message ? e.message : e), errors);
+  }
+
   if (errors.length) {
     console.error('[smoke] FAIL');
     errors.forEach((e) => console.error(' -', e));
     process.exit(1);
   }
-  console.log('[smoke] OK：首页 / Solid / 防内嵌头 / public-config / 探针关闭');
+  console.log('[smoke] OK：首页 / Solid / 防内嵌头 / public-config / 探针关闭 / 密文样例');
 }
 
 main().catch((e) => {

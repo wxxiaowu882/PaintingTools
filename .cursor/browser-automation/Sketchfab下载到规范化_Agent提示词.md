@@ -14,7 +14,7 @@
   B) 自然语言：去 Sketchfab 某某列表/收藏页，下载其中「……描述……」的模型
 
 输出目录: E:/模型/某次任务文件夹
-与 docs/model 不重名: 是
+与 docs/m 不重名: 是
 保留原英文 GLB: 是
 压缩: 是（先体积优先，有问题再展示安全）
 ```
@@ -27,7 +27,7 @@
 |---|---|
 | **任务** | 链接列表和/或自然语言筛选条件；都没有则立刻问用户 |
 | **输出目录 `{OUT}`** | 完整路径；不存在则创建；不要用聊天记录里「上次那个」 |
-| **与 docs/model 不重名** | 默认 **是**；扫描仓库 `docs/model/**/*.glb` |
+| **与 docs/m 不重名** | 默认 **是**；扫描仓库 `docs/m/**/*.glb` |
 | **保留原英文 GLB** | 默认 **是**；规范化只新增中文名文件，不删英文导出 |
 | **压缩** | 默认 **是**；见阶段 6 |
 
@@ -41,7 +41,7 @@
 
 1. 下载 GLB 到 `{OUT}`
 2. 四向正视预览 → Agent **看图**选正脸朝向
-3. 按正脸起中文名（前缀见 `quickNames.json`），与 `docs/model` **不重名**
+3. 按正脸起中文名（前缀见 `quickNames.json`），与 `docs/m` **不重名**
 4. 旋正 + 30cm + 底部中心对齐 → 导出中文 `.glb`（英文原文件保留）
 5. **体积优先**压缩 → 渲染比对 → 有问题则用**展示安全**再压
 6. 写 `{OUT}/pipeline-report.json`，用大白话向用户汇报
@@ -195,16 +195,16 @@ node gen-front-thumbs-cli.mjs "{OUT}"
 
 ---
 
-### 阶段 4 — 与 docs/model 去重
+### 阶段 4 — 与 docs/m 去重
 
-1. 扫描 `{REPO}/docs/model/**/*.glb`，收集已有 basename（**大小写不敏感**）
+1. 扫描 `{REPO}/docs/m/**/*.glb`，收集已有 basename（**大小写不敏感**）
 2. 对 `normalize-plan.json` 每条 `outName`：
    - 与库内重名 → 改描述加 `01`/`02`，或后缀 `_YYYYMMDDhhmmss`（同目录逻辑可参考 `naming-utils.mjs` 的 `ensureUniquePerDir`）
    - 与 `{OUT}` 内已有中文 GLB 重名 → 同样处理
 3. 更新 plan 后写 `{OUT}/dedup-log.json`（原 intent 名 → 最终 outName）
 4. **去重完成后再跑 normalize**
 
-默认 **不** 自动复制进 `docs/model`；产物留在 `{OUT}`，除非用户本条消息明确要求复制。
+默认 **不** 自动复制进 `docs/m`；产物留在 `{OUT}`，除非用户本条消息明确要求复制。
 
 ---
 
@@ -308,7 +308,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "{COMPRESS_PS1}" -Mode displ
 | 概况 | 任务来源、输出目录、共几个模型 |
 | 下载 | 成功 / 失败数；失败 id + 原因 + 截图路径 |
 | 规范化 | 中文文件名列表；normalize 失败项 |
-| 去重 | 是否与 docs/model 冲突及如何改名 |
+| 去重 | 是否与 docs/m 冲突及如何改名 |
 | 压缩 | 体积优先 OK 数；回退展示安全数；待人工数 |
 | 交付物 | 最终推荐使用的 `{名}_opt.glb` 完整路径 |
 | 保留 | 英文原 GLB 仍在 `{OUT}`，满意后可手动删 |
@@ -349,7 +349,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "{COMPRESS_PS1}" -Mode displ
 - [ ] 下载报告已读；失败项已列入汇报
 - [ ] 每个进入规范化的 GLB 有 4 张 `_front_thumbs` 正视图
 - [ ] `normalize-plan.json` 全量、每条有看图选定的 `rotYSteps` 与中文 `outName`
-- [ ] `dedup-log.json` 已处理与 `docs/model` 的重名
+- [ ] `dedup-log.json` 已处理与 `docs/m` 的重名
 - [ ] `normalize-report.json` 成功项 `bytes` 远大于 0
 - [ ] 压缩只对规范化成功的中文 GLB 执行，未误压英文原文件
 - [ ] `compress-review.json` 每条有 visualOk；FAIL 已走展示安全或标记待人工

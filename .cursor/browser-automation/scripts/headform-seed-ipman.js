@@ -10,7 +10,7 @@ const path = require('path');
 
 const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const jsonDir = path.join(repoRoot, 'docs', 'json', '沙盒_头部造型规律');
-const MODEL_URL = '/docs/model/石膏头像_男中青年_IpMan2V_opt.glb';
+const MODEL_URL = '/docs/m/石膏头像_男中青年_IpMan2V_opt.glb';
 const MODEL_ID = 'male_ipman_01';
 const MODEL_LABEL = '叶问';
 const FILE_TOKEN = '叶问';

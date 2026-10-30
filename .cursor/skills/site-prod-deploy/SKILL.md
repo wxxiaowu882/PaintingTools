@@ -44,7 +44,7 @@ Windows 注意：sync 脚本经 `cmd.exe /c npx …` 调 wrangler（直接 `spaw
 
 ### A. 只发测站
 
-1. `DEPLOY_NOPAUSE=1 cmd //c "docs\\deploy-staging.bat"`（或 Portal 20b）。
+1. `DEPLOY_NOPAUSE=1 cmd //c "docs\\deploy-staging.bat"`（或 Portal 20b）。发版前 bat 会跑 `sync-model-assetsignore.mjs`：只上传 **docs/json 引用到的** `docs/m` 文件，未引用模型不进 CF。
 2. 冒烟：`SMOKE_BASE=https://test.wuxiaoart.com node docs/membership/prod-deploy-smoke.mjs`。
 3. 汇报：版本/域名、冒烟结果；**勿**写测站 policy。
 

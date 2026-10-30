@@ -18,7 +18,7 @@ function _isNonPersistableUrl(url) {
 }
 
 /**
- * 任意 GLB 路径写法 → 站点根 canonical key `/docs/model/xxx.glb`。
+ * 任意模型路径写法 → 站点根 canonical key `/docs/m/xxx.png`（轻伪装；旧前缀 docs/model 会归一到 docs/m）。
  * 不可持久化 URL（data/blob/http）原样返回。
  */
 export function normalizeSolidGlbCacheKey(url) {
@@ -27,11 +27,14 @@ export function normalizeSolidGlbCacheKey(url) {
     if (!s) return s;
     if (_isNonPersistableUrl(s)) return s;
     let x = s.replace(/\\/g, '/');
-    x = x.replace(/^(\.\.\/)+docs\/model\//i, 'docs/model/');
+    // 旧路径兼容：docs/model → docs/m
+    x = x.replace(/\/docs\/model\//gi, '/docs/m/');
+    x = x.replace(/(^|\/)docs\/model\//gi, '$1docs/m/');
+    x = x.replace(/^(\.\.\/)+docs\/m\//i, 'docs/m/');
     x = x.replace(/^\.\//, '');
-    if (x.startsWith('/docs/model/')) return x;
-    if (x.startsWith('docs/model/')) return '/' + x;
-    const idx = x.toLowerCase().indexOf('/docs/model/');
+    if (x.startsWith('/docs/m/')) return x;
+    if (x.startsWith('docs/m/')) return '/' + x;
+    const idx = x.toLowerCase().indexOf('/docs/m/');
     if (idx >= 0) return x.substring(idx);
     return x;
   } catch (_e) {
@@ -45,38 +48,40 @@ export function buildSolidGlbFetchCandidates(url) {
     const s = String(url || '').trim();
     if (!s) return [];
     if (_isNonPersistableUrl(s)) return [s];
-    const x = s.replace(/\\/g, '/');
+    let x = s.replace(/\\/g, '/');
+    x = x.replace(/\/docs\/model\//gi, '/docs/m/');
+    x = x.replace(/(^|\/)docs\/model\//gi, '$1docs/m/');
     const out = [];
     const push = (v) => { if (!v) return; if (!out.includes(v)) out.push(v); };
     const cacheKey = normalizeSolidGlbCacheKey(x);
-    if (cacheKey.startsWith('/docs/model/')) {
+    if (cacheKey.startsWith('/docs/m/')) {
       push(cacheKey);
       const tail = cacheKey.substring(1);
       push('../../' + tail);
       push('./' + tail);
       push(tail);
-    } else if (x.startsWith('/docs/model/')) {
+    } else if (x.startsWith('/docs/m/')) {
       const tail = x.substring(1);
       push('/' + tail);
       push('../../' + tail);
       push('./' + tail);
       push(tail);
-    } else if (x.startsWith('docs/model/')) {
+    } else if (x.startsWith('docs/m/')) {
       push('/' + x);
       push('../../' + x);
       push('./' + x);
       push(x);
-    } else if (x.startsWith('./docs/model/')) {
+    } else if (x.startsWith('./docs/m/')) {
       const tail = x.substring(2);
       push('/' + tail);
       push('../../' + tail);
       push(tail);
-    } else if (x.startsWith('../docs/model/')) {
+    } else if (x.startsWith('../docs/m/')) {
       const tail = x.substring(3);
       push('/' + tail);
       push('../../' + tail);
       push(tail);
-    } else if (x.startsWith('../../docs/model/')) {
+    } else if (x.startsWith('../../docs/m/')) {
       const tail = x.replace(/^(\.\.\/)+/, '');
       push('/' + tail);
       push('./' + tail);
@@ -363,7 +368,7 @@ export function createSolidGlbPersistCache(opts) {
     const tryCandidates = opts.tryCandidates !== false;
     const cacheKey = normalizeSolidGlbCacheKey(url);
 
-    if (_isNonPersistableUrl(cacheKey) || !cacheKey.startsWith('/docs/model/')) {
+    if (_isNonPersistableUrl(cacheKey) || !cacheKey.startsWith('/docs/m/')) {
       const candidates = tryCandidates ? buildSolidGlbFetchCandidates(url) : [url];
       const got = await _fetchWithCandidates(candidates, { onProgress, isStale });
       return { buffer: got.buffer, fromCache: false, fetchUrl: got.fetchUrl, cacheKey };

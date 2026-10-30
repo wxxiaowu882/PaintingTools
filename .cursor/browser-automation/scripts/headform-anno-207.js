@@ -19,7 +19,7 @@ const outDir = path.join(runsRoot, `${stamp}-headform-207`);
 const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:18080';
 fs.mkdirSync(outDir, { recursive: true });
 
-const MODEL = '/docs/model/石膏头像_男中青年_大本 蝙蝠侠 布鲁斯韦恩_头像_opt.glb';
+const MODEL = '/docs/m/石膏头像_男中青年_大本 蝙蝠侠 布鲁斯韦恩_头像_opt.glb';
 const FILE_NAME = '207_【光位】逆光 · 轮廓光（Rim）.json';
 
 /** 近侧（画面右缘）亮边分段：上→下 —— 本打底光把镶边打在可见的近侧外缘 */

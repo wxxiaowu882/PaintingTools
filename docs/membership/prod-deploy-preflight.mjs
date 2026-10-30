@@ -10,6 +10,7 @@
  *   PREFLIGHT_BASE=url   默认 https://wuxiaoart.com
  */
 import { spawnSync } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -18,6 +19,7 @@ const REPO = path.resolve(__dirname, '../..');
 const PROD_KV = 'e556d7993e374d31bc8d693a6273f337';
 const REQUIRED_SECRETS = ['MEMBERSHIP_SECRET', 'MEMBERSHIP_ADMIN_PASSWORD'];
 const BASE = String(process.env.PREFLIGHT_BASE || 'https://wuxiaoart.com').replace(/\/$/, '');
+const MODEL_DIR = path.join(REPO, 'docs/m');
 
 function escapeCmdArg(a) {
   const s = String(a);
@@ -144,12 +146,39 @@ function checkOpsSettingsKv(errors) {
   }
 }
 
+/** 4A：docs/m 下仍有明文 .glb → 警告不阻断 */
+function warnPlainGlbInModel() {
+  console.log('[preflight] 检查 docs/m 明文 .glb（警告不阻断）…');
+  try {
+    if (!fs.existsSync(MODEL_DIR)) {
+      console.log('[preflight] WARN: docs/m 不存在');
+      return;
+    }
+    const glbs = fs.readdirSync(MODEL_DIR).filter((f) => /\.glb$/i.test(f));
+    const pngs = fs.readdirSync(MODEL_DIR).filter((f) => /\.png$/i.test(f));
+    if (glbs.length) {
+      console.log(
+        '[preflight] WARN: docs/m 仍有 ' +
+          glbs.length +
+          ' 个明文 .glb（密文 .png=' +
+          pngs.length +
+          '）。工具默认应只导出 .png。'
+      );
+    } else {
+      console.log('[preflight] docs/m 无明文 .glb（png=' + pngs.length + '）');
+    }
+  } catch (e) {
+    console.log('[preflight] WARN: 无法扫描 docs/m: ' + (e && e.message ? e.message : e));
+  }
+}
+
 async function main() {
   if (process.env.SKIP_PREFLIGHT === '1') {
     console.log('[preflight] SKIP_PREFLIGHT=1，跳过');
     return;
   }
   const errors = [];
+  warnPlainGlbInModel();
   checkSecrets(errors);
   checkOpsSettingsKv(errors);
   await checkProbeHttp(errors);

@@ -24,7 +24,7 @@ const NEW_GLB = path.join(
   'model',
   '头部肌肉_黄种人_女_V8_std_opt_20260905111512.glb'
 );
-const NEW_MODEL_SRC = '../docs/model/头部肌肉_黄种人_女_V8_std_opt_20260905111512.glb';
+const NEW_MODEL_SRC = '../docs/m/头部肌肉_黄种人_女_V8_std_opt_20260905111512.glb';
 
 const MAX_NEW_SURFACE_MM = 0.5;
 const EXCLUDE_NAME_RE = /static|pupil|euro pupil|melns/i;

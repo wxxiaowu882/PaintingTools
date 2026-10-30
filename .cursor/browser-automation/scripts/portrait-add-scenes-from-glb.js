@@ -63,7 +63,7 @@ for (const row of items) {
   if (row.age) data.meta.age = row.age;
   if (row.region) data.meta.region = row.region;
   if (row.detail != null) data.meta.detail = String(row.detail);
-  const url = '/docs/model/' + glbName;
+  const url = '/docs/m/' + glbName;
   if (!Array.isArray(data.items) || !data.items.length) {
     data.items = [{ type: 'glb', url, pos: [0, 0, 0], rot: [0, 0, 0], scale: [10, 10, 10], mat: 'origin' }];
   } else {

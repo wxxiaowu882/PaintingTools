@@ -11,7 +11,7 @@ const base = process.env.BASE_URL || `http://127.0.0.1:${port}`;
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const outDir = path.join(__dirname, '..', 'runs', `${stamp}-facial-composite-capture`);
 
-const MODEL = '../docs/model/石膏头像_女中青年_05_opt_石膏白.glb';
+const MODEL = '../docs/m/石膏头像_女中青年_05_opt_石膏白.glb';
 const SEED = {
   version: '1.6.5',
   timestamp: Date.now(),

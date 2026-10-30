@@ -134,9 +134,13 @@ button.danger:hover { background: #d9534f; color: #fff; }
 #global-loading .loading-spinner { position: static; width: 50px; height: 50px; border-width: 4px; margin-bottom: 20px; box-shadow: 0 0 15px rgba(0,210,255,0.2); }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-#custom-prompt-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:10000; display:none; justify-content:center; align-items:flex-start; padding-top:2vh; } #custom-prompt-box { background:#1a1b22; border:1px solid var(--theme-color); border-radius:8px; padding:20px; width:650px; box-shadow:0 4px 20px rgba(0,0,0,0.8); display:flex; flex-direction:column; gap:12px; } #custom-prompt-title { color:var(--text-main); font-size:14px; margin:0; } .input-wrapper { display:flex; align-items:center; background:#000; border:1px solid #444; border-radius:4px; padding:0 8px; transition:0.2s; } .input-wrapper:focus-within { border-color:var(--theme-color); } #custom-prompt-input { flex:1; background:transparent; border:none; color:#00ffcc; font-size:13px; padding:8px 0; outline:none; } .input-suffix { color:#666; font-size:13px; user-select:none; } #custom-prompt-btns { display:flex; justify-content:flex-end; gap:8px; margin-top:4px; } #custom-prompt-btns button { padding:6px 14px; font-size:12px; } </style> <script type="module" src="../../../docs/js/model-viewer.min.js"></script> <script type="importmap"> {
+#custom-prompt-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:10000; display:none; justify-content:center; align-items:flex-start; padding-top:2vh; } #custom-prompt-box { background:#1a1b22; border:1px solid var(--theme-color); border-radius:8px; padding:20px; width:650px; box-shadow:0 4px 20px rgba(0,0,0,0.8); display:flex; flex-direction:column; gap:12px; } #custom-prompt-title { color:var(--text-main); font-size:14px; margin:0; } .input-wrapper { display:flex; align-items:center; background:#000; border:1px solid #444; border-radius:4px; padding:0 8px; transition:0.2s; } .input-wrapper:focus-within { border-color:var(--theme-color); } #custom-prompt-input { flex:1; background:transparent; border:none; color:#00ffcc; font-size:13px; padding:8px 0; outline:none; } .input-suffix { color:#666; font-size:13px; user-select:none; } #custom-prompt-btns { display:flex; justify-content:flex-end; gap:8px; margin-top:4px; } #custom-prompt-btns button { padding:6px 14px; font-size:12px; } </style>
+<!-- importmap 必须在任何 type=module 之前，否则 three 解析失败（浏览器：import map added after module script） -->
+<script type="importmap"> {
 "imports": { "three": "./three.module.js", "three/addons/loaders/GLTFLoader.js": "./GLTFLoader.js", "three/addons/loaders/GLTFExporter.js": "./GLTFExporter.js",
-"three/addons/loaders/DRACOLoader.js": "./DRACOLoader.js", "/build/three.module.js": "./three.module.js", "../../../build/three.module.js": "./three.module.js" } } </script> </head> <body>
+"three/addons/loaders/DRACOLoader.js": "./DRACOLoader.js", "/build/three.module.js": "./three.module.js", "../../../build/three.module.js": "./three.module.js" } } </script>
+<script type="module" src="../../docs/js/model-viewer.min.js"></script>
+</head> <body>
 <div id="global-loading"><div class="loading-spinner"></div><div id="loading-msg">处理中...</div></div>
 <div id="sidebar"> <div class="sidebar-header"> <div class="title-bar"> <h2>模型标准化仓库</h2> <div class="btn-group"> <button id="btn-select-dir" class="primary" title="点击选择本地文件夹">新文件夹</button> <button id="btn-restore-dir" style="display:none;">📂 恢复</button> <button id="btn-refresh" title="刷新列表">↻</button> <button id="btn-rebuild-thumbs" title="强制重建所有缩略图">🔄</button> <button id="btn-toggle-logs" title="查看日志">📋</button> </div> </div> <div class="dir-history-row"><select id="dir-history-select" title="已加载过的文件夹"><option value="">— 历史文件夹 —</option></select><button type="button" id="btn-remove-dir-history" title="删除当前选中的历史路径（不删磁盘文件）" disabled>删除</button><div id="dir-history-list" hidden></div></div> <div id="search-wrap"><input type="text" id="search-input" placeholder="🔍 搜索模型名称..." autocomplete="off" spellcheck="false"><div id="search-suggest-panel" role="listbox" aria-label="搜索提示词"></div></div> <div id="status-text">请选择本地 GLB 文件夹</div><div id="api-status-text">正在检测本机 18080 服务…</div> </div>
 <div id="tool-panel">
@@ -216,14 +220,35 @@ button.danger:hover { background: #d9534f; color: #fff; }
 <canvas id="matcap-canvas"></canvas>
 <model-viewer id="main-viewer" camera-controls tone-mapping="aces" shadow-intensity="0" style="display:none;"></model-viewer> </div>
 <div id="log-panel"> <div id="log-header"> <span style="color:var(--theme-color)">运行终端 (全局排错模式)</span> <div class="btn-group"><button id="btn-clear-logs">清空</button><button id="btn-copy-logs">复制全部</button><button id="btn-close-logs">关闭</button></div> </div> <div id="log-content"></div> </div>
-<div id="custom-prompt-overlay"><div id="custom-prompt-box"><div id="custom-prompt-title">重命名模型</div><select id="custom-prompt-select" style="background:#000; border:1px solid #444; color:#00ffcc; padding:6px; border-radius:4px; outline:none; font-size:12px; cursor:pointer;"><option value="">-- 选择预设名称 (可选) --</option></select><div class="input-wrapper"><input type="text" id="custom-prompt-input" autocomplete="off" spellcheck="false"><span class="input-suffix">.glb</span></div><div id="custom-prompt-btns"><button id="btn-prompt-cancel">取消</button><button id="btn-prompt-ok" class="primary">确定</button></div></div></div>
+<div id="custom-prompt-overlay"><div id="custom-prompt-box"><div id="custom-prompt-title">重命名模型</div><select id="custom-prompt-select" style="background:#000; border:1px solid #444; color:#00ffcc; padding:6px; border-radius:4px; outline:none; font-size:12px; cursor:pointer;"><option value="">-- 选择预设名称 (可选) --</option></select><div class="input-wrapper"><input type="text" id="custom-prompt-input" autocomplete="off" spellcheck="false"><span class="input-suffix" id="custom-prompt-suffix">.png</span></div><div id="custom-prompt-btns"><button id="btn-prompt-cancel">取消</button><button id="btn-prompt-ok" class="primary">确定</button></div></div></div>
 <div id="copy-target-overlay"><div id="copy-target-box"><div id="copy-target-title">复制到历史文件夹</div><div id="copy-target-file"></div><select id="copy-target-select"></select><div id="copy-target-btns"><button type="button" id="btn-copy-cancel">取消</button><button type="button" id="btn-copy-ok" class="primary">开始复制</button></div></div></div>
 <script type="module"> import * as THREE from 'three'; import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'; import { GLTFExporter } from 'three/addons/loaders/GLTFExporter.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; window.errorLogs = []; window.isThreeProcessing = false; window.activeGltfLoads = new Set(); const logContent = document.getElementById('log-content'); const btnToggleLogs = document.getElementById('btn-toggle-logs');
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { toGlbArrayBuffer, encryptGlb, isOurContainer, FAKE_EXT, PLAIN_EXT } from '../../docs/js/model-crypto/ModelCrypto.js';
+window.errorLogs = []; window.isThreeProcessing = false; window.activeGltfLoads = new Set(); const logContent = document.getElementById('log-content'); const btnToggleLogs = document.getElementById('btn-toggle-logs');
 const quickNames = ["石膏头像_男童", "石膏头像_男中青年", "石膏头像_男老年","石膏头像_女童", "石膏头像_女中青年", "石膏头像_女老年","头部分面体","头部肌肉","表情","头像_带标注","真人头像_女","真人头像_男","真人头像_儿童","手","脚","五官","头骨","人物其它","静物_几何体","静物_瓶罐","静物_水果","静物_车","静物_其它","动物","其它"]; // 💡 在这里增删你的预设名字
 // 线上展示用 Draco：scene 量化 + position 16，减少多块模型接缝黑细丝（体积约多几个百分点）
 const DRACO_DISPLAY_SAFE = { quantizationVolume: 'scene', quantizePosition: 16, quantizeNormal: 12 };
-const customPrompt = (title, defaultText) => new Promise(resolve => { const overlay = document.getElementById('custom-prompt-overlay'); const input = document.getElementById('custom-prompt-input'); const select = document.getElementById('custom-prompt-select'); const btnOk = document.getElementById('btn-prompt-ok'); const btnCancel = document.getElementById('btn-prompt-cancel'); document.getElementById('custom-prompt-title').innerText = title; input.value = defaultText.replace(/\.glb$/i, ''); if (select.options.length === 1) { quickNames.forEach(n => { const op = document.createElement('option'); op.value = n; op.innerText = n; select.appendChild(op); }); } select.value = ""; select.onchange = () => { if (select.value) { let cv = input.value; quickNames.forEach(n => { if(cv.startsWith(n+'_')) cv = cv.substring(n.length+1); else if(cv === n) cv = ""; }); input.value = cv ? select.value + '_' + cv : select.value; input.focus(); } }; overlay.style.display = 'flex'; setTimeout(() => { input.focus(); input.select(); }, 50); const cleanup = () => { overlay.style.display = 'none'; btnOk.onclick = null; btnCancel.onclick = null; input.onkeydown = null; select.onchange = null; }; btnOk.onclick = () => { cleanup(); const val = input.value.trim(); resolve(val ? val + '.glb' : null); }; btnCancel.onclick = () => { cleanup(); resolve(null); }; input.onkeydown = (e) => { if (e.key === 'Enter') btnOk.click(); if (e.key === 'Escape') btnCancel.click(); }; });
+const isModelAssetName = (name) => /\.(glb|png)$/i.test(String(name || ''));
+const stripModelExt = (name) => String(name || '').replace(/\.(glb|png)$/i, '');
+const extOfModelName = (name) => (/\.png$/i.test(String(name || '')) ? FAKE_EXT : PLAIN_EXT);
+const ensureEncryptedModelName = (name) => stripModelExt(name || 'model') + FAKE_EXT;
+const withUniqueModelSuffix = (name) => {
+    const d = new Date();
+    const ts = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0') + String(d.getSeconds()).padStart(2,'0');
+    return String(name || 'model').replace(/(\.(glb|png))$/i, `_${ts}$1`);
+};
+/** 加工/另存：明文 GLB buffer → 密文 .png 写入目录 */
+const writeEncryptedModelFile = async (parentHandle, desiredName, glbBuffer) => {
+    const outName = ensureEncryptedModelName(desiredName);
+    const enc = await encryptGlb(glbBuffer);
+    const fileHandle = await parentHandle.getFileHandle(outName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(enc);
+    await writable.close();
+    return { name: outName, handle: fileHandle, byteLength: (enc && enc.byteLength) || 0 };
+};
+const customPrompt = (title, defaultText, forceExt = FAKE_EXT) => new Promise(resolve => { const overlay = document.getElementById('custom-prompt-overlay'); const input = document.getElementById('custom-prompt-input'); const select = document.getElementById('custom-prompt-select'); const btnOk = document.getElementById('btn-prompt-ok'); const btnCancel = document.getElementById('btn-prompt-cancel'); const suffixEl = document.getElementById('custom-prompt-suffix'); const useExt = forceExt === PLAIN_EXT ? PLAIN_EXT : FAKE_EXT; if (suffixEl) suffixEl.innerText = useExt; document.getElementById('custom-prompt-title').innerText = title; input.value = stripModelExt(defaultText); if (select.options.length === 1) { quickNames.forEach(n => { const op = document.createElement('option'); op.value = n; op.innerText = n; select.appendChild(op); }); } select.value = ""; select.onchange = () => { if (select.value) { let cv = input.value; quickNames.forEach(n => { if(cv.startsWith(n+'_')) cv = cv.substring(n.length+1); else if(cv === n) cv = ""; }); input.value = cv ? select.value + '_' + cv : select.value; input.focus(); } }; overlay.style.display = 'flex'; setTimeout(() => { input.focus(); input.select(); }, 50); const cleanup = () => { overlay.style.display = 'none'; btnOk.onclick = null; btnCancel.onclick = null; input.onkeydown = null; select.onchange = null; }; btnOk.onclick = () => { cleanup(); const val = input.value.trim(); resolve(val ? val + useExt : null); }; btnCancel.onclick = () => { cleanup(); resolve(null); }; input.onkeydown = (e) => { if (e.key === 'Enter') btnOk.click(); if (e.key === 'Escape') btnCancel.click(); }; });
 
 const logDebug = (msg, err=null) => {
 const errStr = err ? (err.stack || err.message || JSON.stringify(err)) : ''; const line = `[${new Date().toLocaleTimeString()}] ${msg} ${errStr}`; window.errorLogs.push(line); if(logContent){
@@ -770,11 +795,12 @@ const copyModelToHistoryFolder = async (model, forcedTargetId = null) => {
         }
         const srcFile = await model.handle.getFile();
         const buffer = await srcFile.arrayBuffer();
+        // 复制：原样字节+后缀（不二次加解密），便于历史夹互拷明文/密文
         let finalName = model.name;
-        if (!/\.glb$/i.test(finalName)) finalName += '.glb';
+        if (!isModelAssetName(finalName)) finalName += FAKE_EXT;
         if (await fileExistsInDir(targetHandle, finalName)) {
             const ts = makeGlbTimestampSuffix();
-            finalName = finalName.replace(/\.glb$/i, `_${ts}.glb`);
+            finalName = finalName.replace(/(\.(glb|png))$/i, `_${ts}$1`);
             logDebug(`⚠️ 目标文件夹已有同名文件，自动追加后缀 -> ${finalName}`);
         }
         const newHandle = await targetHandle.getFileHandle(finalName, { create: true });
@@ -2281,19 +2307,14 @@ btnSplitExport.onclick = () => runHeavyTask('正在拆出选中 mesh 并另存�
         else exporter.parse(exportScene, onDone, options);
     });
 
-    let newName = activeModel.name.replace(/\.glb$/i, '') + '_split.glb';
+    let newName = ensureEncryptedModelName(stripModelExt(activeModel.name) + '_split');
     if (modelFiles.some(f => f.parent === activeModel.parent && f.name === newName)) {
-        const d = new Date();
-        const ts = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0') + String(d.getSeconds()).padStart(2,'0');
-        newName = newName.replace(/\.glb$/i, `_${ts}.glb`);
+        newName = withUniqueModelSuffix(newName);
         logDebug(`⚠️ 同名 split 已存在，自动追加后缀 -> ${newName}`);
     }
     const fixedSplit = reinjectPhysicalMaterialExtensions(result, exportScene);
-    const fileHandle = await activeModel.parent.getFileHandle(newName, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(fixedSplit);
-    await writable.close();
-    logDebug(`✅ 拆出保存成功: ${newName}`);
+    await writeEncryptedModelFile(activeModel.parent, newName, fixedSplit);
+    logDebug(`✅ 拆出保存成功(密文): ${newName}`);
     await scanDirectory();
 });
 
@@ -2331,7 +2352,11 @@ const loadToThree = async (file, ctxName="未知") => { return new Promise(async
 let isDone = false; const loadObj = { name: ctxName, reject: (err) => { if(!isDone){ isDone=true; reject(err); } } }; window.activeGltfLoads.add(loadObj);
 const timeoutId = setTimeout(() => { if(!isDone) { window.activeGltfLoads.delete(loadObj); logDebug(`🚨 [防挂死机制] 解析超时(180s)强制释放: ${ctxName}`); if(globalDracoLoader){ globalDracoLoader.dispose(); globalDracoLoader = null; } loadObj.reject(new Error("解析器无响应超时")); } }, 180000);
 try { const loader = new GLTFLoader(); 
-loader.setDRACOLoader(getDracoLoader()); const arrayBuffer = await file.arrayBuffer(); logDebug(`⏳ [排查-GLTF] ArrayBuffer就绪，移交底层解析: ${ctxName}`); 
+loader.setDRACOLoader(getDracoLoader()); const rawBuf = await file.arrayBuffer();
+const wasEnc = isOurContainer(rawBuf);
+const arrayBuffer = await toGlbArrayBuffer(rawBuf);
+if (wasEnc) logDebug(`🔓 [排查-GLTF] 已解密 PTGL 容器: ${ctxName}`);
+logDebug(`⏳ [排查-GLTF] ArrayBuffer就绪，移交底层解析: ${ctxName}`); 
 loader.parse(arrayBuffer, '', (gltf) => { if(isDone) return; isDone=true; clearTimeout(timeoutId); window.activeGltfLoads.delete(loadObj); logDebug(`✅ [排查-GLTF] 解析成功: ${ctxName}`); resolve(gltf); }, (err) => { if(isDone) return; isDone=true; clearTimeout(timeoutId); window.activeGltfLoads.delete(loadObj); const errStr = (err && err.isTrusted) ? 'Web Worker加载拦截 (通常由于缺失 draco_wasm_wrapper.js 或 CDN 被墙)' : String(err); logDebug(`❌ [排查-GLTF] 解析失败 [${ctxName}]:`, errStr); reject(err); }); } catch (e) { if(isDone) return; isDone=true; clearTimeout(timeoutId); window.activeGltfLoads.delete(loadObj); logDebug(`❌ [排查-GLTF] 致命异常 [${ctxName}]:`, e); reject(e); } }); };
 
 document.getElementById('btn-rot-x-cw').onclick = () => runHeavyTask("正在翻转模型...", async () => { if(!processingScene) return; processingScene.scene.rotateX(Math.PI/2); logDebug("🔄 绕 X 顺转 90°"); focusCameraOnModel(true); await updateViewerFromThree(false); });
@@ -2891,10 +2916,10 @@ if(isDraco || isSimplify || isCleanUV) {
     logDebug(`✅ 几何管线终极处理完毕！最终导出极小体积: ${(finalData.byteLength/1024/1024).toFixed(2)}MB`);
 }
 
-const newName = targetModelName.replace('.glb', '') + '_std.glb';
+const newName = ensureEncryptedModelName(stripModelExt(targetModelName) + '_std');
 const newFullPath = targetFullPath.replace(targetModelName, newName);
-const fileHandle = await targetParent.getFileHandle(newName, { create: true });
-const writable = await fileHandle.createWritable(); await writable.write(finalData); await writable.close(); logDebug(`✅ 成功保存: ${newFullPath}`); 
+const { handle: fileHandle } = await writeEncryptedModelFile(targetParent, newName, finalData);
+logDebug(`✅ 成功保存(密文): ${newFullPath}`); 
 
 const newFile = await fileHandle.getFile(); const newModel = { handle: fileHandle, parent: targetParent, file: newFile, name: newName, fullPath: newFullPath };
 if(db) await new Promise(r => { const req = db.transaction('thumbs','readwrite').objectStore('thumbs').delete(newFullPath); req.onsuccess = req.onerror = r; });
@@ -2917,7 +2942,7 @@ if (existingIdx > -1) {
     card.innerHTML = `<div class="thumb-container" title="${newFullPath}"><div class="file-size-tag">${(newFile.size/1024/1024).toFixed(1)}M</div><div class="loading-spinner"></div><img class="thumb-img" id="thumb-${uid}"></div><div class="card-info"><div class="model-name">${newFullPath}</div><div class="btn-row"><button class="rename-btn">重命名</button><button class="copy-btn">复制到</button><button class="delete-btn">删除</button></div></div>`;
     card.__modelData = newModel;
     card.onclick = (e) => { if(!e.target.closest('button')) previewModel(newModel, card); };
-    card.querySelector('.rename-btn').onclick = async (e) => { e.stopPropagation(); const nn = await customPrompt("请输入新的模型名称:", newName); if (!nn || nn === newName) return; try { let finalNn = nn; if (modelFiles.some(f => f.name === finalNn)) { const d = new Date(); const ts = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0') + String(d.getSeconds()).padStart(2,'0'); finalNn = finalNn.replace(/\.glb$/i, `_${ts}.glb`); logDebug(`⚠️ 同名文件已存在，自动追加后缀 -> ${finalNn}`); } logDebug(`正在通过读写方式重命名: ${newFullPath} -> ${finalNn}`); const oldHandle = await targetParent.getFileHandle(newName); const oldFile = await oldHandle.getFile(); const buffer = await oldFile.arrayBuffer(); const newHandle = await targetParent.getFileHandle(finalNn, { create: true }); const writable = await newHandle.createWritable(); await writable.write(buffer); await writable.close(); await targetParent.removeEntry(newName); if(db) { const thumb = await getThumb(newFullPath); if(thumb) { const nfp = newFullPath.replace(newName, finalNn); await saveThumb(nfp, thumb.lastModified, thumb.dataUrl); db.transaction('thumbs','readwrite').objectStore('thumbs').delete(newFullPath); } } if(activeModel && activeModel.fullPath === newFullPath) activeModel = null; await scanDirectory(); logDebug(`✅ 重命名成功`); } catch (err) { logDebug("❌ 重命名失败", err); alert("重命名失败: " + err.message); } };
+    card.querySelector('.rename-btn').onclick = async (e) => { e.stopPropagation(); const nn = await customPrompt("请输入新的模型名称:", newName, extOfModelName(newName)); if (!nn || nn === newName) return; try { let finalNn = nn; if (modelFiles.some(f => f.name === finalNn)) { finalNn = withUniqueModelSuffix(finalNn); logDebug(`⚠️ 同名文件已存在，自动追加后缀 -> ${finalNn}`); } logDebug(`正在通过读写方式重命名: ${newFullPath} -> ${finalNn}`); const oldHandle = await targetParent.getFileHandle(newName); const oldFile = await oldHandle.getFile(); const buffer = await oldFile.arrayBuffer(); const newHandle = await targetParent.getFileHandle(finalNn, { create: true }); const writable = await newHandle.createWritable(); await writable.write(buffer); await writable.close(); await targetParent.removeEntry(newName); if(db) { const thumb = await getThumb(newFullPath); if(thumb) { const nfp = newFullPath.replace(newName, finalNn); await saveThumb(nfp, thumb.lastModified, thumb.dataUrl); db.transaction('thumbs','readwrite').objectStore('thumbs').delete(newFullPath); } } if(activeModel && activeModel.fullPath === newFullPath) activeModel = null; await scanDirectory(); logDebug(`✅ 重命名成功`); } catch (err) { logDebug("❌ 重命名失败", err); alert("重命名失败: " + err.message); } };
     card.querySelector('.copy-btn').onclick = async (e) => { e.stopPropagation(); await copyModelToHistoryFolder(card.__modelData || newModel); };
     card.querySelector('.delete-btn').onclick = async (e) => { e.stopPropagation(); if (!confirm(`确定要永久删除模型文件【${newFullPath}】吗？`)) return; try { logDebug(`正在删除: ${newFullPath}`); await targetParent.removeEntry(newName); if(db) db.transaction('thumbs', 'readwrite').objectStore('thumbs').delete(newFullPath); if(activeModel && activeModel.fullPath === newFullPath) { activeModel = null; processingScene = null; resetSplitSelectState(); document.getElementById('current-model-title').innerText = ''; updateModelHeightDisp(); mainViewer.style.display = 'none'; toolPanel.style.display = 'none'; viewControls.style.display = 'none'; document.getElementById('empty-state').style.display = 'block'; } card.remove(); modelFiles = modelFiles.filter(f => f.fullPath !== newFullPath); statusText.innerText = `共 ${modelFiles.length} 个模型`; updateSearchSuggestions(); logDebug(`✅ 删除成功`); } catch (err) { logDebug("❌ 删除失败", err); alert("删除失败: " + err.message); } };
     if(grid.children[newIdx]) grid.insertBefore(card, grid.children[newIdx]); else grid.appendChild(card);
@@ -2962,7 +2987,7 @@ if (currentDirHandle.__serverAbsRoot) {
     return;
 }
 async function walk(dirHandle, path = '') { for await (const entry of dirHandle.values()) {
-if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.glb')) { const file = await entry.getFile(); const fullPath = path ? `${path}/${entry.name}` : entry.name;
+if (entry.kind === 'file' && isModelAssetName(entry.name)) { const file = await entry.getFile(); const fullPath = path ? `${path}/${entry.name}` : entry.name;
 modelFiles.push({ handle: entry, parent: dirHandle, file, name: entry.name, fullPath });
 } else if (entry.kind === 'directory') { await walk(entry, path ? `${path}/${entry.name}` : entry.name); } } }
 await walk(currentDirHandle); modelFiles.sort((a,b)=>a.fullPath.localeCompare(b.fullPath)); statusText.innerText = `共 ${modelFiles.length} 个模型${currentDirHandle ? ' · ' + currentDirHandle.name : ''}`; renderGrid(); grid.scrollTop = prevScroll; const searchInp = document.getElementById('search-input'); if (searchInp && searchInp.value.trim()) searchInp.dispatchEvent(new Event('input')); } catch(e) { logDebug("❌ 扫描失败", e); } }
@@ -2973,7 +2998,7 @@ const getSearchSuggestPanel = () => document.getElementById('search-suggest-pane
 const rebuildSearchSuggestWords = () => {
     const counts = {};
     modelFiles.forEach(m => {
-        m.name.replace(/\.glb$/i, '').split('_').forEach(t => {
+        stripModelExt(m.name).split('_').forEach(t => {
             const tk = t.trim();
             if (tk && !/^\d+$/.test(tk) && tk.toLowerCase() !== 'std') counts[tk] = (counts[tk] || 0) + 1;
         });
@@ -3043,7 +3068,7 @@ thumbQueue.push({ file: m.file, handle: m.handle, name: m.fullPath, imgEl: entry
 modelFiles.forEach((m, i) => { const card = document.createElement('div'); card.className = 'model-card'; if(activeModel && m.fullPath === activeModel.fullPath) card.classList.add('active');
 card.innerHTML = `<div class="thumb-container" title="${m.fullPath}"><div class="file-size-tag">${(m.file.size/1024/1024).toFixed(1)}M</div><div class="loading-spinner"></div><img class="thumb-img" id="thumb-${i}"></div><div class="card-info"><div class="model-name">${m.fullPath}</div><div class="btn-row"><button class="rename-btn">重命名</button><button class="copy-btn">复制到</button><button class="delete-btn">删除</button></div></div>`;
 card.__modelData = m; card.onclick = (e) => { if(!e.target.closest('button')) previewModel(m, card); };
-card.querySelector('.rename-btn').onclick = async (e) => { e.stopPropagation(); const newName = await customPrompt("请输入新的模型名称:", m.name); if (!newName || newName === m.name) return; try { let finalName = newName; if (modelFiles.some(f => f.name === finalName)) { const d = new Date(); const ts = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0') + String(d.getSeconds()).padStart(2,'0'); finalName = finalName.replace(/\.glb$/i, `_${ts}.glb`); logDebug(`⚠️ 同名文件已存在，自动追加后缀 -> ${finalName}`); } logDebug(`正在通过读写方式重命名: ${m.fullPath} -> ${finalName}`); const oldFile = await m.handle.getFile(); const buffer = await oldFile.arrayBuffer(); const newHandle = await m.parent.getFileHandle(finalName, { create: true }); const writable = await newHandle.createWritable(); await writable.write(buffer); await writable.close(); await m.parent.removeEntry(m.name); if(db) { const thumb = await getThumb(m.fullPath); if(thumb) { const newFullPath = m.fullPath.replace(m.name, finalName); await saveThumb(newFullPath, thumb.lastModified, thumb.dataUrl); db.transaction('thumbs','readwrite').objectStore('thumbs').delete(m.fullPath); } } if(activeModel && activeModel.fullPath === m.fullPath) activeModel = null; await scanDirectory(); logDebug(`✅ 重命名成功`); } catch (err) { logDebug("❌ 重命名失败", err); alert("重命名失败: " + err.message); } };
+card.querySelector('.rename-btn').onclick = async (e) => { e.stopPropagation(); const newName = await customPrompt("请输入新的模型名称:", m.name, extOfModelName(m.name)); if (!newName || newName === m.name) return; try { let finalName = newName; if (modelFiles.some(f => f.name === finalName)) { finalName = withUniqueModelSuffix(finalName); logDebug(`⚠️ 同名文件已存在，自动追加后缀 -> ${finalName}`); } logDebug(`正在通过读写方式重命名: ${m.fullPath} -> ${finalName}`); const oldFile = await m.handle.getFile(); const buffer = await oldFile.arrayBuffer(); const newHandle = await m.parent.getFileHandle(finalName, { create: true }); const writable = await newHandle.createWritable(); await writable.write(buffer); await writable.close(); await m.parent.removeEntry(m.name); if(db) { const thumb = await getThumb(m.fullPath); if(thumb) { const newFullPath = m.fullPath.replace(m.name, finalName); await saveThumb(newFullPath, thumb.lastModified, thumb.dataUrl); db.transaction('thumbs','readwrite').objectStore('thumbs').delete(m.fullPath); } } if(activeModel && activeModel.fullPath === m.fullPath) activeModel = null; await scanDirectory(); logDebug(`✅ 重命名成功`); } catch (err) { logDebug("❌ 重命名失败", err); alert("重命名失败: " + err.message); } };
 card.querySelector('.copy-btn').onclick = async (e) => { e.stopPropagation(); await copyModelToHistoryFolder(m); };
 card.querySelector('.delete-btn').onclick = async (e) => { e.stopPropagation(); if (!confirm(`确定要永久删除模型文件【${m.fullPath}】吗？\n此操作直接从磁盘删除文件，无法通过回收站恢复！`)) return; try { logDebug(`正在删除: ${m.fullPath}`);
 await m.parent.removeEntry(m.name); if(db) db.transaction('thumbs', 'readwrite').objectStore('thumbs').delete(m.fullPath);

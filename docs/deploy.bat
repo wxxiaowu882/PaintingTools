@@ -83,8 +83,17 @@ if /i "%SKIP_POLICY_SYNC%"=="1" (
 )
 echo.
 
-echo [2/4] Building Pages Functions...
->>"%LOG%" echo [2/4] build start
+echo [2/4] Sync model deploy allowlist + build Functions...
+>>"%LOG%" echo [2/4a] sync-model-assetsignore start
+call node "docs\membership\sync-model-assetsignore.mjs"
+if errorlevel 1 (
+  echo [ERROR] sync-model-assetsignore failed
+  >>"%LOG%" echo [ERROR] sync-model-assetsignore failed
+  goto finish_fail
+)
+echo [2/4a] model allowlist OK
+>>"%LOG%" echo [2/4a] sync-model-assetsignore OK
+>>"%LOG%" echo [2/4b] build start
 call npx wrangler pages functions build --outdir=./dist/worker
 if errorlevel 1 (
   echo [ERROR] functions build failed

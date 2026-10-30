@@ -329,6 +329,7 @@
     } from './plugins_02/SolidMaterialShared.js';
     import { getSolidGlbLoadMaxConcurrent, createSolidGlbLoadQueue } from './plugins_02/SolidGlbLoadQueueShared.js';
     import { createSolidGlbPersistCache, normalizeSolidGlbCacheKey } from './plugins_02/SolidGlbPersistCacheShared.js';
+    import { toGlbArrayBuffer } from './docs/js/model-crypto/ModelCrypto.js';
     import { formatSolidLoadPhaseHint, SOLID_LOAD_PHASES, LARGE_SCENE_GLB_THRESHOLD, STALL_HINT_MS } from './plugins_02/SolidSceneLoadHintShared.js';
     import { createSolidFirstFrameHintController } from './plugins_02/SolidFirstFrameHintShared.js';
     import { SOLID_PATH_TRACER_QUALITY, SOLID_RASTER_PREVIEW_CANVAS_FILTER, SOLID_RASTER_AREA_LIGHT_RIG, APP_LOGGING } from './Config/PaintingConfig.js';
@@ -1791,17 +1792,18 @@
     const dirKey = `${state.azimuth},${state.elevation}`; const dirName = presetMap[dirKey] || '自定义'; document.getElementById('dir-trigger').innerText = dirName;
     document.querySelectorAll('#dir-options .custom-option').forEach(opt => opt.classList.remove('selected')); const matchedOpt = document.querySelector(`#dir-options .custom-option[onclick*="'${dirKey}'"]`);
     if(matchedOpt) matchedOpt.classList.add('selected'); }
-    // 兼容历史 JSON（../../docs/model/...）与规范 JSON（docs/model/...）的 GLB 路径写法。
+    // 兼容历史 JSON（docs/model）与轻伪装规范（docs/m）的模型路径写法。
     function solidResolveSceneModelUrl(url) {
     try {
     const s = String(url || '').trim(); if (!s) return s;
     if (/^(https?:|data:|blob:|file:)/i.test(s)) return s;
     let x = s.replace(/\\/g, '/');
-    if (x.startsWith('docs/model/')) return './' + x;
-    if (x.startsWith('./docs/model/')) return x;
-    if (x.startsWith('../../docs/model/')) return './' + x.substring(6);
-    if (x.startsWith('../docs/model/')) return './' + x.substring(3);
-    if (x.startsWith('/docs/model/')) return '.' + x;
+    x = x.replace(/\/docs\/model\//gi, '/docs/m/').replace(/(^|\/)docs\/model\//gi, '$1docs/m/');
+    if (x.startsWith('docs/m/')) return './' + x;
+    if (x.startsWith('./docs/m/')) return x;
+    if (x.startsWith('../../docs/m/')) return './' + x.substring(6);
+    if (x.startsWith('../docs/m/')) return './' + x.substring(3);
+    if (x.startsWith('/docs/m/')) return '.' + x;
     return x;
     } catch (_e) { return url; }
     }
@@ -2240,7 +2242,10 @@
     else if (evt && evt.loaded > 0) { glbSlots[_slot].loaded = evt.loaded; if (evt.total > 0) glbSlots[_slot].total = evt.total; }
     updateSceneAssetProgress();
     };
-    const { buffer } = await (_persist ? _persist.getOrFetchArrayBuffer(item.url, { isStale: _isStale, onProgress: _onGlbProg, tryCandidates: false }) : Promise.reject(new Error('no persist cache')));
+    const { buffer: _fetchedBuf } = await (_persist ? _persist.getOrFetchArrayBuffer(item.url, { isStale: _isStale, onProgress: _onGlbProg, tryCandidates: false }) : Promise.reject(new Error('no persist cache')));
+    if (_isStale()) return;
+    // 双轨：.glb 明文原样；PTGL 密文（假后缀 .png）经统一包解密后再 parse
+    const buffer = await toGlbArrayBuffer(_fetchedBuf);
     if (_isStale()) return;
     const gltf = await gltfLoader.parseAsync(buffer, _cacheKey);
     if (_isStale()) return;
@@ -2255,20 +2260,20 @@
     try { if (window.__solidGlbPersistCache && window.__solidGlbPersistCache.invalidate) await window.__solidGlbPersistCache.invalidate(_cacheKey); } catch (_eInv) {}
     try {
     const _modelUrl = solidResolveSceneModelUrl(item.url);
-    await new Promise((resolveLoad, rejectLoad) => {
-    gltfLoader.load(_modelUrl, (gltf) => {
-    if (_isStale()) { resolveLoad(); return; }
+    const _fbRes = await fetch(_modelUrl, { cache: 'no-cache' });
+    if (!_fbRes.ok) throw new Error('HTTP ' + _fbRes.status);
+    const _fbRaw = await _fbRes.arrayBuffer();
+    if (_isStale()) return;
+    const _fbBuf = await toGlbArrayBuffer(_fbRaw);
+    if (_isStale()) return;
+    const gltf = await gltfLoader.parseAsync(_fbBuf, _cacheKey);
+    if (_isStale()) return;
     glbSlots[_slot].done = true; if (glbSlots[_slot].total <= 0 && glbSlots[_slot].loaded <= 0) { glbSlots[_slot].loaded = 1; glbSlots[_slot].total = 1; }
     try { window.__solidGlbSceneCache.set(_cacheKey, gltf.scene.clone(true)); } catch(_eCache) {}
     const model = gltf.scene;
     solidSceneStampGlbModelMaterials(model);
     model.position.set(...item.pos); model.rotation.set(...item.rot); model.scale.set(...item.scale); model.userData = { type: 'glb', url: item.url }; sceneGroup.add(model);
-    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); solidSceneApplyItemMaterial(model, item, _sceneEnvDefaultMat); _assetDone++; updateSceneAssetProgress(); resolveLoad();
-    }, (evt) => {
-    if (_isStale()) return;
-    if (evt && evt.lengthComputable && evt.total > 0) { glbSlots[_slot].loaded = evt.loaded; glbSlots[_slot].total = evt.total; } else if (evt && evt.loaded > 0) { glbSlots[_slot].loaded = evt.loaded; if (evt.total > 0) glbSlots[_slot].total = evt.total; } updateSceneAssetProgress();
-    }, (err) => { rejectLoad(err || new Error('GLB load failed')); });
-    });
+    if (window.PluginManager) window.PluginManager.trigger('onLoadItem', { obj: model, itemData: item }); solidSceneApplyItemMaterial(model, item, _sceneEnvDefaultMat); _assetDone++; updateSceneAssetProgress();
     } catch (e2) {
     addHwLog("GLB加载失败: " + (e2 && e2.message ? e2.message : e2)); glbSlots[_slot].done = true; _assetDone++; updateSceneAssetProgress();
     }

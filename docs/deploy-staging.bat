@@ -22,6 +22,7 @@ echo   STAGING deploy (NOT production)
 echo   Worker: soft-voice-f822-staging
 echo ========================================
 echo   Log: %LOG%
+echo   0) sync model allowlist into .assetsignore
 echo   1) build functions -^> dist/worker
 echo   2) wrangler deploy --env staging
 echo   NOTE: does NOT write MEMBERSHIP_KV policy_live / tiers_live
@@ -36,6 +37,18 @@ if errorlevel 1 (
   >>"%LOG%" echo [ERROR] npx not found
   goto finish_fail
 )
+
+echo [0/2] Sync model deploy allowlist (.assetsignore)...
+>>"%LOG%" echo [0/2] sync-model-assetsignore start
+call node "docs\membership\sync-model-assetsignore.mjs"
+if errorlevel 1 (
+  echo [ERROR] sync-model-assetsignore failed
+  >>"%LOG%" echo [ERROR] sync-model-assetsignore failed
+  goto finish_fail
+)
+echo [0/2] model allowlist OK
+>>"%LOG%" echo [0/2] sync-model-assetsignore OK
+echo.
 
 echo [1/2] Building Pages Functions...
 >>"%LOG%" echo [1/2] build start
