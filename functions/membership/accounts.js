@@ -19,6 +19,16 @@ export function normalizePhone(raw) {
   return '';
 }
 
+/** 站内显示名（昵称）；登录仍用手机号。2～12 字，去首尾空白。 */
+export function normalizeDisplayName(raw) {
+  const s = String(raw || '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ');
+  if (s.length < 2 || s.length > 12) return '';
+  return s;
+}
+
 function b64(buf) {
   const bytes = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf;
   let s = '';
@@ -104,6 +114,7 @@ function publicAccount(acct) {
   return {
     accountId: acct.accountId,
     phone: acct.phone,
+    displayName: acct.displayName || '',
     wechatNote: acct.wechatNote || '',
     entitlement: acct.entitlement || null,
     promoCode: acct.promoCode || null,
@@ -158,9 +169,11 @@ export async function registerAccount(env, opts) {
   if (!store) return { ok: false, error: '未开通存储，无法注册账号' };
   const phone = normalizePhone(opts && opts.phone);
   const password = String((opts && opts.password) || '');
+  const displayName = normalizeDisplayName(opts && opts.displayName);
   const wechatNote = String((opts && opts.wechatNote) || '').trim().slice(0, 40);
   const deviceId = String((opts && opts.deviceId) || '').trim();
   if (!phone) return { ok: false, error: '请填写正确的手机号' };
+  if (!displayName) return { ok: false, error: '请填写昵称（2～12 个字）' };
   if (password.length < 6) return { ok: false, error: '密码至少 6 位' };
   if (await findAccountByPhone(env, phone)) {
     return { ok: false, error: '该手机号已注册，请直接登录' };
@@ -171,6 +184,7 @@ export async function registerAccount(env, opts) {
   let acct = {
     accountId,
     phone,
+    displayName,
     wechatNote,
     passHash: pass.passHash,
     saltB64: pass.saltB64,

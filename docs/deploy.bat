@@ -21,9 +21,11 @@ echo ========================================
 echo   Deploy soft-voice-f822 (Worker)
 echo ========================================
 echo   Log: %LOG%
-echo   0) sync membership policy staging -^> prod
-echo   1) build functions -^> dist/worker
-echo   2) wrangler deploy
+echo   0) preflight secrets + probe off
+echo   1) bump site version stamp + sync policy
+echo   2) build functions -^> dist/worker
+echo   3) wrangler deploy --env=""  ^(prod^)
+echo   4) post-deploy smoke
 echo   Please wait; do not close this window.
 echo.
 
@@ -34,11 +36,41 @@ if errorlevel 1 (
   goto finish_fail
 )
 
-echo [0/2] Sync membership policy (staging KV -^> file + prod KV)...
->>"%LOG%" echo [0/2] policy sync start
+echo [0/4] Preflight (secrets + probe off)...
+>>"%LOG%" echo [0/4] preflight start
+if /i "%SKIP_PREFLIGHT%"=="1" (
+  echo [0/4] SKIP_PREFLIGHT=1, skip
+  >>"%LOG%" echo [0/4] skipped
+) else (
+  call node "docs\membership\prod-deploy-preflight.mjs"
+  if errorlevel 1 (
+    echo [ERROR] preflight failed
+    >>"%LOG%" echo [ERROR] preflight failed
+    goto finish_fail
+  )
+  echo [0/4] preflight OK
+  >>"%LOG%" echo [0/4] preflight OK
+)
+echo.
+
+echo [1/4] Bump site stamp + sync membership policy/tiers...
+>>"%LOG%" echo [1/4] site-version + policy sync start
+if /i "%SKIP_SITE_VERSION_BUMP%"=="1" (
+  echo [1/4a] SKIP_SITE_VERSION_BUMP=1, skip stamp
+  >>"%LOG%" echo [1/4a] site-version skipped
+) else (
+  call node "docs\site-version-bump.mjs"
+  if errorlevel 1 (
+    echo [ERROR] site-version bump failed
+    >>"%LOG%" echo [ERROR] site-version bump failed
+    goto finish_fail
+  )
+  echo [1/4a] site-version bump OK
+  >>"%LOG%" echo [1/4a] site-version OK
+)
 if /i "%SKIP_POLICY_SYNC%"=="1" (
-  echo [0/2] SKIP_POLICY_SYNC=1, skip
-  >>"%LOG%" echo [0/2] skipped
+  echo [1/4b] SKIP_POLICY_SYNC=1, skip
+  >>"%LOG%" echo [1/4b] policy skipped
 ) else (
   call node "docs\membership\sync-policy-staging-to-prod.mjs"
   if errorlevel 1 (
@@ -46,31 +78,44 @@ if /i "%SKIP_POLICY_SYNC%"=="1" (
     >>"%LOG%" echo [ERROR] policy sync failed
     goto finish_fail
   )
-  echo [0/2] policy sync OK
-  >>"%LOG%" echo [0/2] policy sync OK
+  echo [1/4b] policy sync OK
+  >>"%LOG%" echo [1/4b] policy sync OK
 )
 echo.
 
-echo [1/2] Building Pages Functions...
->>"%LOG%" echo [1/2] build start
+echo [2/4] Building Pages Functions...
+>>"%LOG%" echo [2/4] build start
 call npx wrangler pages functions build --outdir=./dist/worker
 if errorlevel 1 (
   echo [ERROR] functions build failed
   >>"%LOG%" echo [ERROR] functions build failed
   goto finish_fail
 )
-echo [1/2] build OK
->>"%LOG%" echo [1/2] build OK
+echo [2/4] build OK
+>>"%LOG%" echo [2/4] build OK
 echo.
 
-echo [2/2] Deploying Worker + static assets...
->>"%LOG%" echo [2/2] deploy start
-call npx wrangler deploy
+echo [3/4] Deploying Worker + static assets (prod top-level env)...
+>>"%LOG%" echo [3/4] deploy start
+REM Explicit empty --env selects wrangler.toml top-level (prod), not staging
+call npx wrangler deploy --env=""
 if errorlevel 1 (
   echo [ERROR] wrangler deploy failed
   >>"%LOG%" echo [ERROR] wrangler deploy failed
   goto finish_fail
 )
+
+echo.
+echo [4/4] Post-deploy smoke (prod)...
+>>"%LOG%" echo [4/4] smoke start
+call node "docs\membership\prod-deploy-smoke.mjs"
+if errorlevel 1 (
+  echo [ERROR] smoke failed - deploy may have uploaded but checks failed
+  >>"%LOG%" echo [ERROR] smoke failed
+  goto finish_fail
+)
+echo [4/4] smoke OK
+>>"%LOG%" echo [4/4] smoke OK
 
 echo.
 echo ========================================

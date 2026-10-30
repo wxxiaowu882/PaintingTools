@@ -33,4 +33,19 @@ wrangler.toml
 package.json
 package-lock.json
 docs/last-deploy.log
+docs/last-deploy-staging.log
+docs/membership/.policy_live_prod_tmp.json
+docs/membership/.tiers_live_prod_tmp.json
 docs/_test_run_portal20.bat
+
+# 发版/运维脚本勿进站点（含 KV id、流程说明）
+docs/deploy.bat
+docs/deploy-staging.bat
+docs/membership/sync-policy-staging-to-prod.mjs
+docs/membership/prod-deploy-preflight.mjs
+docs/membership/prod-deploy-smoke.mjs
+docs/membership/gen-redeem-code.mjs
+docs/membership/DEPLOY.md
+docs/membership/README.md
+docs/site-version-bump.mjs
+

@@ -232,6 +232,7 @@
                   <thead>
                     <tr>
                       <th>手机号</th>
+                      <th>昵称</th>
                       <th>备注</th>
                       <th>档位</th>
                       <th>到期</th>
@@ -918,6 +919,7 @@
       const lines = [
         '你好，已查到你的会员账号：',
         '手机号：' + (account.phone || ''),
+        '昵称：' + (account.displayName || '—'),
         '当前权益：' + level + (ent.tierId ? '（' + ent.tierId + '）' : ''),
         '到期时间：' + exp
       ];
@@ -960,6 +962,7 @@
       box.innerHTML =
         '<div class="ent-banner ' + bannerClass + '">' +
           '<div class="ent-main">' + escapeHtml(levelLab) +
+            ' · ' + escapeHtml(account.displayName || '未设昵称') +
             ' · ' + escapeHtml(account.phone || '') + '</div>' +
           '<div class="ent-sub">档位 ' + escapeHtml(tierLabel(ent.tierId)) +
             ' · 到期 ' + escapeHtml(exp) + escapeHtml(leftTip) + '</div>' +
@@ -1020,7 +1023,7 @@
       meta.textContent = '共 ' + String((list || []).length) + ' 个账号' +
         (filtered ? '（筛选后 ' + rows.length + '）' : '');
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="tip">暂无账号</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="tip">暂无账号</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map((a) => {
@@ -1028,6 +1031,7 @@
         const devN = (a.devices || []).length;
         return '<tr class="' + active.trim() + '" data-phone="' + escapeHtml(a.phone || '') + '">' +
           '<td>' + escapeHtml(a.phone || '') + '</td>' +
+          '<td>' + escapeHtml(a.displayName || '—') + '</td>' +
           '<td>' + escapeHtml(a.wechatNote || '—') + '</td>' +
           '<td>' + escapeHtml(levelLabel(a)) + '</td>' +
           '<td>' + escapeHtml(expireLabel(a)) + '</td>' +

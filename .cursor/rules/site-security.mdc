@@ -1,0 +1,34 @@
+---
+description: 站点安全口径与已落地配置（防内嵌、模型防盗链 WAF、勿在 Worker 做防盗链）
+alwaysApply: true
+---
+
+# 站点安全（AI 记忆）
+
+权威正文：`docs/站点安全配置.md`。争议以该文档 + 线上 Cloudflare 面板为准。
+
+## 硬性口径
+
+1. **单课 JSON 直链**：产品已定 **暂不修**，勿擅自做鉴权拦截。
+2. **防盗链只护模型外链挂载**：挡外站 Referer 拉 `/docs/model/`；**不声称**防下载。
+3. **防盗链实现**：只用 **Cloudflare Zone WAF 自定义规则**（规则名 **`Block model hotlink`**，zone `wuxiaoart.com`）。  
+   **禁止**再在 `functions/` / `run_worker_first` 里做 Referer 防盗链（已回退；占免费 Worker 次数）。
+4. **图片路径不要默认加防盗链**（SEO / 收录）。
+5. **防内嵌**：根目录 `_headers`（`X-Frame-Options: SAMEORIGIN` + `frame-ancestors 'self'`）。安卓 App 整页打开，**不受影响**。
+6. **GLB 加密全工具链**：后置；先别当「下一优先」默认开工。
+
+## 现网 WAF 规则要点（模型）
+
+- 路径：`/docs/model/`
+- 有 Referer 且不含 `wuxiaoart.com`、不含 `soft-voice-f822` → Block
+- 空 Referer 放行（App 已验收可加载）
+
+## 改 Cloudflare 面板时
+
+- 与用户 **同屏**：Cursor 浏览器已登录 Dashboard；每步确认画面一致再点。
+- 只按用户/同屏截图上的真实按钮文案指导，禁止臆造 Approve / Custom token Get started 等。
+
+## 相关
+
+- 发版预检/冒烟：`docs/membership/DEPLOY.md`、`site-prod-deploy` skill  
+- 登录防刷：`functions/membership/rate-limit.js`

@@ -3,7 +3,7 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#050505">
+    android:background="@color/shell_bg">
 
     <WebView
         android:id="@+id/webview"
@@ -21,12 +21,12 @@
         android:progress="0"
         android:visibility="gone" />
 
-    <!-- 冷启动开场：深色底 + 色立体微动，盖住 WebView 首帧黑屏 -->
+    <!-- 冷启动开场：深色底 + 色立体轻入；文案对齐首页细白字主次 -->
     <FrameLayout
         android:id="@+id/splash"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#050505"
+        android:background="@color/shell_bg"
         android:clickable="true"
         android:focusable="true">
 
@@ -35,40 +35,49 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:gravity="center_horizontal"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp">
 
+            <!-- 视觉锚点：略小于旧版，让「手绘工坊」成为主信息 -->
             <ImageView
                 android:id="@+id/splash_mark"
-                android:layout_width="128dp"
-                android:layout_height="128dp"
+                android:layout_width="96dp"
+                android:layout_height="96dp"
                 android:alpha="0"
                 android:contentDescription="@string/app_name"
                 android:scaleType="fitCenter"
-                android:scaleX="0.88"
-                android:scaleY="0.88"
+                android:scaleX="0.92"
+                android:scaleY="0.92"
                 android:src="@drawable/ic_splash_mark" />
 
             <TextView
                 android:id="@+id/splash_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="28dp"
                 android:alpha="0"
-                android:letterSpacing="0.28"
+                android:fontFamily="sans-serif-thin"
+                android:includeFontPadding="false"
+                android:letterSpacing="0.22"
                 android:text="@string/app_name"
-                android:textColor="#C4A574"
-                android:textSize="13sp" />
+                android:textColor="@color/splash_title"
+                android:textSize="26sp"
+                android:textStyle="normal" />
 
             <TextView
                 android:id="@+id/splash_credit"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="14dp"
                 android:alpha="0"
-                android:letterSpacing="0.12"
+                android:fontFamily="sans-serif-thin"
+                android:includeFontPadding="false"
+                android:letterSpacing="0.18"
                 android:text="@string/splash_credit"
-                android:textColor="#66C4A574"
-                android:textSize="11sp" />
+                android:textColor="@color/splash_credit"
+                android:textSize="12sp"
+                android:textStyle="normal" />
         </LinearLayout>
     </FrameLayout>
 </FrameLayout>

@@ -1,0 +1,6 @@
+# 防内嵌：禁止外站用 iframe 套我们的页面。
+# 同源仍可嵌（如站内自用 iframe）。安卓 App 是整页打开，不受影响。
+# 仅作用于静态资源响应；/api/* 等由 Worker 直接返回的响应不走此文件（内嵌风险主要在 HTML 页）。
+/*
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'

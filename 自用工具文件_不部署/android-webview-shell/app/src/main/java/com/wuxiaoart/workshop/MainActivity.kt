@@ -167,22 +167,23 @@ class MainActivity : AppCompatActivity() {
         splashCredit.alpha = 0f
         val ease = DecelerateInterpolator()
         splashMark.animate()
-            .alpha(1f)
+            .alpha(0.92f)
             .scaleX(1f)
             .scaleY(1f)
             .setDuration(720)
             .setInterpolator(ease)
             .start()
+        // 透明度由字色本身承担主次；动画只到 1，避免「加厚」观感
         splashTitle.animate()
-            .alpha(0.92f)
-            .setStartDelay(220)
-            .setDuration(560)
+            .alpha(1f)
+            .setStartDelay(200)
+            .setDuration(640)
             .setInterpolator(ease)
             .start()
         splashCredit.animate()
             .alpha(1f)
-            .setStartDelay(380)
-            .setDuration(520)
+            .setStartDelay(360)
+            .setDuration(560)
             .setInterpolator(ease)
             .start()
         // 最迟收起，避免断网/慢网一直盖住
@@ -218,7 +219,7 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * 每页注入：锁文档滚动 + 壳标记（减轻内层列表与 WebView 整页抢滑）。
-     * 首页额外显示右下角「V1.0.x」（网页可读 window.__SHELL_VERSION__）。
+     * 注入 __SHELL_VERSION__ / __SHELL_BUILD_STAMP__；版本文案由网页「关于」弹窗显示。
      */
     /**
      * 整页 document 滚动的站内页（作品集、会员、工具长页等）。
@@ -255,45 +256,27 @@ class MainActivity : AppCompatActivity() {
      */
     private fun injectShellPageHelpers(url: String?) {
         val path = (Uri.parse(url ?: "").path ?: "").lowercase()
-        val isHome = path.isEmpty() || path == "/" || path == "/index" || path.endsWith("/index.html")
         val docScroll = isDocumentScrollPath(path)
         webView.isVerticalScrollBarEnabled = docScroll
         val safeTop = shellSafeTopCssPx()
         lastShellSafeTopCss = safeTop
         val safeTopLiteral = String.format(java.util.Locale.US, "%.2f", safeTop)
         val verLiteral = JSONObject.quote(BuildConfig.VERSION_NAME)
+        val stampLiteral = JSONObject.quote(BuildConfig.BUILD_STAMP)
 
-        // 1) 版本号：独立注入，失败也不影响安全区
-        val badgeJs = if (isHome) {
-            """
+        // 1) 壳标记 / 版本戳：独立注入，失败也不影响安全区（角标改由网页关于弹窗绘制）
+        val badgeJs = """
             (function(){
               try {
                 document.documentElement.classList.add('wuxiao-android-shell');
                 window.__SHELL_VERSION__ = $verLiteral;
-                var el = document.getElementById('shell-version-badge');
-                if (!el) {
-                  el = document.createElement('div');
-                  el.id = 'shell-version-badge';
-                  el.setAttribute('aria-hidden','true');
-                  el.style.cssText = 'position:fixed;right:10px;bottom:max(10px,env(safe-area-inset-bottom,0px));z-index:40;padding:3px 8px;font-size:10px;letter-spacing:0.08em;color:rgba(255,255,255,0.42);pointer-events:none;font-family:Inter,\"PingFang SC\",\"Microsoft YaHei\",sans-serif;font-weight:300;';
-                  (document.body || document.documentElement).appendChild(el);
-                }
-                el.textContent = 'V' + window.__SHELL_VERSION__;
+                window.__SHELL_BUILD_STAMP__ = $stampLiteral;
+                var old = document.getElementById('shell-version-badge');
+                if (old && old.parentNode) old.parentNode.removeChild(old);
                 window.__SHELL_INJECT_BADGE_OK__ = true;
               } catch (e) { try { window.__SHELL_INJECT_BADGE_OK__ = false; } catch (_e) {} }
             })();
             """.trimIndent()
-        } else {
-            """
-            (function(){
-              try {
-                document.documentElement.classList.add('wuxiao-android-shell');
-                window.__SHELL_VERSION__ = $verLiteral;
-                window.__SHELL_INJECT_BADGE_OK__ = true;
-              } catch (e) { try { window.__SHELL_INJECT_BADGE_OK__ = false; } catch (_e) {} }
-            })();
-            """.trimIndent()
-        }
         webView.evaluateJavascript(badgeJs, null)
 
         val bodyScrollCss = if (docScroll) {

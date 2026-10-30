@@ -17,9 +17,28 @@
 运营台页面地址：`/member-ops`  
 学员兑换页：`/member`  
 
-**权限涂色（推荐日常改档）**：先在运营台登录，再打开 Solid（测站或正式站），右下角「权限涂色」→ 点课表卡片左上角标签轮换「游客→会员→高级」；底部 Tab 同样可涂。正式发版（`20` / `docs/deploy.bat`）会自动把**测站**上的权限同步到正式站（可用 `SKIP_POLICY_SYNC=1` 跳过）。
+**权限涂色（推荐日常改档）**：先在运营台登录，再打开 Solid（测站或正式站），右下角「权限涂色」→ 点课表卡片左上角标签轮换「游客→会员→高级」；底部 Tab 同样可涂。正式发版（`20` / `docs/deploy.bat`）会自动把**测站**上的权限（及测站若有的定价 `tiers_live`）同步到正式站（可用 `SKIP_POLICY_SYNC=1` 跳过）。
+
+**同步口径（务必一致）**：
+
+| 测站 KV | 正式发版行为 |
+|---------|--------------|
+| 有有效 `policy_live` / `tiers_live` | 写入仓库底稿文件 + 正式站同名 KV |
+| 没有（尚未涂色/保存） | **跳过该键**，正式站保持原样，**不阻断发版** |
+| 读/写真失败（登录失效等） | 发版失败，查 `docs/last-deploy.log` |
+
+紧急只发代码、不改线上权限：`SKIP_POLICY_SYNC=1` 后再跑 `20` / `deploy.bat`。
 
 **发测站（`20b` / `deploy-staging.bat`）绝不覆盖测站涂色**：测站以 KV `policy_live` 为准；发测站只上传静态资源与 Worker，**不会** `kv put` 写权限。仓库里的 `access-policy.json` 只是底稿/兜底，不能拿它整表盖掉测站已涂结果。Agent / 人工发测站时禁止对测站执行 policy 覆盖写入。
+
+**正式发版前自动预检**：`docs/membership/prod-deploy-preflight.mjs`  
+- 确认正式站已配置两个 Secret（只查「有没有」，不读出口令内容）  
+- 确认探针码（测试假码）已关闭（查运营开关 + 实测兑换会被拒）  
+紧急跳过：`SKIP_PREFLIGHT=1`（不推荐）。
+
+**正式发版后自动冒烟**：`docs/membership/prod-deploy-smoke.mjs`（首页 / Solid / 防内嵌头 / 会员公开配置 / 再次确认探针关闭）。Agent 发版约定见 `.cursor/skills/site-prod-deploy/SKILL.md`。
+
+**站点安全配置（防内嵌、模型防盗链 WAF、刻意不做项）**：见 `docs/站点安全配置.md`（Agent 规则 `.cursor/rules/site-security.mdc`）。模型防盗链在 Cloudflare 面板，**不要**写进 Worker。
 
 ---
 

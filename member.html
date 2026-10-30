@@ -236,8 +236,10 @@
         <h2>账号</h2>
         <p class="status" id="status-line">读取中…</p>
         <p class="status" id="account-line" style="margin-top:6px"></p>
-        <p class="hint">用手机号注册后即为会员。换设备登录同一账号可共用高级会员权益（最多 3 台；第 4 台会顶掉最早一台）。</p>
-        <label for="phone">手机号</label>
+        <p class="hint">用手机号注册后即为会员（须填昵称）。换设备登录同一账号可共用高级会员权益（最多 3 台；第 4 台会顶掉最早一台）。登录仍用手机号，不必记昵称。</p>
+        <label for="display-name">昵称（注册必填，2～12 字）</label>
+        <input id="display-name" type="text" maxlength="12" autocomplete="nickname" placeholder="站内怎么称呼你" />
+        <label for="phone" style="margin-top:10px">手机号</label>
         <input id="phone" type="text" inputmode="tel" autocomplete="username" placeholder="11 位手机号" />
         <label for="pwd" style="margin-top:10px">密码（至少 6 位）</label>
         <input id="pwd" type="password" autocomplete="current-password" placeholder="登录密码" />
@@ -424,6 +426,17 @@
       const box = document.getElementById('device-box');
       try {
         const acct = await MA.fetchDevices();
+        const al = document.getElementById('account-line');
+        if (al && acct) {
+          const nick = (acct.displayName || '').trim();
+          const phone = acct.phone || '';
+          const who = nick
+            ? ('昵称：' + nick + (phone ? ' · ' + phone : ''))
+            : (phone ? ('手机：' + phone) : '已登录账号');
+          al.textContent = who + '（设备：' + (MA.getDeviceId() || '').slice(0, 12) + '…）';
+          const nickInput = document.getElementById('display-name');
+          if (nickInput && nick && !nickInput.value) nickInput.value = nick;
+        }
         const list = (acct.devices || []).map((d) => {
           const mine = d.deviceId === MA.getDeviceId() ? '（本机）' : '';
           return '<div class="tier"><span>' + (d.label || '设备') + ' ' + mine + '</span>' +
@@ -484,6 +497,7 @@
 
     function acctFields() {
       return {
+        displayName: document.getElementById('display-name').value,
         phone: document.getElementById('phone').value,
         password: document.getElementById('pwd').value,
         wechatNote: document.getElementById('wxnote').value

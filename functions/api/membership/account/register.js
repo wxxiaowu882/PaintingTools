@@ -1,10 +1,19 @@
 import { registerAccount } from '../../../membership/accounts.js';
 import { bindReferralOnce } from '../../../membership/referral.js';
 import {
+  assertRateLimit,
+  clientIp,
+  rateLimitHeaders
+} from '../../../membership/rate-limit.js';
+import {
   buildSessionCookie,
   jsonResponse,
   normalizeEntitlement
 } from '../../../membership/session.js';
+
+/** 同 IP 每小时最多 8 次注册尝试（含失败） */
+const WIN = 60 * 60;
+const LIM_IP = 8;
 
 export async function onRequestPost(context) {
   let body;
@@ -13,6 +22,13 @@ export async function onRequestPost(context) {
   } catch (_e) {
     return jsonResponse({ ok: false, error: '请求无效' }, 400);
   }
+
+  const ip = clientIp(context.request);
+  const gate = await assertRateLimit(context.env, 'register:ip:' + ip, LIM_IP, WIN);
+  if (!gate.ok) {
+    return jsonResponse({ ok: false, error: gate.error }, 429, rateLimitHeaders(gate));
+  }
+
   const result = await registerAccount(context.env, body);
   if (!result.ok) return jsonResponse({ ok: false, error: result.error }, 400);
 

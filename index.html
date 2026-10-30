@@ -22,6 +22,7 @@
 "@tweenjs/tween.js": "./docs/js/tween/tween.esm.js" } } </script> 
 <!-- 引入全局菜单组件 --> <script src="docs/js/GlobalMenu.js?v=menuhigh3"></script>
 <script src="docs/js/IndexAndroidColorPanel.js?v=acp1"></script>
+<script src="docs/js/SiteVersionBadge.js?v=sv2"></script>
 <style>
 body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 /* 强制极细字体风格 */ .font-hairline { font-weight: 100; } .font-thin { font-weight: 200; }
@@ -121,6 +122,10 @@ transform: translateY(5vh); }
 .index-about-social-row:last-of-type { border-bottom: none; }
 .index-about-social-row:active { color: rgba(255,255,255,0.8); }
 .index-about-copy { margin-top: 14px; font-size: 10px; letter-spacing: 0.12em; color: rgba(255,255,255,0.28); font-weight: 200; }
+.index-about-version {
+  margin-top: 10px; font-size: 10px; letter-spacing: 0.14em; color: rgba(255,255,255,0.22); font-weight: 200;
+  font-variant-numeric: tabular-nums;
+}
 .index-about-app {
   text-align: left; margin: 0 0 14px; padding: 12px 12px 10px;
   border: 1px solid rgba(255,255,255,0.10); border-radius: 12px;
@@ -184,6 +189,7 @@ VISI<div class="avatar-o" onclick="toggleAboutModal(true)" title="关于 · 分�
       <div class="index-about-social-row" onclick="copyContact('lightouches','微信')">微信：lightouches（点击复制）</div>
     </div>
     <div class="index-about-copy">© 2026 童画师吴晓</div>
+    <div class="index-about-version" id="indexAboutVersion" hidden></div>
   </div>
 </div>
 <div id="scene-loader" class="fixed inset-0 z-0 flex flex-col items-center justify-center transition-opacity duration-1000 pointer-events-none">
@@ -419,6 +425,7 @@ setTimeout(function() { loader.style.display = 'none'; }, 1000); } }, 50); </scr
     if (_aboutHideTimer) { clearTimeout(_aboutHideTimer); _aboutHideTimer = null; }
     if (show) {
       hideAppDownloadInShell();
+      try { if (typeof window.__refreshSiteVersionBadge === 'function') window.__refreshSiteVersionBadge(); } catch (_eVer) {}
       m.style.display = 'flex';
       void m.offsetWidth;
       m.classList.add('active');

@@ -6,11 +6,21 @@ import {
 import { applyEntitlementToAccount, loadAccount } from '../../membership/accounts.js';
 import { tryRewardReferrer } from '../../membership/referral.js';
 import {
+  assertRateLimit,
+  clientIp,
+  rateLimitHeaders
+} from '../../membership/rate-limit.js';
+import {
   buildSessionCookie,
   jsonResponse,
   normalizeEntitlement,
   readEntitlementFromRequest
 } from '../../membership/session.js';
+
+/** 同 IP 15 分钟 20 次；已登录账号再限 15 次（防猜码） */
+const WIN = 15 * 60;
+const LIM_IP = 20;
+const LIM_ACCT = 15;
 
 export async function onRequestPost(context) {
   let body;
@@ -20,18 +30,34 @@ export async function onRequestPost(context) {
     return jsonResponse({ ok: false, error: '请求格式无效' }, 400);
   }
 
+  const ip = clientIp(context.request);
+  const gateIp = await assertRateLimit(context.env, 'redeem:ip:' + ip, LIM_IP, WIN);
+  if (!gateIp.ok) {
+    return jsonResponse({ ok: false, error: gateIp.error }, 429, rateLimitHeaders(gateIp));
+  }
+
+  // 先校验码（含探针开关），再要求登录——避免「假码已关」被登录提示盖住
   const resolved = await resolveRedeemCode(body && body.code, context.env);
   if (!resolved.ok) return jsonResponse({ ok: false, error: resolved.error }, 400);
 
   let entitlement = normalizeEntitlement(buildEntitlementFromGrant(resolved.grant));
 
-  // 须先登录会员账号，权益写入账号以便多设备共享
   const current = await readEntitlementFromRequest(context.request, context.env);
   const accountId = current.accountId || null;
   const deviceId = (body && body.deviceId) || current.deviceId || null;
 
   if (!accountId) {
     return jsonResponse({ ok: false, error: '请先注册或登录会员账号再兑换' }, 401);
+  }
+
+  const gateAcct = await assertRateLimit(
+    context.env,
+    'redeem:acct:' + accountId,
+    LIM_ACCT,
+    WIN
+  );
+  if (!gateAcct.ok) {
+    return jsonResponse({ ok: false, error: gateAcct.error }, 429, rateLimitHeaders(gateAcct));
   }
 
   const applied = await applyEntitlementToAccount(

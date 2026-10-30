@@ -926,6 +926,7 @@
     return postJson(API_REGISTER, {
       phone: o.phone,
       password: o.password,
+      displayName: o.displayName || o.nickname || '',
       wechatNote: o.wechatNote || '',
       deviceId: getDeviceId(),
       deviceLabel: o.deviceLabel || guessDeviceLabel(),

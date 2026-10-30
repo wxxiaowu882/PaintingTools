@@ -7,7 +7,9 @@
 1. **语法**：用 Node 对「最终注入字符串」跑 `node --check`（或跑 `xstudio-modal-twice-qa.js` 里的 inject 冒烟）。禁止在 JS 里手写 `a + b +` 再接下文。
 2. **分注**：版本角标与安全区 CSS **分开** `evaluateJavascript`；一侧失败不得拖死另一侧。
 3. **真机/平板冒烟（不可省）**  
-   - 打开首页：右下角有 `V{versionName}`  
+   - 打开首页：点头像打开「关于」弹窗，底部有版本（浏览器站戳 / App 为 `V{BUILD_STAMP}.{webStamp}`）；**无**右下角角标  
+
+
    - Solid：顶栏三杠/场景钮离开状态栏；「童画师解析」不与三杠重叠  
    - 晓色：品牌栏离开状态栏  
    - 控制台或 `window.__SHELL_INJECT_BADGE_OK__` / `__SHELL_INJECT_SAFE_OK__` 均为 true  

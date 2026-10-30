@@ -20,8 +20,8 @@ android {
         applicationId = "com.wuxiaoart.workshop"
         minSdk = 24
         targetSdk = 35
-        versionCode = 21
-        versionName = "1.0.20"
+        versionCode = 24
+        versionName = "1.0.23"
         // 验收期接测试站；发学员群正式包前改回 https://www.wuxiaoart.com/
         buildConfigField("String", "START_URL", "\"https://test.wuxiaoart.com/\"")
         // 相对 START_URL 源站；App 原生能力升级才走此检查（网页内容更新不用换包）
@@ -30,6 +30,8 @@ android {
             "UPDATE_JSON_PATH",
             "\"/docs/app/android-shell-update.json\""
         )
+        // 整体版本号点前段：V{BUILD_STAMP}.{webStamp}；发新 APK 时手改（如 1021B → 1029A）
+        buildConfigField("String", "BUILD_STAMP", "\"1030A\"")
     }
 
     signingConfigs {
