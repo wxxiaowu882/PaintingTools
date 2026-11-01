@@ -696,8 +696,8 @@
         <select id="projectSelect" class="project-select" title="切换工程">
           <option value="">加载中…</option>
         </select>
-        <button type="button" id="btnImportGlb">导入 GLB</button>
-        <input type="file" id="fileGlb" accept=".glb,.gltf" hidden />
+        <button type="button" id="btnImportGlb" title="支持明文 .glb/.gltf，以及本站加密假后缀 .png">导入模型</button>
+        <input type="file" id="fileGlb" accept=".glb,.gltf,.png,model/gltf-binary" hidden />
         <button type="button" id="btnNewFromEuro">欧版新建</button>
         <button type="button" id="btnDeleteProject" disabled title="删除当前工程">删除</button>
         <span id="modelName" class="header-meta">未选择工程</span>
@@ -739,6 +739,8 @@
     import { DRACOLoader } from "./vendor/loaders/DRACOLoader.js";
     import { createBoneMorphController } from "./bone_morph.js?build=sculpt-brush-20260908ag";
     import { GLTFExporter } from "./vendor/exporters/GLTFExporter.js";
+    // 统一加解密包（由 serve_nocache 挂载 /docs/js/model-crypto/）
+    import { toGlbArrayBuffer, isOurContainer } from "/docs/js/model-crypto/ModelCrypto.js";
 
     const boneMorph = createBoneMorphController(THREE);
     const elHost = document.getElementById("viewerHost");
@@ -858,9 +860,21 @@
     }
 
     async function importProjectFile(file) {
+      elStatus.textContent = "读取中… " + file.name;
+      const raw = await file.arrayBuffer();
+      let uploadName = file.name;
+      let uploadBlob = file;
+      // 加密假后缀 .png（PTGL）：先解成明文 GLB 再上传；服务端也会再兜底解密
+      if (isOurContainer(raw) || /\.png$/i.test(file.name)) {
+        elStatus.textContent = "解密中… " + file.name;
+        const glbBuf = await toGlbArrayBuffer(raw);
+        uploadName = String(file.name).replace(/\.png$/i, ".glb");
+        if (!/\.glb$/i.test(uploadName)) uploadName += ".glb";
+        uploadBlob = new File([glbBuf], uploadName, { type: "model/gltf-binary" });
+      }
       const fd = new FormData();
-      fd.append("file", file, file.name);
-      elStatus.textContent = "上传中… " + file.name;
+      fd.append("file", uploadBlob, uploadName);
+      elStatus.textContent = "上传中… " + uploadName;
       const r = await fetch("/api/projects/import", { method: "POST", body: fd });
       const data = await r.json();
       if (!r.ok || !data.ok) throw new Error(data.error || "导入失败");
@@ -908,7 +922,7 @@
           elModelName.textContent = "未选择工程";
           elStatus.textContent = "请选择或新建工程";
           document.getElementById("morphPanel").innerHTML =
-            `<p class="lm-stat">请先导入 GLB 或从欧版新建工程。</p>`;
+            `<p class="lm-stat">请先导入模型（GLB / 加密 PNG）或从欧版新建工程。</p>`;
         }
       } finally {
         projectBusy = false;
@@ -1120,30 +1134,21 @@
       fillMorphPanel();
     }
 
-    function loadGltfFromUrl(url, label, projectId) {
+    async function loadGltfFromUrl(url, label, projectId) {
       elStatus.textContent = "加载中… " + label;
       const loader = makeGltfLoader();
-      return new Promise((resolve, reject) => {
-        loader.load(
-          url,
-          async (gltf) => {
-            try {
-              await attachGltfRoot(gltf.scene || gltf.scenes[0], label, projectId);
-              resolve();
-            } catch (e) {
-              console.error(e);
-              elStatus.textContent = "初始化失败：" + e.message;
-              reject(e);
-            }
-          },
-          undefined,
-          (err) => {
-            console.error(err);
-            elStatus.textContent = "加载失败：" + label;
-            reject(err);
-          }
-        );
-      });
+      try {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const raw = await res.arrayBuffer();
+        const buffer = await toGlbArrayBuffer(raw);
+        const gltf = await loader.parseAsync(buffer, url);
+        await attachGltfRoot(gltf.scene || gltf.scenes[0], label, projectId);
+      } catch (e) {
+        console.error(e);
+        elStatus.textContent = "加载失败：" + label;
+        throw e;
+      }
     }
 
     function morphPointLabel(st, id) {

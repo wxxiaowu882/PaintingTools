@@ -17,11 +17,17 @@ import webbrowser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+# compare_review → work_v4 → 亚洲… → 篡改猴 → 自用工具 → 仓库根
+REPO_ROOT = ROOT.parents[4]
+MODEL_CRYPTO_DIR = REPO_ROOT / "docs" / "js" / "model-crypto"
+MODEL_CRYPTO_CLI = MODEL_CRYPTO_DIR / "cli.mjs"
 PORT = 8765
 URL = f"http://127.0.0.1:{PORT}/"
 PROJECTS_ROOT = ROOT / "projects"
 INDEX_FILE = PROJECTS_ROOT / "index.json"
 DEFAULT_GLB = ROOT / "glb" / "euro_ref.glb"
+PTGL_MAGIC = b"PTGL"
+GLB_MAGIC = b"glTF"
 
 
 def _json_response(handler: http.server.BaseHTTPRequestHandler, code: int, data) -> None:
@@ -120,13 +126,60 @@ def project_item_payload(item: dict) -> dict:
     }
 
 
+def decrypt_ptgl_bytes(data: bytes) -> bytes:
+    """用统一 ModelCrypto CLI 解密 PTGL 容器 → 明文 GLB（禁止在本文件复制算法）。"""
+    if not MODEL_CRYPTO_CLI.is_file():
+        raise FileNotFoundError(f"missing ModelCrypto CLI: {MODEL_CRYPTO_CLI}")
+    import subprocess
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="ptgl_") as td:
+        tin = Path(td) / "in.png"
+        tout = Path(td) / "out.glb"
+        tin.write_bytes(data)
+        try:
+            proc = subprocess.run(
+                ["node", str(MODEL_CRYPTO_CLI), "decrypt", str(tin), str(tout)],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                cwd=str(REPO_ROOT),
+            )
+        except FileNotFoundError as e:
+            raise RuntimeError("需要本机安装 Node.js 以解密加密模型") from e
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError("解密超时") from e
+        if proc.returncode != 0 or not tout.is_file():
+            detail = (proc.stderr or proc.stdout or "").strip() or f"exit {proc.returncode}"
+            raise ValueError(f"解密失败：{detail}")
+        return tout.read_bytes()
+
+
+def ensure_plain_model_bytes(data: bytes, original_name: str) -> tuple[bytes, str]:
+    """密文 .png（PTGL）→ 解密为 .glb；明文 glb/gltf 原样。返回 (bytes, 入库文件名)。"""
+    name = Path(original_name).name
+    lower = name.lower()
+    if data.startswith(PTGL_MAGIC):
+        plain = decrypt_ptgl_bytes(data)
+        if not plain.startswith(GLB_MAGIC):
+            raise ValueError("解密后不是标准 GLB")
+        stem = Path(name).stem or "model"
+        return plain, f"{stem}.glb"
+    if lower.endswith(".png"):
+        raise ValueError("该 .png 不是本站加密模型（缺少 PTGL 魔数）")
+    if lower.endswith((".glb", ".gltf")):
+        return data, name
+    raise ValueError("only .glb / .gltf / 加密.png supported")
+
+
 def create_project_from_bytes(original_name: str, data: bytes, *, label: str | None = None) -> dict:
     if not data:
         raise ValueError("empty file")
-    pid = unique_project_id(original_name)
+    data, store_name = ensure_plain_model_bytes(data, original_name)
+    pid = unique_project_id(store_name)
     project_dir = PROJECTS_ROOT / pid
     project_dir.mkdir(parents=True, exist_ok=False)
-    glb_name = unique_glb_filename(project_dir, original_name)
+    glb_name = unique_glb_filename(project_dir, store_name)
     glb_path = project_dir / glb_name
     glb_path.write_bytes(data)
     now = time.strftime("%Y-%m-%dT%H:%M:%S")
@@ -166,6 +219,36 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             idx = read_projects_index()
             items = [project_item_payload(x) for x in idx.get("items", [])]
             _json_response(self, 200, {"activeId": idx.get("activeId", ""), "items": items})
+            return
+        # 挂载仓库统一加解密包，供对照页 import（禁止在本工具复制算法）
+        if self.path.startswith("/docs/js/model-crypto/"):
+            rel = urllib.parse.unquote(self.path.split("?", 1)[0])
+            rel = rel[len("/docs/js/model-crypto/") :].lstrip("/")
+            if not rel or ".." in rel or rel.startswith(("/", "\\")):
+                self.send_error(404)
+                return
+            target = (MODEL_CRYPTO_DIR / rel).resolve()
+            try:
+                target.relative_to(MODEL_CRYPTO_DIR.resolve())
+            except ValueError:
+                self.send_error(404)
+                return
+            if not target.is_file():
+                self.send_error(404)
+                return
+            try:
+                raw = target.read_bytes()
+            except OSError:
+                self.send_error(500)
+                return
+            ctype = "application/javascript; charset=utf-8"
+            if target.suffix.lower() == ".json":
+                ctype = "application/json; charset=utf-8"
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
             return
         super().do_GET()
 
@@ -261,8 +344,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if not fileitem.filename:
                 raise ValueError("empty filename")
             original = Path(fileitem.filename).name
-            if not original.lower().endswith((".glb", ".gltf")):
-                raise ValueError("only .glb / .gltf supported")
+            if not original.lower().endswith((".glb", ".gltf", ".png")):
+                raise ValueError("only .glb / .gltf / 加密.png supported")
             data = fileitem.file.read()
             label = form.getvalue("label") if "label" in form else None
             meta = create_project_from_bytes(original, data, label=label)

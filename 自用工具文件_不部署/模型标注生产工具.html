@@ -529,6 +529,7 @@
     const viewer = document.querySelector('#workbench-viewer');
     const statusMsg = document.querySelector('#status-msg');
     let _annoFlashTimer = null;
+    let _annoModelBlobUrl = null;
     function flashToast(msg, isErr) {
         let el = document.getElementById('anno-flash-toast');
         if (!el) {
@@ -542,6 +543,33 @@
         _annoFlashTimer = setTimeout(() => { el.classList.remove('show'); }, 1400);
         if (statusMsg) { statusMsg.innerText = msg || ''; statusMsg.style.color = isErr ? '#f88' : '#ccc'; }
     }
+    /** 与 Portrait 同轨：加密假后缀 .png（PTGL）先解密再喂 model-viewer；明文 glb 原样。导出仍用 data-raw-src 逻辑路径。 */
+    async function annoApplyModelSrcToViewer(logicalSrc, displayName) {
+        if (!logicalSrc) return;
+        const oldSrc = viewer.getAttribute('src');
+        if (oldSrc && oldSrc.startsWith('blob:')) {
+            try { URL.revokeObjectURL(oldSrc); } catch (_e) {}
+        }
+        if (_annoModelBlobUrl) {
+            try { URL.revokeObjectURL(_annoModelBlobUrl); } catch (_e2) {}
+            _annoModelBlobUrl = null;
+        }
+        if (/^(blob:|data:)/i.test(logicalSrc)) {
+            viewer.setAttribute('src', logicalSrc);
+            if (displayName) viewer.setAttribute('data-raw-src', displayName);
+            else viewer.removeAttribute('data-raw-src');
+            return;
+        }
+        const { toGlbArrayBuffer } = await import('../docs/js/model-crypto/ModelCrypto.js');
+        const res = await fetch(logicalSrc, { cache: 'no-cache' });
+        if (!res.ok) throw new Error('模型 HTTP ' + res.status + ' ' + logicalSrc);
+        const glbBuf = await toGlbArrayBuffer(await res.arrayBuffer());
+        const blob = new Blob([glbBuf], { type: 'model/gltf-binary' });
+        _annoModelBlobUrl = URL.createObjectURL(blob);
+        viewer.setAttribute('data-raw-src', displayName || logicalSrc);
+        viewer.setAttribute('src', _annoModelBlobUrl + '#.glb');
+    }
+    window.annoApplyModelSrcToViewer = annoApplyModelSrcToViewer;
     /* reload/WS guard lives in <head>; ensure helper exists if head script delayed */
     if (typeof window.armAnnoReloadBlock !== 'function') {
         window.armAnnoReloadBlock = function (ms) {
@@ -1939,7 +1967,7 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
     });
 
     const fileInput = document.querySelector('#file-input');
-    fileInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (evt) => { let parsed = null; try {
+    fileInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (evt) => { let parsed = null; try {
     parsed = JSON.parse(evt.target.result); } catch(err) { const regex = new RegExp("<!-- CONFIG_DATA_BEGIN\\n([\\s\\S]*?)\\nCONFIG_DATA_END -->"); const m = evt.target.result.match(regex); if (m && m[1]) { try { parsed = { pointsData: JSON.parse(m[1]) }; } catch(e){} } }
     if (parsed && parsed.pointsData) { try { _baseCamRadius = null;
     viewer.querySelectorAll('.preview-hotspot, .ink-anchor').forEach(el => el.remove()); pointsData = parsed.pointsData; pointIndex = pointsData.length > 0 ? Math.max(...pointsData.map(p => p.id)) + 1 : 1;
@@ -1970,19 +1998,24 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
     
     // 【核心修复1】：导入时智能补全路径，兼容并自动修复之前由于 Bug 导出导致的残缺路径
     let importSrc = parsed.modelSrc;
-    if (importSrc && !importSrc.startsWith('../') && !importSrc.startsWith('http') && !importSrc.startsWith('blob:')) {
+    if (importSrc && !importSrc.startsWith('../') && !importSrc.startsWith('http') && !importSrc.startsWith('blob:') && !importSrc.startsWith('/')) {
         importSrc = '../docs/m/' + importSrc;
     }
     
     if(importSrc && currentRawSrc !== importSrc) {
-        viewer.setAttribute('src', importSrc);
-        viewer.removeAttribute('data-raw-src');
+        try {
+            await annoApplyModelSrcToViewer(importSrc);
+        } catch (modelErr) {
+            console.error(modelErr);
+            flashToast('模型加载失败：' + (modelErr && modelErr.message ? modelErr.message : modelErr), true);
+            throw modelErr;
+        }
     }
     if(parsed.camera) {
     if(parsed.camera.target) viewer.setAttribute('camera-target', parsed.camera.target); if(parsed.camera.orbit) viewer.setAttribute('camera-orbit', parsed.camera.orbit);
     if(parsed.camera.fov) viewer.setAttribute('field-of-view', parsed.camera.fov); }
     pointsData.forEach(p => { window.AnnotationPluginManager.dispatchMountDOM(p, viewer); });
-    renderState(); renderSnapshots(); setTimeout(() => { updateSVG(); annoSyncPerspectiveSlider(); }, 800); statusMsg.innerText = "场景及配置已完美还原"; } catch (err) { statusMsg.innerText = "导入失败: 数据损坏"; }
+    renderState(); renderSnapshots(); setTimeout(() => { updateSVG(); annoSyncPerspectiveSlider(); }, 800); statusMsg.innerText = "场景及配置已完美还原"; } catch (err) { console.error(err); statusMsg.innerText = "导入失败: 数据损坏"; flashToast('导入失败：' + (err && err.message ? err.message : '数据损坏'), true); }
     } else { statusMsg.innerText = "导入失败: 未找到有效数据"; } }; reader.readAsText(file); fileInput.value = ''; });
 
     // --- 课程封面：绿框截取（参考 SolidCreate） ---
@@ -2486,22 +2519,20 @@ let defaultPosterize = localStorage.getItem('picker_posterize') || '0'; let defa
     document.getElementById('btn-open-glb').addEventListener('click', window.openGlbManager);
 
     // 核心暴露函数：接收来自 Glb管理器.html 的模型加载指令 (增加 displayFileName 参数用于 UI 显示)
-    window.loadModelFromGlbManager = function(url, displayFileName) {
+    window.loadModelFromGlbManager = async function(url, displayFileName) {
         if (!url) return;
         
         // 安全防护：防止误触导致未保存的劳动成果丢失
         if (pointsData.length > 0 && !confirm("载入新素模将清空当前画布所有未保存的标注和快照，是否继续？")) return;
-        
-        // 【新增】：释放上一个通过 Blob 加载的内存，防止内存泄漏！
-        const oldSrc = viewer.getAttribute('src');
-        if (oldSrc && oldSrc.startsWith('blob:')) {
-            URL.revokeObjectURL(oldSrc);
-        }
 
-        // 1. 切换底层 3D 模型
-        viewer.setAttribute('src', url);
-        if (displayFileName) viewer.setAttribute('data-raw-src', displayFileName);
-        else viewer.removeAttribute('data-raw-src');
+        // 1. 切换底层 3D 模型（加密 .png / 明文 glb 统一走解密双轨）
+        try {
+            await annoApplyModelSrcToViewer(url, displayFileName || url);
+        } catch (modelErr) {
+            console.error(modelErr);
+            flashToast('模型加载失败：' + (modelErr && modelErr.message ? modelErr.message : modelErr), true);
+            return;
+        }
         
         // 2. 彻底清空当前画布和业务数据，打扫战场
         _baseCamRadius = null; 
