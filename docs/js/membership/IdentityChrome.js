@@ -36,6 +36,11 @@
       '  font-size: 11px; letter-spacing: 0.16em; font-weight: 400;',
       '  line-height: 1; max-width: min(46vw, 200px);',
       '}',
+      /* PC：身份/登录略放大；移动端保持 11px */
+      '@media (min-width: 900px) {',
+      '  .pt-id-chrome--bar { font-size: 13px; letter-spacing: 0.14em; max-width: min(42vw, 240px); }',
+      '  .pt-id-chrome__sep { font-size: 12px; }',
+      '}',
       '#global-menu-overlay.active .pt-id-chrome--bar { display: inline-flex; }',
       '.pt-id-chrome__title {',
       '  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;',
@@ -71,8 +76,10 @@
     try {
       var path = (window.location.pathname || '/') + (window.location.search || '');
       if (!path || path.indexOf('/member') === 0) return url;
+      // 身份条仅在菜单打开时出现：返回应回到菜单，而不是底下的 Solid 列表等
+      var ret = path + '#menu';
       var u = new URL(url, window.location.origin);
-      u.searchParams.set('return', path);
+      u.searchParams.set('return', ret);
       return u.pathname + u.search + u.hash;
     } catch (_e) {
       return url;

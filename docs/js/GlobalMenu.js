@@ -3,6 +3,31 @@
  * 功能：动态样式注入、DOM构建、当前页自动高亮、页面平滑跳转、跨页面历史路由控制(移动端自愈增强版)
  */
 (function() {
+    // 品牌标签图标（与安卓壳 App 同款）；无 link 的页也能靠根目录 /favicon.ico
+    (function ensureBrandFavicons() {
+        try {
+            if (typeof document === 'undefined') return;
+            if (document.querySelector('link[data-wuxiao-brand-icon], link[rel="icon"][href*="/docs/img/brand/"]')) return;
+            var head = document.head || document.getElementsByTagName('head')[0];
+            if (!head) return;
+            var specs = [
+                { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/docs/img/brand/favicon-32.png?v=fav7' },
+                { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/docs/img/brand/favicon-192.png?v=fav7' },
+                { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png?v=fav8' }
+            ];
+            for (var i = 0; i < specs.length; i++) {
+                var s = specs[i];
+                var link = document.createElement('link');
+                link.setAttribute('data-wuxiao-brand-icon', '1');
+                link.rel = s.rel;
+                if (s.type) link.type = s.type;
+                if (s.sizes) link.setAttribute('sizes', s.sizes);
+                link.href = s.href;
+                head.appendChild(link);
+            }
+        } catch (_eFav) {}
+    })();
+
     // 冷启动 / 返回到 #menu：先盖一层黑底，避免底页闪一帧再出菜单
     (function bootMenuCoverIfNeeded() {
         if (typeof location === 'undefined' || location.hash !== '#menu') return;
@@ -44,9 +69,9 @@
         { id: '07b', text: '会员 · 兑换', url: '/member', color: '#E8C547' },
 
         { type: 'category', text: '实用工具' },
-        { id: '08', text: '色阶分析 · 网格构图', url: '/GR', color: '#3B82F6' },
-        { id: '09', text: '智能调色 · 颜料管理', url: '/XStudio', color: '#A855F7' },
-        { id: '10', text: 'AR 线稿描摹', url: '/ARSketch', color: '#22C55E' },
+        { id: '08', text: '晓阶 · 色阶 · 网格', url: '/GR', color: '#3B82F6' },
+        { id: '09', text: '晓色 · 调色助手', url: '/XStudio', color: '#A855F7' },
+        { id: '10', text: '晓摹 · 描摹助手', url: '/ARSketch', color: '#22C55E' },
 
         { type: 'category', text: '游戏' },
         { id: '11', text: '色感训练 · 光谱行者', url: '/games/ChromaWalker', color: '#F59E0B' },
@@ -362,7 +387,8 @@
                     el.onclick = () => {
                         // 关菜单仅当「真在当前页」；回退高亮的上次栏目仍可再点进入
                         if (isMenuItemCurrent(item)) {
-                            window.toggleMenu();
+                            // 必须 strip #menu，勿 history.back（见 closeMenuStripHash 注释）
+                            closeMenuStripHash();
                             setTimeout(function () {
                                 try { if (typeof window.__solidOnGlobalMenuClosed === 'function') window.__solidOnGlobalMenuClosed(); } catch (_eAct) {}
                             }, 80);
@@ -478,6 +504,23 @@
         }
     }
 
+    /**
+     * 关菜单：用 replaceState 去掉 #menu，禁止 history.back()。
+     * 否则从会员页 return=/xxx#menu 落地后，再点「首页」或关菜单会误退回会员页。
+     * 系统返回键仍走 popstate（自然 back），不受影响。
+     */
+    function closeMenuStripHash() {
+        if (window.location.hash === '#menu') {
+            try {
+                const st = (history.state && typeof history.state === 'object') ? history.state : {};
+                history.replaceState(st, '', window.location.pathname + (window.location.search || ''));
+            } catch (_eRep) {
+                try { history.back(); } catch (_eBack) {}
+            }
+        }
+        syncMenuWithHash();
+    }
+
     window.toggleMenu = function(e) {
         if (e && e.currentTarget) lastTriggerBtn = e.currentTarget;
 
@@ -485,11 +528,7 @@
         if (!overlay) return;
 
         if (overlay.classList.contains('active')) {
-            if (window.location.hash === '#menu') {
-                history.back();
-            } else {
-                syncMenuWithHash(); 
-            }
+            closeMenuStripHash();
         } else {
             // 用户主动打开菜单：高亮跟当前 URL，不用「回退上次栏目」
             _preferLastMenuNav = false;
@@ -503,15 +542,9 @@
     window.zoomAndNavigate = function(url) {
         // 保留 #menu 历史格：从菜单进新页后返回可回到「上一页 + 菜单开」
         // （不再 replaceState 抹掉 #menu）
-        const overlay = document.getElementById('global-menu-overlay');
-        if (overlay) {
-            overlay.classList.remove('active');
-            overlay.classList.remove('instant');
-        }
-        document.querySelectorAll('#menu-trigger, #menu-trigger-overlay, .menu-open').forEach(btn => btn.classList.remove('menu-open'));
-        _globalMenuUiOpen = false;
-
-        // Portrait / Solid 等自带首屏加载层：禁止整页淡出变黑，否则用户会先看一会儿纯黑再见到进度条
+        //
+        // 重要：跳转前不要先拆掉菜单遮罩。否则会露一帧底下的课表/画布（用户感知为「闪一下」）。
+        // Solid/Portrait 仍直接跳（免整页淡出变黑）；其它页可淡出，但淡出时遮罩仍盖住底页。
         var u = String(url || '');
         var skipFade = /\/Portrait_c(\?|$)/i.test(u) || /\/Solid(\?|$)/i.test(u) || /\/Portrait(\?|$)/i.test(u);
         if (skipFade) {
@@ -583,6 +616,16 @@
         s.src = '/docs/js/membership/IdentityChrome.js';
         s.async = true;
         s.setAttribute('data-pt-identity-chrome', '1');
+        document.head.appendChild(s);
+    })();
+
+    // 测站右下角「测」角标（正式站不加载逻辑内也会自检 hostname）
+    (function loadStagingSiteMark() {
+        if (document.querySelector('script[data-pt-staging-site-mark]')) return;
+        var s = document.createElement('script');
+        s.src = '/docs/js/StagingSiteMark.js';
+        s.async = true;
+        s.setAttribute('data-pt-staging-site-mark', '1');
         document.head.appendChild(s);
     })();
 

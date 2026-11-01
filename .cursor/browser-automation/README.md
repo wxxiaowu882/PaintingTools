@@ -26,6 +26,8 @@
 
 ## 已验证经验
 
+0. **肖像沙盒加课 / 课表列表卡（2026-10-30 实踩）**：克隆模板必须重写本课 `uid`（禁继承，否则多课同显「71 ·」）；本地无会员 API 时锁课削薄须保留 `uid` + `meta.age/gender/…`，否则「儿童」筛空、编号丢失。脚本：`portrait-add-scenes-from-glb.js`（写前撞号失败）、`rebuild-portrait-index.js`（撞号失败）。AI 常驻规则：`.cursor/rules/portrait-catalog-integrity.mdc`；账本：`docs/站点安全配置.md` §9。验收：本地 `/Solid?sandbox=portrait` 看儿童数量与编号，勿只信 exit 0。
+0b. **会员页 / 运营台 UX（2026-10-30）**：`/member` 顶栏身份条、登录/注册拆分、未登录兑换提示；`/member-ops` 假码顶栏开关、发码备注确认、权限改说明文（涂色）、怎么测区分测站/正式。冒烟：`SMOKE_BASE=http://127.0.0.1:18080 PLAYWRIGHT_CHANNEL=msedge node scripts/member-ops-ux-smoke.js`（假码开关实开需测站运营口令）。
 1. 打开仓库页面时，优先使用本地 HTTP 服务，不要直接走 `file://`。
 2. Solid 生产端加载慢，默认先等 `#scene-loader` 消失，再留 1 到 2 秒缓冲。
 3. 在 `Solid_Portrait_Create.html` 里，标注工具用原生 `#tool-mode-select` 切换，不要误判成自定义下拉。

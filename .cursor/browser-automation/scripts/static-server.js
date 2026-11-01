@@ -525,10 +525,12 @@ function pickFolderNative() {
       require('os').tmpdir(),
       `glb-pick-folder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`
     );
-    // 独立可见进程 + TopMost 窗体，避免藏在浏览器后面 / 最小化服务窗口里无界面
+    // 直启 powershell -STA（勿再套 cmd start /wait：部分宿主下 start 秒退，网页会误当成「取消」）
+    // TopMost 小窗作 owner，避免对话框藏在浏览器后
     const psScript = `
 $ErrorActionPreference = 'Stop'
 $out = ${JSON.stringify(outFile)}
+[System.IO.File]::WriteAllText($out, 'STARTED', [System.Text.UTF8Encoding]::new($false))
 try {
   Add-Type -AssemblyName System.Windows.Forms
   $form = New-Object System.Windows.Forms.Form
@@ -549,6 +551,8 @@ try {
   $form.Dispose()
   if ($r -eq [System.Windows.Forms.DialogResult]::OK -and $d.SelectedPath) {
     [System.IO.File]::WriteAllText($out, $d.SelectedPath, [System.Text.UTF8Encoding]::new($false))
+  } else {
+    [System.IO.File]::WriteAllText($out, 'USER_CANCEL', [System.Text.UTF8Encoding]::new($false))
   }
 } catch {
   [System.IO.File]::WriteAllText($out, ('ERROR:' + $_.Exception.Message), [System.Text.UTF8Encoding]::new($false))
@@ -565,10 +569,10 @@ try {
       resolve({ ok: false, error: e.message || String(e) });
       return;
     }
-    // start 第一个引号参数是窗口标题；空标题 + /wait，避免中文 title 拆参导致对话框不弹、请求挂死
+    const t0 = Date.now();
     const child = spawn(
-      'cmd.exe',
-      ['/c', 'start', '""', '/wait', 'powershell.exe', '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', psPath],
+      'powershell.exe',
+      ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', psPath],
       {
         windowsHide: false,
         detached: false,
@@ -579,7 +583,7 @@ try {
     child.on('error', (e) => {
       try { fs.unlinkSync(psPath); } catch (_) {}
       try { fs.unlinkSync(outFile); } catch (_) {}
-      resolve({ ok: false, error: e.message || String(e) });
+      resolve({ ok: false, error: e.message || String(e), elapsedMs: Date.now() - t0 });
     });
     child.on('close', () => {
       let selected = '';
@@ -588,15 +592,26 @@ try {
       } catch (_) {}
       try { fs.unlinkSync(psPath); } catch (_) {}
       try { fs.unlinkSync(outFile); } catch (_) {}
-      if (!selected) {
-        resolve({ ok: false, cancelled: true, error: 'cancelled' });
+      const elapsedMs = Date.now() - t0;
+      if (!selected || selected === 'STARTED') {
+        // 秒退且无结果：不是用户点取消，是对话框没真正起来
+        resolve({
+          ok: false,
+          cancelled: elapsedMs >= 800,
+          error: elapsedMs < 800 ? 'native picker exited too fast' : 'cancelled',
+          elapsedMs,
+        });
+        return;
+      }
+      if (selected === 'USER_CANCEL') {
+        resolve({ ok: false, cancelled: true, error: 'cancelled', elapsedMs });
         return;
       }
       if (selected.startsWith('ERROR:')) {
-        resolve({ ok: false, error: selected.slice(6) });
+        resolve({ ok: false, error: selected.slice(6), elapsedMs });
         return;
       }
-      resolve({ ok: true, path: path.normalize(selected) });
+      resolve({ ok: true, path: path.normalize(selected), elapsedMs });
     });
   });
 }

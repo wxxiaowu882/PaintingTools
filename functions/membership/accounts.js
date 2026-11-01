@@ -3,6 +3,7 @@
  * KV：acct:{accountId}、phone:{phone}
  */
 import { getSecret } from './session.js';
+import { beijingDayKey, bumpDailyStats } from './daily-stats.js';
 
 const MAX_DEVICES = 3;
 const ACCT_PREFIX = 'acct:';
@@ -109,6 +110,20 @@ export async function findAccountByPhone(env, phone) {
   return loadAccount(env, id);
 }
 
+/** 账号最近活跃：各设备 lastSeenAt 取最大；无设备则退回注册时间 */
+export function accountLastActiveAt(acct) {
+  if (!acct) return null;
+  let max = 0;
+  const devices = acct.devices || [];
+  for (let i = 0; i < devices.length; i++) {
+    const t = Number(devices[i] && devices[i].lastSeenAt) || 0;
+    if (t > max) max = t;
+  }
+  if (max > 0) return max;
+  const created = Number(acct.createdAt) || 0;
+  return created > 0 ? created : null;
+}
+
 function publicAccount(acct) {
   if (!acct) return null;
   return {
@@ -116,6 +131,8 @@ function publicAccount(acct) {
     phone: acct.phone,
     displayName: acct.displayName || '',
     wechatNote: acct.wechatNote || '',
+    createdAt: acct.createdAt || null,
+    lastActiveAt: accountLastActiveAt(acct),
     entitlement: acct.entitlement || null,
     promoCode: acct.promoCode || null,
     referredByAccountId: acct.referredByAccountId || null,
@@ -196,8 +213,13 @@ export async function registerAccount(env, opts) {
   const touched = touchDevice(acct, deviceId, opts && opts.deviceLabel);
   if (!touched.ok) return touched;
   acct = touched.account;
+  // 注册当日计 注册+登录（同账号日去重标记，与账号同一次写入）
+  acct.statsLoginDay = beijingDayKey();
   const saved = await saveAccount(env, acct);
   if (!saved.ok) return saved;
+  try {
+    await bumpDailyStats(env, { register: 1, login: 1 });
+  } catch (_eStat) {}
   return {
     ok: true,
     account: publicAccount(acct),
@@ -221,13 +243,49 @@ export async function loginAccount(env, opts) {
   const touched = touchDevice(acct, deviceId, opts && opts.deviceLabel);
   if (!touched.ok) return touched;
   acct = touched.account;
+  const day = beijingDayKey();
+  let loginBump = 0;
+  if (acct.statsLoginDay !== day) {
+    acct.statsLoginDay = day;
+    loginBump = 1;
+  }
   const saved = await saveAccount(env, acct);
   if (!saved.ok) return saved;
+  if (loginBump) {
+    try {
+      await bumpDailyStats(env, { login: 1 });
+    } catch (_eStat) {}
+  }
   return {
     ok: true,
     account: publicAccount(acct),
     kickedDeviceId: touched.kickedDeviceId
   };
+}
+
+/**
+ * 日活上报：同账号同北京日只 +1。已计过则只读账号、不写 KV（省点数）。
+ * 可选刷新已绑定设备的 lastSeen（不借此绑新设备）。
+ */
+export async function noteDailyActive(env, accountId, opts) {
+  let acct = await loadAccount(env, accountId);
+  if (!acct) return { ok: false, error: '账号不存在' };
+  const day = beijingDayKey();
+  if (acct.statsLoginDay === day) {
+    return { ok: true, counted: false, account: publicAccount(acct) };
+  }
+  const deviceId = opts && opts.deviceId ? String(opts.deviceId).trim() : '';
+  if (deviceId && deviceAllowed(acct, deviceId)) {
+    const touched = touchDevice(acct, deviceId, (opts && opts.deviceLabel) || '');
+    if (touched.ok) acct = touched.account;
+  }
+  acct.statsLoginDay = day;
+  const saved = await saveAccount(env, acct);
+  if (!saved.ok) return saved;
+  try {
+    await bumpDailyStats(env, { login: 1 });
+  } catch (_eStat) {}
+  return { ok: true, counted: true, account: publicAccount(acct) };
 }
 
 /** 把兑换权益写入账号（取更长有效期 / 更高档简单合并：直接覆盖为新 grant） */
@@ -240,8 +298,19 @@ export async function applyEntitlementToAccount(env, accountId, entitlement, dev
     acct = touched.account;
   }
   acct.entitlement = Object.assign({}, entitlement);
+  const day = beijingDayKey();
+  let redeemBump = 0;
+  if (acct.statsRedeemDay !== day) {
+    acct.statsRedeemDay = day;
+    redeemBump = 1;
+  }
   const saved = await saveAccount(env, acct);
   if (!saved.ok) return saved;
+  if (redeemBump) {
+    try {
+      await bumpDailyStats(env, { redeem: 1 });
+    } catch (_eStat) {}
+  }
   return { ok: true, account: publicAccount(acct) };
 }
 

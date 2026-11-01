@@ -7,6 +7,9 @@
   <meta name="description" content="手绘工坊：游客可逛公开内容；注册即为会员；高级会员按时长开通尊享场景与功能。">
   <meta name="robots" content="noindex,follow">
   <link rel="canonical" href="https://www.wuxiaoart.com/member">
+  <link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-32.png?v=fav7" type="image/png" sizes="32x32">
+  <link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-192.png?v=fav7" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" data-wuxiao-brand-icon="1" href="/apple-touch-icon.png?v=fav8" sizes="180x180">
   <style>
     :root {
       --bg: #111114;
@@ -38,6 +41,7 @@
     }
     .jump a { color: var(--accent); text-decoration: none; }
     .jump a:hover { text-decoration: underline; }
+    .jump a[hidden] { display: none !important; }
     .card {
       background: var(--card); border: 1px solid var(--line);
       border-radius: 12px; padding: 20px 18px; margin-bottom: 18px;
@@ -84,10 +88,14 @@
       border: 1px solid var(--line); background: #0d0d10; color: var(--text);
       font-size: 1rem; letter-spacing: 0.04em;
     }
+    /* 默认安静：描边次要按钮；真正主操作再加 .primary */
     button {
       margin-top: 12px; width: 100%; padding: 12px;
-      border: none; border-radius: 8px; cursor: pointer;
-      background: var(--accent); color: #1a1408; font-weight: 700; font-size: 1rem;
+      border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+      background: transparent; color: var(--muted); font-weight: 600; font-size: 0.95rem;
+    }
+    button.primary {
+      background: var(--accent); color: #1a1408; border-color: var(--accent); font-weight: 700; font-size: 1rem;
     }
     button.secondary {
       background: transparent; color: var(--muted);
@@ -156,6 +164,60 @@
       width: auto; margin: 0; padding: 6px 12px; font-size: 0.82rem;
       font-weight: 600;
     }
+    /* 账号卡顶部身份：安静、一眼可读，不抢整页 */
+    .acct-identity {
+      margin: 0 0 14px; padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .acct-identity .id-kicker {
+      font-size: 0.78rem; color: var(--muted); letter-spacing: 0.04em; margin: 0 0 4px;
+    }
+    .acct-identity .id-main {
+      font-size: 1.25rem; font-weight: 600; margin: 0; color: var(--text);
+    }
+    .acct-identity .id-sub {
+      font-size: 0.88rem; color: var(--muted); margin: 6px 0 0;
+    }
+    .acct-identity .id-next {
+      margin-top: 8px; font-size: 0.88rem;
+    }
+    .acct-identity .id-next a {
+      color: var(--accent); text-decoration: none;
+    }
+    .acct-identity .id-next a:hover { text-decoration: underline; }
+    /* 文字选项卡：绝不要做成黄按钮，避免和「登录」动作撞车 */
+    .mode-tabs {
+      display: flex; gap: 0; margin: 0 0 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .mode-tabs button {
+      width: auto; flex: 0 0 auto; margin: 0; padding: 8px 14px 10px;
+      background: transparent; color: var(--muted);
+      border: none; border-bottom: 2px solid transparent;
+      border-radius: 0; font-weight: 500; font-size: 0.95rem;
+    }
+    .mode-tabs button.active {
+      color: var(--text); border-bottom-color: rgba(232, 197, 71, 0.85);
+      background: transparent; font-weight: 600;
+    }
+    .redeem-callout {
+      margin: 0 0 12px; padding: 10px 12px; border-radius: 8px;
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,0.22);
+      color: var(--muted); font-size: 0.88rem;
+    }
+    .redeem-callout[hidden] { display: none !important; }
+    .redeem-callout a {
+      color: var(--accent); text-decoration: none; margin-left: 4px;
+    }
+    .redeem-callout a:hover { text-decoration: underline; }
+    .forgot-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      margin-top: 10px; font-size: 0.85rem; color: var(--muted);
+    }
+    .forgot-row button {
+      width: auto; margin: 0; padding: 6px 10px; font-size: 0.8rem; font-weight: 500;
+    }
   </style>
 </head>
 <body>
@@ -163,12 +225,12 @@
     <p><a class="back" href="/" id="btn-back">← 返回</a></p>
     <h1>会员权益</h1>
     <p class="sub" id="purchase-hint">游客可逛公开内容；注册即为会员；高级会员按时长开通尊享内容。</p>
-    <nav class="jump" aria-label="本页导航">
-      <a href="#benefits">权益与价格</a>
-      <a href="#how-to-pay">如何开通</a>
-      <a href="#account">账号</a>
-      <a href="#redeem">兑换</a>
-      <a href="#promo">宣传链接</a>
+    <nav class="jump" id="jump-nav" aria-label="本页导航">
+      <a href="#benefits" data-jump="benefits">权益与价格</a>
+      <a href="#how-to-pay" data-jump="how-to-pay">如何开通</a>
+      <a href="#account" data-jump="account">账号</a>
+      <a href="#redeem" data-jump="redeem">兑换</a>
+      <a href="#promo" data-jump="promo">宣传链接</a>
     </nav>
 
     <section class="card" id="benefits">
@@ -234,23 +296,45 @@
     <div class="two-col">
       <section class="card" id="account">
         <h2>账号</h2>
-        <p class="status" id="status-line">读取中…</p>
-        <p class="status" id="account-line" style="margin-top:6px"></p>
-        <p class="hint">用手机号注册后即为会员（须填昵称）。换设备登录同一账号可共用高级会员权益（最多 3 台；第 4 台会顶掉最早一台）。登录仍用手机号，不必记昵称。</p>
-        <label for="display-name">昵称（注册必填，2～12 字）</label>
-        <input id="display-name" type="text" maxlength="12" autocomplete="nickname" placeholder="站内怎么称呼你" />
+        <div class="acct-identity" id="acct-identity" role="status" aria-live="polite">
+          <p class="id-kicker">当前身份</p>
+          <p class="id-main" id="id-bar-main">游客</p>
+          <p class="id-sub" id="id-bar-sub">未登录 · 注册后即为会员</p>
+          <p class="id-next" id="id-bar-next" hidden>
+            <a href="#redeem" id="id-bar-redeem">已有兑换码？去兑换高级会员</a>
+          </p>
+        </div>
+        <p class="status" id="status-line" hidden>读取中…</p>
+        <p class="status" id="account-line" style="margin-top:0"></p>
+        <p class="hint">换设备登录同一账号可共用高级会员权益（最多 3 台；第 4 台会顶掉最早一台）。登录用手机号即可。</p>
+        <div class="mode-tabs" role="tablist" aria-label="选择：已有账号或新用户">
+          <button type="button" class="active" id="mode-login" data-mode="login" role="tab" aria-selected="true">已有账号</button>
+          <button type="button" id="mode-register" data-mode="register" role="tab" aria-selected="false">新用户注册</button>
+        </div>
+        <div id="reg-only-fields" hidden>
+          <label for="display-name">昵称（2～12 字）</label>
+          <input id="display-name" type="text" maxlength="12" autocomplete="nickname" placeholder="站内怎么称呼你" />
+        </div>
         <label for="phone" style="margin-top:10px">手机号</label>
         <input id="phone" type="text" inputmode="tel" autocomplete="username" placeholder="11 位手机号" />
-        <label for="pwd" style="margin-top:10px">密码（至少 6 位）</label>
-        <input id="pwd" type="password" autocomplete="current-password" placeholder="登录密码" />
-        <label for="wxnote" style="margin-top:10px">微信备注（可选）</label>
-        <input id="wxnote" type="text" maxlength="40" placeholder="方便客服核对" />
-        <div class="btn-row">
-          <button type="button" id="btn-login-acct">登录</button>
-          <button type="button" class="secondary" id="btn-register-acct">注册</button>
+        <label for="pwd" style="margin-top:10px" id="pwd-label">密码</label>
+        <input id="pwd" type="password" name="pt-acct-pwd" autocomplete="off" placeholder="登录密码" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
+        <div id="pwd2-wrap" hidden>
+          <label for="pwd2" style="margin-top:10px">确认密码</label>
+          <input id="pwd2" type="password" name="pt-acct-pwd2" autocomplete="off" placeholder="再输入一次" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
         </div>
+        <div id="wxnote-wrap" hidden>
+          <label for="wxnote" style="margin-top:10px">微信备注（可选）</label>
+          <input id="wxnote" type="text" maxlength="40" placeholder="方便客服核对" />
+        </div>
+        <button type="button" class="primary" id="btn-acct-submit">登录</button>
+        <button type="button" id="btn-login-acct" hidden>登录</button>
+        <button type="button" id="btn-register-acct" hidden>注册</button>
         <p class="msg" id="acct-msg"></p>
-        <p class="hint">忘记密码：请微信联系 <strong class="wx-copy">lightouches</strong>，提供注册手机号，由我们人工重置（暂不支持网页自助找回）。</p>
+        <div class="forgot-row">
+          <span>忘记密码：微信联系 <strong class="wx-copy">lightouches</strong>，提供注册手机号，我们人工重置。</span>
+          <button type="button" class="secondary copy-wx" id="btn-copy-wx-forgot">复制微信号</button>
+        </div>
         <div id="device-box" class="hint" style="margin-top:12px"></div>
         <div id="logout-box" hidden>
           <button type="button" class="secondary" id="btn-clear">注销本机（清登录态）</button>
@@ -260,10 +344,14 @@
 
       <section class="card" id="redeem">
         <h2>兑换高级会员</h2>
-        <p class="hint" id="redeem-hint">兑换前请先注册或登录会员账号，以便多设备同步权益。</p>
+        <div id="redeem-callout" class="redeem-callout" hidden>
+          请先在左侧完成登录或注册，再兑换。这样权益会挂在你的账号上，换手机也能用。
+          <a href="#account" id="btn-redeem-goto-acct">去账号区</a>
+        </div>
+        <p class="hint" id="redeem-hint">兑换后权益会同步到你已登录的其它设备。</p>
         <label for="code">兑换码</label>
         <input id="code" type="text" autocomplete="off" placeholder="10 位兑换码" />
-        <button type="button" id="btn-redeem">兑换</button>
+        <button type="button" class="secondary" id="btn-redeem" disabled>兑换</button>
         <p class="msg" id="msg"></p>
       </section>
     </div>
@@ -328,9 +416,55 @@
       }
     };
 
+    let acctMode = 'login';
+
     function isLoggedIn() {
       const level = (MA.getAccessLevel && MA.getAccessLevel()) || 'guest';
       return level === 'user' || level === 'member';
+    }
+
+    function setAcctMode(mode) {
+      acctMode = mode === 'register' ? 'register' : 'login';
+      const isReg = acctMode === 'register';
+      const loginTab = document.getElementById('mode-login');
+      const regTab = document.getElementById('mode-register');
+      if (loginTab) {
+        loginTab.classList.toggle('active', !isReg);
+        loginTab.setAttribute('aria-selected', (!isReg).toString());
+      }
+      if (regTab) {
+        regTab.classList.toggle('active', isReg);
+        regTab.setAttribute('aria-selected', isReg.toString());
+      }
+      const regOnly = document.getElementById('reg-only-fields');
+      const pwd2Wrap = document.getElementById('pwd2-wrap');
+      const wxw = document.getElementById('wxnote-wrap');
+      if (regOnly) regOnly.hidden = !isReg;
+      if (pwd2Wrap) pwd2Wrap.hidden = !isReg;
+      if (wxw) wxw.hidden = !isReg;
+      const phoneInp = document.getElementById('phone');
+      const pwd = document.getElementById('pwd');
+      const pwd2Inp = document.getElementById('pwd2');
+      const pwdLabel = document.getElementById('pwd-label');
+      if (pwdLabel) pwdLabel.textContent = isReg ? '密码（至少 6 位）' : '密码';
+      // 注册时关掉 username/password 配对与「推荐密码」；登录仍可用账号自动填充
+      if (phoneInp) phoneInp.autocomplete = isReg ? 'off' : 'username';
+      if (pwd) {
+        pwd.setAttribute('autocomplete', 'off');
+        pwd.placeholder = isReg ? '至少 6 位' : '登录密码';
+        if (isReg) pwd.setAttribute('readonly', 'readonly');
+        else pwd.removeAttribute('readonly');
+      }
+      if (pwd2Inp) {
+        pwd2Inp.setAttribute('autocomplete', 'off');
+        if (isReg) pwd2Inp.setAttribute('readonly', 'readonly');
+        else pwd2Inp.removeAttribute('readonly');
+      }
+      const submit = document.getElementById('btn-acct-submit');
+      if (submit) {
+        submit.textContent = isReg ? '注册' : '登录';
+        submit.className = 'primary';
+      }
     }
 
     function syncLogoutBox() {
@@ -343,13 +477,95 @@
       const code = document.getElementById('code');
       const btn = document.getElementById('btn-redeem');
       const hint = document.getElementById('redeem-hint');
+      const callout = document.getElementById('redeem-callout');
       if (code) code.disabled = !logged;
-      if (btn) btn.disabled = !logged;
-      if (hint) {
-        hint.textContent = logged
-          ? '兑换后权益会同步到你已登录的其它设备。'
-          : '兑换前请先注册或登录会员账号，以便多设备同步权益。';
+      if (btn) {
+        btn.disabled = !logged;
+        btn.className = logged ? 'primary' : 'secondary';
       }
+      if (callout) callout.hidden = logged;
+      if (hint) {
+        hint.hidden = !logged;
+        hint.textContent = '兑换后权益会同步到你已登录的其它设备。';
+      }
+    }
+
+    /** 身份写在账号卡顶部；游客不出现兑换入口 */
+    function renderIdentityBar(whoText) {
+      const main = document.getElementById('id-bar-main');
+      const sub = document.getElementById('id-bar-sub');
+      const next = document.getElementById('id-bar-next');
+      const level = (MA.getAccessLevel && MA.getAccessLevel()) || 'guest';
+      if (main) {
+        if (level === 'member') main.textContent = '高级会员';
+        else if (level === 'user') main.textContent = '会员';
+        else main.textContent = '游客';
+      }
+      if (sub) {
+        if (level === 'guest') {
+          sub.textContent = '未登录 · 用手机号注册后即为会员';
+        } else if (level === 'user') {
+          sub.textContent = (whoText || '已登录') + ' · 可使用会员内容';
+        } else {
+          sub.textContent = (whoText || '已登录') + ' · 高级会员权益有效';
+        }
+      }
+      if (next) next.hidden = level === 'guest';
+    }
+
+    function promoJumpAvailable() {
+      const info = MA.getPromoInfo && MA.getPromoInfo();
+      const logged = isLoggedIn();
+      return !!(logged && info && info.referral && info.referral.enabled !== false && info.promoUrl);
+    }
+
+    /**
+     * 顶栏跳转按身份显隐（游客偏开通；高级少强调开通）。
+     * guest: 权益 / 开通 / 账号
+     * user:  + 兑换 / 宣传（开了才显示）
+     * member: 权益 / 账号 / 兑换 / 宣传；藏「如何开通」
+     */
+    function syncJumpNav() {
+      const level = (MA.getAccessLevel && MA.getAccessLevel()) || 'guest';
+      const show = {
+        benefits: true,
+        'how-to-pay': level !== 'member',
+        account: true,
+        redeem: level !== 'guest',
+        promo: promoJumpAvailable()
+      };
+      document.querySelectorAll('#jump-nav a[data-jump]').forEach((a) => {
+        const key = a.getAttribute('data-jump');
+        a.hidden = !show[key];
+      });
+    }
+
+    /** 安卓 WebView 对纯 #锚点常不滚；只 scrollIntoView，不改 history（避免搅乱全局菜单 #menu 栈） */
+    function scrollToJumpId(id) {
+      if (!id) return false;
+      const el = document.getElementById(id);
+      if (!el || el.hidden) return false;
+      try {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (_e3) {
+        try { el.scrollIntoView(true); } catch (_e4) {}
+      }
+      return true;
+    }
+
+    function wireJumpNav() {
+      if (document.documentElement.dataset.memberJumpWired === '1') return;
+      document.documentElement.dataset.memberJumpWired = '1';
+      document.addEventListener('click', (e) => {
+        const a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
+        if (!a || a.hidden) return;
+        const href = a.getAttribute('href') || '';
+        if (href.charAt(0) !== '#' || href.length < 2) return;
+        const id = href.slice(1);
+        if (!document.getElementById(id)) return;
+        e.preventDefault();
+        scrollToJumpId(id);
+      });
     }
 
     function renderPromo() {
@@ -359,7 +575,10 @@
       if (!box) return;
       const enabled = !!(info && info.referral && info.referral.enabled !== false && info.promoUrl);
       box.hidden = !(logged && enabled);
-      if (!logged || !enabled) return;
+      if (!logged || !enabled) {
+        syncJumpNav();
+        return;
+      }
       const urlInp = document.getElementById('promo-url');
       if (urlInp) urlInp.value = info.promoUrl || '';
       const days = (info.referral && info.referral.rewardDays) || 90;
@@ -370,22 +589,38 @@
       if (st.rewardTotal) stats += '累计已奖励 ' + st.rewardTotal + ' 次。';
       const statsEl = document.getElementById('promo-stats');
       if (statsEl) statsEl.textContent = stats;
+      syncJumpNav();
     }
 
     function renderStatus() {
       const e = MA.getEntitlement();
-      document.getElementById('status-line').innerHTML = '<strong>' + fmtEnt(e) + '</strong>';
+      const sl = document.getElementById('status-line');
+      if (sl) {
+        sl.hidden = true;
+        sl.innerHTML = '<strong>' + fmtEnt(e) + '</strong>';
+      }
       const al = document.getElementById('account-line');
+      let who = '';
       if (e && e.accountId) {
-        al.innerHTML = '已登录账号（设备：' + (MA.getDeviceId() || '').slice(0, 12) + '…）';
+        if (al) {
+          al.hidden = true;
+          al.textContent = '';
+        }
+        who = '已登录';
         refreshDevices();
       } else {
-        al.textContent = '未登录';
+        if (al) {
+          al.hidden = true;
+          al.textContent = '';
+        }
         document.getElementById('device-box').innerHTML = '';
+        renderIdentityBar('');
       }
       syncLogoutBox();
       syncRedeemGate();
       renderPromo();
+      syncJumpNav();
+      if (e && e.accountId) renderIdentityBar(who || '已登录');
     }
 
     function resolveBackTarget() {
@@ -403,7 +638,8 @@
       if (e) e.preventDefault();
       const ret = resolveBackTarget();
       if (ret) {
-        location.href = ret;
+        // replace：避免「会员」留在历史里，返回菜单后再点首页/关菜单误退回本页
+        location.replace(ret);
         return;
       }
       try {
@@ -427,16 +663,20 @@
       try {
         const acct = await MA.fetchDevices();
         const al = document.getElementById('account-line');
-        if (al && acct) {
-          const nick = (acct.displayName || '').trim();
-          const phone = acct.phone || '';
-          const who = nick
-            ? ('昵称：' + nick + (phone ? ' · ' + phone : ''))
-            : (phone ? ('手机：' + phone) : '已登录账号');
-          al.textContent = who + '（设备：' + (MA.getDeviceId() || '').slice(0, 12) + '…）';
-          const nickInput = document.getElementById('display-name');
-          if (nickInput && nick && !nickInput.value) nickInput.value = nick;
+        if (!(al && acct)) {
+          renderIdentityBar('');
+          box.innerHTML = '';
+          return;
         }
+        const nick = (acct.displayName || '').trim();
+        const phone = acct.phone || '';
+        const who = nick
+          ? ('昵称：' + nick + (phone ? ' · ' + phone : ''))
+          : (phone ? ('手机：' + phone) : '已登录账号');
+        al.textContent = who + '（设备：' + (MA.getDeviceId() || '').slice(0, 12) + '…）';
+        renderIdentityBar(who);
+        const nickInput = document.getElementById('display-name');
+        if (nickInput && nick && !nickInput.value) nickInput.value = nick;
         const list = (acct.devices || []).map((d) => {
           const mine = d.deviceId === MA.getDeviceId() ? '（本机）' : '';
           return '<div class="tier"><span>' + (d.label || '设备') + ' ' + mine + '</span>' +
@@ -506,6 +746,53 @@
 
     document.getElementById('btn-back').addEventListener('click', goBack);
 
+    // 点进密码框再解除 readonly，减轻浏览器「推荐/生成密码」弹层
+    ['pwd', 'pwd2'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('focus', function () { this.removeAttribute('readonly'); });
+    });
+    setAcctMode('login');
+    document.getElementById('mode-login').onclick = () => setAcctMode('login');
+    document.getElementById('mode-register').onclick = () => setAcctMode('register');
+
+    document.getElementById('btn-acct-submit').onclick = () => {
+      if (acctMode === 'register') document.getElementById('btn-register-acct').click();
+      else document.getElementById('btn-login-acct').click();
+    };
+
+    const gotoAcct = document.getElementById('btn-redeem-goto-acct');
+    if (gotoAcct) {
+      gotoAcct.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        setAcctMode('login');
+        const acct = document.getElementById('account');
+        if (acct) acct.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const phone = document.getElementById('phone');
+        if (phone) setTimeout(() => phone.focus(), 300);
+      });
+    }
+
+    async function copyWxTo(msgEl) {
+      const id = currentWxId();
+      try {
+        await navigator.clipboard.writeText(id);
+        if (msgEl) {
+          msgEl.className = 'msg ok';
+          msgEl.textContent = '微信号已复制：' + id;
+        }
+      } catch (_e) {
+        if (msgEl) {
+          msgEl.className = 'msg err';
+          msgEl.textContent = '复制失败，请手动选中微信号';
+        }
+      }
+    }
+    const forgotCopy = document.getElementById('btn-copy-wx-forgot');
+    if (forgotCopy) {
+      forgotCopy.onclick = () => copyWxTo(document.getElementById('acct-msg'));
+    }
+
     document.getElementById('btn-copy-promo').onclick = async () => {
       const msg = document.getElementById('promo-msg');
       const url = (document.getElementById('promo-url').value || '').trim();
@@ -526,6 +813,7 @@
 
     MA.ready().then(() => {
       if (MA.capturePromoRefFromUrl) MA.capturePromoRefFromUrl();
+      wireJumpNav();
       renderTiers(MA.getTiers());
       renderStatus();
       MA.onChange(renderStatus);
@@ -533,19 +821,37 @@
         const u = new URL(location.href);
         const code = u.searchParams.get('code');
         if (code) document.getElementById('code').value = code;
-        if (location.hash === '#account' || location.hash === '#redeem' || location.hash === '#benefits' || location.hash === '#promo' || location.hash === '#how-to-pay') {
-          const el = document.querySelector(location.hash);
-          if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+        const hash = (location.hash || '').replace(/^#/, '');
+        if (hash === 'account' || hash === 'redeem' || hash === 'benefits' || hash === 'promo' || hash === 'how-to-pay') {
+          setTimeout(() => scrollToJumpId(hash), 80);
         }
       } catch (_e) {}
     });
 
     document.getElementById('btn-register-acct').onclick = async () => {
       const msg = document.getElementById('acct-msg');
+      setAcctMode('register');
+      const fields = acctFields();
+      const pwd2 = (document.getElementById('pwd2') && document.getElementById('pwd2').value) || '';
+      if ((fields.displayName || '').trim().length < 2) {
+        msg.className = 'msg err';
+        msg.textContent = '请填写昵称（2～12 字）';
+        return;
+      }
+      if ((fields.password || '').length < 6) {
+        msg.className = 'msg err';
+        msg.textContent = '密码至少 6 位';
+        return;
+      }
+      if (fields.password !== pwd2) {
+        msg.className = 'msg err';
+        msg.textContent = '两次密码不一致，请再确认一次';
+        return;
+      }
       msg.className = 'msg';
       msg.textContent = '注册中…';
       try {
-        const data = await MA.registerAccount(acctFields());
+        const data = await MA.registerAccount(fields);
         msg.className = 'msg ok';
         msg.textContent = data.tip || '注册成功，你已是会员';
         renderStatus();
@@ -557,6 +863,7 @@
 
     document.getElementById('btn-login-acct').onclick = async () => {
       const msg = document.getElementById('acct-msg');
+      setAcctMode('login');
       msg.className = 'msg';
       msg.textContent = '登录中…';
       try {
@@ -575,6 +882,9 @@
       if (!isLoggedIn()) {
         msg.className = 'msg err';
         msg.textContent = '请先注册或登录会员账号再兑换';
+        syncRedeemGate();
+        const callout = document.getElementById('redeem-callout');
+        if (callout) callout.hidden = false;
         const acct = document.getElementById('account');
         if (acct) acct.scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;

@@ -7,8 +7,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.animation.DecelerateInterpolator
@@ -34,6 +36,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -66,6 +69,8 @@ class MainActivity : AppCompatActivity() {
     private var pendingFileChooserAfterCamPerm = false
     /** 强制更新弹窗打开时，返回键直接退出，不进站 */
     private var forceUpdateBlocking = false
+    /** 壳内已下好的更新包；去「安装未知应用」设置页返回后继续安装 */
+    private var pendingInstallApk: File? = null
     private var splashStartedAt = 0L
     private var splashHidden = false
     private var firstPageFinished = false
@@ -419,25 +424,119 @@ class MainActivity : AppCompatActivity() {
             "需要更新应用"
         }
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_force_update, null)
+        val msgView = view.findViewById<TextView>(R.id.update_message)
+        val btnDownload = view.findViewById<TextView>(R.id.btn_update_download)
         view.findViewById<TextView>(R.id.update_title).text = title
-        view.findViewById<TextView>(R.id.update_message).text = info.message
+        msgView.text = info.message
         val dialog = AlertDialog.Builder(this, R.style.Theme_Wuxiao_ForceUpdateDialog)
             .setView(view)
             .setCancelable(false)
             .create()
-        view.findViewById<TextView>(R.id.btn_update_download).setOnClickListener {
-            try {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl)))
-            } catch (_: Exception) {
-            }
-            // 装完需重新打开；此处退出，避免旧壳继续用
-            finish()
+        btnDownload.setOnClickListener {
+            // 壳内直下安装，不打开 Chrome，避免「文件可能有害」下载拦截
+            btnDownload.isEnabled = false
+            btnDownload.text = getString(R.string.update_downloading)
+            progressBar.visibility = View.VISIBLE
+            progressBar.isIndeterminate = true
+            Thread {
+                val result = runCatching { downloadShellApkToCache(info.downloadUrl) }
+                runOnUiThread {
+                    progressBar.isIndeterminate = false
+                    progressBar.visibility = View.GONE
+                    val apk = result.getOrNull()
+                    if (apk == null || !apk.exists()) {
+                        btnDownload.isEnabled = true
+                        btnDownload.text = getString(R.string.update_download)
+                        msgView.text = getString(R.string.update_download_fail)
+                        return@runOnUiThread
+                    }
+                    pendingInstallApk = apk
+                    if (!ensureInstallPermissionThenInstall(apk, msgView, btnDownload)) {
+                        return@runOnUiThread
+                    }
+                }
+            }.start()
         }
         view.findViewById<TextView>(R.id.btn_update_exit).setOnClickListener { finish() }
         dialog.setOnShowListener {
             dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         }
         dialog.show()
+    }
+
+    /** 把更新包拉到 cache，不经系统浏览器下载栏 */
+    private fun downloadShellApkToCache(downloadUrl: String): File {
+        val outFile = File(cacheDir, "shell-update.apk")
+        if (outFile.exists()) outFile.delete()
+        val conn = (URL(downloadUrl).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 30_000
+            readTimeout = 120_000
+            instanceFollowRedirects = true
+            requestMethod = "GET"
+            setRequestProperty("Cache-Control", "no-cache")
+        }
+        try {
+            val code = conn.responseCode
+            if (code !in 200..299) error("apk HTTP $code")
+            conn.inputStream.use { input ->
+                FileOutputStream(outFile).use { output -> input.copyTo(output) }
+            }
+            if (outFile.length() < 50_000L) error("apk too small")
+            return outFile
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /**
+     * Android 8+ 需「允许安装未知应用」；未开则去设置页，返回后 onResume 继续装。
+     * @return true 已调起安装界面
+     */
+    private fun ensureInstallPermissionThenInstall(
+        apk: File,
+        msgView: TextView,
+        btnDownload: TextView
+    ): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !packageManager.canRequestPackageInstalls()
+        ) {
+            msgView.text = getString(R.string.update_install_need_permission)
+            btnDownload.isEnabled = true
+            btnDownload.text = getString(R.string.update_download)
+            try {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:$packageName")
+                    )
+                )
+            } catch (_: Exception) {
+                startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+            }
+            return false
+        }
+        // 已有安装权限：清 pending，避免安装页返回后 onResume 反复弹安装
+        pendingInstallApk = null
+        launchApkInstaller(apk)
+        return true
+    }
+
+    private fun launchApkInstaller(apk: File) {
+        val uri = FileProvider.getUriForFile(
+            this,
+            "$packageName.fileprovider",
+            apk
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            // ignore
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -712,6 +811,19 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         webView.onResume()
+        // 仅在「去开安装未知应用权限」返回后继续；正常安装流程不保留 pending
+        val apk = pendingInstallApk ?: return
+        if (!apk.exists()) {
+            pendingInstallApk = null
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !packageManager.canRequestPackageInstalls()
+        ) {
+            return
+        }
+        pendingInstallApk = null
+        launchApkInstaller(apk)
     }
 
     override fun onDestroy() {

@@ -18,8 +18,12 @@
   var API_SCENE = '/api/membership/scene';
   var API_REGISTER = '/api/membership/account/register';
   var API_LOGIN = '/api/membership/account/login';
+  var API_ACTIVE = '/api/membership/account/active';
   var PROMO_REF_KEY = 'pt_promo_ref';
+  /** 日活本地标记前缀：pt_dau_v1_{accountId}_{北京日}=1 → 同日不再打 Worker */
+  var DAU_KEY_PREFIX = 'pt_dau_v1_';
   var _promoInfo = null;
+  var _dauPingInFlight = false;
   var API_DEVICES = '/api/membership/account/devices';
 
   var _policy = null;
@@ -59,10 +63,32 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body || {})
     }).then(function (r) {
-      return r.json().then(function (data) {
+      // 静态预览常返回纯文本 Not Found；不可直接 r.json()
+      return r.text().then(function (text) {
+        var data = null;
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch (_e) {
+            data = {
+              ok: false,
+              error: (String(text).replace(/\s+/g, ' ').trim().slice(0, 80)) || ('HTTP ' + r.status)
+            };
+          }
+        } else {
+          data = { ok: false, error: 'HTTP ' + r.status };
+        }
         return { r: r, data: data };
       });
     });
+  }
+
+  function accountApiUnavailableMessage(actionLabel) {
+    var verb = actionLabel || '操作';
+    if (isLocalHost()) {
+      return '当前是本地预览，没有会员后台。请用网站线上版再' + verb + '。';
+    }
+    return verb + '服务未部署，请稍后重试';
   }
 
   function loadStoredEntitlement() {
@@ -471,6 +497,71 @@
     return _promoInfo;
   }
 
+  /** 北京日历日 YYYY-MM-DD（与服务端日活键一致） */
+  function beijingDayKeyClient() {
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date());
+    } catch (_e) {
+      var d = new Date(Date.now() + 8 * 3600000);
+      return d.toISOString().slice(0, 10);
+    }
+  }
+
+  function dauLocalKey(accountId) {
+    return DAU_KEY_PREFIX + String(accountId || '') + '_' + beijingDayKeyClient();
+  }
+
+  function markDauLocal(accountId) {
+    if (!accountId) return;
+    try {
+      localStorage.setItem(dauLocalKey(accountId), '1');
+    } catch (_e) {}
+  }
+
+  function hasDauLocal(accountId) {
+    if (!accountId) return false;
+    try {
+      return localStorage.getItem(dauLocalKey(accountId)) === '1';
+    } catch (_e2) {
+      return false;
+    }
+  }
+
+  /**
+   * 挂登录态打开站点 → 日活。本地已记过今日则完全不打 Worker；
+   * 否则 POST /account/active（服务端再按账号日去重兜底）。
+   */
+  function maybeReportDailyActive(accountId) {
+    if (!accountId || hasDauLocal(accountId) || _dauPingInFlight) return;
+    _dauPingInFlight = true;
+    fetch(API_ACTIVE, {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-cache',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId: getDeviceId() })
+    })
+      .then(function (r) {
+        return r.json().catch(function () {
+          return null;
+        });
+      })
+      .then(function (data) {
+        if (data && data.ok) markDauLocal(accountId);
+      })
+      .catch(function () {
+        /* 失败不写本地，下次进站可再试 */
+      })
+      .then(function () {
+        _dauPingInFlight = false;
+      });
+  }
+
   function refreshFromServer() {
     capturePromoRefFromUrl();
     return fetch(API_ME, { credentials: 'same-origin', cache: 'no-cache' }).then(function (r) {
@@ -496,6 +587,14 @@
         };
       } else if (!(data.accessLevel === 'user' || data.accessLevel === 'member')) {
         _promoInfo = null;
+      }
+      // 任意页拉过 me 且为注册/高级会员 → 尝试日活（本地同日只报一次）
+      if (
+        (data.accessLevel === 'user' || data.accessLevel === 'member') &&
+        data.entitlement &&
+        data.entitlement.accountId
+      ) {
+        maybeReportDailyActive(data.entitlement.accountId);
       }
       return data;
     });
@@ -596,21 +695,75 @@
     return API_SCENE + q;
   }
 
-  function stripScenePayload(scene) {
+  /**
+   * 列表可见的轻量 meta（筛选芯片 / 课线依赖）。
+   * 锁课削薄时也必须保留；禁止只留 category/detail，否则肖像「儿童」等芯片会空、headform 会「暂无课程」。
+   */
+  function listSafeMeta(scene, locked, requireLevel) {
+    var m = scene && scene.meta ? scene.meta : {};
+    var meta = {
+      category: m.category,
+      detail: m.detail,
+      description: m.description,
+      line: m.line,
+      slot: m.slot,
+      lessonTabLabel: m.lessonTabLabel,
+      modelLabel: m.modelLabel,
+      modelId: m.modelId,
+      material: m.material,
+      gender: m.gender,
+      age: m.age,
+      region: m.region
+    };
+    var req = requireLevel != null && requireLevel !== '' ? normalizeRequire(requireLevel) : null;
+    if (req && req !== 'public') meta.require = req;
+    else if (m.require) meta.require = m.require;
+    if (locked) meta.locked = true;
+    return meta;
+  }
+
+  function attachSceneKeys(out, scene) {
+    if (!out || !scene) return out;
+    if (scene.uid != null && String(scene.uid).trim() !== '') out.uid = String(scene.uid).trim();
+    if (scene.id != null && String(scene.id).trim() !== '') out.id = String(scene.id).trim();
+    return out;
+  }
+
+  /** 不够档：去掉 items/标注等可复现载荷，但保留编号 uid 与筛选 meta（与 functions/membership/policy.js 对齐） */
+  function stripScenePayload(scene, requireLevel) {
     if (!scene || typeof scene !== 'object') return scene;
-    return {
+    var req = normalizeRequire(requireLevel || 'member');
+    var out = {
       name: scene.name,
       thumbnail: scene.thumbnail,
-      meta: scene.meta
-        ? {
-            category: scene.meta.category,
-            detail: scene.meta.detail,
-            description: scene.meta.description,
-            locked: true
-          }
-        : { locked: true },
-      __membershipLocked: true
+      meta: listSafeMeta(scene, true, req),
+      __membershipLocked: true,
+      __require: req
     };
+    return attachSceneKeys(out, scene);
+  }
+
+  /** 列表卡：与服务端 toCatalogListCard 同口径 */
+  function toCatalogListCard(scene, locked, includeThumb, requireLevel) {
+    if (!scene || typeof scene !== 'object') return scene;
+    var thumb = '';
+    if (includeThumb && scene.thumbnail != null) {
+      thumb = String(scene.thumbnail);
+    } else if (!includeThumb && scene.thumbnail != null) {
+      var t = String(scene.thumbnail);
+      if (t && t.indexOf('data:') !== 0) thumb = t;
+    }
+    var out = {
+      name: scene.name,
+      thumbnail: thumb,
+      meta: listSafeMeta(scene, !!locked, requireLevel || 'public'),
+      __listOnly: true
+    };
+    if (locked) {
+      out.__membershipLocked = true;
+      out.__require = normalizeRequire(requireLevel || 'member');
+    }
+    return attachSceneKeys(out, scene);
   }
 
   /** 本地无 Functions 时的客户端过滤（生产禁止依赖此路径防白嫖） */
@@ -621,10 +774,7 @@
       if (!rid) return sc;
       var gate = canAccess(rid);
       if (!gate.ok) {
-        var stripped = stripScenePayload(sc);
-        if (stripped && stripped.meta) stripped.meta.require = gate.needLevel || (gate.rule && gate.rule.require);
-        stripped.__require = gate.needLevel || (gate.rule && gate.rule.require);
-        return stripped;
+        return stripScenePayload(sc, gate.needLevel || (gate.rule && gate.rule.require));
       }
       return sc;
     });
@@ -665,45 +815,17 @@
       var url = staticMap[sb] || staticMap.geometry;
       return fetchJson(url).then(function (raw) {
         var arr = Array.isArray(raw) ? raw : [raw];
-        return filterScenesClientSide(arr, sb).map(function (sc) {
+        // 与线上 filterCatalogList 同口径：先按权限打 locked，再裁成列表卡。
+        // 禁止先 strip 再拼卡——旧 strip 会丢掉 uid/age，导致编号没了、「儿童」筛空。
+        return arr.map(function (sc) {
           if (!sc || typeof sc !== 'object') return sc;
-          // 本地回退也按列表卡裁剪，行为与线上一致
-          var locked = !!sc.__membershipLocked || !!(sc.meta && sc.meta.locked);
-          // 锁课档位必须带到列表卡：否则点进弹窗会默认成高级会员文案
-          var needReq =
-            sc.__require ||
-            (sc.meta && sc.meta.require) ||
-            null;
-          var card = {
-            name: sc.name,
-            thumbnail: '',
-            meta: sc.meta
-              ? {
-                  category: sc.meta.category,
-                  detail: sc.meta.detail,
-                  description: sc.meta.description,
-                  line: sc.meta.line,
-                  slot: sc.meta.slot,
-                  lessonTabLabel: sc.meta.lessonTabLabel,
-                  modelLabel: sc.meta.modelLabel,
-                  modelId: sc.meta.modelId,
-                  material: sc.meta.material,
-                  gender: sc.meta.gender,
-                  age: sc.meta.age,
-                  region: sc.meta.region,
-                  locked: locked ? true : sc.meta.locked,
-                  require: needReq || sc.meta.require
-                }
-              : (locked
-                ? { locked: true, require: needReq || undefined }
-                : {}),
-            __listOnly: true,
-            __membershipLocked: locked ? true : undefined,
-            __require: needReq || undefined
-          };
-          if (sc.uid != null && String(sc.uid).trim() !== '') card.uid = String(sc.uid).trim();
-          if (sc.id != null && String(sc.id).trim() !== '') card.id = String(sc.id).trim();
-          return card;
+          var rid = sceneResourceId(sb, sc);
+          var gate = rid ? canAccess(rid) : { ok: true, needLevel: null, rule: null };
+          var locked = !gate.ok;
+          var needReq = locked
+            ? (gate.needLevel || (gate.rule && gate.rule.require) || 'member')
+            : ((sc.meta && sc.meta.require) || 'public');
+          return toCatalogListCard(sc, locked, false, needReq);
         });
       });
     });
@@ -909,7 +1031,7 @@
       var data = res.data;
       if (r.status === 404) {
         throw new Error(isLocalHost()
-          ? '当前是静态本地预览，没有兑换后台。请用测试站或正式站兑换。'
+          ? '当前是静态本地预览，没有兑换后台。请用网站线上版兑换。'
           : '兑换服务未部署，请稍后重试');
       }
       if (!r.ok || !data || !data.ok) {
@@ -932,10 +1054,19 @@
       deviceLabel: o.deviceLabel || guessDeviceLabel(),
       ref: o.ref || getStoredPromoRef() || undefined
     }).then(function (res) {
-      if (!res.r.ok || !res.data || !res.data.ok) {
-        throw new Error((res.data && res.data.error) || '注册失败');
+      var r = res.r;
+      var data = res.data;
+      if (r.status === 404) {
+        throw new Error(accountApiUnavailableMessage('注册'));
+      }
+      if (!r.ok || !data || !data.ok) {
+        throw new Error((data && data.error) || ('注册失败 HTTP ' + r.status));
       }
       saveEntitlement(Object.assign({}, res.data.entitlement, { source: 'account' }));
+      // 注册接口已计日活，本地先打标，避免紧接着 /me 再打 active
+      if (res.data.entitlement && res.data.entitlement.accountId) {
+        markDauLocal(res.data.entitlement.accountId);
+      }
       return refreshFromServer().then(function () { return res.data; });
     });
   }
@@ -951,10 +1082,18 @@
       deviceLabel: o.deviceLabel || guessDeviceLabel(),
       ref: o.ref || getStoredPromoRef() || undefined
     }).then(function (res) {
-      if (!res.r.ok || !res.data || !res.data.ok) {
-        throw new Error((res.data && res.data.error) || '登录失败');
+      var r = res.r;
+      var data = res.data;
+      if (r.status === 404) {
+        throw new Error(accountApiUnavailableMessage('登录'));
+      }
+      if (!r.ok || !data || !data.ok) {
+        throw new Error((data && data.error) || ('登录失败 HTTP ' + r.status));
       }
       saveEntitlement(Object.assign({}, res.data.entitlement, { source: 'account' }));
+      if (res.data.entitlement && res.data.entitlement.accountId) {
+        markDauLocal(res.data.entitlement.accountId);
+      }
       return refreshFromServer().then(function () { return res.data; });
     });
   }
@@ -1268,4 +1407,15 @@
 
   global.MembershipAccess = api;
   ensureReady();
+
+  // 会员页等未挂 GlobalMenu 的入口：同样挂测站「测」角标（幂等）
+  try {
+    if (typeof document !== 'undefined' && !document.querySelector('script[data-pt-staging-site-mark]')) {
+      var _sm = document.createElement('script');
+      _sm.src = '/docs/js/StagingSiteMark.js';
+      _sm.async = true;
+      _sm.setAttribute('data-pt-staging-site-mark', '1');
+      (document.head || document.documentElement).appendChild(_sm);
+    }
+  } catch (_eSm) {}
 })(typeof window !== 'undefined' ? window : globalThis);

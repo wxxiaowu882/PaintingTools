@@ -38,6 +38,13 @@ alwaysApply: true
 - 与用户 **同屏**：Cursor 浏览器已登录 Dashboard；每步确认画面一致再点。
 - 只按用户/同屏截图上的真实按钮文案指导，禁止臆造按钮名。
 
+## 课表列表卡（锁课削薄）
+
+- 削薄**只去** items/标注等载荷；**必须保留** `uid` 与筛选用 `meta`（material/gender/age/region、headform 的 line/slot）。
+- 本地回退与线上 `toCatalogListCard` **同口径**；细则见 `docs/站点安全配置.md` §9。
+- 加课克隆模板须重写 `uid`；重建索引遇 uid 碰撞应失败。
+- **AI 加课防再犯专规（alwaysApply）**：`.cursor/rules/portrait-catalog-integrity.mdc`。
+
 ## 相关
 
 - 发版预检/冒烟：`docs/membership/DEPLOY.md`、`site-prod-deploy` skill  

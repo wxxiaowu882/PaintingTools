@@ -104,7 +104,8 @@ async function main() {
   bases.sort((a, b) => b.length - a.length);
   const replacers = bases.map((b) => ({
     base: b,
-    re: new RegExp(`(/?docs\\/model\\/${escapeRegExp(b)})\\.glb\\b`, 'gi')
+    // 兼容旧 docs/model 与现行 docs/m
+    re: new RegExp(`(/?docs\\/(?:m|model)\\/${escapeRegExp(b)})\\.glb\\b`, 'gi')
   }));
 
   function rewriteText(text) {
@@ -127,7 +128,7 @@ async function main() {
   const skippedStillGlb = new Map(); // basename -> count still needing png
 
   // 先扫残留：JSON 里仍有 .glb，但 png 未就绪
-  const staleRe = /\/?docs\/model\/([^"'\\\s]+)\.glb\b/gi;
+  const staleRe = /\/?docs\/(?:m|model)\/([^"'\\\s]+)\.glb\b/gi;
   for (const fp of allJson) {
     const before = fs.readFileSync(fp, 'utf8');
     let m;

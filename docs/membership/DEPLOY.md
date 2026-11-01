@@ -13,6 +13,7 @@
 | `22_会员口令设置说明.html` | 两个口令干什么用 |
 | `23_设置会员口令.bat` | 正式站上传两个口令 |
 | `23b_设置会员口令_测试环境.bat` | **测试站**上传两个口令（与正式分开） |
+| `24_备份正式站会员KV.bat` | 加密备份正式站会员数据到 `历史备份文件/membership-kv/`（发版前也会自动跑） |
 
 运营台页面地址：`/member-ops`  
 学员兑换页：`/member`  
@@ -35,6 +36,15 @@
 - 确认正式站已配置两个 Secret（只查「有没有」，不读出口令内容）  
 - 确认探针码（测试假码）已关闭（查运营开关 + 实测兑换会被拒）  
 紧急跳过：`SKIP_PREFLIGHT=1`（不推荐）。
+
+**正式发版前自动备份会员 KV**：`docs/membership/backup-membership-kv.mjs`  
+- 导出正式站 `MEMBERSHIP_KV`（账号 / 兑换码 / 宣传 / 权限定价 / 日活等；跳过限速桶 `rl:`）  
+- AES 加密写入 `历史备份文件/membership-kv/*.enc.json`（目录已 gitignore）  
+- 加密钥：`历史备份文件/membership-kv/_backup.key`（首次自动生成，**勿外传、勿提交**）  
+- 手动：Portal `24_备份正式站会员KV.bat`  
+- 跳过：`SKIP_KV_BACKUP=1`；备份失败默认**警告不阻断**发版；要硬失败设 `REQUIRE_KV_BACKUP=1`  
+- 解密预览（本机）：`node docs/membership/backup-membership-kv.mjs --decrypt=历史备份文件/membership-kv/某文件.enc.json`
+- 每次备份成功会在对应环境 KV 写入摘要 `ops:backup_history`；运营台「运作说明」可看历史记录与本机目录说明（密文文件仍只在开发机）
 
 **正式发版后自动冒烟**：`docs/membership/prod-deploy-smoke.mjs`（首页 / Solid / 防内嵌头 / 会员公开配置 / 再次确认探针关闭）。Agent 发版约定见 `.cursor/skills/site-prod-deploy/SKILL.md`。
 
@@ -91,6 +101,23 @@
 **发版注意（Worker 单文件 ≤25 MiB）：**  
 超大模型（Workers 单文件上限 25 MiB）不会进入发版白名单；整棵 `自用工具文件_不部署/` 已在 `.assetsignore` 排除。  
 **模型上传白名单**：发版 bat 会先跑 `docs/membership/sync-model-assetsignore.mjs`，按 `docs/json` 里出现的 `docs/m/…` 路径生成 `.assetsignore` 放行段——**课表没引用到的模型不上传 Cloudflare**（本地仓库仍可保留）。若线上缺某课模型，先查 JSON 路径是否写对、磁盘是否有对应密文 `.png`。
+
+**防空场景（硬）**：课表 URL 必须对应 **`docs/m/` 根下文件**（不要写 `docs/m/某子目录/xxx`）。`sync-model-assetsignore` 在「本地缺文件」或「只在子目录找到同名文件」时 **exit 1，阻断发版**。排查/一键扁平化：
+
+```text
+node docs/membership/scan-and-fix-model-refs.mjs
+node docs/membership/scan-and-fix-model-refs.mjs --fix-subdir
+```
+
+**防明文上线（硬）**：公网课表必须指 **加密 `.png`**，不得指 `.glb`。发版白名单脚本遇到 `.glb` 引用亦 **exit 1**。补加密与改路径：
+
+```text
+node docs/js/model-crypto/batch-migrate.mjs --all
+node docs/js/model-crypto/batch-rewrite-json-paths.mjs --from-disk
+node docs/js/model-crypto/backup-then-delete-plain-glb.mjs
+```
+
+临时绕过（不推荐）：`--allow-missing` / `--allow-plain-glb`。
 
 ---
 

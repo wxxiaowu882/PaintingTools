@@ -2,6 +2,11 @@
  * 安卓 App APK 下载：强制 attachment，避免手机浏览器把包当空白页打开。
  * 文件名带版本号（读 android-shell-update.json 的 versionName）。
  * GET/HEAD /api/android-apk
+ *
+ * 按域名分流：
+ * - test.wuxiaoart.com / staging Worker → 测站壳（手绘工坊·测，.staging 包名）
+ * - 正式站及其它 → 正式壳（手绘工坊）
+ * 两套包 applicationId 不同，同机可并存，互不覆盖。
  */
 export async function onRequest(context) {
   const { request, env } = context;
@@ -9,7 +14,19 @@ export async function onRequest(context) {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
-  const origin = new URL(request.url).origin;
+  const url = new URL(request.url);
+  const origin = url.origin;
+  const host = String(url.hostname || '').toLowerCase();
+  const isStagingHost =
+    host === 'test.wuxiaoart.com' ||
+    host.includes('soft-voice-f822-staging') ||
+    /(^|\.)staging(\.|$)/i.test(host);
+
+  const apkPath = isStagingHost
+    ? '/docs/app/wuxiao-workshop-staging.apk'
+    : '/docs/app/wuxiao-workshop.apk';
+  const namePrefix = isStagingHost ? '手绘工坊·测' : '手绘工坊';
+  const asciiPrefix = isStagingHost ? 'shouhui-gongfang-ce' : 'shouhui-gongfang';
 
   let versionName = '';
   try {
@@ -25,13 +42,13 @@ export async function onRequest(context) {
     }
   } catch (_e) {}
 
-  const displayBase = versionName ? `手绘工坊-${versionName}` : '手绘工坊';
+  const displayBase = versionName ? `${namePrefix}-${versionName}` : namePrefix;
   const asciiFallback = versionName
-    ? `shouhui-gongfang-${versionName}.apk`
-    : 'shouhui-gongfang.apk';
+    ? `${asciiPrefix}-${versionName}.apk`
+    : `${asciiPrefix}.apk`;
   const utf8Name = encodeURIComponent(`${displayBase}.apk`);
 
-  const assetReq = new Request(new URL('/docs/app/wuxiao-workshop.apk', origin), {
+  const assetReq = new Request(new URL(apkPath, origin), {
     method: request.method,
     headers: request.headers
   });
@@ -61,6 +78,7 @@ export async function onRequest(context) {
   );
   headers.set('Cache-Control', 'public, max-age=120');
   headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('X-Wuxiao-Apk-Channel', isStagingHost ? 'staging' : 'prod');
 
   if (request.method === 'HEAD') {
     return new Response(null, { status: 200, headers });

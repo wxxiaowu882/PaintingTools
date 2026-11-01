@@ -3,55 +3,86 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>安卓 App 下载 · 手绘工坊 · 童画师吴晓</title>
-  <meta name="description" content="下载手绘工坊安卓 App（童画师吴晓）。苹果手机暂无 App，请用 Safari 打开网页版。">
+  <title>「手绘工坊」安卓App下载 · 童画师吴晓</title>
+  <meta name="description" content="下载「手绘工坊」安卓 App（童画师吴晓）。苹果手机暂无 App，请用 Safari 打开网页版。">
   <link rel="canonical" href="https://www.wuxiaoart.com/docs/app">
+  <link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-32.png?v=fav7" type="image/png" sizes="32x32">
+  <link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-192.png?v=fav7" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" data-wuxiao-brand-icon="1" href="/apple-touch-icon.png?v=fav8" sizes="180x180">
   <style>
     :root {
-      --bg: #0a0a0b;
-      --fg: rgba(255,255,255,0.88);
-      --muted: rgba(255,255,255,0.48);
+      --bg: #070708;
+      --fg: rgba(255,255,255,0.9);
+      --muted: rgba(255,255,255,0.46);
       --line: rgba(255,255,255,0.12);
       --accent: #e8c547;
       --ok: #86efac;
       --warn: #fbbf24;
     }
     * { box-sizing: border-box; }
+    /* 勿写 height:100%：内容超一屏时会把后续区块挤叠在视口里 */
+    html { height: auto; }
     body {
       margin: 0; min-height: 100vh; min-height: 100dvh;
-      font-family: "PingFang SC", "Microsoft YaHei", Inter, sans-serif;
-      background: radial-gradient(1200px 600px at 50% -10%, #1a1a1e 0%, var(--bg) 55%);
+      height: auto;
+      font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
       color: var(--fg);
+      background:
+        radial-gradient(900px 480px at 50% -8%, rgba(70,70,78,0.45) 0%, transparent 58%),
+        radial-gradient(700px 420px at 80% 100%, rgba(40,36,28,0.35) 0%, transparent 50%),
+        linear-gradient(180deg, #121214 0%, var(--bg) 42%, #050506 100%);
       display: flex; align-items: center; justify-content: center;
       padding: max(24px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
     }
-    .card {
+    .page {
       width: 100%; max-width: 440px;
-      padding: 28px 22px 24px;
-      border-radius: 20px;
-      background: rgba(18,18,20,0.94);
-      border: 1px solid var(--line);
-      box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+      position: relative;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
     }
-    h1 { margin: 0 0 8px; font-size: 20px; font-weight: 400; letter-spacing: 0.08em; }
-    .sub { margin: 0 0 16px; font-size: 13px; color: var(--muted); line-height: 1.7; font-weight: 300; }
+    .back {
+      position: absolute;
+      left: max(16px, env(safe-area-inset-left));
+      top: max(14px, env(safe-area-inset-top));
+      z-index: 2;
+      font-size: 12px; color: var(--muted); text-decoration: none; letter-spacing: 0.08em;
+    }
+    .back:hover { color: rgba(255,255,255,0.78); }
+    .card {
+      padding: 48px 0 0;
+      text-align: center;
+    }
+    h1 {
+      margin: 0 auto 22px;
+      max-width: 100%;
+      font-size: 22px; font-weight: 400;
+      letter-spacing: 0.12em;
+      /* letter-spacing 会让末字右侧多出空档，补同等左边距以光学居中 */
+      padding-left: 0.12em;
+      line-height: 1.45;
+      text-align: center;
+    }
     .meta {
-      font-size: 12px; color: var(--muted); margin: 0 0 16px; line-height: 1.6;
+      font-size: 12px; color: var(--muted); margin: 0 0 18px; line-height: 1.6;
+      text-align: center;
     }
     .meta b { color: rgba(255,255,255,0.78); font-weight: 400; }
     .status {
-      display: none; margin: 0 0 14px; padding: 10px 12px; border-radius: 10px;
+      display: none; margin: 0 0 16px; padding: 10px 12px; border-radius: 10px;
       font-size: 12.5px; line-height: 1.55; font-weight: 300;
       border: 1px solid var(--line); background: rgba(255,255,255,0.04);
+      text-align: left;
     }
     .status.show { display: block; }
     .status.ok { border-color: rgba(134,239,172,0.35); color: var(--ok); }
     .status.warn { border-color: rgba(251,191,36,0.4); color: var(--warn); }
     .status.err { border-color: rgba(248,113,113,0.4); color: #fca5a5; }
+    .actions { text-align: left; }
     .btn {
       display: block; width: 100%; text-align: center; text-decoration: none;
       padding: 15px 16px; border-radius: 12px; margin-bottom: 10px;
-      font-size: 15px; letter-spacing: 0.05em; font-weight: 400;
+      font-size: 15px; letter-spacing: 0.06em; font-weight: 400;
       border: none; cursor: pointer; font-family: inherit;
     }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -65,21 +96,106 @@
       border: 1px solid var(--line);
     }
     .steps {
-      margin: 18px 0 0; padding: 14px 14px 12px;
-      border-radius: 12px; border: 1px solid var(--line);
+      margin: 22px 0 0; padding: 16px 16px 14px;
+      border-radius: 14px; border: 1px solid var(--line);
       background: rgba(255,255,255,0.03);
       font-size: 12.5px; line-height: 1.75; color: var(--muted); font-weight: 300;
+      text-align: left;
     }
-    .steps strong { color: rgba(255,255,255,0.8); font-weight: 400; }
+    .steps strong { color: rgba(255,255,255,0.82); font-weight: 400; }
     .steps ol { margin: 8px 0 0; padding-left: 1.2em; }
     .note {
-      margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
+      margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line);
       font-size: 12.5px; line-height: 1.75; color: var(--muted); font-weight: 300;
+      text-align: left;
     }
     .note strong { color: var(--accent); font-weight: 400; }
-    .back { display: inline-block; margin-bottom: 16px; font-size: 12px; color: var(--muted); text-decoration: none; letter-spacing: 0.06em; }
-    .back:hover { color: rgba(255,255,255,0.75); }
     .hidden { display: none !important; }
+    /* 扫码区仅 PC 显示（手机本机下载不必扫） */
+    .qr-scan { display: none; }
+
+    /* PC：更大呼吸感，标题更醒目 */
+    @media (min-width: 900px) {
+      body {
+        /* 有扫码区后内容高于一屏：勿再垂直居中，否则标题会被顶出视口 */
+        align-items: flex-start;
+        justify-content: center;
+        padding: 48px 48px 88px;
+        background:
+          radial-gradient(1400px 720px at 50% -14%, rgba(96,96,104,0.42) 0%, transparent 56%),
+          radial-gradient(1000px 560px at 10% 90%, rgba(52,44,30,0.3) 0%, transparent 52%),
+          radial-gradient(900px 520px at 94% 68%, rgba(36,40,52,0.24) 0%, transparent 48%),
+          linear-gradient(180deg, #18181a 0%, #0a0a0c 45%, #050506 100%);
+      }
+      .page { max-width: 640px; }
+      .back {
+        /* PC：跟在正文后、左对齐（文档流），避免 fixed 压住步骤/脚注 */
+        position: static;
+        order: 2;
+        align-self: flex-start;
+        left: auto; top: auto; bottom: auto;
+        margin: 28px 0 8px;
+        font-size: 13px; letter-spacing: 0.12em;
+        z-index: auto;
+      }
+      .card {
+        order: 1;
+        padding: 24px 12px 8px;
+      }
+      .note { padding-bottom: 4px; }
+      h1 {
+        margin: 0 auto 32px;
+        font-size: 40px;
+        letter-spacing: 0.2em;
+        padding-left: 0.2em;
+        font-weight: 300;
+        line-height: 1.55;
+      }
+      .meta { font-size: 14px; margin-bottom: 26px; letter-spacing: 0.06em; }
+      .btn {
+        padding: 18px 20px; border-radius: 14px; margin-bottom: 14px;
+        font-size: 16px; letter-spacing: 0.1em;
+      }
+      .steps {
+        margin-top: 32px; padding: 22px 24px 20px;
+        font-size: 14px; line-height: 1.9;
+      }
+      .note { margin-top: 26px; font-size: 13.5px; line-height: 1.9; }
+      .status { font-size: 13.5px; padding: 12px 14px; }
+      .qr-scan {
+        display: block;
+        margin: 8px 0 0;
+        padding: 22px 20px 18px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.03);
+        text-align: center;
+      }
+      .qr-scan .qr-label {
+        margin: 0 0 14px;
+        font-size: 14px;
+        letter-spacing: 0.14em;
+        color: rgba(255,255,255,0.78);
+        font-weight: 300;
+      }
+      .qr-scan .qr-box {
+        display: inline-block;
+        padding: 12px;
+        border-radius: 12px;
+        background: #fff;
+        line-height: 0;
+      }
+      .qr-scan .qr-box img,
+      .qr-scan .qr-box canvas { display: block; }
+      .qr-scan .qr-tip {
+        margin: 14px 0 0;
+        font-size: 12.5px;
+        line-height: 1.7;
+        color: var(--muted);
+        font-weight: 300;
+        letter-spacing: 0.04em;
+      }
+    }
 
     /* 微信内置浏览器引导 */
     .wx-mask {
@@ -112,63 +228,101 @@
     </div>
   </div>
 
-  <main class="card">
+  <div class="page">
     <a class="back" href="/index" id="appBackLink">← 返回</a>
-    <h1>安卓 App 下载</h1>
-    <p class="sub" id="lead">安装后桌面一点即可打开「手绘工坊」。有新版本时请下载更新并安装。</p>
-    <p class="meta" id="pkgMeta">正在检查安装包…</p>
-    <div class="status" id="statusBox" role="status"></div>
+    <main class="card">
+      <h1>「手绘工坊」安卓App下载</h1>
+      <p class="meta" id="pkgMeta">正在检查安装包…</p>
+      <div class="status" id="statusBox" role="status"></div>
 
-    <div id="androidPanel">
-      <button type="button" class="btn btn-primary" id="btnDownload">下载安卓安装包</button>
-      <button type="button" class="btn btn-secondary" id="btnCopy">复制下载链接</button>
-      <a class="btn btn-ghost" id="btnAlt" href="/docs/app/wuxiao-workshop.apk">备用直链（若上面无反应可试）</a>
-      <div class="steps">
-        <strong>安装步骤（安卓）</strong>
-        <ol>
-          <li>点「下载安卓安装包」，等通知栏或文件 App 出现下载。</li>
-          <li>打开下载好的 APK；若提示未知来源，允许本次安装。</li>
-          <li>桌面出现「手绘工坊」即可打开（需联网）。</li>
-        </ol>
+      <div id="androidPanel" class="actions">
+        <button type="button" class="btn btn-primary" id="btnDownload">下载安卓安装包</button>
+        <button type="button" class="btn btn-secondary" id="btnCopy">复制下载链接</button>
+        <a class="btn btn-ghost" id="btnAlt" href="/docs/app/wuxiao-workshop.apk">备用直链（若上面无反应可试）</a>
+        <div class="qr-scan" id="qrScan" aria-label="手机扫码下载">
+          <p class="qr-label">手机扫码下载</p>
+          <div class="qr-box" id="qrBox"></div>
+          <p class="qr-tip">用手机系统相机扫开即可下载安装包。<br>请勿用微信扫一扫（常无法下载）。</p>
+        </div>
+        <div class="steps">
+          <strong>安装步骤（安卓）</strong>
+          <ol>
+            <li>点「下载安卓安装包」，等通知栏或文件 App 出现下载。</li>
+            <li>若浏览器提示「文件可能有害 / 危险」：从网页装 App 时经常会出现，属正常提醒；选「仍要下载 / 仍要安装」即可（本站官方安装包）。</li>
+            <li>打开下载好的 APK；若提示未知来源，允许本次安装。</li>
+            <li>桌面出现「手绘工坊」即可打开（需联网）。</li>
+          </ol>
+        </div>
       </div>
-    </div>
 
-    <div id="iosPanel" class="hidden">
-      <a class="btn btn-primary" href="/index">打开网页版首页</a>
-      <div class="note">
-        <strong>苹果 iPhone / iPad：</strong>暂时没有 App。请用 <b>Safari</b> 打开本站网页版（微信内可能不好用，建议用系统浏览器）。
+      <div id="iosPanel" class="hidden">
+        <a class="btn btn-primary" href="/index">打开网页版首页</a>
+        <div class="note">
+          <strong>苹果 iPhone / iPad：</strong>暂时没有 App。请用 <b>Safari</b> 打开本站网页版（微信内可能不好用，建议用系统浏览器）。
+        </div>
       </div>
-    </div>
 
-    <div class="note" id="commonNote">
-      若点击后没反应：请确认不在微信内打开；或点「复制下载链接」到 Chrome / 系统浏览器粘贴访问。
-    </div>
-  </main>
+      <div class="note" id="commonNote">
+        若点击后没反应：请确认不在微信内打开；或点「复制下载链接」到 Chrome / 系统浏览器粘贴访问。<br>
+        浏览器若提示「文件可能有害」：从网页下载安装包时经常会这样提醒，选「仍要下载」即可。
+      </div>
+    </main>
+  </div>
 
+  <script src="/docs/js/qrcode.min.js"></script>
   <script>
 (function () {
   var APK_API = '/api/android-apk';
-  var APK_DIRECT = '/docs/app/wuxiao-workshop.apk';
+  var APK_PROD = '/docs/app/wuxiao-workshop.apk';
+  var APK_STAGING = '/docs/app/wuxiao-workshop-staging.apk';
   var UPDATE_JSON = '/docs/app/android-shell-update.json';
   var downloadFileName = '手绘工坊.apk';
+  var BTN_DL_LABEL = '下载安卓安装包';
+  var activeDownloadPath = APK_API;
 
   var ua = navigator.userAgent || '';
   var isWeChat = /MicroMessenger/i.test(ua);
   var isIOS = /iPhone|iPad|iPod/i.test(ua);
-  var isAndroid = /Android/i.test(ua);
+  var host = String(location.hostname || '');
+  var isStagingHost =
+    /^(test\.wuxiaoart\.com)$/i.test(host) ||
+    /soft-voice-f822-staging/i.test(host);
+  // 按域名静默分流安装包；界面文案与正式站一致，不向访客解释环境差异
+  var APK_DIRECT = isStagingHost ? APK_STAGING : APK_PROD;
 
-  // 从哪进回哪：同站 referrer 用 history.back；否则回首页
+  (function setupAltLink() {
+    var btnAlt = document.getElementById('btnAlt');
+    if (btnAlt) btnAlt.href = APK_DIRECT;
+  })();
+
+  // 上一页若是本站则 history.back；否则进本站首页
   (function setupBack() {
     var a = document.getElementById('appBackLink');
     if (!a) return;
+    a.setAttribute('href', '/index');
+    function isOurSiteUrl(url) {
+      try {
+        var h = String(new URL(url).hostname || '').toLowerCase();
+        return (
+          h === 'wuxiaoart.com' ||
+          h === 'www.wuxiaoart.com' ||
+          h === 'test.wuxiaoart.com' ||
+          h.indexOf('soft-voice-f822') !== -1
+        );
+      } catch (_e) {
+        return false;
+      }
+    }
     a.addEventListener('click', function (ev) {
+      ev.preventDefault();
       try {
         var ref = document.referrer || '';
-        if (ref && ref.indexOf(location.origin) === 0 && history.length > 1) {
-          ev.preventDefault();
+        if (ref && isOurSiteUrl(ref) && history.length > 1) {
           history.back();
+          return;
         }
-      } catch (_e) {}
+      } catch (_e2) {}
+      location.href = '/index';
     });
   })();
 
@@ -188,8 +342,33 @@
     catch (e) { return location.origin + path; }
   }
 
+  // 按当前下载链现场画码，发版换包/换域名不必手改图
+  function renderQrForPath(path) {
+    var box = document.getElementById('qrBox');
+    if (!box || typeof QRCode === 'undefined') return;
+    var url = absoluteUrl(path);
+    box.innerHTML = '';
+    try {
+      new QRCode(box, {
+        text: url,
+        width: 168,
+        height: 168,
+        colorDark: '#111111',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+      box.setAttribute('title', url);
+    } catch (e) {
+      box.textContent = '二维码生成失败';
+    }
+  }
+
+  function setActiveDownloadPath(path) {
+    activeDownloadPath = path;
+    renderQrForPath(path);
+  }
+
   function triggerDownload(url) {
-    // 用隐藏 iframe / 临时 a，比 location.href 更容易触发「下载」而不是空白页
     var a = document.createElement('a');
     a.href = url;
     a.setAttribute('download', downloadFileName);
@@ -200,7 +379,6 @@
     setTimeout(function () {
       try { document.body.removeChild(a); } catch (e) {}
     }, 800);
-    // 部分国产浏览器忽略 download 属性：再开一次顶层导航作兜底
     setTimeout(function () {
       try {
         var w = window.open(url, '_blank');
@@ -218,13 +396,13 @@
       showStatus('warn', '微信内无法下载安装包，请先「在浏览器打开」。');
       return;
     }
-    showStatus('ok', '正在调起下载…请看屏幕上方通知栏，或到「文件 / 下载」里找 APK。');
+    showStatus('ok', '正在调起下载…请看屏幕上方通知栏，或到「文件 / 下载」里找 APK。若提示「文件可能有害」，选「仍要下载」即可。');
     btnDownload.disabled = true;
     btnDownload.textContent = '已调起下载…';
-    triggerDownload(absoluteUrl(APK_API));
+    triggerDownload(absoluteUrl(activeDownloadPath));
     setTimeout(function () {
       btnDownload.disabled = false;
-      btnDownload.textContent = '重新下载安卓安装包';
+      btnDownload.textContent = BTN_DL_LABEL;
       showStatus('ok', '若仍没有下载：请点「复制下载链接」到系统浏览器打开，或试「备用直链」。');
     }, 2500);
   }
@@ -237,7 +415,6 @@
   if (isIOS) {
     document.getElementById('androidPanel').classList.add('hidden');
     document.getElementById('iosPanel').classList.remove('hidden');
-    document.getElementById('lead').textContent = '当前是苹果设备：暂时没有 App，请直接使用网页版。';
     document.getElementById('commonNote').classList.add('hidden');
   } else if (isWeChat) {
     showStatus('warn', '检测到微信内置浏览器：请先点右上角 ··· → 在浏览器打开，再回来下载。');
@@ -246,7 +423,7 @@
 
   btnDownload.addEventListener('click', startDownload);
   btnCopy.addEventListener('click', function () {
-    var link = absoluteUrl(APK_API);
+    var link = absoluteUrl(activeDownloadPath);
     function ok() {
       showStatus('ok', '链接已复制。请粘贴到 Chrome / 系统浏览器地址栏打开。');
     }
@@ -261,7 +438,9 @@
     }
   });
 
-  // 检查安装包是否可访问 + 读版本说明
+  // 先按 API 链画一版；若 HEAD 失败再静默改直链并重画
+  setActiveDownloadPath(APK_API);
+
   Promise.all([
     fetch(APK_API, { method: 'HEAD', cache: 'no-store' }).then(function (r) {
       return { ok: r.ok, len: r.headers.get('content-length') };
@@ -286,17 +465,25 @@
       : '安装包信息加载中或暂不可用';
 
     if (!head.ok) {
-      // API 不通时改试直链
+      // API 不可用时静默改走直链，不向用户报「通道切换」（本地预览常见）
       return fetch(APK_DIRECT, { method: 'HEAD', cache: 'no-store' }).then(function (r) {
         if (r.ok) {
-          showStatus('warn', '下载通道已切换为备用直链。');
+          var len2 = r.headers.get('content-length');
+          if (len2 && bits.indexOf('约') < 0) {
+            bits.push('约 ' + (Number(len2) / (1024 * 1024)).toFixed(1) + ' MB');
+            pkgMeta.innerHTML = '安装包：<b>' + bits.join(' · ') + '</b>';
+          }
+          setActiveDownloadPath(APK_DIRECT);
           btnDownload.onclick = function () {
             if (isWeChat) { startDownload(); return; }
-            showStatus('ok', '正在调起下载…');
+            showStatus('ok', '正在调起下载…请看通知栏或「文件 / 下载」。若提示「文件可能有害」，选「仍要下载」即可。');
             triggerDownload(absoluteUrl(APK_DIRECT));
           };
+          if (!isIOS && !isWeChat) {
+            showStatus('ok', '安装包就绪，点击下方按钮开始下载。');
+          }
         } else {
-          showStatus('err', '安装包暂时无法下载（可能尚未发到本站）。请稍后再试，或向老师要安装包。');
+          showStatus('err', '安装包暂时无法下载。请稍后再试，或向老师要安装包。');
           btnDownload.disabled = true;
         }
       });

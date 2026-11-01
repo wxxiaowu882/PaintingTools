@@ -75,6 +75,18 @@ export const SOLID_PATH_TRACER_QUALITY = {
     resetMinIntervalMs: 160,
     debugResetLog: false,
     bridgeMs: 260, // 追光切换时的短暂光栅过渡窗；挡不住「采样在涨但画面仍黑」的 Mali 假进度，见 blankOutputProbe。
+    // 首帧双保险丝（本页已成功采过样之后用）：
+    // 1) samples===0 短超时：不计 isCompiling 时段；编译结束后重新起算
+    // 2) 编译总时长上限：isCompiling 过久仍回预览（驱动卡死仍能发现）
+    sampleTimeoutMsMobile: 8000,
+    sampleTimeoutMsDesktop: 20000,
+    compileTimeoutMsMobile: 45000,
+    compileTimeoutMsDesktop: 60000,
+    // 本页第一次追光（还没成功采到足够样本）：很长总上限 + 用户可点「放弃渲染」；
+    // 桌面首次可开假黑探针（开采后确认近黑才停；编译中不因黑停）。
+    firstAttemptTimeoutMs: 180000,
+    firstAttemptBlankProbeDesktop: true,
+    firstAttemptOkSamples: 8,
     // 假进度黑屏保底（MatePad/Mali 等）：samples 已涨但画布近黑 → 退回光栅。仅现象检测，不靠 UA 点名机型。
     blankOutputProbe: {
       enabledMobile: true,
@@ -84,8 +96,12 @@ export const SOLID_PATH_TRACER_QUALITY = {
       intervalMs: 600,
       lumaMax: 10,
       consecutiveHits: 2,
-      pointInset: 0.18,
-      minNearBlackPoints: 4,
+      // 中部 3×3（躲开四角黑底/聚光灯黑角）；须 9/9 近黑才算假进度
+      // （任一内容点仍亮 → 不切；真整屏黑仍会命中。偶发单帧噪点靠 consecutiveHits=2 消化）
+      probeMode: 'interiorGrid',
+      interiorMargin: 0.28,
+      gridSize: 3,
+      minNearBlackPoints: 9,
     },
     // 两套质量档：可按业务诉求在 default / antiSpeckle 之间切换。
     profiles: {

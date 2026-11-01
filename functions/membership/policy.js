@@ -152,27 +152,39 @@ export function requiresMember(policy, resourceId) {
 }
 
 /**
- * 当前用户不够档：保留列表可见字段，去掉可复现课的载荷
+ * 当前用户不够档：保留列表可见字段（uid / 筛选 meta），去掉可复现课的载荷（items/标注等）。
+ * 注意：勿只留 category/detail——肖像年龄芯片、列表编号、headform 课线都依赖这些轻量字段。
  */
 export function stripScenePayload(scene, requireLevel) {
   if (!scene || typeof scene !== 'object') return scene;
   const req = normalizeRequire(requireLevel || 'member');
-  const meta = scene.meta
-    ? {
-        category: scene.meta.category,
-        detail: scene.meta.detail,
-        description: scene.meta.description,
-        locked: true,
-        require: req
-      }
-    : { locked: true, require: req };
-  return {
+  const m = scene.meta || {};
+  const meta = {
+    category: m.category,
+    detail: m.detail,
+    description: m.description,
+    line: m.line,
+    slot: m.slot,
+    lessonTabLabel: m.lessonTabLabel,
+    modelLabel: m.modelLabel,
+    modelId: m.modelId,
+    material: m.material,
+    gender: m.gender,
+    age: m.age,
+    region: m.region,
+    locked: true,
+    require: req
+  };
+  const out = {
     name: scene.name,
     thumbnail: scene.thumbnail,
     meta,
     __membershipLocked: true,
     __require: req
   };
+  if (scene.uid != null && String(scene.uid).trim() !== '') out.uid = String(scene.uid).trim();
+  if (scene.id != null && String(scene.id).trim() !== '') out.id = String(scene.id).trim();
+  return out;
 }
 
 /**

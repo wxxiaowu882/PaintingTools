@@ -2,6 +2,7 @@ import { requireAdmin, jsonResponse } from '../../../membership/admin-auth.js';
 import { getSecret } from '../../../membership/session.js';
 import { loadPolicy, loadTiers } from '../../../membership/policy.js';
 import { loadOpsSettings } from '../../../membership/ops-settings.js';
+import { loadBackupHistory } from '../../../membership/backup-history.js';
 
 export async function onRequestGet(context) {
   const gate = await requireAdmin(context);
@@ -46,6 +47,11 @@ export async function onRequestGet(context) {
     tips.push('开发自测通道仍开启；正式对外卖课前请关闭。');
   }
 
+  let backupHistory = { ok: true, entries: [], hints: null };
+  try {
+    backupHistory = await loadBackupHistory(context.env);
+  } catch (_eBh) {}
+
   return jsonResponse({
     ok: true,
     status: {
@@ -63,6 +69,7 @@ export async function onRequestGet(context) {
     tips,
     lockedItems: locked,
     policy,
-    tiers
+    tiers,
+    backupHistory
   });
 }

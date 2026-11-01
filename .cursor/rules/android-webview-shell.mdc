@@ -13,19 +13,57 @@ alwaysApply: true
 1. `自用工具文件_不部署/android-webview-shell/app/build.gradle.kts`  
    - `versionCode`：**+1**（整数，单调递增）  
    - `versionName`：按语义递增（如 `1.0.3` → `1.0.4`；重大变更可升次版本）
+   - `BUILD_STAMP`：发新 APK 时递增（如 `1031B` → `1031C`）
 2. `docs/app/android-shell-update.json`  
-   - `minVersionCode` / `latestVersionCode` = 新的 `versionCode`  
-   - `versionName` = 新的 `versionName`  
-   - `message` 可按本次壳变更改一句说明（仍强调：站点内容更新不用换包）
-3. 打出新 APK 后复制为：  
-   - `自用工具文件_不部署/android-webview-shell/dist/童画师吴晓-{versionName}-debug.apk`（或 release）  
-   - `docs/app/wuxiao-workshop.apk`（供站点下载；apk 已 gitignore，发站时上传）
+   - **`minVersionCode` = `latestVersionCode` = 新的 `versionCode`**（默认强制更新；见下）  
+   - `versionName` = 新的 `versionName`；`buildStamp` 与壳一致  
+   - **`message` 只写笼统话**（如「发现新版本，请更新后继续使用。」）；**禁止**写具体改动/功能清单（更新内容对用户保密）
+3. 打出新 APK 后按渠道复制（**勿搞反**）：  
+   - staging → `docs/app/wuxiao-workshop-staging.apk` + `dist/…测…`  
+   - prod → `docs/app/wuxiao-workshop.apk` + `dist/…正式…`  
+   - 复制后跑 `node docs/app/verify-apk-channels.mjs`（或 ASCII 临时目录 aapt）确认包名
+
+## 强制更新（产品已定默认；勿再问「要不要强制」）
+
+- 壳逻辑：**仅当**本机 `versionCode < minVersionCode` 才弹强制更新；**没有**「可选更新」弹窗。
+- 因此壳发版时 **`minVersionCode` 必须抬到新 `versionCode`**，否则旧壳静默进站、用户以为「没发布」。
+- **禁止**默认做成「只抬 latest、不抬 min」。仅当用户当轮明确说「可选 / 不强制 / 先不拦」时，才允许 `min < latest`，并在汇报里用一句话标明「本次不强制」。
+- 顺序：**先上传新 APK，再（或同一次发版）提高 `minVersionCode`**，避免点下载仍是旧包。
+- **下载方式（1.0.28+）**：强制更新须**壳内直下 + FileProvider 安装**，禁止再 `ACTION_VIEW` 打开浏览器下 APK（Chrome 会弹「文件可能有害」）。网页 `/docs/app/` 侧载另说。
+
+## 壳发版闭环清单（少一步都不算完成）
+
+改图标 / 注入 / 权限 / 启动域等壳行为后，同一轮必须做完：
+
+1. 升 `versionCode` / `versionName` / `BUILD_STAMP`
+2. 打 APK（测站任务至少 staging；正式任务至少 prod；两边都要则两套都打）
+3. 拷到正确的 `docs/app/*.apk`（staging / prod 勿对调）
+4. `android-shell-update.json`：`min` = `latest` = 新 versionCode
+5. **发对应站点**（测站 / 正式），确认上传列表里有 **apk + json**
+6. 冒烟或只读核验：  
+   - `GET …/docs/app/android-shell-update.json` → min/latest 正确  
+   - `HEAD/GET /api/android-apk` → `X-Wuxiao-Apk-Channel` 与域名一致  
+7. 汇报写明：新 versionCode、是否强制、下载入口、正式包是否未动
+
+**只发网页、不发壳** 时：不要动 json 的 min；也不要在汇报里暗示「App 图标已上线」。
 
 ## 原则（写进产品口径）
 
 - **站点网页 / 场景 / JS 更新** → 只发站，**不**升壳版本、**不**逼用户换 APK。  
-- **壳本身更新**（选图、强制更新逻辑、启动域名、权限、壳内 UI 等）→ **必须**升版本 + 更新 json + 新 apk。  
-- 发测试/正式站时：**先上传新 apk，再（或同时）提高 json 的 minVersionCode**，避免用户点下载仍是旧包。
+- **壳本身更新**（图标、选图、强制更新逻辑、启动域名、权限、壳内 UI 等）→ **必须**升版本 + 更新 json（强制）+ 新 apk + 发站。  
+- **两套包勿搞反**（曾踩坑：测站下载发正式包 → 覆盖用户「手绘工坊」）：
+  - prod → `docs/app/wuxiao-workshop.apk`（`com.wuxiaoart.workshop` /「手绘工坊」）
+  - staging → `docs/app/wuxiao-workshop-staging.apk`（`….staging` /「手绘工坊·测」）
+  - 发版前跑 `node docs/app/verify-apk-channels.mjs`（bat 已挂）；API 按域名分流见 `functions/api/android-apk.js`。
+- 测站 / 正式 **各读各站的 json**（由壳 `START_URL` 决定）；抬测站 `min` **不会**逼正式壳更新，反之亦然。
+
+## 用户可见文案（硬性）
+
+- **禁止**在任何用户能见到的界面写「壳」「空壳」「WebView 壳」等内部词；对外一律称 **App** / 「手绘工坊」。
+- **禁止**向访客解释「测站 / 测试站 / 正式站 / 同机并存 / 两套包」等运维概念。下载页测站与正式站**界面文案一致**；安装包按域名静默分流即可。
+- 桌面名「手绘工坊·测」是 App 自身标签，不必在网页上再科普。
+- 适用范围：下载页、菜单、强制更新弹窗、`android-shell-update.json` 的 `message`、安装步骤说明等。开发注释 / README / 规则 / 运营台可用内部词。
+- 强制更新文案：**不写具体更新内容**（保密）；只提示需要更新。
 
 ## 纯文档 / 注释
 

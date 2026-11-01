@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>会员运营｜童画师吴晓</title>
   <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-32.png?v=fav7" type="image/png" sizes="32x32">
+  <link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-192.png?v=fav7" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" data-wuxiao-brand-icon="1" href="/apple-touch-icon.png?v=fav8" sizes="180x180">
   <style>
     :root {
       --bg: #f4f1ea;
@@ -99,13 +102,202 @@
     .ent-banner.user { background: #eef4fb; border-color: #cfdceb; }
     .ent-banner .ent-main { font-size: 1.05rem; font-weight: 600; }
     .ent-banner .ent-sub { font-size: 0.88rem; color: var(--muted); margin-top: 4px; }
+    .probe-banner {
+      display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px; border-radius: 10px; margin-bottom: 12px;
+      border: 2px solid var(--line);
+    }
+    .probe-banner.on {
+      background: #fde8e8; border-color: #e8a0a0; color: var(--bad);
+    }
+    .probe-banner.off {
+      background: #e7f4ea; border-color: #cfe6d4; color: var(--ok);
+    }
+    .probe-banner .probe-title { font-weight: 700; font-size: 1rem; }
+    .probe-banner .probe-desc { font-size: 0.88rem; margin-top: 2px; opacity: 0.92; }
+    .probe-banner .probe-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .guide-ol { margin: 8px 0 0; padding-left: 1.25em; color: var(--muted); font-size: 0.92rem; }
+    .guide-ol li { margin: 6px 0; }
+    .guide-box {
+      border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+      background: #faf7f1; margin-top: 8px;
+    }
+    .guide-box h3 { font-size: 0.95rem; margin: 0 0 6px; }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .ops-cell-actions {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      margin: 0; white-space: normal;
+    }
+    .ops-cell-actions button { padding: 4px 8px; }
+    .ops-device-row {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      margin: 4px 0;
+    }
+    .ops-device-row > span { flex: 1 1 12em; min-width: 0; word-break: break-word; }
+    .ops-device-row button { padding: 4px 8px; flex: 0 0 auto; }
+    .stats-chart-wrap {
+      width: 100%; max-width: 100%; overflow: hidden;
+      border: 1px solid var(--line); border-radius: 8px; background: #fff;
+      margin-top: 8px;
+    }
+    .stats-chart-wrap canvas { display: block; width: 100%; height: auto; }
+    .stats-legend {
+      display: flex; flex-wrap: wrap; gap: 12px 16px;
+      font-size: 0.88rem; color: var(--muted); margin-top: 8px;
+    }
+    .stats-legend i {
+      display: inline-block; width: 14px; height: 3px; margin-right: 6px;
+      vertical-align: middle; border-radius: 1px;
+    }
+    .stats-legend .lg-login { background: #1f4b7a; }
+    .stats-legend .lg-register { background: #2f6b3a; }
+    .stats-legend .lg-redeem { background: #9a5b00; }
+    /* —— 手机运营台：清晰、好点、少横滑抢手势 —— */
+    @media (max-width: 720px) {
+      html, body { overflow-x: hidden; }
+      main {
+        padding: 12px 12px max(48px, env(safe-area-inset-bottom, 0px)) 12px;
+        overflow-x: clip;
+        width: 100%;
+      }
+      h1 { font-size: 1.28rem; }
+      .sub { margin-bottom: 14px; font-size: 0.92rem; }
+      .card { padding: 14px 12px; border-radius: 10px; margin-bottom: 12px; }
+      .card h2 { font-size: 1.02rem; }
+      /* Tab：自动换行，一屏内看全，不左右滑 */
+      .tabs {
+        flex-wrap: wrap;
+        gap: 6px;
+        overflow-x: visible;
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        background: var(--bg);
+        margin: 0 0 14px;
+        padding: 8px 0 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      .tabs button.tab {
+        flex: 0 0 auto;
+        padding: 8px 12px;
+        min-height: 38px;
+        font-size: 0.88rem;
+      }
+      /* 防表格 min-width 把整页撑出屏宽：仅列表区可横滑 */
+      main, .card, .tab-panel, .acct-layout, .acct-layout > * {
+        max-width: 100%;
+        min-width: 0;
+      }
+      .row {
+        gap: 8px;
+        align-items: stretch;
+      }
+      .row > label {
+        flex: 1 1 100%;
+        display: block;
+      }
+      .row > label > input,
+      .row > label > select,
+      .row > input:not([type="checkbox"]),
+      .row > select {
+        width: 100%;
+        max-width: none !important;
+        min-width: 0 !important;
+        display: block;
+        margin-top: 4px;
+      }
+      /* 表单主按钮拉满宽；表格/设备行内按钮保持紧凑，避免行高被撑爆 */
+      .card > .row > button,
+      .probe-actions button,
+      #acct-actions > .row > button,
+      #sec-login .row > button {
+        width: 100%;
+        max-width: 100%;
+        min-height: 44px;
+      }
+      button { min-height: 40px; padding: 9px 12px; max-width: 100%; }
+      #acct-actions .row,
+      #acct-result {
+        max-width: 100%;
+        min-width: 0;
+      }
+      #acct-actions .row { margin: 6px 0; }
+      #acct-result .tip { margin: 2px 0; line-height: 1.4; }
+      .ops-cell-actions button,
+      .ops-device-row button,
+      .table-scroll button,
+      .acct-table-wrap button {
+        width: auto;
+        min-height: 32px;
+        padding: 4px 8px;
+        flex: 0 0 auto;
+      }
+      /* 16px 避免 iOS 聚焦输入框强制放大 */
+      input, select, textarea {
+        font-size: 16px;
+        padding: 10px 12px;
+        min-height: 42px;
+      }
+      input[type="number"] { width: 100%; max-width: 160px; }
+      input[type="checkbox"] { min-height: 0; width: auto; }
+      textarea { min-height: 120px; }
+      .probe-banner {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .probe-banner .probe-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .table-scroll,
+      .acct-table-wrap {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 8px;
+      }
+      .acct-table-wrap { max-height: min(52vh, 420px); }
+      .table-scroll > table,
+      .acct-table-wrap > table {
+        font-size: 0.86rem;
+        min-width: 560px;
+        width: max-content;
+      }
+      th, td {
+        padding: 6px 8px;
+        white-space: nowrap;
+        vertical-align: middle;
+        line-height: 1.35;
+      }
+      .ops-cell-actions { white-space: normal; }
+      .tip { margin: 2px 0; }
+      .ent-banner { padding: 8px 10px; margin-bottom: 6px; }
+      .ent-banner .ent-main { font-size: 1rem; word-break: break-word; }
+      .ent-banner .ent-sub { margin-top: 2px; }
+      #acct-actions .row { margin-top: 8px !important; }
+      .price-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+      }
+      .price-item span { min-width: 0; }
+      .price-item input { width: 100%; max-width: none; }
+      #ops-pwd { min-width: 0 !important; width: 100%; }
+      #acct-note,
+      #acct-new-pwd { max-width: none !important; width: 100%; }
+      .guide-ol { padding-left: 1.15em; font-size: 0.9rem; }
+    }
   </style>
 </head>
 <body>
   <main>
     <h1>会员运营台</h1>
     <p class="sub">发兑换码、看谁兑过、调哪些内容要收费、改价格与话术。</p>
-    <p class="tip" id="top-links"><a href="/member">学员兑换页</a> · <a href="/Solid?sandbox=geometry">几何体场景</a></p>
+    <p class="tip" id="top-links"><a href="/member">学员兑换页</a> · <a href="/">首页</a></p>
 
     <section class="card" id="sec-login">
       <h2>登录</h2>
@@ -123,25 +315,139 @@
         <button type="button" class="secondary" id="btn-logout">退出</button>
       </div>
 
+      <div id="probe-banner" class="probe-banner off" role="status" aria-live="polite">
+        <div>
+          <div class="probe-title" id="probe-title">测试假码：读取中…</div>
+          <div class="probe-desc" id="probe-desc">正式卖课前务必确认已关闭。</div>
+        </div>
+        <div class="probe-actions">
+          <button type="button" class="secondary" id="btn-probe-off">关闭假码</button>
+          <button type="button" class="secondary" id="btn-probe-on">开启假码（仅自测）</button>
+          <span class="msg" id="probe-msg" style="min-height:0;margin:0"></span>
+        </div>
+      </div>
+
       <nav class="tabs" id="ops-tabs" aria-label="运营台分区">
         <button type="button" class="tab active" data-tab="codes">发码与记录</button>
         <button type="button" class="tab" data-tab="accounts">会员账号</button>
-        <button type="button" class="tab" data-tab="policy">收费设置</button>
+        <button type="button" class="tab" data-tab="stats">数据趋势</button>
+        <button type="button" class="tab" data-tab="policy">权限与宣传</button>
         <button type="button" class="tab" data-tab="prices">价格文案</button>
         <button type="button" class="tab" data-tab="scripts">常用话术</button>
+        <button type="button" class="tab" data-tab="guide">运作说明</button>
         <button type="button" class="tab" data-tab="start">怎么测</button>
       </nav>
+
+      <div class="tab-panel" data-panel="guide">
+        <section class="card">
+          <h2>别忘了这些（业务口径）</h2>
+          <p class="tip">给日常发码、对账、看曲线、发版时对照。改权限细则仍用「权限与宣传」；本页只记容易忘的规矩。</p>
+
+          <div class="guide-box">
+            <h3>三档是什么</h3>
+            <ul class="guide-ol" style="list-style:disc">
+              <li><strong>游客</strong>：没登录，只能看标成游客可见的内容；其它会拦并提示注册/升级。</li>
+              <li><strong>会员（注册）</strong>：手机号注册免费；可看标成「会员」的课与功能。</li>
+              <li><strong>高级会员（Pro）</strong>：付费兑码、在有效期内；可看标成「高级 / Pro」的内容。</li>
+              <li>角标只是提示；真正能不能进，以服务器策略为准。改完让学员<strong>刷新页面</strong>再试。</li>
+            </ul>
+          </div>
+
+          <div class="guide-box" style="margin-top:12px">
+            <h3>发码与对账</h3>
+            <ul class="guide-ol" style="list-style:disc">
+              <li>学员付完钱 → 本台生成短码 → 用话术发微信；学员在兑换页兑码。</li>
+              <li><strong>强烈建议写备注</strong>（付款备注里的手机号 / 微信名 / 档位），以后对账才找得着人。</li>
+              <li>「发码记录」能查：何时发、哪一档、是否已兑、兑到哪台手机。</li>
+              <li>正式站顶栏假码必须<strong>关闭</strong>；假码只给自测临时开。</li>
+            </ul>
+          </div>
+
+          <div class="guide-box" style="margin-top:12px">
+            <h3>测站 vs 正式站</h3>
+            <ul class="guide-ol" style="list-style:disc">
+              <li><strong>测站</strong>（test…）：练手、冒烟；口令与数据都是测站自己的。</li>
+              <li><strong>正式站</strong>（wuxiaoart.com）：真实学员；别用测站口令/假码在正式站「随便试」。</li>
+              <li>两边账号、兑换码、曲线、备份记录<strong>互不相通</strong>。给真人发码一定进正式站运营台。</li>
+              <li>发版习惯：先测站冒烟，再发正式。测站涂过的权限，正式生效要看是否同步到正式站。</li>
+            </ul>
+          </div>
+
+          <div class="guide-box" style="margin-top:12px">
+            <h3>数据趋势怎么读</h3>
+            <ul class="guide-ol" style="list-style:disc">
+              <li><strong>日活</strong>：当天有登录态的人打开站就算（不只「点登录」）。同一账号同一天只计 1 次。</li>
+              <li><strong>注册 / 兑换</strong>：当天新注册人数、当天兑成高级的次数。</li>
+              <li>曲线从功能上线后开始有数据；<strong>不会回填更早的历史</strong>，空着是正常的。</li>
+              <li>账号列表里的「注册日 / 最近活跃」方便找人；最近活跃看设备最近一次出现时间。</li>
+            </ul>
+          </div>
+
+          <div class="guide-box" style="margin-top:12px">
+            <h3>宣传链接奖励</h3>
+            <ul class="guide-ol" style="list-style:disc">
+              <li>注册会员有专属链接；别人经链接注册，并且<strong>兑换了高级会员</strong>，分享者才拿延期奖励。</li>
+              <li>默认大约 +90 天；总开关、天数、每月几次、防自推/同设备，在「权限与宣传」里改。</li>
+              <li>自己推自己、同设备刷奖默认拦住，别为了对账关掉除非你很清楚在做什么。</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>会员数据备份</h2>
+          <p class="tip" id="backup-hint">加密备份在<strong>开发机本机目录</strong>，不在网站服务器上。下面是摘要记录；真正文件要去本机文件夹找，解密要本机钥文件。</p>
+          <div class="guide-box" id="backup-path-box">
+            <h3>本机存哪</h3>
+            <ul class="guide-ol" style="list-style:disc">
+              <li>备份目录：<code>历史备份文件/membership-kv/</code>（已不进 git）</li>
+              <li>解密钥：同目录 <code>_backup.key</code>（务必单独保管，勿上传公开处）</li>
+              <li>手动备份：Portal「24_备份正式站会员KV」；也可备份测站环境</li>
+              <li>发正式站时一般会<strong>自动先备份</strong>；急需跳过可设 <code>SKIP_KV_BACKUP=1</code>；要备份失败就停发版可设 <code>REQUIRE_KV_BACKUP=1</code></li>
+              <li>不必一天备份很多次（省接口调用）；发版前 / 重大操作前备份即可</li>
+            </ul>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button type="button" class="secondary" id="btn-backup-reload">刷新备份记录</button>
+          </div>
+          <div class="table-scroll" style="margin-top:8px">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>环境</th>
+                  <th>触发</th>
+                  <th>文件名</th>
+                  <th>键数</th>
+                  <th>本机目录</th>
+                </tr>
+              </thead>
+              <tbody id="backup-tbody">
+                <tr><td colspan="6" class="tip">登录后加载…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="msg" id="backup-msg"></p>
+        </section>
+      </div>
 
       <div class="tab-panel" data-panel="start">
         <section class="card">
           <h2>怎么测一遍</h2>
-          <p class="tip">三档：游客 / 会员（注册）/ 高级会员（兑码）。探针场景可用来验门禁。</p>
-          <ol class="tip" style="margin:8px 0 0;padding-left:1.2em">
-            <li>游客打开几何体：看「会员免费 / 高级会员尊享」角标与拦截文案</li>
-            <li>注册登录后：会员免费探针可进，高级会员探针仍锁</li>
-            <li>发码 → 兑换页兑码 → 高级会员内容解锁</li>
+          <p class="tip">三档：游客 / 会员（注册）/ 高级会员（兑码）。</p>
+          <div class="guide-box">
+            <h3>测站 vs 正式站（别混）</h3>
+            <ul class="guide-ol" style="list-style:disc">
+              <li><strong>测站</strong>（test.wuxiaoart.com）：可用 Portal「21c」进本台；口令多为测站专用。自测时可临时<strong>开启假码</strong>，测完关掉。</li>
+              <li><strong>正式站</strong>（wuxiaoart.com）：Portal「21b」；给真实学员发码。顶栏假码必须是<strong>关闭</strong>；不要用测站口令/假码在正式站「随便试」。</li>
+              <li>发版：先测站冒烟，再发正式。权限涂色若在测站改过，正式发版一般会同步（除非跳过策略同步）。</li>
+            </ul>
+          </div>
+          <ol class="guide-ol">
+            <li>游客打开几何体：看「会员 / Pro」角标与拦截文案</li>
+            <li>注册登录后：会员免费课可进，高级课仍锁</li>
+            <li>本台发码 → 学员页兑码 → 高级内容解锁</li>
             <li>宣传链接：A 复制链接 → B 用链接注册 → B 兑高级 → 看 A 是否延期</li>
-            <li>忘记密码：本台「会员账号」按手机号重置</li>
+            <li>忘记密码：本台「会员账号」按手机号重置，把新密码私下告诉学员</li>
           </ol>
           <div id="status-box" class="hidden" style="margin-top:12px"></div>
         </section>
@@ -150,7 +456,7 @@
       <div class="tab-panel active" data-panel="codes">
         <section class="card">
           <h2>学员付完钱 → 发兑换码</h2>
-          <p class="tip">生成 <strong>10 位短码</strong>，复制话术发微信。可填备注（微信号）方便对账。</p>
+          <p class="tip">生成 <strong>10 位短码</strong>，复制话术发微信。<strong>强烈建议写备注</strong>（付款备注里的手机号 / 微信名），方便以后对账。</p>
           <div class="row">
             <label>档位
               <select id="code-tier">
@@ -163,11 +469,12 @@
             <label>码几天内有效 <input id="code-days" type="number" min="1" max="365" value="30"></label>
           </div>
           <div class="row">
-            <label style="flex:1;min-width:200px">备注（可选，仅你自己看）
-              <input id="code-note" type="text" maxlength="80" placeholder="例如：微信昵称 / 付款备注" style="width:100%">
+            <label style="flex:1;min-width:200px">备注（强烈建议，仅你自己看）
+              <input id="code-note" type="text" maxlength="80" placeholder="例：付款备注手机号 138**** · 微信名小明 · 一年档" style="width:100%">
             </label>
             <button type="button" id="btn-gen">生成兑换码</button>
           </div>
+          <p class="tip" id="code-note-hint">没写备注也能发码，但对账会很难找。学员付款备注格式：高级会员 + 档位 + 注册手机号。</p>
           <textarea id="code-out" readonly placeholder="生成后显示可复制给学员的话术"></textarea>
           <div class="row">
             <button type="button" class="secondary" id="btn-copy-code">复制整段话术</button>
@@ -182,7 +489,7 @@
           <div class="row">
             <button type="button" class="secondary" id="btn-refresh-ledger">刷新列表</button>
           </div>
-          <div style="overflow-x:auto">
+          <div class="table-scroll">
             <table>
               <thead>
                 <tr>
@@ -236,6 +543,8 @@
                       <th>备注</th>
                       <th>档位</th>
                       <th>到期</th>
+                      <th>注册</th>
+                      <th>最近活跃</th>
                       <th>设备</th>
                     </tr>
                   </thead>
@@ -273,6 +582,32 @@
         </section>
       </div>
 
+      <div class="tab-panel" data-panel="stats">
+        <section class="card">
+          <h2>每日趋势</h2>
+          <p class="tip">同图三条线：日活、注册、兑换（按北京日；账号每日去重）。日活=当天打开过站（挂登录态也算；同浏览器同日只上报一次）。从上线本功能起有数，不做历史回填。</p>
+          <div class="row" style="align-items:center">
+            <label>天数
+              <select id="stats-days">
+                <option value="7">近 7 天</option>
+                <option value="30" selected>近 30 天</option>
+                <option value="90">近 90 天</option>
+              </select>
+            </label>
+            <button type="button" class="secondary" id="btn-stats-reload">刷新</button>
+          </div>
+          <div class="stats-legend" aria-hidden="true">
+            <span><i class="lg-login"></i>日活</span>
+            <span><i class="lg-register"></i>注册</span>
+            <span><i class="lg-redeem"></i>兑换</span>
+          </div>
+          <div class="stats-chart-wrap">
+            <canvas id="stats-canvas" width="720" height="280" aria-label="每日登录注册兑换曲线"></canvas>
+          </div>
+          <p class="msg" id="stats-msg"></p>
+        </section>
+      </div>
+
       <div class="tab-panel" data-panel="policy">
         <section class="card">
           <h2>宣传链接奖励</h2>
@@ -300,26 +635,33 @@
           <p class="msg" id="referral-msg"></p>
         </section>
         <section class="card">
-          <h2>哪些内容要哪一档才能用</h2>
-          <p class="tip">推荐：登录本台后打开 <a href="/Solid?sandbox=geometry" target="_blank" rel="noopener">Solid</a>，右下角「权限涂色」，在课表/面板上点标签轮换档位（游客→会员→高级）。下面表格仍可改（几何场景 + 底部 Tab），改完点保存。</p>
-          <div class="row">
-            <button type="button" class="secondary" id="btn-reload-policy">刷新列表</button>
-            <button type="button" id="btn-save-policy">保存收费设置</button>
-            <button type="button" class="secondary" id="btn-dl-policy">下载配置备份</button>
+          <h2>怎么设置权限（推荐做法）</h2>
+          <p class="tip">日常改「哪节课 / 哪个面板要哪一档」，请用 Solid 里的<strong>权限涂色</strong>，不要在本页翻长列表。</p>
+          <div class="guide-box">
+            <h3>操作步骤</h3>
+            <ol class="guide-ol">
+              <li>先在本运营台登录（测站或正式站对应口令）。</li>
+              <li>打开 <a href="/Solid?sandbox=geometry" target="_blank" rel="noopener">Solid</a>（几何 / 肖像 / 头部造型规律均可）。</li>
+              <li>点右下角「权限涂色」，再点课表卡片角标或底部面板标签。</li>
+              <li>每点一次轮换：<strong>游客 → 会员 → 高级</strong>；改完自动保存到当前站点策略。</li>
+            </ol>
           </div>
-          <p class="msg" id="policy-msg"></p>
-          <h3 style="font-size:0.95rem;margin:14px 0 6px">场景（几何体）</h3>
-          <div style="max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:8px">
-            <table>
-              <thead><tr><th style="width:160px">权限</th><th>场景名</th></tr></thead>
-              <tbody id="scene-tbody"></tbody>
-            </table>
+          <div class="guide-box" style="margin-top:12px">
+            <h3>权限逻辑（大白话）</h3>
+            <ul class="guide-ol" style="list-style:disc">
+              <li><strong>游客</strong>：未登录，只能逛标成游客可见的内容。</li>
+              <li><strong>会员</strong>：手机号注册后免费；可看标成「会员」的课与功能。</li>
+              <li><strong>高级会员</strong>：兑码有效期内；可看标成「高级 / Pro」的课与功能。</li>
+              <li>列表角标是提示；真正拦不拦以服务器策略为准。改完让学员<strong>刷新页面</strong>再试。</li>
+              <li>测站涂色与正式站是两套环境：给真实用户生效，要以<strong>正式站</strong>为准（或发版同步后再验）。</li>
+            </ul>
           </div>
-          <h3 style="font-size:0.95rem;margin:14px 0 6px">功能按钮（Solid 底部面板）</h3>
-          <table>
-            <thead><tr><th style="width:160px">权限</th><th>功能</th></tr></thead>
-            <tbody id="ui-tbody"></tbody>
-          </table>
+          <p class="msg" id="policy-msg" hidden></p>
+          <button type="button" class="secondary" id="btn-save-policy" hidden>保存收费设置</button>
+          <button type="button" class="secondary" id="btn-reload-policy" hidden>刷新列表</button>
+          <button type="button" class="secondary" id="btn-dl-policy" hidden>下载配置备份</button>
+          <tbody id="scene-tbody" hidden></tbody>
+          <tbody id="ui-tbody" hidden></tbody>
         </section>
       </div>
 
@@ -369,8 +711,11 @@
     let selectedAcct = null;
 
     function switchTab(name) {
+      let activeTab = null;
       document.querySelectorAll('#ops-tabs .tab').forEach((b) => {
-        b.classList.toggle('active', b.getAttribute('data-tab') === name);
+        const on = b.getAttribute('data-tab') === name;
+        b.classList.toggle('active', on);
+        if (on) activeTab = b;
       });
       document.querySelectorAll('.tab-panel').forEach((p) => {
         p.classList.toggle('active', p.getAttribute('data-panel') === name);
@@ -382,6 +727,12 @@
           if (!acctCache || !acctCache.length) loadAcctList();
           else renderAcctTable(acctCache);
         } catch (_eAcct) {}
+      }
+      if (name === 'stats' && typeof loadDailyStats === 'function') {
+        try { loadDailyStats(); } catch (_eStats) {}
+      }
+      if (name === 'guide' && typeof loadBackupHistory === 'function') {
+        try { loadBackupHistory(); } catch (_eBh) {}
       }
     }
 
@@ -408,10 +759,30 @@
       return { res, data };
     }
 
+    function renderProbeBanner(st) {
+      const ban = $('probe-banner');
+      if (!ban) return;
+      const on = !!(st && st.allowProbeCodes);
+      ban.classList.toggle('on', on);
+      ban.classList.toggle('off', !on);
+      if ($('probe-title')) {
+        $('probe-title').textContent = on
+          ? '⚠ 测试假码：已开启'
+          : '✓ 测试假码：已关闭';
+      }
+      if ($('probe-desc')) {
+        $('probe-desc').textContent = on
+          ? 'PROBE-3M / PROBE-1Y / PROBE-FOREVER 现在可以兑成高级会员。正式卖课务必关掉。'
+          : '正式卖课安全状态。仅自测需要时再临时开启。';
+      }
+      if ($('btn-probe-off')) $('btn-probe-off').disabled = !on;
+      if ($('btn-probe-on')) $('btn-probe-on').disabled = on;
+    }
+
     function renderStatus(st) {
       canSaveOnline = !!st.canSaveOnline;
-      $('btn-save-policy').disabled = false;
-      $('btn-save-tiers').disabled = false;
+      if ($('btn-save-tiers')) $('btn-save-tiers').disabled = false;
+      renderProbeBanner(st || {});
       const box = $('status-box');
       if (!box) return;
       // 只在真正发不了码时提醒；正常情况不打扰
@@ -424,12 +795,37 @@
       }
     }
 
+    async function setProbeEnabled(on) {
+      setMsg($('probe-msg'), '保存中…', true);
+      const { res, data } = await api('/api/membership/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ allowProbeCodes: !!on })
+      });
+      if (!res.ok) {
+        setMsg($('probe-msg'), (data && data.error) || '保存失败', false);
+        return;
+      }
+      renderProbeBanner({ allowProbeCodes: !!(data.settings && data.settings.allowProbeCodes) });
+      setMsg($('probe-msg'), data.tip || (on ? '假码已开启' : '假码已关闭'), true);
+    }
+
     function fmtTime(ms) {
       if (!ms) return '—';
       try {
         const d = new Date(ms);
         const p = (n) => (n < 10 ? '0' + n : '' + n);
         return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+      } catch (_e) { return '—'; }
+    }
+
+    /** 仅日期（列表「注册 / 最近活跃」） */
+    function fmtDate(ms) {
+      if (!ms) return '—';
+      try {
+        const d = new Date(Number(ms));
+        if (isNaN(d.getTime())) return '—';
+        const p = (n) => (n < 10 ? '0' + n : '' + n);
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
       } catch (_e) { return '—'; }
     }
 
@@ -457,7 +853,7 @@
           '<td>' + status + '</td>' +
           '<td>' + who + '</td>' +
           '<td>' + escapeHtml(c.note || '') + '</td>' +
-          '<td class="row" style="margin:0">' +
+          '<td class="ops-cell-actions">' +
             '<button type="button" class="secondary btn-copy-one" data-code="' + escapeHtml(c.code) + '">复制</button>' +
             '<button type="button" class="secondary btn-reset-code" data-code="' + escapeHtml(c.code) + '">重置可再兑</button>' +
             '<button type="button" class="secondary btn-open-one" data-code="' + escapeHtml(c.code) + '">去兑换</button>' +
@@ -548,6 +944,7 @@
 
     function renderScenes(scenes) {
       const tb = $('scene-tbody');
+      if (!tb) return;
       tb.innerHTML = '';
       (scenes || []).forEach((s) => {
         const tr = document.createElement('tr');
@@ -566,6 +963,7 @@
         { id: 'ui:solid:tab:assist', label: '辅助' }
       ];
       const tb = $('ui-tbody');
+      if (!tb) return;
       tb.innerHTML = '';
       defs.forEach((d) => {
         const rule = (policy.resources && policy.resources[d.id]) || {};
@@ -644,6 +1042,71 @@
       return next;
     }
 
+    function fmtBackupAt(iso) {
+      if (!iso) return '—';
+      try {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return String(iso);
+        return d.toLocaleString('zh-CN', { hour12: false });
+      } catch (_e) {
+        return String(iso);
+      }
+    }
+
+    function triggerLabel(t) {
+      const s = String(t || 'manual');
+      if (s === 'prod-deploy') return '正式发版自动';
+      if (s === 'portal-24') return 'Portal 手动';
+      if (s === 'manual') return '手动';
+      return s;
+    }
+
+    function envLabel(e) {
+      const s = String(e || '');
+      if (s === 'prod' || s === 'production') return '正式站';
+      if (s === 'staging' || s === 'test' || s === 'preview') return '测站';
+      return s || '—';
+    }
+
+    function renderBackupHistory(bh) {
+      const tb = $('backup-tbody');
+      if (!tb) return;
+      const hints = (bh && bh.hints) || null;
+      if (hints && $('backup-hint')) {
+        $('backup-hint').textContent =
+          (hints.note || '') +
+          ' 目录：' + (hints.localDir || '历史备份文件/membership-kv/') +
+          '；钥：' + (hints.keyFile || '_backup.key');
+      }
+      const entries = (bh && Array.isArray(bh.entries)) ? bh.entries : [];
+      if (!entries.length) {
+        tb.innerHTML = '<tr><td colspan="6" class="tip">还没有备份摘要。在本机跑 Portal「24」或正式发版自动备份后，这里会出现记录。</td></tr>';
+        return;
+      }
+      tb.innerHTML = entries.map((row) => {
+        const dir = (row && row.localDir) || (hints && hints.localDir) || '历史备份文件/membership-kv/';
+        return '<tr>' +
+          '<td>' + fmtBackupAt(row && row.at) + '</td>' +
+          '<td>' + envLabel(row && row.env) + '</td>' +
+          '<td>' + triggerLabel(row && row.trigger) + '</td>' +
+          '<td><code style="font-size:0.85em">' + String((row && row.file) || '—') + '</code></td>' +
+          '<td>' + (row && row.keyCount != null ? row.keyCount : '—') + '</td>' +
+          '<td><code style="font-size:0.8em">' + String(dir) + '</code></td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    async function loadBackupHistory() {
+      setMsg($('backup-msg'), '加载中…', true);
+      const { res, data } = await api('/api/membership/admin/backup-history');
+      if (!res.ok) {
+        setMsg($('backup-msg'), (data && data.error) || '加载失败', false);
+        return;
+      }
+      renderBackupHistory(data || {});
+      setMsg($('backup-msg'), '', true);
+    }
+
     async function loadAll() {
       const { res, data } = await api('/api/membership/admin/overview');
       if (!res.ok) {
@@ -652,14 +1115,30 @@
       }
       policy = data.policy;
       tiersDoc = data.tiers;
-      renderStatus(data.status || {});
+      renderStatus(Object.assign({}, data.status || {}, {
+        allowProbeCodes: (data.status && data.status.allowProbeCodes) ||
+          (data.opsSettings && data.opsSettings.allowProbeCodes)
+      }));
       fillReferralForm(data.opsSettings || {});
-      renderUiTabs();
+      if ($('ui-tbody') && !$('ui-tbody').hidden) renderUiTabs();
       renderTiers();
-      const sc = await api('/api/membership/admin/policy?scenes=1&sandbox=geometry');
-      if (sc.res.ok && sc.data && sc.data.scenes) renderScenes(sc.data.scenes);
+      if (data.backupHistory) renderBackupHistory(data.backupHistory);
       await loadLedger();
       return true;
+    }
+
+    if ($('btn-backup-reload')) {
+      $('btn-backup-reload').onclick = () => loadBackupHistory();
+    }
+
+    if ($('btn-probe-off')) {
+      $('btn-probe-off').onclick = () => setProbeEnabled(false);
+    }
+    if ($('btn-probe-on')) {
+      $('btn-probe-on').onclick = () => {
+        if (!confirm('确认开启测试假码？仅用于自测。正式卖课时请保持关闭。')) return;
+        setProbeEnabled(true);
+      };
     }
 
     if ($('btn-save-referral')) {
@@ -718,6 +1197,15 @@
     };
 
     $('btn-gen').onclick = async () => {
+      const noteVal = (($('code-note') && $('code-note').value) || '').trim();
+      if (!noteVal) {
+        const go = confirm('还没写备注（手机号/微信名）。没有备注以后对账会很难。\n\n仍要继续生成吗？');
+        if (!go) {
+          if ($('code-note')) $('code-note').focus();
+          setMsg($('code-msg'), '已取消。建议先填备注再生成。', false);
+          return;
+        }
+      }
       setMsg($('code-msg'), '生成中…', true);
       const { res, data } = await api('/api/membership/admin/codes', {
         method: 'POST',
@@ -725,7 +1213,7 @@
           tierId: $('code-tier').value,
           count: Number($('code-count').value || 1),
           codeDays: Number($('code-days').value || 30),
-          note: ($('code-note') && $('code-note').value) || ''
+          note: noteVal
         })
       });
       if (!res.ok) {
@@ -774,33 +1262,9 @@
       window.open('/member?code=' + encodeURIComponent(code), '_blank', 'noopener');
     };
 
-    $('btn-reload-policy').onclick = () => loadAll();
-
-    $('btn-save-policy').onclick = async () => {
-      const next = collectPolicyFromUi();
-      setMsg($('policy-msg'), '保存中…', true);
-      const { res, data } = await api('/api/membership/admin/policy', {
-        method: 'PUT',
-        body: JSON.stringify({ policy: next })
-      });
-      if (!res.ok) {
-        setMsg($('policy-msg'), (data && data.error) || '保存失败', false);
-        return;
-      }
-      policy = data.policy;
-      setMsg($('policy-msg'), '已保存，学员端刷新后生效', true);
-      await loadAll();
-    };
-
-    $('btn-dl-policy').onclick = () => {
-      const next = collectPolicyFromUi();
-      const blob = new Blob([JSON.stringify(next, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'access-policy.json';
-      a.click();
-      setMsg($('policy-msg'), '已下载。若不能网页保存，把文件交给技术替换发版即可。', true);
-    };
+    if ($('btn-reload-policy')) $('btn-reload-policy').onclick = () => loadAll();
+    if ($('btn-save-policy')) $('btn-save-policy').onclick = async () => {};
+    if ($('btn-dl-policy')) $('btn-dl-policy').onclick = () => {};
 
     $('btn-save-tiers').onclick = async () => {
       const next = collectTiersFromUi();
@@ -968,6 +1432,8 @@
             ' · 到期 ' + escapeHtml(exp) + escapeHtml(leftTip) + '</div>' +
           '<div class="ent-sub">兑换码 ' + codeHtml + '</div>' +
         '</div>' +
+        '<div class="tip">注册：' + escapeHtml(fmtDate(account.createdAt)) +
+          ' · 最近活跃：' + escapeHtml(fmtTime(account.lastActiveAt)) + '</div>' +
         '<div class="tip">备注：' + escapeHtml(account.wechatNote || '—') + '</div>' +
         '<div class="tip">来源：' + escapeHtml(sourceLabel(ent.source)) +
           (ent.redeemedAt ? (' · 兑码时间 ' + fmtTime(ent.redeemedAt)) : '') + '</div>' +
@@ -980,11 +1446,11 @@
         devicesBox.innerHTML = '设备（' + devices.length + '/3）：<br>' + devices.map((d) => {
           const seen = d.lastSeenAt ? (' · 最近 ' + new Date(d.lastSeenAt).toLocaleString('zh-CN')) : '';
           const id = String(d.deviceId || '');
-          return '<div class="row" style="margin:4px 0;align-items:center">' +
+          return '<div class="ops-device-row">' +
             '<span>' + escapeHtml(d.label || '设备') + ' · ' + escapeHtml(id.slice(0, 12)) +
             escapeHtml(seen) + '</span>' +
             '<button type="button" class="secondary btn-kick-dev" data-device="' +
-            escapeHtml(id) + '" style="padding:4px 8px">踢掉</button></div>';
+            escapeHtml(id) + '">踢掉</button></div>';
         }).join('');
         devicesBox.querySelectorAll('.btn-kick-dev').forEach((btn) => {
           btn.onclick = () => kickDevice(btn.getAttribute('data-device') || '');
@@ -1023,7 +1489,7 @@
       meta.textContent = '共 ' + String((list || []).length) + ' 个账号' +
         (filtered ? '（筛选后 ' + rows.length + '）' : '');
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="tip">暂无账号</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="tip">暂无账号</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map((a) => {
@@ -1035,6 +1501,8 @@
           '<td>' + escapeHtml(a.wechatNote || '—') + '</td>' +
           '<td>' + escapeHtml(levelLabel(a)) + '</td>' +
           '<td>' + escapeHtml(expireLabel(a)) + '</td>' +
+          '<td>' + escapeHtml(fmtDate(a.createdAt)) + '</td>' +
+          '<td>' + escapeHtml(fmtDate(a.lastActiveAt)) + '</td>' +
           '<td>' + String(devN) + '/3</td></tr>';
       }).join('');
       tbody.querySelectorAll('tr[data-phone]').forEach((tr) => {
@@ -1179,6 +1647,117 @@
       }, '密码已重置');
       if (data) $('acct-new-pwd').value = '';
     };
+
+    let statsCache = null;
+    let statsLoading = false;
+
+    function drawStatsChart(series) {
+      const canvas = $('stats-canvas');
+      if (!canvas || !canvas.getContext) return;
+      const wrap = canvas.parentElement;
+      const cssW = Math.max(280, (wrap && wrap.clientWidth) || 720);
+      const cssH = 280;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.round(cssW * dpr);
+      canvas.height = Math.round(cssH * dpr);
+      canvas.style.width = cssW + 'px';
+      canvas.style.height = cssH + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cssW, cssH);
+      const pad = { l: 36, r: 12, t: 16, b: 36 };
+      const rows = Array.isArray(series) ? series : [];
+      const n = rows.length || 1;
+      let maxY = 1;
+      rows.forEach((r) => {
+        maxY = Math.max(maxY, Number(r.login) || 0, Number(r.register) || 0, Number(r.redeem) || 0);
+      });
+      const plotW = cssW - pad.l - pad.r;
+      const plotH = cssH - pad.t - pad.b;
+      const xAt = (i) => pad.l + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+      const yAt = (v) => pad.t + plotH - (v / maxY) * plotH;
+
+      ctx.strokeStyle = '#e5dfd3';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#6b645a';
+      ctx.font = '11px "Microsoft YaHei","PingFang SC",sans-serif';
+      const gridN = 4;
+      for (let g = 0; g <= gridN; g++) {
+        const val = Math.round((maxY * g) / gridN);
+        const y = yAt(val);
+        ctx.beginPath();
+        ctx.moveTo(pad.l, y);
+        ctx.lineTo(cssW - pad.r, y);
+        ctx.stroke();
+        ctx.fillText(String(val), 4, y + 3);
+      }
+
+      function strokeLine(key, color) {
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        rows.forEach((r, i) => {
+          const x = xAt(i);
+          const y = yAt(Number(r[key]) || 0);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        rows.forEach((r, i) => {
+          const x = xAt(i);
+          const y = yAt(Number(r[key]) || 0);
+          ctx.beginPath();
+          ctx.fillStyle = color;
+          ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+      strokeLine('login', '#1f4b7a');
+      strokeLine('register', '#2f6b3a');
+      strokeLine('redeem', '#9a5b00');
+
+      ctx.fillStyle = '#6b645a';
+      const labelStep = n > 20 ? 6 : (n > 10 ? 3 : 1);
+      rows.forEach((r, i) => {
+        if (i % labelStep !== 0 && i !== n - 1) return;
+        const label = String(r.day || '').slice(5);
+        ctx.fillText(label, xAt(i) - 12, cssH - 10);
+      });
+    }
+
+    async function loadDailyStats(force) {
+      if (statsLoading) return;
+      const daysEl = $('stats-days');
+      const days = (daysEl && daysEl.value) || '30';
+      if (!force && statsCache && statsCache.days === Number(days) && statsCache.series) {
+        drawStatsChart(statsCache.series);
+        return;
+      }
+      statsLoading = true;
+      setMsg($('stats-msg'), '加载中…', true);
+      try {
+        const { res, data } = await api('/api/membership/admin/stats?days=' + encodeURIComponent(days));
+        if (!res.ok) {
+          setMsg($('stats-msg'), (data && data.error) || '加载失败', false);
+          return;
+        }
+        statsCache = { days: Number(data.days) || Number(days), series: data.series || [] };
+        drawStatsChart(statsCache.series);
+        setMsg($('stats-msg'), data.tip || '', true);
+      } finally {
+        statsLoading = false;
+      }
+    }
+
+    if ($('btn-stats-reload')) {
+      $('btn-stats-reload').onclick = () => loadDailyStats(true);
+    }
+    if ($('stats-days')) {
+      $('stats-days').onchange = () => loadDailyStats(true);
+    }
+    window.addEventListener('resize', () => {
+      if (statsCache && statsCache.series) drawStatsChart(statsCache.series);
+    });
 
     (async () => {
       const { res } = await api('/api/membership/admin/overview');

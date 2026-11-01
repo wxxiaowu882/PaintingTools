@@ -1,42 +1,36 @@
 {
   "summary": {
-    "dryRun": true,
+    "dryRun": false,
     "fromDisk": true,
     "ok": true,
-    "readyPngBases": 591,
-    "filesTouched": 0,
-    "totalReplacements": 0,
-    "skippedNoReadyPng": [
-      {
-        "name": "静物_其它_房子.glb",
-        "count": 4
-      },
-      {
-        "name": "静物_其它_房子_20260413110850.glb",
-        "count": 2
-      },
-      {
-        "name": "静物_其它_房子_20260413110859.glb",
-        "count": 2
-      }
-    ],
-    "skippedTruncated": false,
-    "touchedSample": [],
-    "touchedTruncated": false
+    "backupRoot": ".cursor/browser-automation/runs/model-crypto-json-backup-2026-10-31T07-00-29-068Z",
+    "readyPngBases": 593,
+    "filesTouched": 5,
+    "totalReplacements": 8,
+    "skippedNoReadyPng": [],
+    "skippedTruncated": false
   },
-  "touched": [],
-  "skippedNoReadyPng": [
+  "touched": [
     {
-      "name": "静物_其它_房子.glb",
-      "count": 4
+      "file": "docs/json/沙盒_几何体静物/002_以简驭繁，从几何体开始.json",
+      "replacements": 1
     },
     {
-      "name": "静物_其它_房子_20260413110850.glb",
-      "count": 2
+      "file": "docs/json/沙盒_几何体静物/2501_【静物写生】自然场景01.json",
+      "replacements": 1
     },
     {
-      "name": "静物_其它_房子_20260413110859.glb",
-      "count": 2
+      "file": "docs/json/沙盒_几何体静物/2502_【静物写生】自然场景02.json",
+      "replacements": 1
+    },
+    {
+      "file": "docs/json/沙盒_几何体静物/2503_【静物写生】自然场景03.json",
+      "replacements": 1
+    },
+    {
+      "file": "docs/json/沙盒_几何体静物/沙盒_几何体静物.json",
+      "replacements": 4
     }
-  ]
+  ],
+  "skippedNoReadyPng": []
 }

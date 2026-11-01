@@ -857,6 +857,10 @@ const callPickFolderApi = async () => {
     try {
         // 选目录对话框可能被挡住：90s 超时后交给上层回退浏览器选目录
         const data = await callJsonApi(PICK_FOLDER_API_URLS, {}, { timeoutMs: 90000 });
+        // 服务端判定「秒退」：不当成用户取消，抛给上层走浏览器回退
+        if (data && data.error && /exited too fast|native picker/i.test(String(data.error))) {
+            throw new Error(String(data.error));
+        }
         if (data.cancelled) return null;
         if (data.ok && data.path) {
             const normalized = normalizeDirPath(data.path);
@@ -3381,12 +3385,20 @@ try {
         logDebug('📂 18080 可用：一次系统选目录并记住路径');
         let picked = null;
         let nativeFailed = false;
+        const pickT0 = performance.now();
         try {
             picked = await callPickFolderApi();
         } catch (pickErr) {
             nativeFailed = true;
             logDebug('⚠️ 本机选目录失败，将回退浏览器选目录', pickErr);
             if (st) st.innerText = '本机选目录失败，改用浏览器选目录…';
+        }
+        const pickElapsed = performance.now() - pickT0;
+        // 秒关（常见：本机对话框没弹出）≠ 用户真取消；回退浏览器选目录，避免「点了没反应」
+        if (!nativeFailed && !picked && pickElapsed < 1200) {
+            nativeFailed = true;
+            logDebug('⚠️ 本机选目录秒关（疑似对话框未弹出），回退浏览器选目录', { pickElapsed: Math.round(pickElapsed) });
+            if (st) st.innerText = '本机选目录窗未弹出，改用浏览器选目录…';
         }
         if (!nativeFailed) {
             if (!picked) {

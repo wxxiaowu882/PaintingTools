@@ -11,7 +11,10 @@ const { spawnSync } = require('child_process');
 
 const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const dir = path.join(repoRoot, 'docs', 'json', '沙盒_肖像光影沙盒');
-const modelDir = path.join(repoRoot, 'docs', 'model');
+const modelDirs = [
+  path.join(repoRoot, 'docs', 'm'),
+  path.join(repoRoot, 'docs', 'model')
+];
 const batchPath = process.argv[2];
 if (!batchPath) {
   console.error('usage: node scripts/portrait-add-scenes-from-glb.js <batch.json>');
@@ -41,9 +44,9 @@ for (const row of items) {
   const n = Number(row.n);
   if (!n) continue;
   const glbName = String(row.glb || '').replace(/^.*[\\/]/, '');
-  const glbAbs = path.join(modelDir, glbName);
-  if (!fs.existsSync(glbAbs)) {
-    console.warn('missing glb', glbName);
+  const glbAbs = modelDirs.map((d) => path.join(d, glbName)).find((p) => fs.existsSync(p));
+  if (!glbAbs) {
+    console.warn('missing model', glbName);
     continue;
   }
   const outName = `${n}_${n}.json`;
@@ -55,6 +58,23 @@ for (const row of items) {
   const tpl = loadTemplate(row.templateN || 27);
   const data = JSON.parse(JSON.stringify(tpl));
   data.name = String(row.name);
+  // 课号权威键：必须写成本课 n，禁止继承模板 uid（否则列表全变成「71 · xxx」）
+  data.uid = row.uid != null && String(row.uid).trim() !== '' ? String(row.uid).trim() : String(n);
+  if (Object.prototype.hasOwnProperty.call(data, 'id')) delete data.id;
+  // 硬闸：与其它单课 uid 撞号则拒绝写入（防 AI/脚本再踩坑）
+  {
+    const clash = fs.readdirSync(dir).filter((name) => {
+      if (!/^\d+_.+\.json$/.test(name) || name === outName) return false;
+      try {
+        const other = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+        return other && String(other.uid || '').trim() === data.uid;
+      } catch (_e) { return false; }
+    });
+    if (clash.length) {
+      console.error('[portrait-add] FATAL uid collision', data.uid, 'with', clash.join(', '));
+      process.exit(1);
+    }
+  }
   data.thumbnail = tinyThumb;
   data.meta = data.meta && typeof data.meta === 'object' ? data.meta : {};
   data.meta.material = row.material || '石膏';

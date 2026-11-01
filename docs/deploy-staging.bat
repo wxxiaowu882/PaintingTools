@@ -38,6 +38,26 @@ if errorlevel 1 (
   goto finish_fail
 )
 
+echo [0a/2] Verify Android APK channels (prod vs staging package ids)...
+>>"%LOG%" echo [0a/2] verify-apk-channels start
+if /I "%SKIP_APK_CHANNEL_CHECK%"=="1" (
+  echo [0a/2] SKIP_APK_CHANNEL_CHECK=1 — skipped
+  >>"%LOG%" echo [0a/2] verify-apk-channels SKIPPED
+) else (
+  call node "docs\app\verify-apk-channels.mjs"
+  if errorlevel 1 (
+    echo [ERROR] APK channel check failed — refuse staging deploy
+    echo         Fix: copy staging flavor to docs\app\wuxiao-workshop-staging.apk
+    echo              and prod flavor to docs\app\wuxiao-workshop.apk
+    echo         Emergency skip only: SET SKIP_APK_CHANNEL_CHECK=1
+    >>"%LOG%" echo [ERROR] verify-apk-channels failed
+    goto finish_fail
+  )
+  echo [0a/2] APK channels OK
+  >>"%LOG%" echo [0a/2] verify-apk-channels OK
+)
+echo.
+
 echo [0/2] Sync model deploy allowlist (.assetsignore)...
 >>"%LOG%" echo [0/2] sync-model-assetsignore start
 call node "docs\membership\sync-model-assetsignore.mjs"

@@ -22,6 +22,7 @@ echo   Deploy soft-voice-f822 (Worker)
 echo ========================================
 echo   Log: %LOG%
 echo   0) preflight secrets + probe off
+echo   0b) backup prod membership KV ^(encrypted^)
 echo   1) bump site version stamp + sync policy
 echo   2) build functions -^> dist/worker
 echo   3) wrangler deploy --env=""  ^(prod^)
@@ -50,6 +51,30 @@ if /i "%SKIP_PREFLIGHT%"=="1" (
   )
   echo [0/4] preflight OK
   >>"%LOG%" echo [0/4] preflight OK
+)
+echo.
+
+echo [0b/4] Backup prod membership KV (encrypted -^> history backup folder)...
+>>"%LOG%" echo [0b/4] kv backup start
+if /i "%SKIP_KV_BACKUP%"=="1" (
+  echo [0b/4] SKIP_KV_BACKUP=1, skip
+  >>"%LOG%" echo [0b/4] skipped
+) else (
+  set KV_BACKUP_TRIGGER=prod-deploy
+  call node "docs\membership\backup-membership-kv.mjs" --env=prod
+  set KV_BACKUP_TRIGGER=
+  if errorlevel 1 (
+    echo [WARN] kv backup failed - deploy continues ^(set REQUIRE_KV_BACKUP=1 to hard-fail^)
+    >>"%LOG%" echo [WARN] kv backup failed
+    if /i "%REQUIRE_KV_BACKUP%"=="1" (
+      echo [ERROR] REQUIRE_KV_BACKUP=1, abort deploy
+      >>"%LOG%" echo [ERROR] REQUIRE_KV_BACKUP abort
+      goto finish_fail
+    )
+  ) else (
+    echo [0b/4] kv backup OK
+    >>"%LOG%" echo [0b/4] kv backup OK
+  )
 )
 echo.
 
@@ -84,6 +109,24 @@ if /i "%SKIP_POLICY_SYNC%"=="1" (
 echo.
 
 echo [2/4] Sync model deploy allowlist + build Functions...
+>>"%LOG%" echo [2/4a0] verify-apk-channels start
+if /I "%SKIP_APK_CHANNEL_CHECK%"=="1" (
+  echo [2/4a0] SKIP_APK_CHANNEL_CHECK=1 — skipped
+  >>"%LOG%" echo [2/4a0] verify-apk-channels SKIPPED
+) else (
+  call node "docs\app\verify-apk-channels.mjs"
+  if errorlevel 1 (
+    echo [ERROR] APK channel check failed — refuse prod deploy
+    echo         Fix: prod apk -^> docs\app\wuxiao-workshop.apk
+    echo              staging apk -^> docs\app\wuxiao-workshop-staging.apk
+    echo         Emergency skip only: SET SKIP_APK_CHANNEL_CHECK=1
+    >>"%LOG%" echo [ERROR] verify-apk-channels failed
+    goto finish_fail
+  )
+  echo [2/4a0] APK channels OK
+  >>"%LOG%" echo [2/4a0] verify-apk-channels OK
+)
+
 >>"%LOG%" echo [2/4a] sync-model-assetsignore start
 call node "docs\membership\sync-model-assetsignore.mjs"
 if errorlevel 1 (

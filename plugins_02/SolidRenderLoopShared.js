@@ -15,6 +15,72 @@ export function solidShouldContinueSampling(currentSamples, targetSamples) {
   return current < target;
 }
 
+/**
+ * 首帧采样 / 着色器编译双保险丝（纯判定，无副作用）。
+ * - hold_compiling：编译中，短超时不计；调用方应记下 compileSince
+ * - restart_sample_clock：刚离开编译，调用方应把 lastResetAt 拨到 now
+ * - fail_compile_timeout / fail_sample_timeout / fail_first_attempt_timeout：应降级回光栅
+ * - firstAttemptMode：本页尚未证明能追光时，只用很长总上限（主要靠用户放弃）
+ */
+export function solidEvalFirstSampleWatchdog(opts = {}) {
+  const samples = Number(opts.samples || 0);
+  if (!Number.isFinite(samples) || samples > 0) {
+    return { action: 'none', clearCompileTracking: true };
+  }
+  if (opts.disabled === true || opts.isLoadingScene === true) {
+    return { action: 'none' };
+  }
+  const now = Number(opts.now || 0);
+  const lastResetAt = Number(opts.lastResetAt || 0);
+  if (!Number.isFinite(now) || !Number.isFinite(lastResetAt) || lastResetAt <= 0) {
+    return { action: 'none' };
+  }
+
+  const compiling = !!opts.isCompiling;
+  const compileSinceRaw = Number(opts.compileSince || 0);
+  const wasCompiling = !!opts.wasCompiling;
+  const firstAttemptMode = !!opts.firstAttemptMode;
+  const attemptSinceRaw = Number(opts.attemptSince || 0);
+  const attemptSince = (Number.isFinite(attemptSinceRaw) && attemptSinceRaw > 0) ? attemptSinceRaw : lastResetAt;
+  const firstLimit = Number(opts.firstAttemptTimeoutMs || 180000);
+
+  if (firstAttemptMode) {
+    if (compiling) {
+      const compileSince = (Number.isFinite(compileSinceRaw) && compileSinceRaw > 0) ? compileSinceRaw : now;
+      if (Number.isFinite(firstLimit) && firstLimit > 0 && (now - attemptSince) > firstLimit) {
+        return { action: 'fail_first_attempt_timeout', compileSince };
+      }
+      return { action: 'hold_compiling', compileSince, markWasCompiling: true };
+    }
+    if (wasCompiling) {
+      return { action: 'restart_sample_clock', clearCompileTracking: true };
+    }
+    if (Number.isFinite(firstLimit) && firstLimit > 0 && (now - attemptSince) > firstLimit) {
+      return { action: 'fail_first_attempt_timeout' };
+    }
+    return { action: 'none' };
+  }
+
+  if (compiling) {
+    const compileSince = (Number.isFinite(compileSinceRaw) && compileSinceRaw > 0) ? compileSinceRaw : now;
+    const compileLimit = Number(opts.compileTimeoutMs || 60000);
+    if (Number.isFinite(compileLimit) && compileLimit > 0 && (now - compileSince) > compileLimit) {
+      return { action: 'fail_compile_timeout', compileSince };
+    }
+    return { action: 'hold_compiling', compileSince, markWasCompiling: true };
+  }
+
+  if (wasCompiling) {
+    return { action: 'restart_sample_clock', clearCompileTracking: true };
+  }
+
+  const sampleLimit = Number(opts.sampleTimeoutMs || 12000);
+  if (Number.isFinite(sampleLimit) && sampleLimit > 0 && (now - lastResetAt) > sampleLimit) {
+    return { action: 'fail_sample_timeout' };
+  }
+  return { action: 'none' };
+}
+
 export function solidShouldAutoStopRender(opts = {}) {
   if (!opts || opts.enabled !== true) return false;
   const threshold = Number(opts.autoStopSamples || 0);
@@ -57,12 +123,16 @@ export function solidIsNearBlackRgba(r, g, b, lumaMax = 10) {
 }
 
 /**
- * 根据多点 RGBA 样本判定是否「整屏近黑」。
+ * 根据多点 RGBA 样本判定是否「内容区近黑 / 假进度」。
  * samples: [{r,g,b}...] 或扁平 Uint8Array（每 4 字节一点）。
+ *
+ * 不要用「四角黑」当证据（聚光灯场景四角本就黑）。
+ * 点应采自画面中部（见 solidBlankOutputProbePoints interiorGrid）；
+ * 多数点近黑才算（单点碰巧踩进阴影不够格）。
  */
 export function solidIsNearBlackSampleSet(samples, opts = {}) {
   const lumaMax = Number(opts.lumaMax != null ? opts.lumaMax : 10);
-  const minNear = Number(opts.minNearBlackPoints != null ? opts.minNearBlackPoints : 4);
+  const minNear = Number(opts.minNearBlackPoints != null ? opts.minNearBlackPoints : 9);
   let list = [];
   if (samples && typeof samples.length === 'number' && samples.length && typeof samples[0] === 'object' && samples[0] != null && 'r' in samples[0]) {
     list = Array.from(samples);
@@ -81,24 +151,56 @@ export function solidIsNearBlackSampleSet(samples, opts = {}) {
   return near >= need;
 }
 
-/** 中心 + 四角内缩的 5 个画布采样点（CSS/backing 像素坐标系，原点左下时由调用方换算）。 */
-export function solidBlankOutputProbePoints(width, height, inset = 0.18) {
+/**
+ * 空输出探针采样点。
+ * - 默认 / opts.mode==='interiorGrid'：画面中部 N×N 网格（躲开四角黑底）
+ * - opts.mode==='corners' 或传入数字 inset：旧版「中心+四角」（易误判，仅兼容）
+ * 坐标：backing 像素；WebGL 默认 FBO 原点左下，由调用方按此理解。
+ */
+export function solidBlankOutputProbePoints(width, height, insetOrOpts = 0.28) {
   const w = Math.max(1, Math.floor(Number(width) || 1));
   const h = Math.max(1, Math.floor(Number(height) || 1));
-  let t = Number(inset);
-  if (!Number.isFinite(t)) t = 0.18;
-  t = Math.max(0.05, Math.min(0.4, t));
-  const x0 = Math.max(0, Math.min(w - 1, Math.floor(w * t)));
-  const x1 = Math.max(0, Math.min(w - 1, Math.floor(w * (1 - t))));
-  const y0 = Math.max(0, Math.min(h - 1, Math.floor(h * t)));
-  const y1 = Math.max(0, Math.min(h - 1, Math.floor(h * (1 - t))));
-  const cx = Math.max(0, Math.min(w - 1, Math.floor(w * 0.5)));
-  const cy = Math.max(0, Math.min(h - 1, Math.floor(h * 0.5)));
-  return [
-    { x: cx, y: cy },
-    { x: x0, y: y0 },
-    { x: x1, y: y0 },
-    { x: x0, y: y1 },
-    { x: x1, y: y1 },
-  ];
+  let opts = insetOrOpts;
+  if (opts == null || typeof opts === 'number') {
+    opts = { mode: 'interiorGrid', interiorMargin: opts != null ? opts : 0.28 };
+  }
+  const mode = opts.mode === 'corners' ? 'corners' : 'interiorGrid';
+
+  if (mode === 'corners') {
+    let t = Number(opts.pointInset != null ? opts.pointInset : 0.18);
+    if (!Number.isFinite(t)) t = 0.18;
+    t = Math.max(0.05, Math.min(0.4, t));
+    const x0 = Math.max(0, Math.min(w - 1, Math.floor(w * t)));
+    const x1 = Math.max(0, Math.min(w - 1, Math.floor(w * (1 - t))));
+    const y0 = Math.max(0, Math.min(h - 1, Math.floor(h * t)));
+    const y1 = Math.max(0, Math.min(h - 1, Math.floor(h * (1 - t))));
+    const cx = Math.max(0, Math.min(w - 1, Math.floor(w * 0.5)));
+    const cy = Math.max(0, Math.min(h - 1, Math.floor(h * 0.5)));
+    return [
+      { x: cx, y: cy },
+      { x: x0, y: y0 },
+      { x: x1, y: y0 },
+      { x: x0, y: y1 },
+      { x: x1, y: y1 },
+    ];
+  }
+
+  let margin = Number(opts.interiorMargin != null ? opts.interiorMargin : 0.28);
+  if (!Number.isFinite(margin)) margin = 0.28;
+  margin = Math.max(0.15, Math.min(0.4, margin));
+  let n = Math.floor(Number(opts.gridSize != null ? opts.gridSize : 3));
+  if (!Number.isFinite(n)) n = 3;
+  n = Math.max(2, Math.min(5, n));
+  const pts = [];
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const u = n === 1 ? 0.5 : margin + (1 - 2 * margin) * (i / (n - 1));
+      const v = n === 1 ? 0.5 : margin + (1 - 2 * margin) * (j / (n - 1));
+      pts.push({
+        x: Math.max(0, Math.min(w - 1, Math.floor(w * u))),
+        y: Math.max(0, Math.min(h - 1, Math.floor(h * v))),
+      });
+    }
+  }
+  return pts;
 }

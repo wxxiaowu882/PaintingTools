@@ -1,19 +1,23 @@
 # 童画师吴晓 · 安卓套壳（WebView）
 
-桌面一点打开测试站 [https://test.wuxiaoart.com/](https://test.wuxiaoart.com/)（验收期）。  
 **只加载线上站，APK 内不打包任何网页 / JS / 模型**；本目录在 `自用工具文件_不部署/`，**不会**进 Cloudflare 站点部署。
+
+| 项 | 正式（prod） | 测站（staging） |
+|----|--------------|-----------------|
+| 桌面名 | **手绘工坊** | **手绘工坊·测** |
+| 包名 | `com.wuxiaoart.workshop` | `com.wuxiaoart.workshop.staging` |
+| 启动站 | `https://www.wuxiaoart.com/` | `https://test.wuxiaoart.com/` |
+| 同机并存 | 可以（两套包名互不覆盖） | 可以 |
 
 | 项 | 值 |
 |----|-----|
-| 桌面名 | **手绘工坊** |
-| 包名 | `com.wuxiaoart.workshop` |
 | 最低安卓 | 7.0（API 24） |
-| 分发 | 学员群侧载（不上应用商店） |
-| 启动站 | **测试站** `https://test.wuxiaoart.com/`（`BuildConfig.START_URL`；正式包再改 `www`） |
+| 分发 | 学员群侧载（不上应用商店）；测站包仅自用验收 |
 | 资源是否进包 | **否**。壳 ≈ 空壳 WebView；JS/CSS/GLB 全部现网拉取，**网页内容更新不用换 APK** |
-| App 强制更新 | 启动读 `/docs/app/android-shell-update.json`；本机 versionCode 低于 `minVersionCode` 则拦进站并跳 APK 下载（对外统称 App 更新） |
-| 当前可测包 | `dist/手绘工坊-1.0.20-debug.apk`；发测试站时同步 `docs/app/wuxiao-workshop.apk` |
+| App 强制更新 | 启动读各自源站 `/docs/app/android-shell-update.json`；本机 versionCode 低于 `minVersionCode` 则拦进站并跳 APK 下载 |
+| 当前可测包 | `dist/手绘工坊-1.0.24-prod-debug.apk`、`dist/手绘工坊-1.0.24-staging-debug.apk`；正式发站同步 `docs/app/wuxiao-workshop.apk`（prod） |
 | 对外下载页 | 站点 `/docs/app/`（浏览器菜单「安卓 App 下载」；**App 内隐藏该入口**） |
+| 1.0.24 | 正式/测站双 flavor，可同机并存 |
 | 1.0.1 | 修复：相册选图、Cookie、blob/data；描摹可申请摄像头 |
 | 1.0.2 | 启动 URL 改为测试站 |
 | 1.0.3 | 壳强制更新（仅壳版本，不逼内容更新） |
@@ -62,9 +66,12 @@ iPhone 不能装本 APK；请用 Safari 打开站点后「添加到主屏幕」�
 
 ```bash
 # Windows（Git Bash / CMD），需本机已装 JDK 17 + Android SDK 35
-./gradlew.bat assembleDebug
-# 产物：app/build/outputs/apk/debug/app-debug.apk
-# 亦可复制到 dist/手绘工坊-1.0.8-debug.apk（APK 默认不入库）
+./gradlew.bat assembleStagingDebug   # 测站壳 → 桌面「手绘工坊·测」
+./gradlew.bat assembleProdDebug      # 正式壳 → 桌面「手绘工坊」
+# 产物：
+#   app/build/outputs/apk/staging/debug/app-staging-debug.apk
+#   app/build/outputs/apk/prod/debug/app-prod-debug.apk
+# 亦可复制到 dist/（APK 默认不入库）
 ```
 
 Gradle 发行包默认走腾讯云镜像（见 `gradle/wrapper/gradle-wrapper.properties`）。
@@ -82,11 +89,13 @@ keytool -genkeypair -v -keystore release.keystore -alias wuxiao \
 3. 构建：
 
 ```bash
-./gradlew.bat assembleRelease
-# 产物：app/build/outputs/apk/release/app-release.apk
+./gradlew.bat assembleStagingRelease assembleProdRelease
+# 产物：
+#   app/build/outputs/apk/staging/release/app-staging-release.apk
+#   app/build/outputs/apk/prod/release/app-prod-release.apk
 ```
 
-4. 把 APK 拷到 `dist/` 或发群文件。**同一 keystore** 才能以后覆盖更新。
+4. 学员群发 **prod** 包；自用验收装 **staging** 包。拷到 `dist/` 或发群文件。**同一 keystore** 才能以后同渠道覆盖更新。
 
 `*.jks` / `*.keystore` / `keystore.properties` / `*.apk` 已在 `.gitignore`。
 
@@ -94,9 +103,10 @@ keytool -genkeypair -v -keystore release.keystore -alias wuxiao \
 
 ## 行为说明
 
-- 启动 URL：测试站 `https://test.wuxiaoart.com/`（`BuildConfig.START_URL`）
+- 启动 URL：由 flavor 决定（prod→正式站，staging→测站；见上表）
 - **未**把 `docs/js`、页面 HTML、模型打进 APK；体积小，内容跟线上走
 - **壳更新 vs 站更新**：改网页/场景 → 只发站；改壳 → 升 versionCode、打 APK、更新 `docs/app/` 的 json+apk 再发站
+- **强制更新注意**：升 `minVersionCode` 会同时影响读同一 json 的正式壳与测站壳；发测站包时先上传对应 APK，再抬 min
 - **顶栏安全区（1.0.15+）**：沉浸式全屏不垫 WebView；页面加载后注入 `--app-safe-top`（状态栏高度，至少 20px），仅下移 Solid/晓色顶栏与菜单游客条。浏览器打开站点不受影响
 - **1.0.16**：Solid「童画师解析」与三杠错开；晓色品牌栏顶空；配置弹层禁 blur、锁背后滚动
 - **1.0.17**：× 恢复无边框原样（仅扩大透明热区）；配置页打开/切 Tab 性能重做；壳侧不再改 × 外观

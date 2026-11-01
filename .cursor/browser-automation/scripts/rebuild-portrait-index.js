@@ -46,6 +46,32 @@ for (const name of names) {
   }
 }
 
+/** uid 碰撞会让列表编号错乱（如多课同显「71 ·」）；缺 uid 则口头报号失效 */
+const uidMap = new Map();
+const uidCollisions = [];
+const missingUid = [];
+for (let i = 0; i < merged.length; i++) {
+  const sc = merged[i];
+  const file = names[i];
+  const uid = sc && sc.uid != null ? String(sc.uid).trim() : '';
+  if (!uid) {
+    missingUid.push(file + ':' + ((sc && sc.name) || '?'));
+    continue;
+  }
+  if (uidMap.has(uid)) {
+    uidCollisions.push({ uid, a: uidMap.get(uid), b: file + ':' + ((sc && sc.name) || '?') });
+  } else {
+    uidMap.set(uid, file + ':' + ((sc && sc.name) || '?'));
+  }
+}
+if (uidCollisions.length) {
+  console.error('[rebuild-portrait-index] FATAL uid collisions:', JSON.stringify(uidCollisions, null, 2));
+  process.exit(1);
+}
+if (missingUid.length) {
+  console.warn('[rebuild-portrait-index] WARN missing uid:', missingUid.slice(0, 20));
+}
+
 const outPath = path.join(dir, masterName);
 fs.writeFileSync(outPath, JSON.stringify(merged));
 
@@ -54,5 +80,7 @@ console.log(JSON.stringify({
   files: names.length,
   merged: merged.length,
   skipped,
+  uidCount: uidMap.size,
+  missingUid: missingUid.length,
   out: outPath
 }, null, 2));

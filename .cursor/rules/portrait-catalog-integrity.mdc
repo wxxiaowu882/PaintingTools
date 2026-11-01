@@ -1,0 +1,28 @@
+---
+description: 肖像课表完整性：加课须重写 uid；锁课削薄不得丢掉编号与儿童等筛选字段（防 AI 再踩坑）
+alwaysApply: true
+---
+
+# 肖像 / Solid 课表完整性（AI 防再犯）
+
+权威细则：`docs/站点安全配置.md` **§9**。曾实踩：**儿童筛空 + 多课同显「71 ·」**。
+
+## 加课 / 改单课 JSON（最高频失误）
+
+1. **禁止手改** `docs/json/`；用脚本（如 `portrait-add-scenes-from-glb.js` / `portrait-apply-meta-batch.js`）再 `rebuild-portrait-index.js`。
+2. **克隆模板后必须重写 `uid` = 本课号**（如 `144`）。**禁止**继承模板 `uid`（曾把 144–149 全写成 `71`）。
+3. 模型目录以 **`docs/m`** 为准（可兼容旧 `docs/model`）；URL 用 `/docs/m/...`。
+4. 写完必须跑重建；**uid 碰撞时重建应失败**——不得跳过或强行合并。
+5. 交付前本地打开 `/Solid?sandbox=portrait`：看「儿童」数量是否合理、课名编号是否各不相同（勿只信脚本 exit 0）。
+
+## 会员课表削薄 / 列表卡（改 Membership 时）
+
+1. 锁课可去掉 `items`/标注等载荷，**必须保留**：`uid`（及 `id`）、`meta.material/gender/age/region`，以及 headform 的 `line/slot/modelId` 等。
+2. **禁止**「只留 category/detail」的 strip 再拼列表卡——本地无 Functions 回退与线上 `toCatalogListCard` **必须同口径**。
+3. 改动落点：`docs/js/membership/MembershipAccess.js`、`functions/membership/policy.js`；改一处须核对另一处。
+
+## 不要做的
+
+- 不要为「列表更轻」再删掉筛选 meta 或 uid。
+- 不要假设「detail 文案在，芯片就能筛」——主路径仍须保留结构化 `meta.age` 等；detail 仅兜底。
+- 不要在未跑重建、未看儿童筛+编号的情况下宣称加课完成。

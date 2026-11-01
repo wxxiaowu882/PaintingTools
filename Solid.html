@@ -14,6 +14,9 @@
 <meta name="keywords" content="几何光影,头部造型规律,明暗交界,外轮廓,肖像光影,石膏素描,水彩人物教程,肖像画教程,童画师吴晓,手绘工坊">
 <meta name="author" content="童画师吴晓">
 <link rel="canonical" href="https://www.wuxiaoart.com/Solid">
+<link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-32.png?v=fav7" type="image/png" sizes="32x32">
+<link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-192.png?v=fav7" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" data-wuxiao-brand-icon="1" href="/apple-touch-icon.png?v=fav8" sizes="180x180">
 <meta property="og:title" content="几何光影与头部造型规律｜3D 场景课 - 童画师吴晓">
 <meta property="og:description" content="几何体光影、头部造型规律、肖像光影沙盒。手绘工坊 · 童画师吴晓免费场景课。">
 <meta property="og:image" content="https://www.wuxiaoart.com/docs/img/wuxiao_s.jpg">
@@ -26,7 +29,7 @@
     <script type="importmap">{ "imports": { "three": "./docs/js/three_164/three.module.js", "three/addons/controls/OrbitControls.js": "./docs/js/three_164/OrbitControls.js",
     "three/addons/loaders/GLTFLoader.js": "./docs/js/three_164/examples/jsm/loaders/GLTFLoader.js", "three/addons/loaders/DRACOLoader.js": "./docs/js/three_164/examples/jsm/loaders/DRACOLoader.js", "three/addons/": "./docs/js/three_164/examples/jsm/",
     "three/examples/jsm/": "./docs/js/three_164/examples/jsm/", "three/": "./docs/js/three_164/", "three-mesh-bvh": "./docs/js/three-mesh-bvh.js",
-    "three-gpu-pathtracer": "./docs/js/three-gpu-pathtracer.js" } }</script> <script src="docs/js/GlobalMenu.js?v=menuhigh3"></script> <script src="docs/js/SolidHelp.js"></script> <style>
+    "three-gpu-pathtracer": "./docs/js/three-gpu-pathtracer.js" } }</script> <script src="docs/js/GlobalMenu.js?v=brandicon7"></script> <script src="docs/js/SolidHelp.js"></script> <style>
     body{margin:0;overflow:hidden;background-color:#050505;font-family:'Inter',-apple-system,sans-serif;-webkit-user-select:none;user-select:none;} .font-hairline{font-weight:100;}.font-thin{font-weight:200;}
     /* 顶栏按钮只做“视觉上移”，不影响画布/模型区 */
     #menu-trigger-overlay{position:fixed;top:20px;right:20px;width:44px;height:44px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;cursor:pointer;z-index:7002;background:transparent;opacity:0.82;transform:translateY(calc(env(safe-area-inset-top, 0px) - 16px));}
@@ -76,11 +79,13 @@
     .modal-close { cursor:pointer; width:32px; height:32px; flex-shrink:0; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.08); border:none; border-radius:10px; font-size:18px; line-height:1; position:relative; z-index:9001; pointer-events:auto; color:rgba(255,255,255,0.7); user-select:none; -webkit-tap-highlight-color:transparent; }
     .modal-close:hover { background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.9); }
     /* pan-y 对齐 Portrait_c 列表：明确纵向滑动手势，避免 manipulation 与滚动容器抢手势 */
-    .scene-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows:max-content; gap:15px; overflow-y:auto; flex:1; align-content:start; padding-bottom:30px; min-height:0; -webkit-overflow-scrolling:touch; touch-action:pan-y; overscroll-behavior-y:contain; }
+    .scene-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); grid-auto-rows:max-content; gap:15px; overflow-y:auto; flex:1; align-content:start; padding-bottom:30px; min-height:0; -webkit-overflow-scrolling:touch; touch-action:pan-y; overscroll-behavior-y:contain; scrollbar-width:none; -ms-overflow-style:none; }
+    /* 默认（移动端）不露滚动条，仍可手指滑；与顶部分类条同口径 */
+    .scene-grid::-webkit-scrollbar { display:none; width:0; height:0; }
     /* PC 课表滚动条：低调深灰，避免系统默认死白滑块抢戏 */
     @media (hover: hover) and (pointer: fine) {
       .scene-grid { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
-      .scene-grid::-webkit-scrollbar { width: 5px; }
+      .scene-grid::-webkit-scrollbar { display:block; width: 5px; height:auto; }
       .scene-grid::-webkit-scrollbar-track { background: transparent; }
       .scene-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; border: 1px solid transparent; background-clip: padding-box; }
       .scene-grid::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); background-clip: padding-box; }
@@ -302,6 +307,7 @@
         solidIsInRasterPreviewBridge,
         solidShouldBlockSamplingWhenPending,
         solidShouldContinueSampling,
+        solidEvalFirstSampleWatchdog,
         solidShouldProbeBlankOutput,
         solidIsNearBlackSampleSet,
         solidBlankOutputProbePoints,
@@ -450,7 +456,9 @@
     // 默认不自动开启渲染：初次进入为预览模式，需用户点击「开始渲染」再尝试开启完整效果
     window.useAdvancedRender = false;
     window._solidUserStoppedRender = true;
-    window.perfTestDone = false; window.isTestingPerformance = true; window.isLoadingScene = false; window._solidHardwareUnsupported = false; window._solidPerfSoftFail = false; window._solidSampleTimeout = false; window._solidBlankOutputFail = false; window._solidBlankProbeDisabled = false; window._solidBlankProbeHits = 0; window._solidBlankProbeLastAt = 0; window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
+    window.perfTestDone = false; window.isTestingPerformance = true; window.isLoadingScene = false; window._solidHardwareUnsupported = false; window._solidPerfSoftFail = false; window._solidSampleTimeout = false; window._solidBlankOutputFail = false; window._solidBlankProbeDisabled = false; window._solidBlankProbeHits = 0; window._solidBlankProbeLastAt = 0;
+    window._solidPtFirstAttemptCompleted = false; window._solidPtFirstAttemptActive = false; window._solidPtFirstAttemptStartedAt = 0;
+    window.posterizeLevel = 0; window.isFogEnabled = false; window.fogDensity = 0.02; window.fogNoise = 0;
     window.__solidJsonLoadStarted = false; window.__solidPendingSwitchSceneIndex = null; window.__solidPerfBgActive = false;
     window.__solidInitRenderReady = false; window.__solidPerfKickStarted = false; window.__solidPerfWantBackground = false; window.__solidPerfDeferred = false;
     window.__solidNoInterModelShadow = false;
@@ -679,6 +687,56 @@
         // 仅在高级渲染时清空 canvas filter；光栅态下由 _solidApplyRasterCanvasCssFilter 管理。
         if (renderer && renderer.domElement && window.useAdvancedRender) renderer.domElement.style.filter = '';
     }
+    /** 首次追光等待：屏幕中央偏下的真按钮（控制条小字「停止→放弃」不够显眼） */
+    function _solidEnsureAbandonRenderBtn() {
+        var b = document.getElementById('btn-abandon-first-render');
+        if (b) return b;
+        b = document.createElement('button');
+        b.id = 'btn-abandon-first-render';
+        b.type = 'button';
+        b.textContent = '放弃渲染';
+        b.setAttribute('aria-label', '放弃渲染');
+        b.style.cssText = [
+            'position:fixed', 'left:50%', 'bottom:88px', 'transform:translateX(-50%)',
+            'z-index:6200', 'display:none', 'padding:11px 22px', 'border-radius:999px',
+            'border:1px solid rgba(255,255,255,0.4)', 'background:rgba(12,12,14,0.88)',
+            'color:#fff', 'font-size:14px', 'letter-spacing:0.12em', 'font-weight:400',
+            'cursor:pointer', 'pointer-events:auto', 'font-family:inherit',
+            'box-shadow:0 8px 28px rgba(0,0,0,0.45)', '-webkit-tap-highlight-color:transparent'
+        ].join(';');
+        b.addEventListener('click', function (ev) {
+            try { ev.preventDefault(); ev.stopPropagation(); } catch (_e) {}
+            try { if (typeof window.stopRender === 'function') window.stopRender(); } catch (_e2) {}
+        });
+        document.body.appendChild(b);
+        return b;
+    }
+    function _solidSyncAbandonRenderBtn() {
+        try {
+            var b = _solidEnsureAbandonRenderBtn();
+            // 不依赖 useAdvancedRender：点「开始」后、core 跑起来前就要能看见放弃按钮
+            var show = !!window._solidPtFirstAttemptActive && !window._solidPtFirstAttemptCompleted;
+            b.style.display = show ? 'block' : 'none';
+        } catch (_e) {}
+    }
+    function _solidShowRenderToastNow(text, holdMs) {
+        var t = document.getElementById('render-toast');
+        if (!t) return;
+        if (t.__hideTimer) { clearTimeout(t.__hideTimer); t.__hideTimer = 0; }
+        t.textContent = String(text || '');
+        t.style.opacity = '1';
+        t.style.transform = 'translateY(0px)';
+        // 强制一次布局，尽量让本帧先画出提示再跑 PathTracer 重活
+        try { void t.offsetWidth; } catch (_eRf) {}
+        var hold = Number(holdMs);
+        if (Number.isFinite(hold) && hold > 0) {
+            t.__hideTimer = setTimeout(function () {
+                t.style.opacity = '0';
+                t.style.transform = 'translateY(6px)';
+                t.__hideTimer = 0;
+            }, hold);
+        }
+    }
 
     /** 光栅阴影 frustum：逻辑在 plugins_02/SolidPreviewLighting.js，与生产端共用实现。 */
     function _solidFitRasterShadowFrustumForSceneGroup() {
@@ -864,6 +922,11 @@
             const glLost = (typeof _solidIsGlContextLost === 'function') ? _solidIsGlContextLost() : false;
             const busy = !!window.isLoadingScene || !!window.isTestingPerformance;
             const adv = !!window.useAdvancedRender;
+            const firstWait = adv && !!window._solidPtFirstAttemptActive && !window._solidPtFirstAttemptCompleted;
+            try {
+                bs.textContent = firstWait ? '□ 放弃渲染' : '□ 停止渲染';
+                bs.style.borderColor = firstWait ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)';
+            } catch (_eLbl) {}
 
             if (glLost) {
                 br.style.opacity = '0.4';
@@ -876,7 +939,7 @@
             if (busy) {
                 if (adv) {
                     br.style.opacity = '0.4';
-                    bs.style.opacity = '0.8';
+                    bs.style.opacity = firstWait ? '1' : '0.8';
                 } else {
                     br.style.opacity = '0.8';
                     bs.style.opacity = '0.4';
@@ -886,11 +949,12 @@
 
             if (adv) {
                 br.style.opacity = '0.4';
-                bs.style.opacity = '0.8';
+                bs.style.opacity = firstWait ? '1' : '0.8';
             } else {
                 br.style.opacity = '0.8';
                 bs.style.opacity = '0.4';
             }
+            try { _solidSyncAbandonRenderBtn(); } catch (_eAb) {}
         } catch (_e) {}
     }
 
@@ -914,7 +978,10 @@
             }
         } catch (_eStop) {}
     }
-    window.stopRender = function() { window._solidUserStoppedRender = true; window.useAdvancedRender = false; window.isLoadingScene = false; if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
+    window.stopRender = function() { window._solidUserStoppedRender = true; window.useAdvancedRender = false; window.isLoadingScene = false;
+    window._solidPtFirstAttemptActive = false; window._solidPtFirstAttemptStartedAt = 0;
+    window.__solidPtCompileSince = 0; window.__solidPtWasCompiling = false;
+    if (pathTracer) { safeDispose(pathTracer); pathTracer = null; }
     // 统一“停渲染态”曝光，避免停在不同采样阶段导致色阶显示不一致
     if (renderer) renderer.toneMappingExposure = 0.7;
     // 关键：停止渲染后必须重建主光（rect 从 RectAreaLight 回到光栅 Spot 口径），否则会无投影/亮度异常。
@@ -946,9 +1013,11 @@
     hwLog("已停止渲染，当前为预览模式。点击“开始渲染”可再次尝试。");
     const pBar = document.getElementById('render-progress-bar'); if(pBar) pBar.style.opacity = '0';
     syncRenderButtons();
+    try { _solidSyncAbandonRenderBtn(); } catch (_eAbStop) {}
     };
     function _solidGetBlankOutputProbeCfg() {
         const raw = (_solidPtCfg && _solidPtCfg.blankOutputProbe) ? _solidPtCfg.blankOutputProbe : {};
+        const mode = (raw.probeMode === 'corners') ? 'corners' : 'interiorGrid';
         return {
             enabledMobile: raw.enabledMobile !== false,
             enabledDesktop: raw.enabledDesktop === true,
@@ -957,15 +1026,22 @@
             intervalMs: Math.max(200, Number(raw.intervalMs || 600)),
             lumaMax: Math.max(0, Number(raw.lumaMax != null ? raw.lumaMax : 10)),
             consecutiveHits: Math.max(1, Number(raw.consecutiveHits || 2)),
+            probeMode: mode,
+            interiorMargin: Number(raw.interiorMargin != null ? raw.interiorMargin : 0.28),
+            gridSize: Math.max(2, Math.min(5, Number(raw.gridSize || 3))),
             pointInset: Number(raw.pointInset != null ? raw.pointInset : 0.18),
-            minNearBlackPoints: Math.max(1, Number(raw.minNearBlackPoints || 4)),
+            // interiorGrid 默认 9/9；corners 旧口径默认 4
+            minNearBlackPoints: Math.max(1, Number(raw.minNearBlackPoints != null ? raw.minNearBlackPoints : (mode === 'corners' ? 4 : 9))),
         };
     }
     /** 假进度黑屏：samples 已涨但默认帧缓冲近黑 → 退回光栅（节流 readPixels，禁区对齐取色插件）。 */
     function _solidTryBlankOutputProbeAndFallback(currentSamples) {
         try {
             const cfg = _solidGetBlankOutputProbeCfg();
-            const enabled = isMobile ? cfg.enabledMobile : cfg.enabledDesktop;
+            // 桌面默认关假黑探针；本页首次追光开采后按需开启（编译中 samples 不足不会进探针）
+            const firstBlank = !isMobile && !!_solidPtCfg.firstAttemptBlankProbeDesktop
+                && !!window._solidPtFirstAttemptActive && !window._solidPtFirstAttemptCompleted;
+            const enabled = isMobile ? cfg.enabledMobile : (cfg.enabledDesktop || firstBlank);
             if (!solidShouldProbeBlankOutput({
                 enabled,
                 disabled: !!window._solidBlankProbeDisabled,
@@ -992,7 +1068,12 @@
             const h = (canvas && canvas.height) ? canvas.height : 0;
             if (w < 8 || h < 8) return false;
             window._solidBlankProbeLastAt = performance.now();
-            const pts = solidBlankOutputProbePoints(w, h, cfg.pointInset);
+            const pts = solidBlankOutputProbePoints(w, h, {
+                mode: cfg.probeMode,
+                interiorMargin: cfg.interiorMargin,
+                gridSize: cfg.gridSize,
+                pointInset: cfg.pointInset,
+            });
             const pix = (window.__solidBlankProbePixBuf && window.__solidBlankProbePixBuf.length >= 4)
                 ? window.__solidBlankProbePixBuf
                 : (window.__solidBlankProbePixBuf = new Uint8Array(4));
@@ -1020,6 +1101,7 @@
             window._solidBlankOutputFail = true;
             window.useAdvancedRender = false;
             window._solidUserStoppedRender = true;
+            window._solidPtFirstAttemptActive = false; window._solidPtFirstAttemptStartedAt = 0;
             if (pathTracer) {
                 const _ptDrop = pathTracer;
                 pathTracer = null;
@@ -1118,19 +1200,22 @@
         window._solidUserStoppedRender = false;
         try { _solidClearDegradeGuard(); } catch (_eG) {}
         var _hwBad = !!window._solidHardwareUnsupported;
+        var _firstTry = !window._solidPtFirstAttemptCompleted;
+        if (_firstTry && !_hwBad) {
+            window._solidPtFirstAttemptActive = true;
+            window._solidPtFirstAttemptStartedAt = performance.now();
+        } else {
+            window._solidPtFirstAttemptActive = false;
+            window._solidPtFirstAttemptStartedAt = 0;
+        }
+        // 立刻上屏提示（先于任何 PathTracer 重活），避免「点了卡住半天才出字」
         try {
-            var t = document.getElementById('render-toast');
-            if (t) {
-                t.textContent = _hwBad ? '当前设备暂不支持高级渲染' : '正在开始渲染…';
-                t.style.opacity = '1';
-                t.style.transform = 'translateY(0px)';
-                if (t.__hideTimer) clearTimeout(t.__hideTimer);
-                t.__hideTimer = setTimeout(function () {
-                    t.style.opacity = '0';
-                    t.style.transform = 'translateY(6px)';
-                }, _hwBad ? 2500 : 3000);
-            }
+            if (_hwBad) _solidShowRenderToastNow('当前设备暂不支持高级渲染', 2500);
+            else if (_firstTry) _solidShowRenderToastNow('首次开启可能较久，下方可点「放弃渲染」…', 0);
+            else _solidShowRenderToastNow('正在开始渲染…', 3000);
         } catch (_eToast) {}
+        try { syncRenderButtons(); } catch (_eSync0) {}
+        try { _solidSyncAbandonRenderBtn(); } catch (_eAb0) {}
         try {
             var br = document.getElementById('btn-rerender');
             if (br) {
@@ -1156,13 +1241,22 @@
                 window.__solidForceReRenderDeferTimer = null;
             }
         } catch (_eClr) {}
-        // setTimeout(0)：先让 toast/按钮样式上屏，再进 PathTracer 重建（同步跑会堵掉首次绘制）
-        window.__solidForceReRenderDeferTimer = setTimeout(function () {
+        // 双 rAF + 短延时：等浏览器先画出 toast/放弃按钮，再进 PathTracer（setTimeout(0) 仍常被同帧重活挤掉）
+        var _launchCore = function () {
             window.__solidForceReRenderDeferTimer = null;
             try { window._solidDoForceReRenderCore(); } catch (_eCore) {
                 try { window.hwLog('[forceReRender] core failed: ' + (_eCore && _eCore.message)); } catch (_eL) {}
             }
-        }, 0);
+        };
+        try {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    window.__solidForceReRenderDeferTimer = setTimeout(_launchCore, 50);
+                });
+            });
+        } catch (_eRafLaunch) {
+            window.__solidForceReRenderDeferTimer = setTimeout(_launchCore, 80);
+        }
     }; window.isUnsupported = false;
     window.__solidLastDegradeReason = null;
     function _solidIsGlContextLost() {
@@ -2328,9 +2422,9 @@
             if (sk !== 'geometry' && sk !== 'portrait' && sk !== 'headform') sk = 'geometry';
             window.__solidSandboxKey = sk;
             const metaBySandbox = {
-                geometry: { title: '几何光影观察 · 视觉维度', description: '专为绘画初学者设计的3D几何体光影观察工具，实时调节光源位置、强度，模拟真实石膏素描明暗调子。', modalTitle: '几何体&静物学习地图' },
-                portrait: { title: '肖像光影沙盒 · 视觉维度', description: '在3D光影画室里观察肖像明暗与体块，实时调节光源，练就写生眼力。', modalTitle: '肖像光影沙盒' },
-                headform: { title: '头部造型规律 · 视觉维度', description: '用光影看头部体块与造型规律。', modalTitle: '头部造型规律' }
+                geometry: { title: '几何光影观察 · 手绘工坊', description: '专为绘画初学者设计的3D几何体光影观察工具，实时调节光源位置、强度，模拟真实石膏素描明暗调子。', modalTitle: '几何体&静物学习地图' },
+                portrait: { title: '肖像光影沙盒 · 手绘工坊', description: '在3D光影画室里观察肖像明暗与体块，实时调节光源，练就写生眼力。', modalTitle: '肖像光影沙盒' },
+                headform: { title: '头部造型规律 · 手绘工坊', description: '用光影看头部体块与造型规律。', modalTitle: '头部造型规律' }
             };
             const m = metaBySandbox[sk] || metaBySandbox.geometry;
             try { document.title = m.title; } catch (_eT) {}
@@ -2475,6 +2569,13 @@
             if (new RegExp('^' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:\\s+|·|$)').test(base)) return base;
             return id + ' · ' + base;
         }
+        /** detail 文案兜底：如「…石膏 · 男 · 儿童 · 西方」（列表卡无 items 时 glb 名回退会失效） */
+        function solidPortraitDetailHay(sceneData) {
+            try {
+                const m = sceneData && sceneData.meta ? sceneData.meta : {};
+                return String(m.detail || m.description || '');
+            } catch (_e) { return ''; }
+        }
         function solidPortraitGenderOf(sceneData) {
             try {
                 const m = sceneData && sceneData.meta ? sceneData.meta : {};
@@ -2482,6 +2583,9 @@
                 const bn = solidPortraitPrimaryGlbBase(sceneData);
                 if (/女童|女中青年|女老年|女_|女0|Woman|Female|girl|Hera|Minerva|Nefertiti/i.test(bn) || (/女/.test(bn) && !/男/.test(bn))) return '女';
                 if (/男童|男中青年|男老年|男_|男0|Male|Boy|David|Caesar|Homer/i.test(bn) || /男/.test(bn)) return '男';
+                const det = solidPortraitDetailHay(sceneData);
+                if (/(?:^|[·\s])女(?:[·\s]|$)/.test(det) && !/(?:^|[·\s])男(?:[·\s]|$)/.test(det)) return '女';
+                if (/(?:^|[·\s])男(?:[·\s]|$)/.test(det)) return '男';
             } catch (_e) {}
             return '';
         }
@@ -2493,6 +2597,10 @@
                 if (/女童|男童|儿童|Baby|child|幼儿/i.test(bn)) return '儿童';
                 if (/老年|老人|Homer|Seneca|Socrates|Goethe|长须|白须/i.test(bn)) return '老年';
                 if (/中青年|青年|中年/.test(bn)) return '中青年';
+                const det = solidPortraitDetailHay(sceneData);
+                if (/儿童/.test(det)) return '儿童';
+                if (/老年/.test(det)) return '老年';
+                if (/中青年/.test(det)) return '中青年';
             } catch (_e) {}
             return '';
         }
@@ -2503,6 +2611,9 @@
                 const bn = solidPortraitPrimaryGlbBase(sceneData);
                 if (/欧|AARON|Paul|David|Caesar|Homer|Seneca|Socrates|Goethe|Jackson|Schwarzenegger|Phoenix|Joker|Apollo|Hercules|Michelangelo|glyptotek|thorvaldsen|smithsonian|Nefertiti|Minerva|Hera|Leeds|Jason|Statham|Tommy/i.test(bn)) return '西方';
                 if (/亚|东方|叶问|IpMan|光头|大本|桌上|军装|短袖|老农|胡须长者|女0|男中|男老|女中|女老/.test(bn)) return '东方';
+                const det = solidPortraitDetailHay(sceneData);
+                if (/西方/.test(det)) return '西方';
+                if (/东方/.test(det)) return '东方';
             } catch (_e) {}
             return '';
         }
@@ -4112,13 +4223,52 @@
             return;
         }
         const pBar = document.getElementById('render-progress-bar'); const targetSamples = _solidPt.targetSamples; const currentSamples = pathTracer.samples;
-        // 【采样超时保底·防黑屏】：reset 后长时间卡在 samples=0，自动切光栅
+        const _okSamples = Math.max(1, Number(_solidPtCfg.firstAttemptOkSamples || 8));
+        if (!window._solidPtFirstAttemptCompleted && currentSamples >= _okSamples) {
+            window._solidPtFirstAttemptCompleted = true;
+            window._solidPtFirstAttemptActive = false;
+            window._solidPtFirstAttemptStartedAt = 0;
+            try { syncRenderButtons(); } catch (_eOkBtn) {}
+            try { window.hwLog('[PT] 本页首次追光已达标 samples>=' + _okSamples + '，后续恢复短超时'); } catch (_eOkL) {}
+        }
+        // 【首帧保底】未达标：仅很长总上限（可点放弃）；已达标：编译中不计短超时 + 编译/首帧短保险丝
         if (currentSamples === 0 && window.__solidLastResetAt && !window._solidSampleTimeout && !window.isLoadingScene) {
-        const _stLimit = isMobile ? 8000 : 12000; if ((performance.now() - window.__solidLastResetAt) > _stLimit) {
+        const _nowWd = performance.now();
+        const _firstMode = !!window._solidPtFirstAttemptActive && !window._solidPtFirstAttemptCompleted;
+        const _wd = solidEvalFirstSampleWatchdog({
+            samples: currentSamples,
+            now: _nowWd,
+            lastResetAt: window.__solidLastResetAt,
+            isCompiling: !!(pathTracer && pathTracer.isCompiling),
+            compileSince: window.__solidPtCompileSince || 0,
+            wasCompiling: !!window.__solidPtWasCompiling,
+            isLoadingScene: !!window.isLoadingScene,
+            firstAttemptMode: _firstMode,
+            attemptSince: window._solidPtFirstAttemptStartedAt || window.__solidLastResetAt,
+            firstAttemptTimeoutMs: Number(_solidPtCfg.firstAttemptTimeoutMs || 180000),
+            sampleTimeoutMs: isMobile ? Number(_solidPtCfg.sampleTimeoutMsMobile || 8000) : Number(_solidPtCfg.sampleTimeoutMsDesktop || 20000),
+            compileTimeoutMs: isMobile ? Number(_solidPtCfg.compileTimeoutMsMobile || 45000) : Number(_solidPtCfg.compileTimeoutMsDesktop || 60000),
+        });
+        if (_wd.action === 'hold_compiling') {
+            window.__solidPtCompileSince = _wd.compileSince;
+            window.__solidPtWasCompiling = true;
+        } else if (_wd.action === 'restart_sample_clock') {
+            window.__solidLastResetAt = _nowWd;
+            window.__solidPtCompileSince = 0;
+            window.__solidPtWasCompiling = false;
+        } else if (_wd.clearCompileTracking) {
+            window.__solidPtCompileSince = 0;
+            window.__solidPtWasCompiling = false;
+        }
+        if (_wd.action === 'fail_compile_timeout' || _wd.action === 'fail_sample_timeout' || _wd.action === 'fail_first_attempt_timeout') {
+        const _failReason = (_wd.action === 'fail_compile_timeout') ? 'compile_timeout'
+            : (_wd.action === 'fail_first_attempt_timeout' ? 'first_attempt_timeout' : 'sample_timeout');
         window._solidSampleTimeout = true; window.useAdvancedRender = false; window._solidUserStoppedRender = true;
+        window.__solidPtCompileSince = 0; window.__solidPtWasCompiling = false;
+        window._solidPtFirstAttemptActive = false; window._solidPtFirstAttemptStartedAt = 0;
         if (pathTracer) { const _ptDrop = pathTracer; pathTracer = null; setTimeout(function() { try { safeDispose(_ptDrop); } catch(_e) {} }, 0); }
-        try { _solidCommitStandardRasterFallback('sample_timeout'); } catch (_eRf2) {}
-        window.hwLog('[animate] 采样超时保底：首帧超 ' + (_stLimit/1000) + 's 未完成，切换光栅模式');
+        try { _solidCommitStandardRasterFallback(_failReason); } catch (_eRf2) {}
+        window.hwLog('[animate] 首帧保底：' + _failReason + '，切换光栅模式');
         (function() { const t = document.getElementById('render-toast'); if (t) { t.textContent = '高级渲染耗时过长，已暂停。可点「开始渲染」重试'; t.style.opacity = '1'; t.style.transform = 'translateY(0px)'; if (t.__hideTimer) clearTimeout(t.__hideTimer); t.__hideTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(6px)'; }, 4000); } })();
         try { if (typeof window.solidSetPersistentWarning === 'function') window.solidSetPersistentWarning('高级渲染超时已暂停。可点「开始渲染」重试', true); } catch (_ePwTo) {}
         try { syncRenderButtons(); } catch (_eBtnTo) {}
@@ -4157,14 +4307,21 @@
             if (!t) return;
             // 预览模式 / 仅设备检测：不要冒「准备渲染」（用户没点开启也会误解）
             if (!window.useAdvancedRender) {
-                if (t.style.opacity !== '0' && /准备渲染|正在渲染光影|画质/.test(String(t.textContent || ''))) {
+                if (t.style.opacity !== '0' && /准备渲染|正在编译|正在渲染光影|画质/.test(String(t.textContent || ''))) {
                     t.style.opacity = '0';
                 }
                 return;
             }
             var _isFloating = t.parentNode === document.body;
             if (currentSamples < _qualityTh && currentSamples < targetSamples) {
-                if (currentSamples < _qualityTh * 0.1)        t.textContent = '准备渲染…';
+                if (pathTracer && pathTracer.isCompiling && currentSamples === 0) {
+                    t.textContent = (window._solidPtFirstAttemptActive && !window._solidPtFirstAttemptCompleted)
+                        ? '正在编译着色器（首次可能较久，可点「放弃渲染」）…'
+                        : '正在编译着色器（首次可能较久）…';
+                } else if (window._solidPtFirstAttemptActive && !window._solidPtFirstAttemptCompleted && currentSamples < _okSamples) {
+                    t.textContent = '首次渲染准备中，可点「放弃渲染」停止…';
+                }
+                else if (currentSamples < _qualityTh * 0.1)        t.textContent = '准备渲染…';
                 else if (currentSamples < _qualityTh * 0.5)   t.textContent = '正在渲染光影…';
                 else if (currentSamples < _qualityTh * 0.8)   t.textContent = '画质提升中…';
                 else                                            t.textContent = '画质即将达标…';

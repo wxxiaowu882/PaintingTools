@@ -44,18 +44,21 @@ Windows 注意：sync 脚本经 `cmd.exe /c npx …` 调 wrangler（直接 `spaw
 
 ### A. 只发测站
 
-1. `DEPLOY_NOPAUSE=1 cmd //c "docs\\deploy-staging.bat"`（或 Portal 20b）。发版前 bat 会跑 `sync-model-assetsignore.mjs`：只上传 **docs/json 引用到的** `docs/m` 文件，未引用模型不进 CF。
+1. `DEPLOY_NOPAUSE=1 cmd //c "docs\\deploy-staging.bat"`（或 Portal 20b）。发版前 bat 会跑：
+   - `docs/app/verify-apk-channels.mjs`（正式/测站 APK 包名不得搞反；失败则拒发）
+   - `sync-model-assetsignore.mjs`：只上传 **docs/json 引用到的** `docs/m` 文件，未引用模型不进 CF。
 2. 冒烟：`SMOKE_BASE=https://test.wuxiaoart.com node docs/membership/prod-deploy-smoke.mjs`。
 3. 汇报：版本/域名、冒烟结果；**勿**写测站 policy。
+4. **安卓壳**（本轮若改了壳/图标/APK）：测站主下载必须是 `….workshop.staging`。拷贝勿对调。发站前确认 `android-shell-update.json` 的 **`minVersionCode` = `latestVersionCode` = 新 versionCode**（强制更新默认；壳**没有**可选更新弹窗）。发站后核验 json + `/api/android-apk` 的 `X-Wuxiao-Apk-Channel`。细则见 `.cursor/rules/android-webview-shell.mdc` 与 `docs/app/README.md`。
 
 ### B. 发正式（默认）
 
 1. 确认业务要带上测站权限（默认要）。不要则 `SKIP_POLICY_SYNC=1`。
-2. `DEPLOY_NOPAUSE=1 cmd //c "docs\\deploy.bat"`（含 **preflight** → sync → build → `wrangler deploy --env=""` → smoke）。
-3. preflight 失败：缺 Secret → Portal「23」设口令；探针仍开 → 运营台关掉测试假码。紧急跳过用 `SKIP_PREFLIGHT=1`（须向用户说明风险）。
+2. `DEPLOY_NOPAUSE=1 cmd //c "docs\\deploy.bat"`（含 **preflight** → **会员 KV 加密备份** → sync → build → `wrangler deploy --env=""` → smoke）。
+3. preflight 失败：缺 Secret → Portal「23」设口令；探针仍开 → 运营台关掉测试假码。紧急跳过用 `SKIP_PREFLIGHT=1`（须向用户说明风险）。KV 备份失败默认警告不阻断（`SKIP_KV_BACKUP=1` 跳过；`REQUIRE_KV_BACKUP=1` 硬失败）。手动备份：Portal `24`。
 4. 若 sync 失败：先 `npx wrangler whoami`，再单独跑 sync 看日志；**不要**默认跳过同步除非用户要紧急只发代码。
 5. 冒烟已挂在 bat 末步；失败视为发版未完成，根据日志排查（上传可能已成功）。
-6. 汇报：preflight、是否同步了 policy/tiers、冒烟是否通过、正式 URL。
+6. 汇报：preflight、KV 备份是否成功、是否同步了 policy/tiers、冒烟是否通过、正式 URL。备份成功后运营台「运作说明」应出现新摘要（密文仍在本机 `历史备份文件/membership-kv/`）。
 
 ### C. 发版前后核对（脚本已覆盖时可略人手）
 
