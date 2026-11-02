@@ -1,0 +1,49 @@
+---
+description: SEO 硬备忘——主域/验证码/禁改/定期检查；权威正文见 docs/SEO站长提交说明.md
+alwaysApply: true
+---
+
+# SEO 备忘（AI 硬约束）
+
+权威细则与进度：`docs/SEO站长提交说明.md`（含 §7 AI 备忘）；产品口径：`docs/站点规划_访谈与路线图.md` §4.7 / §8。争议以文档为准，先改文档再改代码。
+
+## 已完成水位（2026-11-01）
+
+- 主域 **`https://www.wuxiaoart.com/`**（无 www → www 301）；canonical / sitemap / OG 对齐 www。
+- 百度：www 已验证 + 站点类型自适应；**sitemap 配额常 0，暂挂**（不办 ICP）。
+- 必应：已验证 + sitemap + 高优 URL 已交。
+- Google Search Console：网址前缀 www 已 HTML meta 验证 + sitemap 成功。
+- Cloudflare：**勿开** Managed robots.txt / Bot Preference Sync（曾禁 Baiduspider）；Bot Fight Mode 保持关。
+- 首页文案主轴：童画师吴晓 = 儿童肖像画师；水彩人物教程 / 儿童肖像画定制（见首页 title/desc/keywords）。关于弹层保持站长口语，**不强制**塞 SEO 句——标签「儿童肖像画师 · 水彩 · 油画」已表达身份，勿再叠「我专画儿童肖像（水彩）」类重复句。
+
+## 严禁擅自改动
+
+1. **验证 meta / 文件**（验证后勿删）：`baidu-site-verification`、`msvalidate.01`、`google-site-verification`；根目录 `BingSiteAuth.xml`（及日后同类验证文件）。
+2. **主域口径**：勿把对外主站改回 apex-only；勿在对外 URL / sitemap / canonical 写 `*.html`。
+3. **站名主推**：「手绘工坊 · 童画师吴晓」；「视觉维度」仅历史副称，不主推。
+4. **Cloudflare**：勿再开启 Managed robots / Bot Preference Sync；改 Bot 相关设置须先对照 SEO 说明 §6 并征得用户同意。
+5. **勿主动提交**：`Backup/`、`自用工具文件_不部署/`、`.cursor/`、`/docs/json/`、`/docs/m/`、`/member-ops`、`/api/` 等（与 `robots.txt` 一致）。
+6. **勿堆砌关键词**改正文；勿在验证码到手前写占位 meta。
+7. **不办 ICP** 是现行产品决定；勿把「为抬百度配额去备案」当默认方案推销。
+
+## 测站 vs 正式站
+
+- 测站 `test.wuxiaoart.com` 与正式站内容像 → **不致命**（未提交站长、sitemap 无 test），但仍应 **禁收录**。
+- 测站：`functions/_middleware.js` + staging `run_worker_first = true` → robots `Disallow: /` + `X-Robots-Tag: noindex`。**勿**把全量 Worker-first 抄到正式站。
+- **禁止**把 test 加进站长平台或对外 sitemap。
+
+## 可改进 / 未完成（须用户拍板后再做）
+
+- 百度 sitemap：配额恢复后再交（todo）。
+- 独立「关于/课程说明」长页、长尾内容页、站外回链（小红书等）——属内容运营，非再拧一遍 meta。
+- **`/Course` 暂不收录（2026-11-02）**：保持 `noindex`；开放门槛与 Agent「须主动提起去 noindex」见路线图 **§3.2「Course 收录」**。勿擅自收录或塞进 sitemap。
+- 对外分享路径验证、关键页文案与首页口径持续对齐。
+- 水彩大词不急攻；优先品牌词「童画师吴晓」+ 长尾。
+
+## 定期检查（Agent 或站长）
+
+- **发版后**：抽查 `/` title 含站名；`/robots.txt` 无 `Baiduspider Disallow` / Cloudflare Managed 段；`/sitemap.xml` 可打开且为 www 无后缀。
+- **约每 1–2 周**（或用户说「查 SEO」）：百度索引量/抓取异常；必应/GSC sitemap 状态与覆盖率；有无 `.html` 重复收录。
+- **改 CF 安全/Bot 面板后**：立刻复查 `robots.txt` 与百度能否抓。
+
+改 SEO 相关约定时：**先更新** `docs/SEO站长提交说明.md`（及必要时路线图 §8/§11），再改代码。

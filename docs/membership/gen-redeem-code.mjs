@@ -6,9 +6,9 @@
  *   set MEMBERSHIP_SECRET=你的密钥
  *   node docs/membership/gen-redeem-code.mjs --tier member_3m
  *   node docs/membership/gen-redeem-code.mjs --tier member_1y --count 5
- *   node docs/membership/gen-redeem-code.mjs --tier member_forever --code-days 60
+ *   node docs/membership/gen-redeem-code.mjs --tier member_3y --code-days 60
  *
- * 档位：member_3m (90天会员) / member_1y (365) / member_forever (永久)
+ * 档位：member_3m (90天) / member_1y (365) / member_3y (1095，三年)
  * --code-days：兑换码本身多久内可兑（默认 30）
  */
 import crypto from 'crypto';
@@ -16,7 +16,7 @@ import crypto from 'crypto';
 const TIERS = {
   member_3m: { durationDays: 90 },
   member_1y: { durationDays: 365 },
-  member_forever: { durationDays: null }
+  member_3y: { durationDays: 1095 }
 };
 
 function b64url(buf) {

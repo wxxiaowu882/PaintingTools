@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "currency": "CNY",
   "earlyBird": true,
   "contactWeChat": "lightouches",
@@ -26,7 +26,7 @@
       "price": 39,
       "durationDays": 90,
       "requireLevel": "member",
-      "benefits": ["含会员全部权益", "可使用「高级会员尊享」场景与功能"]
+      "benefits": ["含会员全部权益", "可使用「Pro」场景与功能"]
     },
     {
       "id": "member_1y",
@@ -34,16 +34,16 @@
       "price": 99,
       "durationDays": 365,
       "requireLevel": "member",
-      "benefits": ["含会员全部权益", "可使用「高级会员尊享」场景与功能"]
+      "benefits": ["含会员全部权益", "可使用「Pro」场景与功能"]
     },
     {
-      "id": "member_forever",
-      "name": "高级会员 · 永久",
+      "id": "member_3y",
+      "name": "高级会员 · 三年",
       "price": 199,
-      "durationDays": null,
+      "durationDays": 1095,
       "requireLevel": "member",
-      "benefits": ["含会员全部权益", "可使用「高级会员尊享」场景与功能", "一次开通长期有效"]
+      "benefits": ["含会员全部权益", "可使用「Pro」场景与功能", "开通后有效三年"]
     }
   ],
-  "purchaseHint": "游客可看公开内容；注册即为会员，可免费使用「会员免费」内容；开通高级会员（按时长）可使用「高级会员尊享」内容。具体范围以网站当前标注为准，我们会持续更新。早鸟价日后可能调整。"
+  "purchaseHint": "游客可看公开内容；注册即为会员，可免费使用「会员免费」内容；开通高级会员（按时长）可使用「Pro」内容。具体范围以网站当前标注为准，我们会持续更新。早鸟价日后可能调整。"
 }

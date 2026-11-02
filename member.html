@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>会员权益｜手绘工坊 · 童画师吴晓</title>
-  <meta name="description" content="手绘工坊：游客可逛公开内容；注册即为会员；高级会员按时长开通尊享场景与功能。">
+  <meta name="description" content="手绘工坊：游客可逛公开内容；注册即为会员；高级会员按时长开通 Pro 场景与功能。">
   <meta name="robots" content="noindex,follow">
   <link rel="canonical" href="https://www.wuxiaoart.com/member">
   <link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-32.png?v=fav7" type="image/png" sizes="32x32">
@@ -117,6 +117,21 @@
     a.back { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
     a.back:hover { color: var(--text); }
     .hint { font-size: 0.85rem; color: var(--muted); margin-top: 10px; }
+    .course-promo {
+      margin-top: 16px; padding: 14px 14px 12px;
+      border: 1px solid rgba(232, 197, 71, 0.28);
+      border-radius: 10px;
+      background: rgba(232, 197, 71, 0.06);
+      scroll-margin-top: 20px;
+    }
+    .course-promo h3 { margin: 0 0 8px; color: var(--accent); }
+    .course-lead {
+      margin: 0; color: var(--text); font-size: 0.92rem; line-height: 1.6;
+    }
+    a.course-link {
+      color: var(--accent); text-decoration: none; font-size: 0.9rem; font-weight: 600;
+    }
+    a.course-link:hover { text-decoration: underline; }
     .pay-box {
       margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
     }
@@ -224,9 +239,10 @@
   <main>
     <p><a class="back" href="/" id="btn-back">← 返回</a></p>
     <h1>会员权益</h1>
-    <p class="sub" id="purchase-hint">游客可逛公开内容；注册即为会员；高级会员按时长开通尊享内容。</p>
+    <p class="sub" id="purchase-hint">游客可逛公开内容；注册即为会员；高级会员按时长开通 Pro 内容。</p>
     <nav class="jump" id="jump-nav" aria-label="本页导航">
       <a href="#benefits" data-jump="benefits">权益与价格</a>
+      <a href="#course-preview" data-jump="course-preview">水彩课程</a>
       <a href="#how-to-pay" data-jump="how-to-pay">如何开通</a>
       <a href="#account" data-jump="account">账号</a>
       <a href="#redeem" data-jump="redeem">兑换</a>
@@ -241,7 +257,7 @@
           <p class="name">游客</p>
           <ul>
             <li>可浏览公开场景与基础功能</li>
-            <li>列表中标注「会员免费 / 高级会员尊享」的内容需升级后使用</li>
+            <li>列表中标注「会员免费 / Pro」的内容需升级后使用</li>
           </ul>
         </div>
         <div class="benefit">
@@ -257,8 +273,8 @@
           <p class="name">高级会员</p>
           <ul>
             <li>含会员全部权益</li>
-            <li>可使用「高级会员尊享」场景与功能</li>
-            <li>按时长：三个月 / 一年 / 永久</li>
+            <li>可使用「Pro」场景与功能</li>
+            <li>按时长：三个月 / 一年 / 三年</li>
           </ul>
         </div>
       </div>
@@ -266,11 +282,18 @@
       <h3>高级会员 · 早鸟价格</h3>
       <div id="tier-list"></div>
 
+      <div class="course-promo" id="course-preview">
+        <h3>水彩肖像画课程预告</h3>
+        <p class="course-lead">2027年第一季度内，童画师将推出其精心打磨了三年的水彩肖像画课程，届时成为学员的高级会员可从课程定价中减免高级会员订阅费用。</p>
+        <p class="hint" style="margin:10px 0 0">想先了解课程方向？可打开预告页（暂不开放正式预约）。</p>
+        <p style="margin:12px 0 0"><a class="course-link" href="/Course">查看课程预告 →</a></p>
+      </div>
+
       <div class="pay-box" id="how-to-pay">
         <h3>如何开通</h3>
         <ol class="pay-steps">
           <li>先在本页注册 / 登录会员账号</li>
-          <li>扫「收款码」付款，备注写：高级会员 + 档位（三个月/一年/永久）+ 注册手机号</li>
+          <li>扫「收款码」付款，备注写：高级会员 + 档位（三个月/一年/三年）+ 注册手机号</li>
           <li>再扫「名片码」加微信，或搜微信号：lightouches（复制微信号），等待微信好友通过后，发送付款截图。</li>
           <li>本站收到您的付款截图，确认到账后 2 小时内发您兑换码，您回到本页「兑换」粘贴即可。</li>
         </ol>
@@ -380,7 +403,7 @@
           const d = new Date(e.expiresAt);
           return '高级会员（' + name + '，至 ' + d.toLocaleDateString('zh-CN') + '）';
         }
-        return '高级会员（' + name + '，永久）';
+        return '高级会员（' + name + '）';
       }
       if (level === 'user' || (e && e.accountId)) return '会员（已注册）';
       return '游客';
@@ -521,14 +544,15 @@
 
     /**
      * 顶栏跳转按身份显隐（游客偏开通；高级少强调开通）。
-     * guest: 权益 / 开通 / 账号
+     * guest: 权益 / 水彩课程 / 开通 / 账号
      * user:  + 兑换 / 宣传（开了才显示）
-     * member: 权益 / 账号 / 兑换 / 宣传；藏「如何开通」
+     * member: 权益 / 水彩课程 / 账号 / 兑换 / 宣传；藏「如何开通」
      */
     function syncJumpNav() {
       const level = (MA.getAccessLevel && MA.getAccessLevel()) || 'guest';
       const show = {
         benefits: true,
+        'course-preview': true,
         'how-to-pay': level !== 'member',
         account: true,
         redeem: level !== 'guest',

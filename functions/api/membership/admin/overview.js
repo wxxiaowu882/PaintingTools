@@ -64,7 +64,7 @@ export async function onRequestGet(context) {
       tiersSource: tiers._source || 'file'
     },
     opsSettings,
-    probeCodes: ['PROBE-3M', 'PROBE-1Y', 'PROBE-FOREVER'],
+    probeCodes: ['PROBE-3M', 'PROBE-1Y', 'PROBE-3Y'],
     stampPhrase: secret,
     tips,
     lockedItems: locked,

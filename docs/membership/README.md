@@ -6,7 +6,7 @@
 |------|---------------------------|------|
 | **游客** | `guest` / `public`（兼容旧值 `free`） | 未登录 |
 | **会员** | `user` / `user` | 已注册，未付费或付费已过期 |
-| **高级会员** | `member` / `member` | 兑码有效期内（按时长：3 月 / 1 年 / 永久） |
+| **高级会员** | `member` / `member` | 兑码有效期内（按时长：3 月 / 1 年 / 3 年） |
 
 业务上「谁开放给哪一档」最终以后台策略为准；仓库里带 `probe: true` 的条目仅技术验证。
 
@@ -28,13 +28,14 @@
 ## 客户端
 
 `docs/js/membership/MembershipAccess.js` → `window.MembershipAccess`  
-插件：`plugins_02/Plugin_MembershipGate.js`（角标「会员免费」/「高级会员尊享」，包装 `switchScene` / `switchTab`）
+插件：`plugins_02/Plugin_MembershipGate.js`（角标「会员免费」/「Pro」，包装 `switchScene` / `switchTab`）
 
 ## 页面
 
 | 地址 | 作用 |
 |------|------|
-| `/member` | 权益说明（PC 宽版）+ 账号 + 兑换 |
+| `/member` | 权益说明（PC 宽版）+ 账号 + 兑换 + 水彩课程宣传 |
+| `/Course` | 水彩肖像课程预告（静态；预约未开放） |
 | `/member-ops` | 发码、会员账号查询/重置密码、三档收费设置 |
 
 忘记密码：用户微信联系 → 运营台「会员账号」人工重置（无短信自助）。

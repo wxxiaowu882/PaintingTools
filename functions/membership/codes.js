@@ -9,7 +9,7 @@ import { getSecret, signPayload, verifySigned } from './session.js';
 const PROBE = {
   'PROBE-3M': { tierId: 'member_3m', durationDays: 90 },
   'PROBE-1Y': { tierId: 'member_1y', durationDays: 365 },
-  'PROBE-FOREVER': { tierId: 'member_forever', durationDays: null }
+  'PROBE-3Y': { tierId: 'member_3y', durationDays: 1095 }
 };
 
 /** 去掉易混字符 0/O/1/I */

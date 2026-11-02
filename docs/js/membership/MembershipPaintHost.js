@@ -293,7 +293,7 @@
       ? (MA.badgeLabelForRequire(need) || '会员')
       : '会员';
     var place = (opts && opts.place) || 'tr';
-    var title = MA.badgeTitleForLabel ? MA.badgeTitleForLabel(text) : (text === 'Pro' ? '高级会员尊享' : '会员免费');
+    var title = MA.badgeTitleForLabel ? MA.badgeTitleForLabel(text) : (text === 'Pro' ? 'Pro' : '会员免费');
 
     // Portrait / 课表：与 Solid 同款角内斜带
     if (place === 'ribbon' && MA.attachLockRibbon) {

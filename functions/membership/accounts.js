@@ -427,7 +427,7 @@ export async function adminRemoveDevice(env, phoneRaw, deviceId) {
 
 /**
  * 按账号 ID 延期高级会员（天）。已是高级则在现到期日上加；否则从今天起算并升高级。
- * forever 档返回错误。宣传奖励与运营台共用。
+ * 宣传奖励与运营台共用。
  */
 export async function extendMemberByDays(env, accountId, daysRaw, sourceTag) {
   let acct = await loadAccount(env, accountId);
@@ -436,16 +436,14 @@ export async function extendMemberByDays(env, accountId, daysRaw, sourceTag) {
   if (!days) return { ok: false, error: '延期天数至少 1 天' };
   const ent = Object.assign({}, acct.entitlement || {});
   const now = Date.now();
-  const tierId = ent.tierId || 'member_3m';
-  if (tierId === 'member_forever' && ent.level === 'member' && !ent.expiresAt) {
-    return { ok: false, error: '永久档无需延期' };
-  }
   let base = now;
   if (ent.level === 'member' && ent.expiresAt && Number(ent.expiresAt) > now) {
     base = Number(ent.expiresAt);
   }
   ent.level = 'member';
   if (!ent.tierId || ent.tierId === 'free') ent.tierId = 'member_3m';
+  // 旧测试「永久」档无到期日：延期时落到有期限，便于统一管理
+  if (ent.tierId === 'member_forever') ent.tierId = 'member_3y';
   ent.expiresAt = base + days * 86400000;
   // 宣传奖励改写来源；运营延期尽量保留原兑码来源便于对账
   if (sourceTag === 'referral_reward') ent.source = 'referral_reward';

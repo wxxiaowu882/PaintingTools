@@ -2,9 +2,9 @@ import { requireAdmin, jsonResponse } from '../../../membership/admin-auth.js';
 import { mintShortRedeemCode, listIssuedCodes, resetShortRedeemCode } from '../../../membership/codes.js';
 
 const TIERS = {
-  member_3m: { name: '会员 · 三个月', durationDays: 90 },
-  member_1y: { name: '会员 · 一年', durationDays: 365 },
-  member_forever: { name: '会员 · 永久', durationDays: null }
+  member_3m: { name: '高级会员 · 三个月', durationDays: 90 },
+  member_1y: { name: '高级会员 · 一年', durationDays: 365 },
+  member_3y: { name: '高级会员 · 三年', durationDays: 1095 }
 };
 
 export async function onRequestGet(context) {

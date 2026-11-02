@@ -153,6 +153,41 @@
     .stats-legend .lg-login { background: #1f4b7a; }
     .stats-legend .lg-register { background: #2f6b3a; }
     .stats-legend .lg-redeem { background: #9a5b00; }
+    /* 宣传链接奖励：独立表单，避免手机端 .row>label 把勾选挤成上下乱排 */
+    .ref-form {
+      display: grid;
+      gap: 12px 16px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: end;
+      margin-top: 4px;
+    }
+    .ref-check {
+      display: flex; align-items: center; gap: 10px;
+      margin: 0; color: var(--ink); font-size: 0.95rem; line-height: 1.35;
+      grid-column: 1 / -1;
+    }
+    .ref-check input[type="checkbox"] {
+      flex: 0 0 auto; width: 18px; height: 18px; margin: 0;
+      accent-color: var(--accent);
+    }
+    .ref-field {
+      display: flex; flex-direction: column; gap: 6px;
+      margin: 0; color: var(--muted); font-size: 0.92rem;
+    }
+    .ref-field input[type="number"] {
+      width: 100%; max-width: 160px; margin: 0;
+    }
+    .ref-checks {
+      display: grid; gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-column: 1 / -1;
+    }
+    .ref-checks .ref-check { grid-column: auto; }
+    .ref-save {
+      grid-column: 1 / -1;
+      justify-self: start;
+      min-width: 140px;
+    }
     /* —— 手机运营台：清晰、好点、少横滑抢手势 —— */
     @media (max-width: 720px) {
       html, body { overflow-x: hidden; }
@@ -287,6 +322,20 @@
       .price-item span { min-width: 0; }
       .price-item input { width: 100%; max-width: none; }
       #ops-pwd { min-width: 0 !important; width: 100%; }
+      /* 宣传链接奖励：手机单列，勾选横排，保存拉满 */
+      .ref-form {
+        grid-template-columns: 1fr;
+        gap: 14px;
+        align-items: stretch;
+      }
+      .ref-field input[type="number"] { max-width: none; }
+      .ref-checks { grid-template-columns: 1fr; gap: 12px; }
+      .ref-save {
+        width: 100%;
+        max-width: 100%;
+        justify-self: stretch;
+        min-height: 44px;
+      }
       #acct-note,
       #acct-new-pwd { max-width: none !important; width: 100%; }
       .guide-ol { padding-left: 1.15em; font-size: 0.9rem; }
@@ -462,7 +511,7 @@
               <select id="code-tier">
                 <option value="member_3m">高级会员 · 三个月（¥39）</option>
                 <option value="member_1y">高级会员 · 一年（¥99）</option>
-                <option value="member_forever">高级会员 · 永久（¥199）</option>
+                <option value="member_3y">高级会员 · 三年（¥199）</option>
               </select>
             </label>
             <label>数量 <input id="code-count" type="number" min="1" max="20" value="1"></label>
@@ -609,28 +658,31 @@
       </div>
 
       <div class="tab-panel" data-panel="policy">
-        <section class="card">
+        <section class="card" id="card-referral">
           <h2>宣传链接奖励</h2>
           <p class="tip">鼓励学员把专属链接发到网上。别人通过链接注册并<strong>兑换高级会员</strong>后，给分享者延期。默认 +90 天；可关总开关。</p>
-          <div class="row" style="align-items:center">
-            <label style="display:flex;align-items:center;gap:8px">
-              <input id="ref-enabled" type="checkbox" checked> 开启宣传奖励
+          <div class="ref-form">
+            <label class="ref-check" for="ref-enabled">
+              <input id="ref-enabled" type="checkbox" checked>
+              <span>开启宣传奖励</span>
             </label>
-            <label>每次成功奖励（天）
-              <input id="ref-days" type="number" min="1" max="365" value="90" style="width:88px">
+            <label class="ref-field" for="ref-days">每次成功奖励（天）
+              <input id="ref-days" type="number" min="1" max="365" value="90">
             </label>
-            <label>每人每月最多几次（0=不封顶）
-              <input id="ref-cap" type="number" min="0" max="99" value="0" style="width:72px">
+            <label class="ref-field" for="ref-cap">每人每月最多几次（0=不封顶）
+              <input id="ref-cap" type="number" min="0" max="99" value="0">
             </label>
-          </div>
-          <div class="row" style="align-items:center;margin-top:8px">
-            <label style="display:flex;align-items:center;gap:8px">
-              <input id="ref-block-self" type="checkbox" checked> 禁止自己推自己
-            </label>
-            <label style="display:flex;align-items:center;gap:8px">
-              <input id="ref-block-device" type="checkbox" checked> 禁止同设备刷奖
-            </label>
-            <button type="button" id="btn-save-referral">保存宣传设置</button>
+            <div class="ref-checks">
+              <label class="ref-check" for="ref-block-self">
+                <input id="ref-block-self" type="checkbox" checked>
+                <span>禁止自己推自己</span>
+              </label>
+              <label class="ref-check" for="ref-block-device">
+                <input id="ref-block-device" type="checkbox" checked>
+                <span>禁止同设备刷奖</span>
+              </label>
+            </div>
+            <button type="button" class="ref-save" id="btn-save-referral">保存宣传设置</button>
           </div>
           <p class="msg" id="referral-msg"></p>
         </section>
@@ -688,7 +740,7 @@
 
 · 三个月 ¥39
 · 一年 ¥99
-· 永久 ¥199
+· 三年 ¥199
 
 付款备注：会员+档位+微信昵称
 截图发我，确认后发兑换码。
@@ -772,7 +824,7 @@
       }
       if ($('probe-desc')) {
         $('probe-desc').textContent = on
-          ? 'PROBE-3M / PROBE-1Y / PROBE-FOREVER 现在可以兑成高级会员。正式卖课务必关掉。'
+          ? 'PROBE-3M / PROBE-1Y / PROBE-3Y 现在可以兑成高级会员。正式卖课务必关掉。'
           : '正式卖课安全状态。仅自测需要时再临时开启。';
       }
       if ($('btn-probe-off')) $('btn-probe-off').disabled = !on;
@@ -1300,7 +1352,7 @@
     function expireLabel(account) {
       const ent = (account && account.entitlement) || {};
       if (ent.expiresAt) return new Date(ent.expiresAt).toLocaleString('zh-CN');
-      if (account && account.accessLevel === 'member') return '永久';
+      if (account && account.accessLevel === 'member') return '未设到期日';
       return '—';
     }
 
@@ -1329,7 +1381,8 @@
       const id = String(tierId || '').trim();
       if (id === 'member_3m') return '高级会员 · 三个月';
       if (id === 'member_1y') return '高级会员 · 一年';
-      if (id === 'member_forever') return '高级会员 · 永久';
+      if (id === 'member_3y') return '高级会员 · 三年';
+      if (id === 'member_forever') return '高级会员 · 三年（旧永久档）';
       if (id === 'free') return '注册会员';
       return id || '—';
     }

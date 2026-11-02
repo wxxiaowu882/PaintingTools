@@ -204,7 +204,7 @@
   }
 
   function badgeTitleForLabel(text) {
-    if (text === 'Pro') return '高级会员尊享';
+    if (text === 'Pro') return 'Pro';
     if (text === '会员') return '会员免费';
     return text || '';
   }
@@ -1244,7 +1244,7 @@
       okText = '去注册';
       hash = 'account';
     } else {
-      title = '「' + subject + '」高级会员尊享';
+      title = '「' + subject + '」Pro';
       body = '开通高级会员后可学习此类场景与功能。请先登录会员账号再兑换，权益可同步到其它设备。';
       okText = '查看权益与兑换';
       hash = 'benefits';
@@ -1276,7 +1276,7 @@
         return;
       }
       var eye = modal.querySelector('.mu-eyebrow');
-      if (eye) eye.textContent = need === 'user' ? '会员免费' : '高级会员尊享';
+      if (eye) eye.textContent = need === 'user' ? '会员免费' : 'Pro';
       modal.querySelector('.mu-title').textContent = title;
       modal.querySelector('.mu-body').textContent = body;
       var okBtn = modal.querySelector('.mu-ok');

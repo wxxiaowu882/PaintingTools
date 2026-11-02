@@ -2,7 +2,7 @@
  * 会员门禁插件（轻耦合）
  * - 包装 window.switchScene / window.switchTab
  * - 收费项由 docs/membership/access-policy.json 决定，本文件不写死业务清单
- * - 角标：会员免费 / 高级会员尊享
+ * - 角标：会员免费 / Pro
  * - 网格 MutationObserver 须防抖，且 mark 期间 disconnect，避免重建时 O(n²) 连环卡顿
  */
 import '../docs/js/membership/MembershipAccess.js';
@@ -34,7 +34,7 @@ import '../docs/js/membership/MembershipAccess.js';
 
   function badgeTitle(text) {
     if (MA.badgeTitleForLabel) return MA.badgeTitleForLabel(text);
-    return text === 'Pro' ? '高级会员尊享' : '会员免费';
+    return text === 'Pro' ? 'Pro' : '会员免费';
   }
 
   /** 文本/标题外包一层（防重复套娃，否则 tab 多切会 DOM 爆炸崩溃） */

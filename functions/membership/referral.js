@@ -189,24 +189,6 @@ export async function tryRewardReferrer(env, inviteeAccountId, deviceId) {
     return { ok: true, rewarded: false, reason: 'monthly_cap' };
   }
 
-  const ent = referrer.entitlement || {};
-  if (
-    ent.tierId === 'member_forever' &&
-    ent.level === 'member' &&
-    !ent.expiresAt
-  ) {
-    await store.put(
-      awardKey,
-      JSON.stringify({
-        referrerId,
-        rewardedAt: Date.now(),
-        days: 0,
-        skipped: 'forever'
-      })
-    );
-    return { ok: true, rewarded: false, reason: 'forever' };
-  }
-
   const days = settings.referralRewardDays || 90;
   const extended = await extendMemberByDays(env, referrerId, days, 'referral_reward');
   if (!extended.ok) {

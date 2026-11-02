@@ -8,7 +8,7 @@ export async function onRequestGet(context) {
   return jsonResponse({
     ok: true,
     settings,
-    probeCodes: ['PROBE-3M', 'PROBE-1Y', 'PROBE-FOREVER']
+    probeCodes: ['PROBE-3M', 'PROBE-1Y', 'PROBE-3Y']
   });
 }
 

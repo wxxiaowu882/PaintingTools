@@ -65,7 +65,7 @@
         { id: '04', text: '头部造型规律', url: '/Solid?sandbox=headform', color: '#D946EF' },
         { id: '05', text: '肖像光影沙盒', url: '/Solid?sandbox=portrait', color: '#F43F5E' },
         { id: '06', text: '吴晓的作品', url: '/Gallery', color: '#EC4899' },
-        { id: '07', text: '课程预约', url: '', disabled: true, tag: 'Coming Soon' },
+        { id: '07', text: '课程预约', url: '/Course', color: '#FBBF24' },
         { id: '07b', text: '会员 · 兑换', url: '/member', color: '#E8C547' },
 
         { type: 'category', text: '实用工具' },
@@ -77,7 +77,7 @@
         { id: '11', text: '色感训练 · 光谱行者', url: '/games/ChromaWalker', color: '#F59E0B' },
 
         { type: 'category', text: '安装', cat: 'install' },
-        { id: '12', text: '安卓 App 下载', url: '/docs/app/', color: '#94A3B8', hideInAndroidShell: true },
+        { id: '12', text: 'App下载', url: '/docs/app/', color: '#94A3B8', hideInAndroidShell: true },
 
         { type: 'footer', text: '© 2026 手绘工坊 · 童画师吴晓' }
     ];
