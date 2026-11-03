@@ -469,7 +469,7 @@
         <div class="meta-row">
           <span>状态：<strong id="meta-status">静态架子</strong></span>
           <span>鉴权：<strong>尚未接入</strong></span>
-          <span>存储：<strong>R2（规划中）</strong></span>
+          <span>存储：<strong id="meta-storage">R2（规划中）</strong></span>
           <span>样片：<strong id="meta-sample">探测中</strong></span>
         </div>
         <p class="note" id="dev-note">
@@ -552,6 +552,7 @@
       var mediaTimeEl = document.getElementById('media-time');
       var icoPlay = document.getElementById('ico-play');
       var metaStatus = document.getElementById('meta-status');
+      var metaStorage = document.getElementById('meta-storage');
       var metaSample = document.getElementById('meta-sample');
       var PLAY_D = 'M8 5.5v13l11-6.5z';
       var PAUSE_D = 'M7 5h3v14H7zm7 0h3v14h-3z';
@@ -730,13 +731,19 @@
           syncScrub();
         }
       }
-      function enableControls(ok) {
+      function enableControls(ok, label) {
         hasMedia = !!ok;
         if (btnPlay) btnPlay.disabled = !ok;
         if (btnSpeed) btnSpeed.disabled = !ok;
         if (frame) frame.classList.toggle('has-media', !!ok);
-        if (metaStatus) metaStatus.textContent = ok ? '本地样片试播' : '静态架子';
-        if (metaSample) metaSample.textContent = ok ? '已加载' : '无（占位壳）';
+        var isR2 = !!(label && /短时|r2/i.test(String(label)));
+        if (metaStatus) {
+          if (!ok) metaStatus.textContent = '静态架子';
+          else if (isR2) metaStatus.textContent = 'R2 短时试播';
+          else metaStatus.textContent = '本地样片试播';
+        }
+        if (metaStorage) metaStorage.textContent = isR2 ? 'R2 短时链' : 'R2（规划中）';
+        if (metaSample && !ok) metaSample.textContent = '无（占位壳）';
         syncTimeLabel();
       }
       function bindMediaOnce() {
@@ -831,7 +838,7 @@
               if (token !== loadToken || settled) return;
               settled = true;
               cleanup();
-              enableControls(true);
+              enableControls(true, label);
               setPlayUi(false);
               if (metaSample) metaSample.textContent = label || '已加载';
               resolve(true);
