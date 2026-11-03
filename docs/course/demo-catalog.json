@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "courseId": "watercolor-portrait-demo",
+  "title": "水彩肖像画课程",
+  "require": "member",
+  "note": "C6 demo 课表。lessonId/uid 将来与会员体系对齐；r2Key 对应 R2 对象键。本地用 demoSrc* 试播。",
+  "lessons": [
+    {
+      "lessonId": "demo",
+      "uid": "demo",
+      "index": 1,
+      "title": "观察与起稿节奏",
+      "durationSec": 20,
+      "r2Key": "course/demo/v1/main.mp4",
+      "demoSrc": "/自用工具文件_不部署/视频压片/samples/demo-land-1080.mp4",
+      "demoSrcPortrait": "/自用工具文件_不部署/视频压片/samples/demo-vert-preview.mp4"
+    },
+    {
+      "lessonId": "demo-02",
+      "uid": "demo-02",
+      "index": 2,
+      "title": "大色块铺底",
+      "durationSec": 1080,
+      "r2Key": "course/demo-02/v1/main.mp4"
+    },
+    {
+      "lessonId": "demo-03",
+      "uid": "demo-03",
+      "index": 3,
+      "title": "面部转折与边线",
+      "durationSec": 1320,
+      "r2Key": "course/demo-03/v1/main.mp4"
+    },
+    {
+      "lessonId": "demo-04",
+      "uid": "demo-04",
+      "index": 4,
+      "title": "头发与背景关系",
+      "durationSec": 960,
+      "r2Key": "course/demo-04/v1/main.mp4"
+    },
+    {
+      "lessonId": "demo-05",
+      "uid": "demo-05",
+      "index": 5,
+      "title": "收拾与完成感",
+      "durationSec": 840,
+      "r2Key": "course/demo-05/v1/main.mp4"
+    }
+  ]
+}

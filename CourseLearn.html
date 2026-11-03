@@ -477,34 +477,8 @@
         </button>
         <div class="curriculum-body">
           <h2>本课目录</h2>
-          <p class="progress">占位进度 1 / 5 · 未连接学习记录</p>
-          <ol class="lesson-list" id="lesson-list">
-            <li>
-              <button type="button" data-title="01 · 观察与起稿节奏" aria-current="true">
-                <span class="idx">01</span><span>观察与起稿节奏</span><span class="dur">12:00</span>
-              </button>
-            </li>
-            <li>
-              <button type="button" data-title="02 · 大色块铺底">
-                <span class="idx">02</span><span>大色块铺底</span><span class="dur">18:00</span>
-              </button>
-            </li>
-            <li>
-              <button type="button" data-title="03 · 面部转折与边线">
-                <span class="idx">03</span><span>面部转折与边线</span><span class="dur">22:00</span>
-              </button>
-            </li>
-            <li>
-              <button type="button" data-title="04 · 头发与背景关系">
-                <span class="idx">04</span><span>头发与背景关系</span><span class="dur">16:00</span>
-              </button>
-            </li>
-            <li>
-              <button type="button" data-title="05 · 收拾与完成感">
-                <span class="idx">05</span><span>收拾与完成感</span><span class="dur">14:00</span>
-              </button>
-            </li>
-          </ol>
+          <p class="progress" id="curriculum-progress">课表加载中…</p>
+          <ol class="lesson-list" id="lesson-list"></ol>
         </div>
       </aside>
     </div>
@@ -536,17 +510,10 @@
 
       var list = document.getElementById('lesson-list');
       var titleEl = document.getElementById('current-lesson-title');
-      if (list && titleEl) {
-        list.addEventListener('click', function (e) {
-          var btn = e.target.closest('button[data-title]');
-          if (!btn) return;
-          list.querySelectorAll('button[aria-current="true"]').forEach(function (b) {
-            b.removeAttribute('aria-current');
-          });
-          btn.setAttribute('aria-current', 'true');
-          titleEl.textContent = btn.getAttribute('data-title') || titleEl.textContent;
-        });
-      }
+      var progressEl = document.getElementById('curriculum-progress');
+      var courseNameEl = document.querySelector('.topbar .course-name');
+      var catalogLessons = [];
+      var activeLessonId = '';
 
       var panel = document.getElementById('curriculum');
       var toggle = document.getElementById('curriculum-toggle');
@@ -574,6 +541,7 @@
       var SPEEDS = [1, 1.25, 1.5, 2];
       var speedIdx = 0;
       var hasMedia = false;
+      var loadToken = 0;
 
       function qs(name) {
         try {
@@ -682,93 +650,235 @@
         }
       }
       bindMediaOnce();
-      (function tryLoadDemo() {
+
+      function formatDur(sec) {
+        var n = Math.max(0, Math.round(Number(sec) || 0));
+        var m = Math.floor(n / 60);
+        var s = n % 60;
+        return m + ':' + (s < 10 ? '0' : '') + s;
+      }
+      function padIdx(n) {
+        var x = Number(n) || 0;
+        return x < 10 ? '0' + x : String(x);
+      }
+      function lessonDisplayTitle(lesson) {
+        if (!lesson) return '';
+        return padIdx(lesson.index) + ' · ' + (lesson.title || lesson.lessonId || '');
+      }
+      function clearVideo(msg) {
+        if (!video) return;
+        try { video.pause(); } catch (_e) {}
+        video.removeAttribute('src');
+        try { video.load(); } catch (_e2) {}
+        enableControls(false);
+        setPlayUi(false);
+        if (metaSample) metaSample.textContent = msg || '无片';
+        if (scrubFill) scrubFill.style.width = '0%';
+      }
+      function probeAndPlay(src, label, token) {
+        return fetch(src, { method: 'HEAD' }).then(function (res) {
+          if (!res.ok) throw new Error('missing');
+          return src;
+        }).catch(function () {
+          return src;
+        }).then(function (readySrc) {
+          return new Promise(function (resolve, reject) {
+            if (token !== loadToken) {
+              reject(new Error('stale'));
+              return;
+            }
+            var settled = false;
+            var onOk = function () {
+              if (token !== loadToken || settled) return;
+              settled = true;
+              cleanup();
+              enableControls(true);
+              setPlayUi(false);
+              if (metaSample) metaSample.textContent = label || '已加载';
+              resolve(true);
+            };
+            var onErr = function () {
+              if (token !== loadToken || settled) return;
+              settled = true;
+              cleanup();
+              reject(new Error('load fail'));
+            };
+            var timer = window.setTimeout(function () {
+              if (!settled && (!video.readyState || video.readyState < 1)) onErr();
+            }, 5000);
+            function cleanup() {
+              window.clearTimeout(timer);
+              video.removeEventListener('loadeddata', onOk);
+              video.removeEventListener('error', onErr);
+            }
+            video.addEventListener('loadeddata', onOk, { once: true });
+            video.addEventListener('error', onErr, { once: true });
+            video.src = readySrc;
+            video.load();
+          });
+        });
+      }
+      function tryApiPlayUrl(lessonId, token) {
+        return fetch('/api/course/play-url?lessonId=' + encodeURIComponent(lessonId || 'demo'), {
+          credentials: 'same-origin'
+        }).then(function (res) {
+          return res.json().then(function (body) {
+            if (!res.ok || !body || !body.ok || !body.url) throw new Error('api');
+            return probeAndPlay(body.url, body.source === 'demo' ? 'API·demo' : 'API·短时', token);
+          });
+        });
+      }
+      function sourcesForLesson(lesson) {
+        var out = [];
+        if (!lesson) return out;
+        if (isPortraitViewport()) {
+          if (lesson.demoSrcPortrait) out.push({ src: lesson.demoSrcPortrait, label: '竖屏样片' });
+          if (lesson.demoSrc) out.push({ src: lesson.demoSrc, label: '横屏样片' });
+        } else {
+          if (lesson.demoSrc) out.push({ src: lesson.demoSrc, label: '横屏样片' });
+          if (lesson.demoSrcPortrait) out.push({ src: lesson.demoSrcPortrait, label: '竖屏样片' });
+        }
+        return out;
+      }
+      function loadLessonMedia(lesson) {
+        var token = ++loadToken;
         if (!video) {
           enableControls(false);
-          return;
+          return Promise.resolve();
         }
         var custom = qs('vsrc');
-        var settled = false;
-        function failAll(msg) {
-          if (settled) return;
-          settled = true;
-          video.removeAttribute('src');
-          try { video.load(); } catch (_e) {}
-          enableControls(false);
-          if (metaSample) metaSample.textContent = msg || '本机无样片';
-        }
-        function ok(label) {
-          if (settled) return;
-          settled = true;
-          enableControls(true);
-          setPlayUi(false);
-          if (metaSample) metaSample.textContent = label || '已加载';
-        }
-        function probeAndPlay(src, label) {
-          return fetch(src, { method: 'HEAD' }).then(function (res) {
-            if (!res.ok) throw new Error('missing');
-            return src;
-          }).catch(function () {
-            // HEAD 失败时仍尝试装载（个别静态服对 HEAD 不友好）
-            return src;
-          }).then(function (readySrc) {
-            return new Promise(function (resolve, reject) {
-              var onOk = function () {
-                cleanup();
-                ok(label);
-                resolve(true);
-              };
-              var onErr = function () {
-                cleanup();
-                reject(new Error('load fail'));
-              };
-              var timer = window.setTimeout(function () {
-                if (!settled && (!video.readyState || video.readyState < 1)) onErr();
-              }, 5000);
-              function cleanup() {
-                window.clearTimeout(timer);
-                video.removeEventListener('loadeddata', onOk);
-                video.removeEventListener('error', onErr);
-              }
-              video.addEventListener('loadeddata', onOk, { once: true });
-              video.addEventListener('error', onErr, { once: true });
-              video.src = readySrc;
-              video.load();
-            });
-          });
-        }
-        function tryApiPlayUrl() {
-          // 测站/正式 Worker 上的接口形状预演；本机静态服通常 404，忽略即可
-          var lessonId = qs('lesson') || 'demo';
-          return fetch('/api/course/play-url?lessonId=' + encodeURIComponent(lessonId), {
-            credentials: 'same-origin'
-          }).then(function (res) {
-            return res.json().then(function (body) {
-              if (!res.ok || !body || !body.ok || !body.url) throw new Error('api');
-              return probeAndPlay(body.url, body.source === 'demo' ? 'API·demo' : 'API·短时');
-            });
-          });
-        }
         var chain = Promise.resolve();
         if (custom) {
-          chain = probeAndPlay(custom, '自定义');
+          chain = probeAndPlay(custom, '自定义', token);
         } else {
-          var list = demoCandidates();
-          function labelFor(src) {
-            if (src === DEMO_VERT) return '竖屏样片';
-            if (src === DEMO_LAND) return '横屏样片';
-            return '样片';
+          var srcList = sourcesForLesson(lesson);
+          if (!srcList.length) {
+            // 无本地样片：尝试 play-url，再退全局默认样片
+            chain = tryApiPlayUrl(lesson && lesson.lessonId, token).catch(function () {
+              var fallback = demoCandidates();
+              return probeAndPlay(fallback[0], fallback[0] === DEMO_VERT ? '竖屏样片' : '横屏样片', token).catch(function () {
+                return probeAndPlay(fallback[1], fallback[1] === DEMO_VERT ? '竖屏样片' : '横屏样片', token);
+              });
+            });
+          } else {
+            chain = probeAndPlay(srcList[0].src, srcList[0].label, token);
+            var i;
+            for (i = 1; i < srcList.length; i++) {
+              (function (item) {
+                chain = chain.catch(function () {
+                  return probeAndPlay(item.src, item.label, token);
+                });
+              })(srcList[i]);
+            }
+            chain = chain.catch(function () {
+              return tryApiPlayUrl(lesson && lesson.lessonId, token);
+            });
           }
-          chain = probeAndPlay(list[0], labelFor(list[0])).catch(function () {
-            return probeAndPlay(list[1], labelFor(list[1]));
-          }).catch(function () {
-            return tryApiPlayUrl();
-          });
         }
-        chain.catch(function () {
-          failAll(custom ? '自定义地址失败' : '本机无样片');
+        return chain.catch(function (err) {
+          if (token !== loadToken) return;
+          if (err && err.message === 'stale') return;
+          clearVideo(custom ? '自定义地址失败' : '本课暂无样片');
         });
-      })();
+      }
+      function syncProgress(idx) {
+        if (!progressEl) return;
+        var total = catalogLessons.length || 0;
+        if (!total) {
+          progressEl.textContent = '课表未加载';
+          return;
+        }
+        progressEl.textContent = '当前 ' + idx + ' / ' + total + ' · 未连接学习记录';
+      }
+      function selectLesson(lessonId, opts) {
+        opts = opts || {};
+        var lesson = null;
+        var i;
+        for (i = 0; i < catalogLessons.length; i++) {
+          if (catalogLessons[i].lessonId === lessonId) {
+            lesson = catalogLessons[i];
+            break;
+          }
+        }
+        if (!lesson && catalogLessons.length) lesson = catalogLessons[0];
+        if (!lesson) return;
+        activeLessonId = lesson.lessonId;
+        if (titleEl) titleEl.textContent = lessonDisplayTitle(lesson);
+        if (list) {
+          list.querySelectorAll('button[aria-current="true"]').forEach(function (b) {
+            b.removeAttribute('aria-current');
+          });
+          var cur = list.querySelector('button[data-lesson-id="' + lesson.lessonId + '"]');
+          if (cur) cur.setAttribute('aria-current', 'true');
+        }
+        syncProgress(lesson.index || 1);
+        if (!opts.skipMedia) loadLessonMedia(lesson);
+      }
+      function renderCatalog(data) {
+        catalogLessons = (data && data.lessons) || [];
+        if (courseNameEl && data && data.title) courseNameEl.textContent = data.title;
+        if (!list) return;
+        list.innerHTML = '';
+        catalogLessons.forEach(function (lesson) {
+          var li = document.createElement('li');
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.setAttribute('data-lesson-id', lesson.lessonId);
+          btn.setAttribute('data-title', lessonDisplayTitle(lesson));
+          btn.innerHTML =
+            '<span class="idx">' + padIdx(lesson.index) + '</span>' +
+            '<span></span>' +
+            '<span class="dur"></span>';
+          btn.children[1].textContent = lesson.title || lesson.lessonId;
+          btn.children[2].textContent = formatDur(lesson.durationSec);
+          li.appendChild(btn);
+          list.appendChild(li);
+        });
+      }
+      if (list) {
+        list.addEventListener('click', function (e) {
+          var btn = e.target.closest('button[data-lesson-id]');
+          if (!btn) return;
+          selectLesson(btn.getAttribute('data-lesson-id'));
+        });
+      }
+
+      function boot() {
+        var custom = qs('vsrc');
+        var wantLesson = qs('lesson') || 'demo';
+        fetch('/docs/course/demo-catalog.json', { cache: 'no-store' })
+          .then(function (res) {
+            if (!res.ok) throw new Error('catalog');
+            return res.json();
+          })
+          .then(function (data) {
+            renderCatalog(data);
+            var startId = wantLesson;
+            var found = catalogLessons.some(function (L) { return L.lessonId === startId; });
+            if (!found && catalogLessons[0]) startId = catalogLessons[0].lessonId;
+            selectLesson(startId);
+          })
+          .catch(function () {
+            if (progressEl) progressEl.textContent = '课表加载失败 · 使用默认样片';
+            // 无课表时仍尽量播本地默认样片
+            var token = ++loadToken;
+            var fallback = demoCandidates();
+            if (custom) {
+              probeAndPlay(custom, '自定义', token).catch(function () {
+                clearVideo('自定义地址失败');
+              });
+              return;
+            }
+            probeAndPlay(fallback[0], fallback[0] === DEMO_VERT ? '竖屏样片' : '横屏样片', token)
+              .catch(function () {
+                return probeAndPlay(fallback[1], fallback[1] === DEMO_VERT ? '竖屏样片' : '横屏样片', token);
+              })
+              .catch(function () {
+                clearVideo('本机无样片');
+              });
+          });
+      }
+      boot();
 
       // 全屏壳：Fullscreen API → 失败则 CSS 沉浸（照顾 iOS 等）
       var fsBtn = document.getElementById('btn-fullscreen');
