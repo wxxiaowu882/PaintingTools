@@ -3,7 +3,7 @@
   "courseId": "watercolor-portrait-demo",
   "title": "水彩肖像画课程",
   "require": "member",
-  "note": "C6 demo 课表。lessonId/uid 将来与会员体系对齐；r2Key 对应 R2 对象键。本地用 demoSrc* 试播。",
+  "note": "C6 demo 课表。lessonId/uid 将来与会员体系对齐；r2Key 对应 R2 对象键。本地用 demoSrc* 试播。smoke-land 无 demoSrc：测站走 R2 短时链冒烟。",
   "lessons": [
     {
       "lessonId": "demo",
@@ -46,6 +46,14 @@
       "title": "收拾与完成感",
       "durationSec": 840,
       "r2Key": "course/demo-05/v1/main.mp4"
+    },
+    {
+      "lessonId": "smoke-land",
+      "uid": "smoke-land",
+      "index": 6,
+      "title": "R2 冒烟样片（测站）",
+      "durationSec": 20,
+      "r2Key": "course/smoke-land/v1/main.mp4"
     }
   ]
 }

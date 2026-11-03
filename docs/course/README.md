@@ -31,3 +31,9 @@
 - 学习页用 `localStorage` 键 `wuxiao.courseLearn.progress.v1`，按 `courseId` → `lessonId` 记播放位置与上次打开的课。
 - **不上云、不跨设备**；清站点数据即丢。接近片尾（约最后 2 秒）视为看完，下次从头。
 - URL 带 `?lesson=` 时优先该课，不再用「上次打开的课」覆盖。
+
+## 测站 R2 冒烟（C3）
+
+- 课表末课 `smoke-land`：**无** `demoSrc`，学习页会调 `/api/course/play-url`。
+- 测站已配 Secrets 时返回 `source:r2` 短时链；`demo*` 课仍强制本地样片路径。
+- 本地 static-server 对任意 lessonId 仍预演 demo 样片（无真签）。

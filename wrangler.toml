@@ -46,12 +46,14 @@ id = "050dc9b4fa834d27918dd32f54ecde09"
 
 # ---------- 正课 R2 短时签名（C3）----------
 # play-url 用 S3 API Token 签 GET，不靠 R2 binding。
-# 启用前（拍板后再做，默认不冒烟）：
-# 1) 控制台建私有桶（建议 staging/prod 分开）
-# 2) 建 R2 API Token（Object Read）
-# 3) wrangler secret put COURSE_R2_ACCOUNT_ID / COURSE_R2_ACCESS_KEY_ID /
-#    COURSE_R2_SECRET_ACCESS_KEY / COURSE_R2_BUCKET  （可加 --env staging）
-# 4) 桶 CORS：允许 https://www.wuxiaoart.com 与 https://test.wuxiaoart.com 的 GET/HEAD，
+# 测站已冒烟（2026-11-03）：桶 wuxiao-course-staging；Secrets 已 put --env staging；
+# 探针 lessonId=smoke-land → source:r2。正式站仍未配。
+# 启用正式站时再：
+# 1) 另建正式私有桶（勿与 staging 混用）
+# 2) 建 R2 API Token（Object Read，限正式桶）
+# 3) wrangler secret put COURSE_R2_* （正式环境，勿加 staging）
+# 4) 桶 CORS：允许 https://www.wuxiaoart.com（及测站域若需）GET/HEAD，
 #    AllowedHeaders 含 Range / Content-Type；暴露 Accept-Ranges / Content-Range / Content-Length
 # 可选 var：COURSE_R2_TTL_SEC=600 ；COURSE_LESSON_KEY_JSON='{"71":"course/71/v1/main.mp4"}'
 # 未配齐 Secrets 时：/api/course/play-url 对 demo/测站走本地样片路径，正式站返回 not_ready。
+# demo* lessonId 始终强制本地样片，不走 R2。
