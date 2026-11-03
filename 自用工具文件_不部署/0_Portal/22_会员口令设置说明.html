@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>会员两个口令怎么设</title>
+<style>
+  body { font-family: "Microsoft YaHei","PingFang SC",sans-serif; max-width: 720px; margin: 28px auto; padding: 0 16px 48px; line-height: 1.65; color: #1c1915; background: #f7f4ee; }
+  h1 { font-size: 1.35rem; }
+  h2 { font-size: 1.05rem; margin-top: 28px; }
+  .card { background: #fff; border: 1px solid #e5dfd3; border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+  code { background: #eee; padding: 1px 6px; border-radius: 4px; }
+  ol { padding-left: 1.3em; }
+  .muted { color: #6b645a; font-size: 0.92rem; }
+  .ok { color: #2f6b3a; }
+  .warn { background: #fff6e8; border-color: #f0dfb8; }
+</style>
+</head>
+<body>
+  <h1>会员两个口令：干什么用、怎么设</h1>
+  <p class="muted">不用懂代码。设一次，之后日常只打开运营台发码就行。</p>
+
+  <div class="card warn">
+    <h2>若网页提示「Variables cannot be added… static assets」</h2>
+    <p>这是正常现象：Cloudflare 认为当前站还是「只发静态网页」，所以<strong>网页上加不了密钥</strong>。</p>
+    <p class="ok"><b>请改用 Portal 里的脚本：</b>正式站用 <code>23_设置会员口令.bat</code>；测试站用 <code>23b_设置会员口令_测试环境.bat</code>。</p>
+    <p>不要死磕 Workers 设置页里的 Variables。</p>
+  </div>
+
+  <div class="card">
+    <h2>1）运营台登录密码</h2>
+    <p><b>名字：</b><code>MEMBERSHIP_ADMIN_PASSWORD</code></p>
+    <p><b>干什么：</b>打开「会员运营台」时输入的密码，防止别人乱进后台发兑换码、改收费项。</p>
+  </div>
+
+  <div class="card">
+    <h2>2）会员总密钥</h2>
+    <p><b>名字：</b><code>MEMBERSHIP_SECRET</code></p>
+    <p><b>干什么：</b>给兑换码和学员登录「盖章」，防止伪造会员。自己保管，不要发群。</p>
+    <p>建议随机一长串（16 位以上）。</p>
+  </div>
+
+  <h2>正式站（给学员）</h2>
+  <ol>
+    <li>双击 <b>20_站点发版.bat</b></li>
+    <li>双击 <b>23_设置会员口令.bat</b>，按提示输入两个口令</li>
+    <li>双击 <b>21b_打开会员运营台_线上.bat</b>，用你的运营密码登录试一下</li>
+  </ol>
+
+  <h2>测试站（日常验收，推荐）</h2>
+  <ol>
+    <li>双击 <b>20b_站点发版_测试环境.bat</b></li>
+    <li>需要改口令时双击 <b>23b_设置会员口令_测试环境.bat</b>（当前多为 <code>ops-staging</code>）</li>
+    <li>双击 <b>21c_打开会员运营台_测试站.bat</b> 练发码、验兑换</li>
+  </ol>
+  <p class="ok">测试站发的码不要发给真实学员；正式发码只用正式站。</p>
+
+  <p class="muted">相关：20 / 20b 发版 · 21b / 21c 运营台 · 23 / 23b 设口令</p>
+</body>
+</html>

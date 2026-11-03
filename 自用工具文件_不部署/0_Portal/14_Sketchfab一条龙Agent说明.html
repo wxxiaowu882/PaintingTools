@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>Sketchfab 一条龙（Agent）</title>
+<style>
+  :root { --bg:#0e0e12; --card:#1a1a22; --line:#2a2a36; --text:#e8e8ef; --muted:#8a8a9a; --accent:#00e0c0; }
+  body { margin:0; font-family:"Microsoft YaHei","PingFang SC",sans-serif; background:var(--bg); color:var(--text); line-height:1.65; }
+  main { max-width:720px; margin:0 auto; padding:28px 24px 48px; }
+  h1 { font-size:20px; font-weight:600; margin:0 0 12px; color:var(--accent); }
+  p, li { font-size:14px; }
+  .muted { color:var(--muted); font-size:13px; }
+  pre { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:14px 16px; overflow-x:auto; font-size:12px; line-height:1.5; }
+  code { background:#222; padding:1px 6px; border-radius:3px; font-size:12px; }
+  ol { padding-left:1.2em; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sketchfab 一条龙（Agent 提示词）</h1>
+  <p class="muted">本页说明如何在 Cursor 里让 Agent 用既有脚本完成：Sketchfab 下载 → 看图命名与旋正 → 30cm 规范 → 体积优先压缩 / 展示安全回退 → 汇总汇报。</p>
+
+  <p><b>提示词文件（在 Cursor 中 @ 引用）：</b></p>
+  <pre>PaintingTools/.cursor/browser-automation/Sketchfab下载到规范化_Agent提示词.md</pre>
+
+  <p><b>用户发送示例：</b></p>
+  <pre>按《Sketchfab下载到规范化_Agent提示词.md》执行。
+
+任务: https://sketchfab.com/3d-models/...
+输出目录: E:/模型/某次任务
+与 docs/model 不重名: 是
+保留原英文 GLB: 是
+压缩: 是</pre>
+
+  <p><b>Agent 会调用的既有工具（无需每次重写代码）：</b></p>
+  <ol>
+    <li><code>sketchfab-batch-download.js</code> — 批量下载</li>
+    <li><code>batch-normalize</code> — 四向预览 + normalize-cli</li>
+    <li><code>compress-glb.ps1</code> — 同 Portal <code>09b</code> / <code>09</code> 压缩逻辑</li>
+  </ol>
+
+  <p class="muted">仅批量下载、不做后续处理：双击 Portal <code>13_Sketchfab批量下载.bat</code> 或见 browser-automation 的 README。</p>
+</main>
+</body>
+</html>

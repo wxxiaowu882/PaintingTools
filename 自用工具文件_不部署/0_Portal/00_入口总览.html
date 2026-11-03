@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>自用工具 Portal</title>
+<style>
+  :root { --bg:#0e0e12; --card:#1a1a22; --line:#2a2a36; --text:#e8e8ef; --muted:#8a8a9a; --accent:#00e0c0; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Microsoft YaHei","PingFang SC",sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:28px 32px 12px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 8px; font-size:22px; font-weight:600; letter-spacing:.04em; }
+  .sub { color:var(--muted); font-size:13px; line-height:1.6; max-width:720px; }
+  main { padding:20px 32px 48px; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border-radius:8px; overflow:hidden; }
+  th, td { text-align:left; padding:10px 14px; border-bottom:1px solid var(--line); font-size:13px; }
+  th { color:var(--muted); font-weight:500; background:#14141c; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .f { font-family: Consolas, "Courier New", monospace; font-size:12px; }
+  .tip { color:var(--muted); }
+  .note { margin-top:18px; color:var(--muted); font-size:12px; line-height:1.7; }
+  code { background:#222; padding:1px 6px; border-radius:3px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>自用工具 Portal</h1>
+  <p class="sub">
+    本目录是「自用工具文件_不部署」的总入口抽屉（文件夹名 <code>0_Portal</code> 会排在最前）。<br>
+    <b>HTML</b>：对本页或下列 <code>*.html</code> 右键 <b>Open with Live Server</b>（跳转壳会进到真实工具目录，相对资源不坏）。<br>
+    <b>BAT</b>：在资源管理器中双击对应 <code>.bat</code>（会先切到原工具目录再启动）。<br>
+    <b>Glb管理器</b>：若要用「打开所在文件夹 / 记住盘符路径」，请双击 <code>01_Glb管理器.bat</code>（自动起 18080），不要只开 Live Server。<br>
+    <b>模型标注生产工具</b>：会内嵌打开 GLB 管理器，请双击 <code>02_模型标注生产工具.bat</code>，不要只开 Live Server。<br>
+    <b>追光沙盒场景生产工具</b>：请双击 <code>03_追光沙盒场景生产工具.bat</code>（自动起 18080），不要只开 Live Server。<br>
+    <b>消费端首页</b>：请双击 <code>19_打开首页.bat</code>（自动起 18080），与 Live Server 互不影响，改其它页面不必重启首页服务。<br>
+    <b>会员运营</b>：正式发版 <code>20_站点发版.bat</code> + 运营台 <code>21b_…线上.bat</code>；日常验收用测试站 <code>20b</code> + <code>21c</code>。口令用 <code>23</code> / <code>23b</code>（见 <code>22_会员口令设置说明.html</code>）。会员 KV 加密备份：<code>24_备份正式站会员KV.bat</code>（正式发版前也会自动跑）。不再提供本机 8788 运营台。<br>
+    <b>视频压片</b>：剪映前用 <code>25_视频压剪辑代理.bat</code>；剪映导出后用 <code>25b_视频压上架档.bat</code>（默认横屏；答 V=竖屏预告）。两个入口都会问「去掉声音？Y / 回车保留」。也可把视频拖到对应 bat 上。
+  </p>
+</header>
+<main>
+  <table>
+    <thead><tr><th>入口文件</th><th>工具</th><th>备注</th><th>怎么开</th></tr></thead>
+    <tbody>
+<tr>
+<td class="f"><a href="./24_备份正式站会员KV.bat">24_备份正式站会员KV.bat</a></td>
+<td>正式站会员 KV 加密备份</td>
+<td>账号/兑码/权限等 → <code>历史备份文件/membership-kv/</code>；钥文件同目录 <code>_backup.key</code></td>
+<td class="tip"><b>双击 bat</b>（发版前也会自动跑）</td>
+</tr>
+<tr>
+<td class="f"><a href="./19_打开首页.bat">19_打开首页.bat</a></td>
+<td>消费端首页</td>
+<td>仓库根 index.html；独立 18080，不依赖 Live Server</td>
+<td class="tip"><b>双击 bat</b>（自动起 18080 并打开首页）</td>
+</tr>
+<tr>
+<td class="f"><a href="./20_站点发版.bat">20_站点发版.bat</a></td>
+<td>站点发版（正式）</td>
+<td>上传到正式站；学员/正式运营台才更新</td>
+<td class="tip"><b>双击 bat</b></td>
+</tr>
+<tr>
+<td class="f"><a href="./20b_站点发版_测试环境.bat">20b_站点发版_测试环境.bat</a></td>
+<td>站点发版（测试）</td>
+<td>上传到测试站 test.wuxiaoart.com；不碰正式</td>
+<td class="tip"><b>双击 bat</b></td>
+</tr>
+<tr>
+<td class="f"><a href="./21c_打开会员运营台_测试站.bat">21c_打开会员运营台_测试站.bat</a></td>
+<td>会员运营台（测试站）</td>
+<td>日常验收发码；打开 test.wuxiaoart.com；口令见 23b</td>
+<td class="tip"><b>双击 bat</b>（建议先 20b）</td>
+</tr>
+<tr>
+<td class="f"><a href="./21b_打开会员运营台_线上.bat">21b_打开会员运营台_线上.bat</a></td>
+<td>会员运营台（正式站）</td>
+<td>需已发版 + 已设 Cloudflare 口令</td>
+<td class="tip"><b>双击 bat</b></td>
+</tr>
+<tr>
+<td class="f"><a href="./22_会员口令设置说明.html">22_会员口令设置说明.html</a></td>
+<td>会员两个口令说明</td>
+<td>ADMIN 密码 / SECRET 密钥干什么；网页加不了变量时看这里</td>
+<td class="tip">双击打开 或 Live Server</td>
+</tr>
+<tr>
+<td class="f"><a href="./23_设置会员口令.bat">23_设置会员口令.bat</a></td>
+<td>设置会员口令（正式）</td>
+<td>绕过「纯静态无法加 Variables」；用命令上传两个 Secret</td>
+<td class="tip"><b>双击 bat</b>（建议先 20 发版）</td>
+</tr>
+<tr>
+<td class="f"><a href="./23b_设置会员口令_测试环境.bat">23b_设置会员口令_测试环境.bat</a></td>
+<td>设置会员口令（测试）</td>
+<td>只改测试站口令；与正式分开</td>
+<td class="tip"><b>双击 bat</b></td>
+</tr>
+<tr>
+<td class="f"><a href="./01_Glb管理器.bat">01_Glb管理器.bat</a></td>
+<td>Glb管理器</td>
+<td>主入口；记住路径 / 打开所在文件夹需 18080</td>
+<td class="tip"><b>双击 bat</b>（自动起 18080 并打开页面）</td>
+</tr>
+<tr>
+<td class="f"><a href="./01b_Glb批量命名.html">01b_Glb批量命名.html</a></td>
+<td>Glb批量命名</td>
+<td>子入口</td>
+<td class="tip">右键 → Open with Live Server</td>
+</tr>
+<tr>
+<td class="f"><a href="./01c_Glb批量规范化预览.html">01c_Glb批量规范化预览.html</a></td>
+<td>Glb批量规范化预览</td>
+<td>子入口</td>
+<td class="tip">右键 → Open with Live Server</td>
+</tr>
+<tr>
+<td class="f"><a href="./02_模型标注生产工具.bat">02_模型标注生产工具.bat</a></td>
+<td>模型标注生产工具</td>
+<td>内嵌 GLB 管理器，需 18080</td>
+<td class="tip"><b>双击 bat</b>（自动起 18080 并打开页面）</td>
+</tr>
+<tr>
+<td class="f"><a href="./03_追光沙盒场景生产工具.bat">03_追光沙盒场景生产工具.bat</a></td>
+<td>追光沙盒场景生产工具</td>
+<td>Solid 生产端；需 18080</td>
+<td class="tip"><b>双击 bat</b>（自动起 18080 并打开页面）</td>
+</tr>
+<tr>
+<td class="f"><a href="./04_anatomyToGLB.html">04_anatomyToGLB.html</a></td>
+<td>anatomyToGLB</td>
+<td>HTML</td>
+<td class="tip">右键 → Open with Live Server</td>
+</tr>
+<tr>
+<td class="f"><a href="./05_代码压缩.html">05_代码压缩.html</a></td>
+<td>代码压缩</td>
+<td>HTML</td>
+<td class="tip">右键 → Open with Live Server</td>
+</tr>
+<tr>
+<td class="f"><a href="./06_Gallery生成.bat">06_Gallery生成.bat</a></td>
+<td>Gallery生成</td>
+<td>双击运行</td>
+<td class="tip">资源管理器中双击</td>
+</tr>
+<tr>
+<td class="f"><a href="./06b_Gallery片段预览.html">06b_Gallery片段预览.html</a></td>
+<td>Gallery片段预览</td>
+<td>HTML</td>
+<td class="tip">右键 → Open with Live Server</td>
+</tr>
+<tr>
+<td class="f"><a href="./07_STL转GLB.bat">07_STL转GLB.bat</a></td>
+<td>STL转GLB</td>
+<td>双击运行</td>
+<td class="tip">资源管理器中双击</td>
+</tr>
+<tr>
+<td class="f"><a href="./08_减面_Blender.bat">08_减面_Blender.bat</a></td>
+<td>Blender减面</td>
+<td>双击运行</td>
+<td class="tip">资源管理器中双击</td>
+</tr>
+<tr>
+<td class="f"><a href="./09_压缩GLB_展示安全.bat">09_压缩GLB_展示安全.bat</a></td>
+<td>压缩GLB·展示安全</td>
+<td>双击运行</td>
+<td class="tip">资源管理器中双击</td>
+</tr>
+<tr>
+<td class="f"><a href="./09b_压缩GLB_体积优先.bat">09b_压缩GLB_体积优先.bat</a></td>
+<td>压缩GLB·体积优先</td>
+<td>双击运行</td>
+<td class="tip">资源管理器中双击</td>
+</tr>
+<tr>
+<td class="f"><a href="./10_https临时证书.bat">10_https临时证书.bat</a></td>
+<td>HTTPS临时证书</td>
+<td>双击（仓库根启动）</td>
+<td class="tip">资源管理器中双击</td>
+</tr>
+<tr>
+<td class="f"><a href="./11_自动换号.bat">11_自动换号.bat</a></td>
+<td>自动换号监控</td>
+<td>双击（可能提权）</td>
+<td class="tip">资源管理器中双击</td>
+</tr>
+<tr>
+<td class="f"><a href="./12_头部肌肉色彩变更.bat">12_头部肌肉色彩变更.bat</a></td>
+<td>头部肌肉色彩变更</td>
+<td>导入 GLB · 锚点拧形 · Alt+左键设色 · 存档/导出</td>
+<td class="tip">资源管理器中双击（自动起服务）</td>
+</tr>
+<tr>
+<td class="f"><a href="./13_Sketchfab批量下载.bat">13_Sketchfab批量下载.bat</a></td>
+<td>Sketchfab批量下载</td>
+<td>双击</td>
+<td class="tip">资源管理器中双击</td>
+</tr>
+<tr>
+<td class="f"><a href="./14_Sketchfab一条龙Agent说明.html">14_Sketchfab一条龙Agent说明.html</a></td>
+<td>Sketchfab一条龙（Agent）</td>
+<td>下载→命名→规范→压缩</td>
+<td class="tip">Cursor 中 @ 提示词 md；本页看用法</td>
+</tr>
+<tr>
+<td class="f"><a href="./15_GNM头模工坊.bat">15_GNM头模工坊.bat</a></td>
+<td>GNM 头模工坊</td>
+<td>上一级；自动起 18080</td>
+<td class="tip">资源管理器中双击</td>
+</tr>
+<tr>
+<td class="f"><a href="./15b_GNM对齐叠显.bat">15b_GNM对齐叠显.bat</a></td>
+<td>GNM × 欧版对齐叠显</td>
+<td>历史 JSON 需 18080</td>
+<td class="tip">资源管理器中双击</td>
+</tr>
+<tr>
+<td class="f"><a href="./16_头部造型规律电子书.bat">16_头部造型规律电子书.bat</a></td>
+<td>头部造型规律之解析 · 电子书</td>
+<td>左文右图 · 知识库原稿；自动起 18080</td>
+<td class="tip"><b>双击 bat</b></td>
+</tr>
+<tr>
+<td class="f"><a href="./17_面部表情艺用解剖电子书.bat">17_面部表情艺用解剖电子书.bat</a></td>
+<td>面部表情艺用解剖 · 电子书</td>
+<td>自动起 18080</td>
+<td class="tip"><b>双击 bat</b></td>
+</tr>
+<tr>
+<td class="f"><a href="./18_艺术与视知觉电子书.bat">18_艺术与视知觉电子书.bat</a></td>
+<td>艺术与视知觉 · 电子书</td>
+<td>自动起 18080</td>
+<td class="tip"><b>双击 bat</b></td>
+</tr>
+<tr>
+<td class="f"><a href="./25_视频压剪辑代理.bat">25_视频压剪辑代理.bat</a></td>
+<td>视频 · 剪辑代理压片</td>
+<td>手机原片 → 小文件进剪映；运行中问「去掉声音？」</td>
+<td class="tip">双击或拖视频到 bat；答 Y=去声</td>
+</tr>
+<tr>
+<td class="f"><a href="./25b_视频压上架档.bat">25b_视频压上架档.bat</a></td>
+<td>视频 · 上架档压片</td>
+<td>剪映导出 → 档位 +「去掉声音？」；默认横屏保留声</td>
+<td class="tip">双击或拖视频到 bat；答 Y=去声 / V=竖屏</td>
+</tr>
+    </tbody>
+  </table>
+  <p class="note">
+    篡改猴脚本（如 <code>篡改猴Sketchfab.js</code>）需装到浏览器扩展，不是网页入口；文件在 <code>../篡改猴/</code>。<br>
+    工具本体仍在各自原目录，此处仅为跳转/包装，勿把依赖拷进 Portal。
+  </p>
+</main>
+</body>
+</html>
