@@ -25,3 +25,9 @@
 
 - 有 `COURSE_R2_*` 时：`play-url` 按 `r2Key`（或默认键）签短时 URL。
 - 无 Secrets：`lessonId` 以 `demo` 开头走本地样片路径。
+
+## 本机进度（C2 / C8 轻量）
+
+- 学习页用 `localStorage` 键 `wuxiao.courseLearn.progress.v1`，按 `courseId` → `lessonId` 记播放位置与上次打开的课。
+- **不上云、不跨设备**；清站点数据即丢。接近片尾（约最后 2 秒）视为看完，下次从头。
+- URL 带 `?lesson=` 时优先该课，不再用「上次打开的课」覆盖。

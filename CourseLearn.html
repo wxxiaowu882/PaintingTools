@@ -180,9 +180,10 @@
     .player-frame .play-fake {
       width: 72px; height: 72px; border-radius: 50%;
       border: none; cursor: pointer;
-      background: rgba(212,181,106,0.92); color: #0c0c10;
+      /* 略透明，少挡画面；仍够认得出是播放钮 */
+      background: rgba(212,181,106,0.55); color: rgba(12,12,16,0.92);
       display: inline-flex; align-items: center; justify-content: center;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.28);
       padding: 0;
     }
     .player-frame .play-fake svg {
@@ -249,6 +250,17 @@
       border-radius: 999px; background: var(--accent);
       pointer-events: none;
     }
+    .controls .time {
+      flex: 0 0 auto;
+      min-width: 5.6em;
+      font-size: 0.78rem;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+      color: var(--muted);
+      white-space: nowrap;
+      user-select: none;
+    }
+    .controls .time.is-ready { color: var(--text); }
     .meta-row {
       margin-top: 14px;
       display: flex; flex-wrap: wrap; gap: 10px 16px;
@@ -447,6 +459,7 @@
           </button>
           <button type="button" class="btn-speed" id="btn-speed" disabled aria-label="倍速 1倍" title="倍速">1x</button>
           <div class="scrub" id="scrub" role="slider" aria-label="进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0"><i id="scrub-fill"></i></div>
+          <span class="time" id="media-time" aria-live="off">0:00 / 0:00</span>
           <button type="button" id="btn-fullscreen" aria-label="全屏" title="全屏播放区" aria-pressed="false">
             <svg id="ico-fullscreen" viewBox="0 0 24 24" aria-hidden="true">
               <path id="ico-fullscreen-path" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
@@ -514,6 +527,9 @@
       var courseNameEl = document.querySelector('.topbar .course-name');
       var catalogLessons = [];
       var activeLessonId = '';
+      var activeCourseId = '';
+      var PROGRESS_KEY = 'wuxiao.courseLearn.progress.v1';
+      var progressSaveTimer = 0;
 
       var panel = document.getElementById('curriculum');
       var toggle = document.getElementById('curriculum-toggle');
@@ -533,6 +549,7 @@
       var btnSpeed = document.getElementById('btn-speed');
       var scrub = document.getElementById('scrub');
       var scrubFill = document.getElementById('scrub-fill');
+      var mediaTimeEl = document.getElementById('media-time');
       var icoPlay = document.getElementById('ico-play');
       var metaStatus = document.getElementById('meta-status');
       var metaSample = document.getElementById('meta-sample');
@@ -542,6 +559,116 @@
       var speedIdx = 0;
       var hasMedia = false;
       var loadToken = 0;
+
+      function formatClock(sec) {
+        var n = Math.max(0, Math.floor(Number(sec) || 0));
+        var h = Math.floor(n / 3600);
+        var m = Math.floor((n % 3600) / 60);
+        var s = n % 60;
+        var ss = (s < 10 ? '0' : '') + s;
+        if (h > 0) {
+          var mm = (m < 10 ? '0' : '') + m;
+          return h + ':' + mm + ':' + ss;
+        }
+        return m + ':' + ss;
+      }
+      function syncTimeLabel() {
+        if (!mediaTimeEl) return;
+        var cur = 0;
+        var dur = 0;
+        var ready = false;
+        if (video && hasMedia) {
+          cur = video.currentTime || 0;
+          if (video.duration && isFinite(video.duration) && video.duration > 0) {
+            dur = video.duration;
+            ready = true;
+          }
+        }
+        mediaTimeEl.textContent = formatClock(cur) + ' / ' + formatClock(dur);
+        mediaTimeEl.classList.toggle('is-ready', ready);
+        if (scrub && ready) {
+          scrub.setAttribute('aria-valuetext', formatClock(cur) + ' / ' + formatClock(dur));
+        }
+      }
+      function readProgressStore() {
+        try {
+          var raw = localStorage.getItem(PROGRESS_KEY);
+          if (!raw) return { courses: {} };
+          var o = JSON.parse(raw);
+          if (!o || typeof o !== 'object') return { courses: {} };
+          if (!o.courses || typeof o.courses !== 'object') o.courses = {};
+          return o;
+        } catch (_e) {
+          return { courses: {} };
+        }
+      }
+      function writeProgressStore(store) {
+        try {
+          localStorage.setItem(PROGRESS_KEY, JSON.stringify(store));
+        } catch (_e) {}
+      }
+      function courseProgressBucket(store, courseId) {
+        var id = courseId || 'default';
+        if (!store.courses[id] || typeof store.courses[id] !== 'object') {
+          store.courses[id] = { lastLessonId: '', lessons: {} };
+        }
+        if (!store.courses[id].lessons || typeof store.courses[id].lessons !== 'object') {
+          store.courses[id].lessons = {};
+        }
+        return store.courses[id];
+      }
+      function getLastLessonId(courseId) {
+        var bucket = courseProgressBucket(readProgressStore(), courseId);
+        return bucket.lastLessonId || '';
+      }
+      function readSavedTime(courseId, lessonId) {
+        var bucket = courseProgressBucket(readProgressStore(), courseId);
+        var row = bucket.lessons[lessonId];
+        if (!row) return 0;
+        var t = Number(row.t) || 0;
+        return t > 1 ? t : 0;
+      }
+      function saveLessonProgress() {
+        if (!activeCourseId || !activeLessonId) return;
+        var store = readProgressStore();
+        var bucket = courseProgressBucket(store, activeCourseId);
+        bucket.lastLessonId = activeLessonId;
+        if (video && hasMedia) {
+          var t = Number(video.currentTime) || 0;
+          var dur = Number(video.duration) || 0;
+          if (isFinite(dur) && dur > 0 && t >= Math.max(2, dur - 2)) {
+            bucket.lessons[activeLessonId] = { t: 0, updatedAt: Date.now(), done: true };
+          } else if (isFinite(t) && t >= 1) {
+            bucket.lessons[activeLessonId] = { t: t, updatedAt: Date.now() };
+          }
+        }
+        writeProgressStore(store);
+      }
+      function scheduleSaveProgress() {
+        if (progressSaveTimer) return;
+        progressSaveTimer = window.setTimeout(function () {
+          progressSaveTimer = 0;
+          saveLessonProgress();
+        }, 2000);
+      }
+      function restoreLessonProgress(lesson) {
+        if (!video || !lesson || !hasMedia) return false;
+        var t = readSavedTime(activeCourseId, lesson.lessonId);
+        if (t <= 1) return false;
+        var dur = Number(video.duration) || 0;
+        if (isFinite(dur) && dur > 0) {
+          if (t >= dur - 2) return false;
+          t = Math.min(t, Math.max(0, dur - 0.35));
+        }
+        if (t <= 1) return false;
+        try {
+          video.currentTime = t;
+        } catch (_e) {
+          return false;
+        }
+        syncScrub();
+        return true;
+      }
 
       function qs(name) {
         try {
@@ -578,6 +705,7 @@
         var pct = d && isFinite(d) && d > 0 ? (video.currentTime / d) * 100 : 0;
         scrubFill.style.width = pct + '%';
         if (scrub) scrub.setAttribute('aria-valuenow', String(Math.round(pct)));
+        syncTimeLabel();
       }
       function togglePlay() {
         if (!video || !hasMedia) return;
@@ -609,14 +737,25 @@
         if (frame) frame.classList.toggle('has-media', !!ok);
         if (metaStatus) metaStatus.textContent = ok ? '本地样片试播' : '静态架子';
         if (metaSample) metaSample.textContent = ok ? '已加载' : '无（占位壳）';
+        syncTimeLabel();
       }
       function bindMediaOnce() {
         if (!video) return;
         video.addEventListener('play', function () { setPlayUi(true); });
         video.addEventListener('pause', function () { setPlayUi(false); });
         video.addEventListener('ended', function () { setPlayUi(false); });
-        video.addEventListener('timeupdate', syncScrub);
+        video.addEventListener('timeupdate', function () {
+          syncScrub();
+          scheduleSaveProgress();
+        });
         video.addEventListener('loadedmetadata', syncScrub);
+        video.addEventListener('durationchange', syncScrub);
+        video.addEventListener('pause', saveLessonProgress);
+        window.addEventListener('pagehide', saveLessonProgress);
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'hidden') saveLessonProgress();
+        });
+        syncTimeLabel();
         if (btnPlay) btnPlay.addEventListener('click', togglePlay);
         // 点播放器画面（含中心钮、黑边区域）切换播/停；控制条在 frame 外，不受影响
         if (frame) {
@@ -775,20 +914,44 @@
             });
           }
         }
-        return chain.catch(function (err) {
+        return chain.then(function () {
+          if (token !== loadToken) return;
+          var resumed = restoreLessonProgress(lesson);
+          saveLessonProgress();
+          syncProgress(lesson && lesson.index ? lesson.index : 1, {
+            resumed: resumed,
+            at: resumed && video ? video.currentTime : 0
+          });
+        }).catch(function (err) {
           if (token !== loadToken) return;
           if (err && err.message === 'stale') return;
           clearVideo(custom ? '自定义地址失败' : '本课暂无样片');
         });
       }
-      function syncProgress(idx) {
+      function syncProgress(idx, opts) {
+        opts = opts || {};
         if (!progressEl) return;
         var total = catalogLessons.length || 0;
         if (!total) {
           progressEl.textContent = '课表未加载';
           return;
         }
-        progressEl.textContent = '当前 ' + idx + ' / ' + total + ' · 未连接学习记录';
+        var base = '当前 ' + idx + ' / ' + total + ' · 本机进度';
+        if (opts.resumed && opts.at > 1) {
+          progressEl.textContent = base + ' · 续看 ' + formatClock(opts.at);
+        } else {
+          progressEl.textContent = base;
+        }
+      }
+      function closeCurriculumIfMobile() {
+        if (!panel || !toggle) return;
+        if (!panel.classList.contains('is-open')) return;
+        try {
+          if (window.matchMedia('(min-width: 900px)').matches) return;
+        } catch (_e) {}
+        panel.classList.remove('is-open');
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-label', '展开课表');
       }
       function selectLesson(lessonId, opts) {
         opts = opts || {};
@@ -802,6 +965,10 @@
         }
         if (!lesson && catalogLessons.length) lesson = catalogLessons[0];
         if (!lesson) return;
+        var same = activeLessonId === lesson.lessonId;
+        if (activeLessonId && !same) {
+          saveLessonProgress();
+        }
         activeLessonId = lesson.lessonId;
         if (titleEl) titleEl.textContent = lessonDisplayTitle(lesson);
         if (list) {
@@ -810,6 +977,13 @@
           });
           var cur = list.querySelector('button[data-lesson-id="' + lesson.lessonId + '"]');
           if (cur) cur.setAttribute('aria-current', 'true');
+        }
+        if (same && !opts.forceMedia) {
+          syncProgress(lesson.index || 1, {
+            resumed: hasMedia && video && video.currentTime > 1,
+            at: video ? video.currentTime : 0
+          });
+          return;
         }
         syncProgress(lesson.index || 1);
         if (!opts.skipMedia) loadLessonMedia(lesson);
@@ -840,12 +1014,13 @@
           var btn = e.target.closest('button[data-lesson-id]');
           if (!btn) return;
           selectLesson(btn.getAttribute('data-lesson-id'));
+          closeCurriculumIfMobile();
         });
       }
 
       function boot() {
         var custom = qs('vsrc');
-        var wantLesson = qs('lesson') || 'demo';
+        var wantLesson = qs('lesson');
         fetch('/docs/course/demo-catalog.json', { cache: 'no-store' })
           .then(function (res) {
             if (!res.ok) throw new Error('catalog');
@@ -853,7 +1028,8 @@
           })
           .then(function (data) {
             renderCatalog(data);
-            var startId = wantLesson;
+            activeCourseId = (data && data.courseId) || 'watercolor-portrait-demo';
+            var startId = wantLesson || getLastLessonId(activeCourseId) || 'demo';
             var found = catalogLessons.some(function (L) { return L.lessonId === startId; });
             if (!found && catalogLessons[0]) startId = catalogLessons[0].lessonId;
             selectLesson(startId);
