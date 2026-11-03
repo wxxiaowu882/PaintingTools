@@ -197,7 +197,7 @@
 
     .controls {
       margin-top: 12px;
-      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      display: flex; flex-wrap: nowrap; gap: 8px; align-items: center;
     }
     .controls button {
       min-height: 44px; min-width: 44px;
@@ -229,7 +229,8 @@
       color: var(--accent);
     }
     .controls .scrub {
-      flex: 1 1 140px;
+      flex: 1 1 auto;
+      min-width: 48px;
       height: 22px; border-radius: 999px;
       background: transparent;
       position: relative; align-self: center;
@@ -252,8 +253,8 @@
     }
     .controls .time {
       flex: 0 0 auto;
-      min-width: 5.6em;
-      font-size: 0.78rem;
+      min-width: 4.8em;
+      font-size: 0.72rem;
       font-variant-numeric: tabular-nums;
       letter-spacing: 0.02em;
       color: var(--muted);
@@ -261,6 +262,9 @@
       user-select: none;
     }
     .controls .time.is-ready { color: var(--text); }
+    #btn-play, #btn-speed, #btn-fullscreen, .controls .time {
+      flex: 0 0 auto;
+    }
     .meta-row {
       margin-top: 14px;
       display: flex; flex-wrap: wrap; gap: 10px 16px;
@@ -1089,7 +1093,13 @@
         if (!frame) return;
         frame.classList.remove('is-immersive');
         document.body.classList.remove('is-player-immersive');
+        // 退出后强制回到常态 16:9 盒，避免 ESC 后仍缩在中间
+        try {
+          frame.style.removeProperty('width');
+          frame.style.removeProperty('height');
+        } catch (_e0) {}
         syncFsLabel();
+        syncScrub();
       }
       function exitAnyFs() {
         var exit = document.exitFullscreen || document.webkitExitFullscreen;
@@ -1098,9 +1108,19 @@
         }
         exitCssImmersive();
       }
+      function preferCssImmersiveOnly() {
+        try {
+          if (window.matchMedia('(max-width: 899px)').matches) return true;
+          if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return true;
+        } catch (_e) {}
+        return false;
+      }
       function enterFs() {
         if (!frame) return;
+        // 先上 CSS 沉浸（控制条在 frame 外，必须靠它才能留在画面上）
         enterCssImmersive();
+        // 手机/触控：不要再叠原生 Fullscreen——ESC 只退原生时会残留沉浸态，画面缩在中间
+        if (preferCssImmersiveOnly()) return;
         var req = frame.requestFullscreen || frame.webkitRequestFullscreen;
         if (!req) return;
         try {
@@ -1114,15 +1134,25 @@
           syncFsLabel();
         }
       }
+      function onFsChange() {
+        if (fsElement()) {
+          syncFsLabel();
+          return;
+        }
+        // 原生全屏被 ESC/系统退出：必须连带清掉 CSS 沉浸，否则会一直缩在中间
+        exitCssImmersive();
+      }
       if (fsBtn && frame) {
         fsBtn.addEventListener('click', function () {
           if (fsElement() || frame.classList.contains('is-immersive')) exitAnyFs();
           else enterFs();
         });
-        document.addEventListener('fullscreenchange', syncFsLabel);
-        document.addEventListener('webkitfullscreenchange', syncFsLabel);
+        document.addEventListener('fullscreenchange', onFsChange);
+        document.addEventListener('webkitfullscreenchange', onFsChange);
         document.addEventListener('keydown', function (e) {
-          if (e.key === 'Escape') exitCssImmersive();
+          if (e.key !== 'Escape') return;
+          // 原生全屏由浏览器 ESC 退出，交给 onFsChange 清状态；纯 CSS 沉浸在此退出
+          if (!fsElement() && frame.classList.contains('is-immersive')) exitCssImmersive();
         });
       }
     })();
