@@ -60,7 +60,7 @@ Windows：
 
 ## 给 `/CourseLearn` 试播
 
-`samples/` 建议文件：
+`samples/` 建议本机自备（**不入库**；脚本与 bat 仍入库，发站仍整树跳过）：
 
 | 文件 | 用途 |
 |------|------|
@@ -70,5 +70,4 @@ Windows：
 本地打开 `/CourseLearn` 会先找横屏再找竖屏；也可用 `?vsrc=/某路径.mp4`。  
 接口预演：`GET /api/course/play-url?lessonId=demo`。  
 R2 短时签名自测：`node 自用工具文件_不部署/视频压片/selftest-r2-presign.mjs`（不联网）。  
-测站 R2 冒烟已通；正式站 Secrets 未配。  
-该目录在 gitignore 内，**不会进仓库/发版**。
+测站 R2 冒烟已通；正式站 Secrets 未配。
