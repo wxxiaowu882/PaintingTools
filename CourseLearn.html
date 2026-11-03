@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>课程学习 · Demo｜手绘工坊 · 童画师吴晓</title>
+  <meta name="description" content="站内课程学习页静态架子（开发中）。正式站仅显示筹备中。">
+  <!-- 开发期 noindex；正式站由 Worker 直接返回筹备中页。口径见路线图 §4.5.2 -->
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="canonical" href="https://www.wuxiaoart.com/CourseLearn">
+  <link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-32.png?v=fav7" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" data-wuxiao-brand-icon="1" href="/apple-touch-icon.png?v=fav8" sizes="180x180">
+  <script src="/docs/js/GlobalMenu.js?v=courselearn1"></script>
+  <style>
+    :root {
+      --bg: #0c0c10;
+      --panel: #14141a;
+      --text: #f4f1ea;
+      --muted: #a39e96;
+      --accent: #d4b56a;
+      --line: rgba(255,255,255,0.08);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --topbar-h: 52px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+
+    /* —— 顶栏 —— */
+    .topbar {
+      position: sticky; top: 0; z-index: 40;
+      height: var(--topbar-h);
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 12px; padding-right: 72px;
+      background: rgba(12,12,16,0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+    }
+    .topbar .back {
+      flex: 0 0 auto;
+      min-width: 44px; min-height: 44px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+      text-decoration: none; color: var(--muted); font-size: 0.86rem;
+    }
+    .topbar .back svg {
+      width: 18px; height: 18px;
+      fill: none; stroke: currentColor; stroke-width: 1.8;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+    .topbar .back:hover { color: var(--text); }
+    @media (max-width: 420px) {
+      .topbar .back .back-text { display: none; }
+    }
+    @media (max-width: 899px) {
+      /* 避免与右上角菜单抢位 */
+      .badge-demo { display: none; }
+    }
+    .topbar .titles { flex: 1; min-width: 0; }
+    .topbar .course-name {
+      margin: 0; font-size: 0.82rem; color: var(--accent);
+      letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .topbar .lesson-name {
+      margin: 2px 0 0; font-size: 0.95rem; font-weight: 560;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .badge-demo {
+      flex: 0 0 auto;
+      font-size: 0.65rem; letter-spacing: 0.08em;
+      color: #0c0c10; background: var(--accent);
+      padding: 3px 7px; border-radius: 999px; font-weight: 600;
+      margin-right: 4px;
+    }
+
+    /* —— 布局：PC 分栏 / 手机纵向 —— */
+    .shell {
+      display: grid;
+      grid-template-columns: 1fr;
+      min-height: calc(100vh - var(--topbar-h));
+    }
+    @media (min-width: 900px) {
+      .shell {
+        grid-template-columns: minmax(0, 1fr) 320px;
+        align-items: start;
+      }
+    }
+
+    .stage {
+      padding: 12px 12px 20px;
+    }
+    @media (min-width: 900px) {
+      .stage { padding: 20px 24px 40px; }
+    }
+
+    /* 16:9 播放区占位（防 CLS） */
+    .player-frame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 14px;
+      overflow: hidden;
+      background:
+        linear-gradient(145deg, #1a1820 0%, #121018 55%, #0e0e14 100%);
+      border: 1px solid var(--line);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+    }
+    /* 浏览器全屏 API（PC / 部分安卓） */
+    .player-frame:fullscreen,
+    .player-frame:-webkit-full-screen {
+      aspect-ratio: auto;
+      width: 100vw; height: 100vh; height: 100dvh;
+      max-width: 100vw; max-height: 100dvh;
+      border-radius: 0; border: none; box-shadow: none;
+      background: #000;
+    }
+    /* iOS 等不支持 div 全屏时的 CSS 沉浸兜底 */
+    .player-frame.is-immersive {
+      position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 80;
+      width: 100vw; height: 100vh; height: 100dvh;
+      max-width: 100vw; max-height: 100dvh;
+      aspect-ratio: auto;
+      border-radius: 0; border: none; box-shadow: none;
+      background: #000;
+    }
+    body.is-player-immersive {
+      overflow: hidden;
+    }
+    body.is-player-immersive .topbar,
+    body.is-player-immersive .curriculum,
+    body.is-player-immersive .meta-row,
+    body.is-player-immersive .note,
+    body.is-player-immersive #menu-trigger {
+      visibility: hidden; pointer-events: none;
+    }
+    body.is-player-immersive .shell,
+    body.is-player-immersive .stage {
+      padding: 0; margin: 0;
+      width: 100%; max-width: none;
+      display: block;
+    }
+    body.is-player-immersive .controls {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+      margin: 0; padding: 10px 12px calc(10px + var(--safe-bottom));
+      background: linear-gradient(transparent, rgba(0,0,0,0.72));
+    }
+    .player-frame .media {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      /* 常态/全屏均完整显示（可留黑边）；竖屏机请优先竖屏样片，否则横屏片会缩成中间一条 */
+      object-fit: contain;
+      object-position: center center;
+      background: #000;
+      display: none;
+    }
+    .player-frame.has-media .media { display: block; cursor: pointer; }
+    .player-frame:fullscreen .media,
+    .player-frame:-webkit-full-screen .media,
+    .player-frame.is-immersive .media {
+      width: 100%; height: 100%;
+      object-fit: contain;
+    }
+    .player-frame.has-media { cursor: pointer; }
+    .player-frame .placeholder {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 10px; color: var(--muted); text-align: center; padding: 16px;
+      z-index: 2;
+    }
+    /* 播放中：点画面任意处可暂停（占位层不挡点击） */
+    .player-frame.has-media.is-playing .placeholder { opacity: 0; pointer-events: none; }
+    /* 中心播放钮：三角约占圆径一半以上，光学右偏 */
+    .player-frame .play-fake {
+      width: 72px; height: 72px; border-radius: 50%;
+      border: none; cursor: pointer;
+      background: rgba(212,181,106,0.92); color: #0c0c10;
+      display: inline-flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+      padding: 0;
+    }
+    .player-frame .play-fake svg {
+      display: block;
+      width: 56px; height: 56px;
+      fill: currentColor;
+      transform: translateX(3px);
+    }
+    .player-frame .hint { font-size: 0.85rem; max-width: 22em; margin: 0; }
+    .player-frame.has-media .hint { display: none; }
+
+    .controls {
+      margin-top: 12px;
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    }
+    .controls button {
+      min-height: 44px; min-width: 44px;
+      padding: 0;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      font: inherit; font-size: 0.88rem;
+      cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .controls button:hover { border-color: rgba(212,181,106,0.45); }
+    .controls button:disabled { opacity: 0.45; cursor: default; }
+    .controls button svg {
+      width: 20px; height: 20px;
+      fill: none; stroke: currentColor; stroke-width: 1.8;
+      stroke-linecap: round; stroke-linejoin: round;
+      display: block;
+      flex: 0 0 auto;
+    }
+    .controls button.svg-fill svg { fill: currentColor; stroke: none; }
+    /* 全屏按钮内只允许一个图标节点，避免并排残影 */
+    #btn-fullscreen { position: relative; overflow: hidden; }
+    #btn-fullscreen svg { pointer-events: none; }
+    .controls .btn-speed {
+      min-width: 48px; padding: 0 8px;
+      font-size: 0.78rem; font-weight: 600; letter-spacing: 0.02em;
+      color: var(--accent);
+    }
+    .controls .scrub {
+      flex: 1 1 140px;
+      height: 22px; border-radius: 999px;
+      background: transparent;
+      position: relative; align-self: center;
+      cursor: pointer;
+      padding: 8px 0;
+      box-sizing: border-box;
+    }
+    .controls .scrub::before {
+      content: '';
+      position: absolute; left: 0; right: 0; top: 50%;
+      height: 6px; margin-top: -3px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+    }
+    .controls .scrub > i {
+      position: absolute; left: 0; top: 50%;
+      height: 6px; margin-top: -3px; width: 0%;
+      border-radius: 999px; background: var(--accent);
+      pointer-events: none;
+    }
+    .meta-row {
+      margin-top: 14px;
+      display: flex; flex-wrap: wrap; gap: 10px 16px;
+      font-size: 0.84rem; color: var(--muted);
+    }
+    .meta-row strong { color: var(--text); font-weight: 560; }
+
+    .note {
+      margin: 18px 0 0;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(212,181,106,0.08);
+      border: 1px solid rgba(212,181,106,0.22);
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    /* —— 课表侧栏 / 手机底栏 —— */
+    .curriculum {
+      background: var(--panel);
+      border-top: 1px solid var(--line);
+      padding: 12px 12px calc(16px + var(--safe-bottom));
+    }
+    @media (min-width: 900px) {
+      .curriculum {
+        position: sticky; top: var(--topbar-h);
+        height: calc(100vh - var(--topbar-h));
+        overflow: auto;
+        border-top: none;
+        border-left: 1px solid var(--line);
+        padding: 16px 14px 24px;
+      }
+    }
+    .curriculum h2 {
+      margin: 0 0 10px;
+      font-size: 0.92rem; font-weight: 560; letter-spacing: 0.04em;
+    }
+    .curriculum .progress {
+      margin: 0 0 14px;
+      font-size: 0.8rem; color: var(--muted);
+    }
+    .lesson-list { list-style: none; margin: 0; padding: 0; }
+    .lesson-list li { margin: 0 0 6px; }
+    .lesson-list button {
+      width: 100%;
+      min-height: 48px;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      font: inherit; font-size: 0.9rem;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 8px; align-items: center;
+    }
+    .lesson-list button:hover { background: rgba(255,255,255,0.04); }
+    .lesson-list button[aria-current="true"] {
+      background: rgba(212,181,106,0.12);
+      border-color: rgba(212,181,106,0.35);
+    }
+    .lesson-list .idx { color: var(--muted); font-size: 0.8rem; }
+    .lesson-list .dur { color: var(--muted); font-size: 0.78rem; }
+
+    /* 手机：课表默认收成底栏，点开展开 */
+    @media (max-width: 899px) {
+      .shell { min-height: auto; }
+      .stage { padding: 10px 12px 6px; }
+      .player-frame .hint { display: none; }
+      .note { margin-top: 10px; font-size: 0.78rem; }
+      .meta-row { margin-top: 8px; gap: 6px 10px; font-size: 0.78rem; }
+      .curriculum {
+        margin-top: 0;
+        padding-top: 4px;
+      }
+      .curriculum-toggle {
+        display: flex; width: 100%;
+        min-height: 48px; align-items: center; justify-content: center; gap: 10px;
+        border: 1px solid var(--line); border-radius: 12px;
+        background: #1a1a22; color: var(--text);
+        font: inherit; font-size: 0.92rem; cursor: pointer; margin-bottom: 10px;
+      }
+      .curriculum-toggle svg {
+        width: 18px; height: 18px;
+        fill: none; stroke: currentColor; stroke-width: 1.8;
+        stroke-linecap: round; stroke-linejoin: round;
+        flex: 0 0 auto;
+      }
+      .curriculum-toggle .ico-collapse { display: none; }
+      .curriculum-toggle .label-collapse { display: none; }
+      .curriculum-toggle .label-expand { display: inline; }
+      .curriculum.is-open .curriculum-toggle .ico-expand { display: none; }
+      .curriculum.is-open .curriculum-toggle .ico-collapse { display: block; }
+      .curriculum.is-open .curriculum-toggle .label-expand { display: none; }
+      .curriculum.is-open .curriculum-toggle .label-collapse { display: inline; }
+      .curriculum-body { display: none; }
+      .curriculum.is-open .curriculum-body { display: block; }
+    }
+    @media (min-width: 900px) {
+      .curriculum-toggle { display: none; }
+      .curriculum-body { display: block; }
+    }
+
+    /* 手机横屏：画面优先占满可视高度，课表默认收起（可再展开） */
+    @media (max-width: 899px) and (orientation: landscape) {
+      :root { --topbar-h: 44px; }
+      .topbar { padding-right: 56px; }
+      .topbar .course-name { display: none; }
+      .badge-demo { display: none; }
+      .shell { min-height: calc(100dvh - var(--topbar-h)); }
+      .stage {
+        padding: 6px 8px 8px;
+        display: flex; flex-direction: column;
+        min-height: calc(100dvh - var(--topbar-h) - 56px);
+      }
+      .player-frame {
+        flex: 1 1 auto;
+        width: 100%;
+        aspect-ratio: auto;
+        max-height: calc(100dvh - var(--topbar-h) - 100px);
+        min-height: 140px;
+      }
+      .meta-row, .note { display: none; }
+      .curriculum {
+        position: sticky; bottom: 0; z-index: 30;
+        padding-bottom: calc(8px + var(--safe-bottom));
+        background: rgba(20,20,26,0.96);
+      }
+      .curriculum:not(.is-open) .curriculum-body { display: none; }
+      body.is-landscape-hint::after {
+        content: none;
+      }
+    }
+
+    #coming-soon {
+      display: none;
+      min-height: 70vh;
+      padding: 88px 20px 48px;
+      text-align: center;
+    }
+    #coming-soon .brand {
+      font-size: 0.78rem; letter-spacing: 0.14em; color: var(--accent); margin: 0 0 10px;
+    }
+    #coming-soon h1 { font-size: 1.35rem; font-weight: 560; margin: 0 0 12px; }
+    #coming-soon p { color: var(--muted); max-width: 28em; margin: 0 auto 18px; }
+    #coming-soon a { color: var(--text); border-bottom: 1px solid rgba(212,181,106,0.45); text-decoration: none; }
+    body.mode-coming #learn-demo { display: none !important; }
+    body.mode-coming #coming-soon { display: block; }
+    body.mode-coming #menu-trigger { /* keep */ }
+  </style>
+</head>
+<body>
+  <div id="menu-trigger" class="absolute" onclick="typeof toggleMenu==='function'&&toggleMenu()" aria-label="打开菜单" style="position:fixed;top:24px;right:24px;width:44px;height:44px;z-index:50;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;">
+    <span style="display:block;width:28px;height:1.5px;background:#fff;margin:3.5px 0;border-radius:1px;"></span>
+    <span style="display:block;width:20px;height:1.5px;background:#fff;margin:3.5px 0;border-radius:1px;"></span>
+    <span style="display:block;width:28px;height:1.5px;background:#fff;margin:3.5px 0;border-radius:1px;"></span>
+  </div>
+
+  <!-- 正式站兜底（本地若误判也会显示）；线上正式站通常由 Worker 直接返回筹备中 HTML -->
+  <div id="coming-soon" role="status">
+    <p class="brand">童画师吴晓 · 水彩课程</p>
+    <h1>学习页筹备中</h1>
+    <p>站内课程播放还在打磨。开放时会从「课程预约」页给出入口。</p>
+    <p><a href="/Course">返回课程预告</a> · <a href="/">回首页</a></p>
+  </div>
+
+  <div id="learn-demo">
+    <header class="topbar">
+      <a class="back" href="/Course" id="btn-back" aria-label="返回课程预告">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 6 9 12 15 18"/></svg>
+        <span class="back-text">预告</span>
+      </a>
+      <div class="titles">
+        <p class="course-name">水彩肖像画课程</p>
+        <p class="lesson-name" id="current-lesson-title">01 · 观察与起稿节奏</p>
+      </div>
+      <span class="badge-demo" title="仅测站/本地可见完整架子">DEMO</span>
+    </header>
+
+    <div class="shell">
+      <section class="stage" aria-label="播放区域">
+        <div class="player-frame" id="player-frame" aria-label="视频播放区">
+          <video id="lesson-video" class="media" playsinline preload="metadata"></video>
+          <div class="placeholder" id="player-placeholder">
+            <button type="button" class="play-fake svg-fill" id="btn-center-play" aria-label="播放">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.2v17.6L20 12z"/></svg>
+            </button>
+            <p class="hint" id="player-hint">此处为 16:9 播放器壳。本地有样片时自动试播；会员短时地址接入后替换。可点全屏；手机可横屏。</p>
+          </div>
+        </div>
+        <div class="controls" aria-label="控制条">
+          <button type="button" class="svg-fill" id="btn-play" disabled aria-label="播放" title="播放">
+            <svg id="ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+          </button>
+          <button type="button" class="btn-speed" id="btn-speed" disabled aria-label="倍速 1倍" title="倍速">1x</button>
+          <div class="scrub" id="scrub" role="slider" aria-label="进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0"><i id="scrub-fill"></i></div>
+          <button type="button" id="btn-fullscreen" aria-label="全屏" title="全屏播放区" aria-pressed="false">
+            <svg id="ico-fullscreen" viewBox="0 0 24 24" aria-hidden="true">
+              <path id="ico-fullscreen-path" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
+            </svg>
+          </button>
+        </div>
+        <div class="meta-row">
+          <span>状态：<strong id="meta-status">静态架子</strong></span>
+          <span>鉴权：<strong>尚未接入</strong></span>
+          <span>存储：<strong>R2（规划中）</strong></span>
+          <span>样片：<strong id="meta-sample">探测中</strong></span>
+        </div>
+        <p class="note" id="dev-note">
+          开发备注：本地样片试播；竖屏手机优先竖屏片（全屏才能铺得开）。正课 1A 仍横拍。正式站访客只见「筹备中」。
+        </p>
+      </section>
+
+      <aside class="curriculum" id="curriculum" aria-label="本课目录">
+        <button type="button" class="curriculum-toggle" id="curriculum-toggle" aria-expanded="false" aria-label="展开课表">
+          <svg class="ico-expand" viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+          <svg class="ico-collapse" viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="6 15 12 9 18 15"/>
+          </svg>
+          <span class="label-expand">展开课表</span>
+          <span class="label-collapse">收起课表</span>
+        </button>
+        <div class="curriculum-body">
+          <h2>本课目录</h2>
+          <p class="progress">占位进度 1 / 5 · 未连接学习记录</p>
+          <ol class="lesson-list" id="lesson-list">
+            <li>
+              <button type="button" data-title="01 · 观察与起稿节奏" aria-current="true">
+                <span class="idx">01</span><span>观察与起稿节奏</span><span class="dur">12:00</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" data-title="02 · 大色块铺底">
+                <span class="idx">02</span><span>大色块铺底</span><span class="dur">18:00</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" data-title="03 · 面部转折与边线">
+                <span class="idx">03</span><span>面部转折与边线</span><span class="dur">22:00</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" data-title="04 · 头发与背景关系">
+                <span class="idx">04</span><span>头发与背景关系</span><span class="dur">16:00</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" data-title="05 · 收拾与完成感">
+                <span class="idx">05</span><span>收拾与完成感</span><span class="dur">14:00</span>
+              </button>
+            </li>
+          </ol>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      function allowDemo() {
+        var h = String(location.hostname || '').toLowerCase();
+        if (h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0') return true;
+        if (h === 'test.wuxiaoart.com' || h.indexOf('soft-voice-f822-staging') >= 0) return true;
+        // 本机局域网 HTTP（方便真机扫码看架子）
+        if (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return true;
+        return false;
+      }
+
+      if (!allowDemo()) {
+        document.body.classList.add('mode-coming');
+        var demo = document.getElementById('learn-demo');
+        if (demo) demo.setAttribute('aria-hidden', 'true');
+        return;
+      }
+
+      var soon = document.getElementById('coming-soon');
+      if (soon) {
+        soon.setAttribute('aria-hidden', 'true');
+        soon.style.display = 'none';
+      }
+
+      var list = document.getElementById('lesson-list');
+      var titleEl = document.getElementById('current-lesson-title');
+      if (list && titleEl) {
+        list.addEventListener('click', function (e) {
+          var btn = e.target.closest('button[data-title]');
+          if (!btn) return;
+          list.querySelectorAll('button[aria-current="true"]').forEach(function (b) {
+            b.removeAttribute('aria-current');
+          });
+          btn.setAttribute('aria-current', 'true');
+          titleEl.textContent = btn.getAttribute('data-title') || titleEl.textContent;
+        });
+      }
+
+      var panel = document.getElementById('curriculum');
+      var toggle = document.getElementById('curriculum-toggle');
+      if (panel && toggle) {
+        toggle.addEventListener('click', function () {
+          var open = panel.classList.toggle('is-open');
+          toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+          toggle.setAttribute('aria-label', open ? '收起课表' : '展开课表');
+        });
+      }
+
+      // —— 本地/测站样片试播（正式站已被中间件拦；无片则保持占位壳）——
+      var frame = document.getElementById('player-frame');
+      var video = document.getElementById('lesson-video');
+      var btnPlay = document.getElementById('btn-play');
+      var btnCenter = document.getElementById('btn-center-play');
+      var btnSpeed = document.getElementById('btn-speed');
+      var scrub = document.getElementById('scrub');
+      var scrubFill = document.getElementById('scrub-fill');
+      var icoPlay = document.getElementById('ico-play');
+      var metaStatus = document.getElementById('meta-status');
+      var metaSample = document.getElementById('meta-sample');
+      var PLAY_D = 'M8 5.5v13l11-6.5z';
+      var PAUSE_D = 'M7 5h3v14H7zm7 0h3v14h-3z';
+      var SPEEDS = [1, 1.25, 1.5, 2];
+      var speedIdx = 0;
+      var hasMedia = false;
+
+      function qs(name) {
+        try {
+          return new URLSearchParams(location.search).get(name);
+        } catch (_e) {
+          return null;
+        }
+      }
+      // 样片均在本机「不部署」目录。竖屏机优先竖屏片，避免全屏 contain 时横屏片缩成中间一条。
+      var DEMO_LAND = '/自用工具文件_不部署/视频压片/samples/demo-land-1080.mp4';
+      var DEMO_VERT = '/自用工具文件_不部署/视频压片/samples/demo-vert-preview.mp4';
+      function isPortraitViewport() {
+        try {
+          if (window.matchMedia('(orientation: portrait)').matches) return true;
+          if (window.matchMedia('(max-aspect-ratio: 10/16)').matches) return true;
+        } catch (_e) {}
+        return window.innerHeight > window.innerWidth;
+      }
+      function demoCandidates() {
+        return isPortraitViewport() ? [DEMO_VERT, DEMO_LAND] : [DEMO_LAND, DEMO_VERT];
+      }
+      function setPlayUi(playing) {
+        if (frame) frame.classList.toggle('is-playing', !!playing);
+        if (btnPlay) {
+          btnPlay.setAttribute('aria-label', playing ? '暂停' : '播放');
+          btnPlay.title = playing ? '暂停' : '播放';
+        }
+        if (btnCenter) btnCenter.setAttribute('aria-label', playing ? '暂停' : '播放');
+        if (icoPlay) icoPlay.setAttribute('d', playing ? PAUSE_D : PLAY_D);
+      }
+      function syncScrub() {
+        if (!video || !scrubFill) return;
+        var d = video.duration;
+        var pct = d && isFinite(d) && d > 0 ? (video.currentTime / d) * 100 : 0;
+        scrubFill.style.width = pct + '%';
+        if (scrub) scrub.setAttribute('aria-valuenow', String(Math.round(pct)));
+      }
+      function togglePlay() {
+        if (!video || !hasMedia) return;
+        if (video.paused) {
+          setPlayUi(true);
+          var p = video.play();
+          if (p && typeof p.catch === 'function') {
+            p.catch(function () { setPlayUi(false); });
+          }
+        } else {
+          video.pause();
+          setPlayUi(false);
+        }
+      }
+      function seekFromClientX(clientX) {
+        if (!video || !scrub || !hasMedia) return;
+        var rect = scrub.getBoundingClientRect();
+        if (!rect.width) return;
+        var ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+        if (video.duration && isFinite(video.duration)) {
+          video.currentTime = ratio * video.duration;
+          syncScrub();
+        }
+      }
+      function enableControls(ok) {
+        hasMedia = !!ok;
+        if (btnPlay) btnPlay.disabled = !ok;
+        if (btnSpeed) btnSpeed.disabled = !ok;
+        if (frame) frame.classList.toggle('has-media', !!ok);
+        if (metaStatus) metaStatus.textContent = ok ? '本地样片试播' : '静态架子';
+        if (metaSample) metaSample.textContent = ok ? '已加载' : '无（占位壳）';
+      }
+      function bindMediaOnce() {
+        if (!video) return;
+        video.addEventListener('play', function () { setPlayUi(true); });
+        video.addEventListener('pause', function () { setPlayUi(false); });
+        video.addEventListener('ended', function () { setPlayUi(false); });
+        video.addEventListener('timeupdate', syncScrub);
+        video.addEventListener('loadedmetadata', syncScrub);
+        if (btnPlay) btnPlay.addEventListener('click', togglePlay);
+        // 点播放器画面（含中心钮、黑边区域）切换播/停；控制条在 frame 外，不受影响
+        if (frame) {
+          frame.addEventListener('click', function () {
+            if (!hasMedia) return;
+            togglePlay();
+          });
+        }
+        if (btnSpeed) {
+          btnSpeed.addEventListener('click', function () {
+            speedIdx = (speedIdx + 1) % SPEEDS.length;
+            var r = SPEEDS[speedIdx];
+            video.playbackRate = r;
+            btnSpeed.textContent = r + 'x';
+            btnSpeed.setAttribute('aria-label', '倍速 ' + r + '倍');
+          });
+        }
+        if (scrub) {
+          scrub.addEventListener('click', function (e) { seekFromClientX(e.clientX); });
+          scrub.addEventListener('keydown', function (e) {
+            if (!video.duration) return;
+            var step = Math.max(1, video.duration * 0.05);
+            if (e.key === 'ArrowRight') {
+              video.currentTime = Math.min(video.duration, video.currentTime + step);
+              e.preventDefault();
+            } else if (e.key === 'ArrowLeft') {
+              video.currentTime = Math.max(0, video.currentTime - step);
+              e.preventDefault();
+            }
+          });
+        }
+      }
+      bindMediaOnce();
+      (function tryLoadDemo() {
+        if (!video) {
+          enableControls(false);
+          return;
+        }
+        var custom = qs('vsrc');
+        var settled = false;
+        function failAll(msg) {
+          if (settled) return;
+          settled = true;
+          video.removeAttribute('src');
+          try { video.load(); } catch (_e) {}
+          enableControls(false);
+          if (metaSample) metaSample.textContent = msg || '本机无样片';
+        }
+        function ok(label) {
+          if (settled) return;
+          settled = true;
+          enableControls(true);
+          setPlayUi(false);
+          if (metaSample) metaSample.textContent = label || '已加载';
+        }
+        function probeAndPlay(src, label) {
+          return fetch(src, { method: 'HEAD' }).then(function (res) {
+            if (!res.ok) throw new Error('missing');
+            return src;
+          }).catch(function () {
+            // HEAD 失败时仍尝试装载（个别静态服对 HEAD 不友好）
+            return src;
+          }).then(function (readySrc) {
+            return new Promise(function (resolve, reject) {
+              var onOk = function () {
+                cleanup();
+                ok(label);
+                resolve(true);
+              };
+              var onErr = function () {
+                cleanup();
+                reject(new Error('load fail'));
+              };
+              var timer = window.setTimeout(function () {
+                if (!settled && (!video.readyState || video.readyState < 1)) onErr();
+              }, 5000);
+              function cleanup() {
+                window.clearTimeout(timer);
+                video.removeEventListener('loadeddata', onOk);
+                video.removeEventListener('error', onErr);
+              }
+              video.addEventListener('loadeddata', onOk, { once: true });
+              video.addEventListener('error', onErr, { once: true });
+              video.src = readySrc;
+              video.load();
+            });
+          });
+        }
+        function tryApiPlayUrl() {
+          // 测站/正式 Worker 上的接口形状预演；本机静态服通常 404，忽略即可
+          var lessonId = qs('lesson') || 'demo';
+          return fetch('/api/course/play-url?lessonId=' + encodeURIComponent(lessonId), {
+            credentials: 'same-origin'
+          }).then(function (res) {
+            return res.json().then(function (body) {
+              if (!res.ok || !body || !body.ok || !body.url) throw new Error('api');
+              return probeAndPlay(body.url, body.source === 'demo' ? 'API·demo' : 'API·短时');
+            });
+          });
+        }
+        var chain = Promise.resolve();
+        if (custom) {
+          chain = probeAndPlay(custom, '自定义');
+        } else {
+          var list = demoCandidates();
+          function labelFor(src) {
+            if (src === DEMO_VERT) return '竖屏样片';
+            if (src === DEMO_LAND) return '横屏样片';
+            return '样片';
+          }
+          chain = probeAndPlay(list[0], labelFor(list[0])).catch(function () {
+            return probeAndPlay(list[1], labelFor(list[1]));
+          }).catch(function () {
+            return tryApiPlayUrl();
+          });
+        }
+        chain.catch(function () {
+          failAll(custom ? '自定义地址失败' : '本机无样片');
+        });
+      })();
+
+      // 全屏壳：Fullscreen API → 失败则 CSS 沉浸（照顾 iOS 等）
+      var fsBtn = document.getElementById('btn-fullscreen');
+      function fsElement() {
+        return document.fullscreenElement || document.webkitFullscreenElement || null;
+      }
+      var FS_ENTER = 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5';
+      var FS_EXIT = 'M6 6l12 12M18 6L6 18';
+      function syncFsLabel() {
+        if (!fsBtn) return;
+        var on = !!(fsElement() || (frame && frame.classList.contains('is-immersive')));
+        fsBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        fsBtn.setAttribute('aria-label', on ? '退出全屏' : '全屏');
+        fsBtn.title = on ? '退出全屏' : '全屏播放区';
+        var path = document.getElementById('ico-fullscreen-path');
+        if (path) path.setAttribute('d', on ? FS_EXIT : FS_ENTER);
+      }
+      function enterCssImmersive() {
+        if (!frame) return;
+        frame.classList.add('is-immersive');
+        document.body.classList.add('is-player-immersive');
+        syncFsLabel();
+      }
+      function exitCssImmersive() {
+        if (!frame) return;
+        frame.classList.remove('is-immersive');
+        document.body.classList.remove('is-player-immersive');
+        syncFsLabel();
+      }
+      function exitAnyFs() {
+        var exit = document.exitFullscreen || document.webkitExitFullscreen;
+        if (fsElement() && exit) {
+          try { exit.call(document); } catch (_e) {}
+        }
+        exitCssImmersive();
+      }
+      function enterFs() {
+        if (!frame) return;
+        enterCssImmersive();
+        var req = frame.requestFullscreen || frame.webkitRequestFullscreen;
+        if (!req) return;
+        try {
+          var ret = req.call(frame);
+          if (ret && typeof ret.then === 'function') {
+            ret.then(syncFsLabel).catch(syncFsLabel);
+          } else {
+            syncFsLabel();
+          }
+        } catch (_e2) {
+          syncFsLabel();
+        }
+      }
+      if (fsBtn && frame) {
+        fsBtn.addEventListener('click', function () {
+          if (fsElement() || frame.classList.contains('is-immersive')) exitAnyFs();
+          else enterFs();
+        });
+        document.addEventListener('fullscreenchange', syncFsLabel);
+        document.addEventListener('webkitfullscreenchange', syncFsLabel);
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') exitCssImmersive();
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

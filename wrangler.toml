@@ -8,7 +8,8 @@ main = "./dist/worker/index.js"
 directory = "."
 binding = "ASSETS"
 # 默认先吐静态文件会绕过会员过滤；API 与课表 JSON 必须先走 Worker。
-run_worker_first = ["/api/*", "/docs/json/*"]
+# /CourseLearn*：正式站由 _middleware 拦成「筹备中」，测站/本地仍出完整 demo（见路线图 §4.5.2）
+run_worker_first = ["/api/*", "/docs/json/*", "/CourseLearn", "/CourseLearn/", "/CourseLearn.html"]
 # 与线上无后缀 URL 习惯对齐：/Solid → Solid.html
 html_handling = "auto-trailing-slash"
 
@@ -27,6 +28,14 @@ preview_id = "5d6b765a9da241e390799c24519d96b8"
 name = "soft-voice-f822-staging"
 workers_dev = true
 
+# 测站专用：全量 Worker-first，才能用 _middleware 禁收录（覆盖 robots + HTML 头）。
+# 正式站保持上面选择性 run_worker_first，勿把 true 抄到 prod（占免费 Worker 次数）。
+[env.staging.assets]
+directory = "."
+binding = "ASSETS"
+run_worker_first = true
+html_handling = "auto-trailing-slash"
+
 [[env.staging.routes]]
 pattern = "test.wuxiaoart.com"
 custom_domain = true
@@ -34,3 +43,15 @@ custom_domain = true
 [[env.staging.kv_namespaces]]
 binding = "MEMBERSHIP_KV"
 id = "050dc9b4fa834d27918dd32f54ecde09"
+
+# ---------- 正课 R2 短时签名（C3）----------
+# play-url 用 S3 API Token 签 GET，不靠 R2 binding。
+# 启用前（拍板后再做，默认不冒烟）：
+# 1) 控制台建私有桶（建议 staging/prod 分开）
+# 2) 建 R2 API Token（Object Read）
+# 3) wrangler secret put COURSE_R2_ACCOUNT_ID / COURSE_R2_ACCESS_KEY_ID /
+#    COURSE_R2_SECRET_ACCESS_KEY / COURSE_R2_BUCKET  （可加 --env staging）
+# 4) 桶 CORS：允许 https://www.wuxiaoart.com 与 https://test.wuxiaoart.com 的 GET/HEAD，
+#    AllowedHeaders 含 Range / Content-Type；暴露 Accept-Ranges / Content-Range / Content-Length
+# 可选 var：COURSE_R2_TTL_SEC=600 ；COURSE_LESSON_KEY_JSON='{"71":"course/71/v1/main.mp4"}'
+# 未配齐 Secrets 时：/api/course/play-url 对 demo/测站走本地样片路径，正式站返回 not_ready。

@@ -103,12 +103,76 @@ const contentTypes = {
   '.bin': 'application/octet-stream',
   '.wasm': 'application/wasm',
   '.md': 'text/markdown; charset=utf-8',
+  // 课程样片试播需要正确 MIME + Range，否则 <video> seekable 常为 0-0
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.m4v': 'video/mp4',
 };
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS,HEAD');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+}
+
+/** 静态文件：支持 Range（HTML5 video 拖进度必需） */
+function sendStaticFile(req, res, filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const type = contentTypes[ext] || 'application/octet-stream';
+  const stat = fs.statSync(filePath);
+  const total = stat.size;
+  cors(res);
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Cache-Control', 'no-store');
+
+  if (req.method === 'HEAD') {
+    res.writeHead(200, {
+      'Content-Type': type,
+      'Content-Length': total,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'no-store',
+    });
+    res.end();
+    return;
+  }
+
+  const range = req.headers.range;
+  if (range) {
+    const m = /^bytes=(\d*)-(\d*)$/i.exec(String(range).trim());
+    if (!m) {
+      res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+      res.end();
+      return;
+    }
+    let start = m[1] === '' ? 0 : parseInt(m[1], 10);
+    let end = m[2] === '' ? total - 1 : parseInt(m[2], 10);
+    if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= total) {
+      res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+      res.end();
+      return;
+    }
+    end = Math.min(end, total - 1);
+    const chunk = end - start + 1;
+    res.writeHead(206, {
+      'Content-Type': type,
+      'Content-Length': chunk,
+      'Content-Range': `bytes ${start}-${end}/${total}`,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'no-store',
+    });
+    fs.createReadStream(filePath, { start, end }).pipe(res);
+    return;
+  }
+
+  res.writeHead(200, {
+    'Content-Type': type,
+    'Content-Length': total,
+    'Accept-Ranges': 'bytes',
+    'Cache-Control': 'no-store',
+  });
+  fs.createReadStream(filePath).pipe(res);
 }
 
 function resolvePath(urlPath) {
@@ -876,6 +940,46 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // 本地预演 C3：与 functions/api/course/play-url.js 同形状（无 R2）
+    if (urlPath === '/api/course/play-url' || urlPath === '/api/course/play-url/') {
+      cors(res);
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'method' }));
+        return;
+      }
+      const q = new URL(req.url || '/', 'http://127.0.0.1');
+      const lessonId = (q.searchParams.get('lessonId') || q.searchParams.get('lesson') || '').trim();
+      if (!lessonId) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: '缺少 lessonId', code: 'missing_lesson' }));
+        return;
+      }
+      const ttlSec = 600;
+      const demoPath =
+        String(lessonId).toLowerCase() === 'demo-vert'
+          ? '/自用工具文件_不部署/视频压片/samples/demo-vert-preview.mp4'
+          : '/自用工具文件_不部署/视频压片/samples/demo-land-1080.mp4';
+      const body = JSON.stringify({
+        ok: true,
+        lessonId,
+        url: demoPath,
+        expiresAt: new Date(Date.now() + ttlSec * 1000).toISOString(),
+        ttlSec,
+        source: 'demo',
+        accessLevel: 'local',
+        note: '本地 static-server 预演；非 Cloudflare Functions',
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(body);
+      return;
+    }
+
     const filePath = resolvePath(req.url);
     if (!filePath || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
       cors(res);
@@ -884,13 +988,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const ext = path.extname(filePath).toLowerCase();
-    cors(res);
-    res.writeHead(200, {
-      'Content-Type': contentTypes[ext] || 'application/octet-stream',
-      'Cache-Control': 'no-store',
-    });
-    fs.createReadStream(filePath).pipe(res);
+    sendStaticFile(req, res, filePath);
   } catch (error) {
     cors(res);
     res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });

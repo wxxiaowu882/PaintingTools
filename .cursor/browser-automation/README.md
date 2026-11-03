@@ -117,6 +117,7 @@
 
 1. 先启动本地静态服务：`npm run serve:repo`
    - 这一步是为了在自动化脚本里稳定访问页面（避免 `file://` 初始化问题）。
+   - **视频课试播**：`static-server.js` 已支持 `.mp4` MIME + **HTTP Range**；否则 `<video>` 的 `seekable` 会卡在 `0-0`，进度条拖不动。改服务后须重启 18080。
 2. 执行脚本：`npm run smoke:solid-create`
 2. 再执行针对任务的脚本，或基于模板写新脚本。
 3. 截图和过程文件统一落到 `runs/<时间戳>-<任务名>/`
