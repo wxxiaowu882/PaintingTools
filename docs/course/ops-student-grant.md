@@ -37,6 +37,12 @@
   - `{ action: 'revoke_course_pack', phone, packId }`  
 - 课包目录（静态）：`/docs/course/packs.json`
 
-## 本步不做
+## 播放门禁（已接首刀）
 
-学习页按课包细锁、单点登录踢会话、自助支付——接同一写入口后续再做。
+- `GET /api/course/play-url` 对 **R2 正课短时链**：须登录且账号 `coursePacks` 含对应 `packId`（可用 `?courseId=` / `?packId=`；默认 `watercolor-portrait-demo`）。  
+- **demo\*** 本地样片路径、未配 R2 时的测站回退：**不验课包**（方便搭 UI）。  
+- Pro 是否在期**不**代替课包；Pro 过期只要课包还在仍可拿链。
+
+## 仍未做
+
+学习页 UI 锁态提示、单点登录踢会话、自助支付——接同一写入口后续再做。

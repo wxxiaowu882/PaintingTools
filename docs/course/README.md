@@ -23,7 +23,8 @@
 
 ## 与会员
 
-- `require`：旧稿（如 `member`）；**现行口径以课包清单为准**（Pro ≠ 自动拥有未买课）。账号已有 `coursePacks`；**play-url / 学习页细锁下一步接**。
+- `require`：旧稿（如 `member`）；**现行口径以课包清单为准**（Pro ≠ 自动拥有未买课）。  
+- **play-url**：R2 正课短时链已验 `coursePacks`（`functions/course/pack-access.js`）；`demo*` 本地样片不验。学习页 UI 锁态提示仍待接。
 - 禁止另起一套与肖像/Solid 冲突的 uid 规则；真课上架时复用会员 uid 口径。
 
 ## 与 C3
