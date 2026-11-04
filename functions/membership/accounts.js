@@ -1,11 +1,14 @@
 /**
- * 学员账号（务实 2C）：手机号+密码，可选微信备注；每账号最多 3 台设备。
+ * 学员账号（务实 2C）：手机号+密码，可选微信备注。
+ * 设备白名单最多 3 台；同时在线会话最多 2 处（看课+对照场景）。
  * KV：acct:{accountId}、phone:{phone}
  */
 import { getSecret } from './session.js';
 import { beijingDayKey, bumpDailyStats } from './daily-stats.js';
 
 const MAX_DEVICES = 3;
+/** 同时在线会话上限（与设备白名单分开；第 3 处登录踢最老会话，不删白名单） */
+const MAX_CONCURRENT_SESSIONS = 2;
 /** 购课开通：站内 Pro 覆盖重算天数（与 tiers member_3y 一致） */
 const COURSE_PRO_DAYS = 1095;
 const ACCT_PREFIX = 'acct:';
@@ -101,6 +104,7 @@ export function ensureAccountFields(acct) {
   if (acct.referralRewardMonthKey == null) acct.referralRewardMonthKey = null;
   if (acct.referralRewardTotal == null) acct.referralRewardTotal = 0;
   if (!Array.isArray(acct.coursePacks)) acct.coursePacks = [];
+  if (!Array.isArray(acct.activeSessions)) acct.activeSessions = [];
   return acct;
 }
 
@@ -222,6 +226,59 @@ export function deviceAllowed(acct, deviceId) {
   return (acct.devices || []).some((d) => d.deviceId === deviceId);
 }
 
+/**
+ * 刷新同时在线会话；超过 MAX_CONCURRENT_SESSIONS 时踢掉最久未活跃的一处（不删设备白名单）。
+ * 首次建立会话表时，用现有设备按 lastSeenAt 预填最多 2 条，避免旧账号一登录就把其它端全踢光。
+ * @returns {{ ok, account, kickedSessionDeviceId?, error? }}
+ */
+export function touchSession(acct, deviceId) {
+  const id = String(deviceId || '').trim();
+  if (!id || id.length < 8) return { ok: false, error: '设备标识无效' };
+  const now = Date.now();
+  let sessions = Array.isArray(acct.activeSessions) ? acct.activeSessions.slice() : [];
+
+  if (sessions.length === 0 && Array.isArray(acct.devices) && acct.devices.length) {
+    const sorted = acct.devices.slice().sort(function (a, b) {
+      return (Number(b.lastSeenAt) || 0) - (Number(a.lastSeenAt) || 0);
+    });
+    sessions = sorted.slice(0, MAX_CONCURRENT_SESSIONS).map(function (d) {
+      return {
+        deviceId: d.deviceId,
+        lastActiveAt: Number(d.lastSeenAt) || Number(d.boundAt) || now
+      };
+    });
+  }
+
+  let kickedSessionDeviceId = null;
+  const idx = sessions.findIndex(function (s) {
+    return s && s.deviceId === id;
+  });
+  if (idx >= 0) {
+    sessions[idx].lastActiveAt = now;
+  } else {
+    if (sessions.length >= MAX_CONCURRENT_SESSIONS) {
+      sessions.sort(function (a, b) {
+        return (Number(a.lastActiveAt) || 0) - (Number(b.lastActiveAt) || 0);
+      });
+      const kicked = sessions.shift();
+      kickedSessionDeviceId = kicked ? kicked.deviceId : null;
+    }
+    sessions.push({ deviceId: id, lastActiveAt: now });
+  }
+  acct.activeSessions = sessions;
+  return { ok: true, account: acct, kickedSessionDeviceId: kickedSessionDeviceId };
+}
+
+/** 是否仍在同时在线名额内。尚无会话表时放行（兼容旧数据，待下次登录写入）。 */
+export function sessionAllowed(acct, deviceId) {
+  if (!acct || !deviceId) return false;
+  const sessions = acct.activeSessions;
+  if (!Array.isArray(sessions) || sessions.length === 0) return true;
+  return sessions.some(function (s) {
+    return s && s.deviceId === deviceId;
+  });
+}
+
 export async function registerAccount(env, opts) {
   const store = kv(env);
   if (!store) return { ok: false, error: '未开通存储，无法注册账号' };
@@ -254,6 +311,9 @@ export async function registerAccount(env, opts) {
   const touched = touchDevice(acct, deviceId, opts && opts.deviceLabel);
   if (!touched.ok) return touched;
   acct = touched.account;
+  const sess = touchSession(acct, deviceId);
+  if (!sess.ok) return sess;
+  acct = sess.account;
   // 注册当日计 注册+登录（同账号日去重标记，与账号同一次写入）
   acct.statsLoginDay = beijingDayKey();
   const saved = await saveAccount(env, acct);
@@ -264,7 +324,8 @@ export async function registerAccount(env, opts) {
   return {
     ok: true,
     account: publicAccount(acct),
-    kickedDeviceId: touched.kickedDeviceId
+    kickedDeviceId: touched.kickedDeviceId,
+    kickedSessionDeviceId: sess.kickedSessionDeviceId || null
   };
 }
 
@@ -284,6 +345,9 @@ export async function loginAccount(env, opts) {
   const touched = touchDevice(acct, deviceId, opts && opts.deviceLabel);
   if (!touched.ok) return touched;
   acct = touched.account;
+  const sess = touchSession(acct, deviceId);
+  if (!sess.ok) return sess;
+  acct = sess.account;
   const day = beijingDayKey();
   let loginBump = 0;
   if (acct.statsLoginDay !== day) {
@@ -300,7 +364,8 @@ export async function loginAccount(env, opts) {
   return {
     ok: true,
     account: publicAccount(acct),
-    kickedDeviceId: touched.kickedDeviceId
+    kickedDeviceId: touched.kickedDeviceId,
+    kickedSessionDeviceId: sess.kickedSessionDeviceId || null
   };
 }
 
@@ -364,6 +429,9 @@ export async function removeDevice(env, accountId, deviceId) {
     return { ok: false, error: '该账号下没有这台设备' };
   }
   acct.devices = before.filter((d) => d.deviceId !== id);
+  if (Array.isArray(acct.activeSessions)) {
+    acct.activeSessions = acct.activeSessions.filter((s) => s && s.deviceId !== id);
+  }
   const saved = await saveAccount(env, acct);
   if (!saved.ok) return saved;
   return { ok: true, account: publicAccount(acct) };
@@ -627,4 +695,4 @@ export async function adminRevokeCoursePack(env, phoneRaw, packIdRaw) {
   return { ok: true, account: publicAccount(acct) };
 }
 
-export { MAX_DEVICES, COURSE_PRO_DAYS, publicAccount };
+export { MAX_DEVICES, MAX_CONCURRENT_SESSIONS, COURSE_PRO_DAYS, publicAccount };

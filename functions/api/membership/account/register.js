@@ -48,13 +48,17 @@ export async function onRequestPost(context) {
     })
   );
   const cookie = await buildSessionCookie(ent, context.env, context.request);
+  const tips = [];
+  if (result.kickedDeviceId) tips.push('已超过 3 台设备，已自动退出最早一台');
+  if (result.kickedSessionDeviceId) tips.push('已超过 2 处同时在线，已退出最早一处');
   return jsonResponse(
     {
       ok: true,
       account: result.account,
       entitlement: ent,
       kickedDeviceId: result.kickedDeviceId || null,
-      tip: result.kickedDeviceId ? '已超过 3 台设备，已自动退出最早一台' : null
+      kickedSessionDeviceId: result.kickedSessionDeviceId || null,
+      tip: tips.length ? tips.join('；') : null
     },
     200,
     { 'Set-Cookie': cookie }

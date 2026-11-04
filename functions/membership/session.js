@@ -176,10 +176,10 @@ export async function readEntitlementFromRequest(request, env) {
   const secret = getSecret(env);
   const payload = await verifySigned(decodeURIComponent(raw), secret);
   let ent = normalizeEntitlement(payload);
-  // 已挂账号：以 KV 账号权益为准，并校验设备仍在名额内
+  // 已挂账号：以 KV 账号权益为准；校验设备白名单 + 同时在线会话名额
   if (ent.accountId) {
     try {
-      const { loadAccount, deviceAllowed } = await import('./accounts.js');
+      const { loadAccount, deviceAllowed, sessionAllowed } = await import('./accounts.js');
       const acct = await loadAccount(env, ent.accountId);
       if (!acct) {
         return normalizeEntitlement({ tierId: 'free', level: 'guest', source: 'account_missing' });
@@ -189,6 +189,13 @@ export async function readEntitlementFromRequest(request, env) {
           tierId: 'free',
           level: 'guest',
           source: 'device_kicked'
+        });
+      }
+      if (ent.deviceId && !sessionAllowed(acct, ent.deviceId)) {
+        return normalizeEntitlement({
+          tierId: 'free',
+          level: 'guest',
+          source: 'session_kicked'
         });
       }
       const ae = normalizeEntitlement(acct.entitlement || null);

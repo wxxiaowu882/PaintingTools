@@ -401,21 +401,39 @@
       }
     }
 
-    #coming-soon {
+    #coming-soon, #access-gate {
       display: none;
       min-height: 70vh;
       padding: 88px 20px 48px;
       text-align: center;
     }
-    #coming-soon .brand {
+    #coming-soon .brand, #access-gate .brand {
       font-size: 0.78rem; letter-spacing: 0.14em; color: var(--accent); margin: 0 0 10px;
     }
-    #coming-soon h1 { font-size: 1.35rem; font-weight: 560; margin: 0 0 12px; }
-    #coming-soon p { color: var(--muted); max-width: 28em; margin: 0 auto 18px; }
-    #coming-soon a { color: var(--text); border-bottom: 1px solid rgba(212,181,106,0.45); text-decoration: none; }
-    body.mode-coming #learn-demo { display: none !important; }
+    #coming-soon h1, #access-gate h1 { font-size: 1.35rem; font-weight: 560; margin: 0 0 12px; }
+    #coming-soon p, #access-gate p { color: var(--muted); max-width: 28em; margin: 0 auto 18px; }
+    #coming-soon a, #access-gate a { color: var(--text); border-bottom: 1px solid rgba(212,181,106,0.45); text-decoration: none; }
+    #access-gate .gate-actions {
+      display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 8px;
+    }
+    #access-gate .gate-actions a {
+      border-bottom: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 12px 18px; border-radius: 8px; font-weight: 650; font-size: 0.93rem;
+    }
+    #access-gate .gate-actions a.primary {
+      background: var(--accent); color: #1a1408;
+    }
+    #access-gate .gate-actions a.ghost {
+      border: 1px solid rgba(255,255,255,0.16); color: var(--muted);
+    }
+    #access-gate .gate-actions a.ghost:hover { color: var(--text); border-color: rgba(255,255,255,0.3); }
+    body.mode-coming #learn-demo,
+    body.mode-gate #learn-demo { display: none !important; }
     body.mode-coming #coming-soon { display: block; }
-    body.mode-coming #menu-trigger { /* keep */ }
+    body.mode-gate #access-gate { display: block; }
+    body.mode-coming #menu-trigger,
+    body.mode-gate #menu-trigger { /* keep */ }
   </style>
 </head>
 <body>
@@ -431,6 +449,17 @@
     <h1>学习页筹备中</h1>
     <p>站内课程播放还在打磨。开放时会从「课程预约」页给出入口。</p>
     <p><a href="/Course">返回课程预告</a> · <a href="/">回首页</a></p>
+  </div>
+
+  <!-- 测站/可演示环境：未登录或未开通课包时整页门禁（本机 localhost 免验，方便搭架子） -->
+  <div id="access-gate" role="status" aria-live="polite">
+    <p class="brand">童画师吴晓 · 水彩课程</p>
+    <h1 id="gate-title">需要开通后才能学习</h1>
+    <p id="gate-desc">本课需登录并开通课包后，才能进入学习页。请先到课程说明页查看入口。</p>
+    <div class="gate-actions" id="gate-actions">
+      <a class="primary" id="gate-primary" href="/Course">返回课程说明</a>
+      <a class="ghost" id="gate-secondary" href="/member">登录 / 会员</a>
+    </div>
   </div>
 
   <div id="learn-demo">
@@ -472,7 +501,7 @@
         </div>
         <div class="meta-row">
           <span>状态：<strong id="meta-status">静态架子</strong></span>
-          <span>鉴权：<strong>尚未接入</strong></span>
+          <span>鉴权：<strong id="meta-auth">检查中</strong></span>
           <span>存储：<strong id="meta-storage">R2（规划中）</strong></span>
           <span>样片：<strong id="meta-sample">探测中</strong></span>
         </div>
@@ -1029,6 +1058,108 @@
         });
       }
 
+      function isLocalDevHost() {
+        var h = String(location.hostname || '').toLowerCase();
+        if (h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0') return true;
+        if (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return true;
+        return false;
+      }
+      function packsInclude(packs, courseId) {
+        var id = String(courseId || '').trim();
+        if (!id || !Array.isArray(packs)) return false;
+        var i;
+        for (i = 0; i < packs.length; i++) {
+          if (packs[i] && String(packs[i].packId || '') === id) return true;
+        }
+        return false;
+      }
+      function setMetaAuth(text) {
+        var el = document.getElementById('meta-auth');
+        if (el) el.textContent = text || '—';
+      }
+      function showAccessGate(kind) {
+        document.body.classList.add('mode-gate');
+        var demo = document.getElementById('learn-demo');
+        if (demo) demo.setAttribute('aria-hidden', 'true');
+        var title = document.getElementById('gate-title');
+        var desc = document.getElementById('gate-desc');
+        var primary = document.getElementById('gate-primary');
+        var secondary = document.getElementById('gate-secondary');
+        if (kind === 'auth_required') {
+          if (title) title.textContent = '请先登录';
+          if (desc) {
+            desc.textContent =
+              '学习页不对游客开放。请先登录账号；若已购课，登录后从课程说明页点「进入课堂」。';
+          }
+          if (primary) {
+            primary.textContent = '去登录';
+            primary.href = '/member?return=' + encodeURIComponent('/Course');
+          }
+          if (secondary) {
+            secondary.textContent = '返回课程说明';
+            secondary.href = '/Course';
+          }
+        } else {
+          if (title) title.textContent = '尚未开通本课';
+          if (desc) {
+            desc.textContent =
+              '本学习页仅对已开通课包的学员开放。请联系运营开通（报手机号 + 课包意向），或先回到课程说明页。';
+          }
+          if (primary) {
+            primary.textContent = '返回课程说明';
+            primary.href = '/Course';
+          }
+          if (secondary) {
+            secondary.textContent = '会员中心';
+            secondary.href = '/member';
+          }
+        }
+      }
+      /** 测站/正式可演示环境须持有课包；本机免验方便搭架子 */
+      function checkPackAccess(courseId) {
+        if (isLocalDevHost()) {
+          return Promise.resolve({ ok: true, bypass: 'local' });
+        }
+        return fetch('/api/membership/me', { credentials: 'same-origin', cache: 'no-store' })
+          .then(function (res) {
+            return res.json().then(function (body) {
+              return { res: res, body: body || {} };
+            });
+          })
+          .then(function (wrap) {
+            var body = wrap.body;
+            var level = body.accessLevel || 'guest';
+            var packs = body.coursePacks || [];
+            if (level !== 'user' && level !== 'member') {
+              return { ok: false, code: 'auth_required' };
+            }
+            if (!packsInclude(packs, courseId)) {
+              return { ok: false, code: 'pack_required' };
+            }
+            return { ok: true, packs: packs, level: level };
+          })
+          .catch(function () {
+            return { ok: false, code: 'auth_required' };
+          });
+      }
+      function bootMediaFallback(custom) {
+        if (progressEl) progressEl.textContent = '课表加载失败 · 使用默认样片';
+        var token = ++loadToken;
+        var fallback = demoCandidates();
+        if (custom) {
+          probeAndPlay(custom, '自定义', token).catch(function () {
+            clearVideo('自定义地址失败');
+          });
+          return;
+        }
+        probeAndPlay(fallback[0], fallback[0] === DEMO_VERT ? '竖屏样片' : '横屏样片', token)
+          .catch(function () {
+            return probeAndPlay(fallback[1], fallback[1] === DEMO_VERT ? '竖屏样片' : '横屏样片', token);
+          })
+          .catch(function () {
+            clearVideo('本机无样片');
+          });
+      }
       function boot() {
         var custom = qs('vsrc');
         var wantLesson = qs('lesson');
@@ -1040,29 +1171,34 @@
           .then(function (data) {
             renderCatalog(data);
             activeCourseId = (data && data.courseId) || 'watercolor-portrait-demo';
-            var startId = wantLesson || getLastLessonId(activeCourseId) || 'demo';
-            var found = catalogLessons.some(function (L) { return L.lessonId === startId; });
-            if (!found && catalogLessons[0]) startId = catalogLessons[0].lessonId;
-            selectLesson(startId);
+            return checkPackAccess(activeCourseId).then(function (access) {
+              if (!access.ok) {
+                showAccessGate(access.code === 'pack_required' ? 'pack_required' : 'auth_required');
+                return;
+              }
+              if (access.bypass === 'local') setMetaAuth('本机免验');
+              else setMetaAuth('课包已开通');
+              var startId = wantLesson || getLastLessonId(activeCourseId) || 'demo';
+              var found = catalogLessons.some(function (L) { return L.lessonId === startId; });
+              if (!found && catalogLessons[0]) startId = catalogLessons[0].lessonId;
+              selectLesson(startId);
+            });
           })
           .catch(function () {
-            if (progressEl) progressEl.textContent = '课表加载失败 · 使用默认样片';
-            // 无课表时仍尽量播本地默认样片
-            var token = ++loadToken;
-            var fallback = demoCandidates();
-            if (custom) {
-              probeAndPlay(custom, '自定义', token).catch(function () {
-                clearVideo('自定义地址失败');
+            // 无课表时：本机仍可试播；测站无课表则门禁意义不大，仍试播失败提示
+            if (!isLocalDevHost()) {
+              checkPackAccess('watercolor-portrait-demo').then(function (access) {
+                if (!access.ok) {
+                  showAccessGate(access.code === 'pack_required' ? 'pack_required' : 'auth_required');
+                  return;
+                }
+                setMetaAuth(access.bypass === 'local' ? '本机免验' : '课包已开通');
+                bootMediaFallback(custom);
               });
               return;
             }
-            probeAndPlay(fallback[0], fallback[0] === DEMO_VERT ? '竖屏样片' : '横屏样片', token)
-              .catch(function () {
-                return probeAndPlay(fallback[1], fallback[1] === DEMO_VERT ? '竖屏样片' : '横屏样片', token);
-              })
-              .catch(function () {
-                clearVideo('本机无样片');
-              });
+            setMetaAuth('本机免验');
+            bootMediaFallback(custom);
           });
       }
       boot();

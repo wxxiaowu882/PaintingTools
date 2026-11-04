@@ -190,6 +190,36 @@
       color: var(--muted);
     }
     .cta-row a.ghost:hover { color: var(--text); border-color: rgba(255,255,255,0.3); }
+    .cta-row a.is-disabled,
+    .cta-row span.is-disabled {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 650; font-size: 0.93rem;
+      padding: 12px 18px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.10);
+      color: rgba(163, 158, 150, 0.75);
+      background: rgba(255,255,255,0.02);
+      cursor: default;
+      user-select: none;
+    }
+
+    .entry {
+      margin: 8px 0 8px;
+      padding: 18px 0 4px;
+      border-top: 1px solid var(--line);
+    }
+    .entry h2 {
+      margin: 0 0 8px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+    .entry .entry-lead {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      max-width: 34em;
+    }
 
     .note {
       font-size: 0.8rem;
@@ -257,25 +287,113 @@
       </div>
     </section>
 
-    <p class="note">本页仅为预告，暂不支持在线预约或付款报名。</p>
+    <section class="entry" id="course-entry" aria-label="学习入口" hidden>
+      <h2>学习入口</h2>
+      <p class="entry-lead" id="entry-lead">正在确认你的开通状态…</p>
+      <div class="cta-row" id="course-entry-ctas"></div>
+    </section>
 
-    <p class="note" id="learn-entry-note" hidden>
-      开发中的站内学习页：<a href="/CourseLearn" style="color:var(--accent)">打开学习页架子</a>
-      （测站/本地为完整 UI；正式站仅显示「筹备中」。）
-    </p>
+    <p class="note">本页仅为预告，暂不支持在线预约或付款报名。购课通道开放后，会在上方「学习入口」出现明确按钮。</p>
   </main>
   <script>
     (function () {
-      // 学习页入口：本地 / 测站可见链接；正式站隐藏（即使打开 /CourseLearn 也是筹备中）
-      (function showLearnEntry() {
-        var note = document.getElementById('learn-entry-note');
-        if (!note) return;
+      var COURSE_PACK_ID = 'watercolor-portrait-demo';
+
+      function hostAllowsLearnUi() {
         var h = String(location.hostname || '').toLowerCase();
-        var ok =
+        return (
           h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' ||
           h === 'test.wuxiaoart.com' || h.indexOf('soft-voice-f822-staging') >= 0 ||
-          /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h);
-        if (ok) note.hidden = false;
+          /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)
+        );
+      }
+      function isLocalDevHost() {
+        var h = String(location.hostname || '').toLowerCase();
+        if (h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0') return true;
+        return /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h);
+      }
+      function packsInclude(packs, packId) {
+        if (!Array.isArray(packs)) return false;
+        var i;
+        for (i = 0; i < packs.length; i++) {
+          if (packs[i] && String(packs[i].packId || '') === packId) return true;
+        }
+        return false;
+      }
+      function el(tag, cls, text) {
+        var n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text) n.textContent = text;
+        return n;
+      }
+      function linkBtn(cls, href, text) {
+        var a = el('a', cls, text);
+        a.href = href;
+        return a;
+      }
+      function disabledChip(text) {
+        return el('span', 'is-disabled', text);
+      }
+
+      // 测站/本地：显示学习入口；正式站学习页仍筹备中，不挂「进入课堂」
+      (function paintCourseEntry() {
+        var section = document.getElementById('course-entry');
+        var lead = document.getElementById('entry-lead');
+        var row = document.getElementById('course-entry-ctas');
+        if (!section || !lead || !row) return;
+        if (!hostAllowsLearnUi()) return;
+        section.hidden = false;
+
+        function paint(state) {
+          row.innerHTML = '';
+          if (state === 'has_pack' || state === 'local_bypass') {
+            lead.textContent =
+              state === 'local_bypass'
+                ? '本机开发环境可直接进入学习页。正式学员须开通课包后，才会看到「进入课堂」。'
+                : '你已开通本课。点下方进入学习页看课。';
+            row.appendChild(linkBtn('primary', '/CourseLearn', '进入课堂'));
+            row.appendChild(linkBtn('ghost', '/member', '会员中心'));
+            return;
+          }
+          if (state === 'need_login') {
+            lead.textContent =
+              '看课前请先登录。若已购课，登录后本页会出现「进入课堂」；尚未购课可先了解会员权益，购课通道仍在筹备。';
+            row.appendChild(
+              linkBtn('primary', '/member?return=' + encodeURIComponent('/Course'), '登录后看课')
+            );
+            row.appendChild(disabledChip('购课通道筹备中'));
+            return;
+          }
+          // logged in, no pack
+          lead.textContent =
+            '当前账号尚未开通本课。请联系运营开通（报手机号 + 课包意向）。在线购课通道仍在筹备，开通后本页会变为「进入课堂」。';
+          row.appendChild(linkBtn('primary', '/member#course-preview', '申请开通本课'));
+          row.appendChild(disabledChip('购课通道筹备中'));
+        }
+
+        if (isLocalDevHost()) {
+          paint('local_bypass');
+          return;
+        }
+
+        fetch('/api/membership/me', { credentials: 'same-origin', cache: 'no-store' })
+          .then(function (res) {
+            return res.json().then(function (body) {
+              return body || {};
+            });
+          })
+          .then(function (body) {
+            var level = body.accessLevel || 'guest';
+            if (level !== 'user' && level !== 'member') {
+              paint('need_login');
+              return;
+            }
+            if (packsInclude(body.coursePacks, COURSE_PACK_ID)) paint('has_pack');
+            else paint('need_pack');
+          })
+          .catch(function () {
+            paint('need_login');
+          });
       })();
 
       var btn = document.getElementById('btn-back');
