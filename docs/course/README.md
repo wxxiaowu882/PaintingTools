@@ -23,7 +23,7 @@
 
 ## 与会员
 
-- `require`：课程级门槛草稿（如 `member`）；**学习页按课包细锁尚未接**（账号已有 `coursePacks`，下一步接 play-url）。
+- `require`：旧稿（如 `member`）；**现行口径以课包清单为准**（Pro ≠ 自动拥有未买课）。账号已有 `coursePacks`；**play-url / 学习页细锁下一步接**。
 - 禁止另起一套与肖像/Solid 冲突的 uid 规则；真课上架时复用会员 uid 口径。
 
 ## 与 C3
