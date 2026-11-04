@@ -16,9 +16,14 @@
 | `r2Key` | R2 对象键，默认形态 `course/{lessonId}/v1/main.mp4` |
 | `demoSrc` / `demoSrcPortrait` | 仅本地试播；**不进 R2** |
 
+## 可售课包（运营开通）
+
+- `packs.json`：运营台「开通学员」下拉来源；`packId` 与课表 `courseId` 对齐。
+- 开通写权说明：`ops-student-grant.md`（三年 Pro 覆盖重算 + 课包永久）。
+
 ## 与会员
 
-- `require`：课程级门槛草稿（如 `member`）；细锁课尚未接 Membership。
+- `require`：课程级门槛草稿（如 `member`）；**学习页按课包细锁尚未接**（账号已有 `coursePacks`，下一步接 play-url）。
 - 禁止另起一套与肖像/Solid 冲突的 uid 规则；真课上架时复用会员 uid 口径。
 
 ## 与 C3

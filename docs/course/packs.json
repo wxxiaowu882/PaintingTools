@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "note": "可售课包清单（运营开通学员时选用）。packId 稳定，勿随意改；与 demo-catalog 的 courseId 对齐。新套课上架时在此追加一行。",
+  "packs": [
+    {
+      "packId": "watercolor-portrait-demo",
+      "title": "水彩肖像画课程（demo）",
+      "catalogPath": "/docs/course/demo-catalog.json",
+      "status": "demo"
+    }
+  ]
+}

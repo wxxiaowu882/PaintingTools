@@ -49,7 +49,14 @@
 | `GET /api/membership/catalog?sandbox=` | 按访问档过滤课表 |
 | `GET /api/membership/scene?sandbox=&name=` | 进课全文（不够档返回 locked） |
 | `POST /api/membership/account/register\|login` | 注册/登录（注册默认会员档） |
-| `GET/POST /api/membership/admin/accounts` | 运营台查账号 / 重置密码 |
+| `GET/POST /api/membership/admin/accounts` | 运营台查账号 / 重置密码 / **开通学员** / 取消课包 |
+| `GET /api/membership/me` | 会话 + `accessLevel`；登录后含 **`coursePacks`**（已购课包，永久） |
+
+### 学员开通（运营台）
+
+口径见 `docs/站点规划_访谈与路线图.md` §4.5；操作说明见 `docs/course/ops-student-grant.md`。  
+课包目录：`docs/course/packs.json`。  
+写权：`grant_course_student` → 三年 Pro（覆盖重算）+ 永久课包；无账号则开户。
 
 密钥：Cloudflare Secret `MEMBERSHIP_SECRET`（≥16 字符）  
 生成正式码：`node docs/membership/gen-redeem-code.mjs`

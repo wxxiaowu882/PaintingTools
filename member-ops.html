@@ -497,6 +497,7 @@
             <li>本台发码 → 学员页兑码 → 高级内容解锁</li>
             <li>宣传链接：A 复制链接 → B 用链接注册 → B 兑高级 → 看 A 是否延期</li>
             <li>忘记密码：本台「会员账号」按手机号重置，把新密码私下告诉学员</li>
+            <li>购课开通学员：报手机号+课包 →「会员账号」页顶部「开通学员」（三年 Pro 覆盖重算 + 课包永久）；新开户密码须私下告知</li>
           </ol>
           <div id="status-box" class="hidden" style="margin-top:12px"></div>
         </section>
@@ -562,8 +563,33 @@
 
       <div class="tab-panel" data-panel="accounts">
         <section class="card">
+          <h2>开通学员</h2>
+          <p class="tip">用户报手机号 + 课包意向后在此开通：<strong>自今日起三年 Pro</strong>（覆盖重算）+ <strong>该课包永久</strong>。无账号会开户并生成密码（须私下告知）。已付时长 Pro 的退费/抵扣线下处理。特殊延期仍用下方「延期高级」。</p>
+          <div class="row">
+            <label style="flex:1;min-width:140px">手机号
+              <input id="grant-phone" type="text" inputmode="tel" placeholder="11 位手机号" style="width:100%">
+            </label>
+            <label style="flex:1.4;min-width:180px">课包
+              <select id="grant-pack" style="width:100%">
+                <option value="">加载中…</option>
+              </select>
+            </label>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <label style="flex:1;min-width:160px">备注（可选）
+              <input id="grant-note" type="text" maxlength="40" placeholder="微信名 / 付款备注" style="width:100%">
+            </label>
+            <label style="flex:1;min-width:140px">初始密码（仅新开户；空=自动生成）
+              <input id="grant-pwd" type="text" autocomplete="off" placeholder="至少 6 位，可留空" style="width:100%">
+            </label>
+            <button type="button" id="btn-grant-student">开通学员</button>
+          </div>
+          <p class="msg" id="grant-msg"></p>
+          <div id="grant-result" class="tip" style="margin-top:8px"></div>
+        </section>
+        <section class="card">
           <h2>会员账号</h2>
-          <p class="tip">列表一次拉取后本地筛选（少打接口）。点行看权益/兑码；可延期、取消高级、踢设备、复制回复话术。</p>
+          <p class="tip">列表一次拉取后本地筛选（少打接口）。点行看权益/兑码/课包；可延期、取消高级、踢设备、复制回复话术。</p>
           <div class="row">
             <label style="flex:1;min-width:160px">手机号
               <input id="acct-phone" type="text" inputmode="tel" placeholder="片段过滤" style="width:100%">
@@ -744,7 +770,7 @@
 
 付款备注：会员+档位+微信昵称
 截图发我，确认后发兑换码。
-到网站「会员 · 兑换」输入即可。</textarea>
+到网站「会员权益」输入即可。</textarea>
           <div class="row"><button type="button" class="secondary" id="btn-copy-script">复制购买说明</button></div>
         </section>
       </div>
@@ -774,10 +800,13 @@
       });
       try { localStorage.setItem('memberOpsTab', name); } catch (_e) {}
       // 有缓存则本地筛，避免每次切 Tab 再打列表接口（免费档省请求）
-      if (name === 'accounts' && typeof loadAcctList === 'function') {
+      if (name === 'accounts') {
         try {
-          if (!acctCache || !acctCache.length) loadAcctList();
-          else renderAcctTable(acctCache);
+          if (typeof loadCoursePackOptions === 'function') loadCoursePackOptions();
+          if (typeof loadAcctList === 'function') {
+            if (!acctCache || !acctCache.length) loadAcctList();
+            else renderAcctTable(acctCache);
+          }
         } catch (_eAcct) {}
       }
       if (name === 'stats' && typeof loadDailyStats === 'function') {
@@ -1370,6 +1399,7 @@
       if (s === 'admin_extend') return '运营台延期';
       if (s === 'admin_revoke') return '运营台已取消高级';
       if (s === 'referral_reward') return '宣传链接奖励延期';
+      if (s === 'course_purchase') return '购课/运营开通学员';
       if (s === 'probe') return '测试假码开通';
       if (s === 'expired') return '高级已过期';
       if (s === 'signed_code') return '兑换开通';
@@ -1441,6 +1471,13 @@
         '到期时间：' + exp
       ];
       if (code) lines.push('关联兑换码：' + code);
+      const packs = account.coursePacks || [];
+      if (packs.length) {
+        lines.push(
+          '已购课包：' +
+            packs.map((p) => p.title || p.packId).join('、')
+        );
+      }
       if (account.wechatNote) lines.push('（内部备注：' + account.wechatNote + '）');
       lines.push('如需延期或改密码，直接回复我就行。');
       return lines.join('\n');
@@ -1490,6 +1527,7 @@
         '<div class="tip">备注：' + escapeHtml(account.wechatNote || '—') + '</div>' +
         '<div class="tip">来源：' + escapeHtml(sourceLabel(ent.source)) +
           (ent.redeemedAt ? (' · 兑码时间 ' + fmtTime(ent.redeemedAt)) : '') + '</div>' +
+        formatCoursePacksHtml(account) +
         formatReferralTip(account);
       $('acct-note').value = account.wechatNote || '';
       const devices = account.devices || [];
@@ -1509,8 +1547,29 @@
           btn.onclick = () => kickDevice(btn.getAttribute('data-device') || '');
         });
       }
+      box.querySelectorAll('.btn-revoke-pack').forEach((btn) => {
+        btn.onclick = () => revokeCoursePack(btn.getAttribute('data-pack') || '');
+      });
       actions.classList.remove('hidden');
       renderAcctTable(acctCache);
+    }
+
+    function formatCoursePacksHtml(account) {
+      const packs = (account && account.coursePacks) || [];
+      if (!packs.length) {
+        return '<div class="tip" style="margin-top:6px">课包：无（购课开通后显示于此；永久可看，与 Pro 到期无关）</div>';
+      }
+      const rows = packs.map((p) => {
+        const when = p.grantedAt ? fmtTime(p.grantedAt) : '—';
+        const title = p.title || p.packId;
+        return '<div class="ops-device-row">' +
+          '<span>' + escapeHtml(title) +
+          ' <code>' + escapeHtml(p.packId) + '</code>' +
+          ' · ' + escapeHtml(when) + '</span>' +
+          '<button type="button" class="secondary btn-revoke-pack" data-pack="' +
+          escapeHtml(p.packId) + '">取消课包</button></div>';
+      }).join('');
+      return '<div class="tip" style="margin-top:6px">课包（永久）：</div>' + rows;
     }
 
     function filterAcctRows(list) {
@@ -1700,6 +1759,115 @@
       }, '密码已重置');
       if (data) $('acct-new-pwd').value = '';
     };
+
+    let coursePackOptions = [];
+
+    async function loadCoursePackOptions() {
+      const sel = $('grant-pack');
+      if (!sel) return;
+      try {
+        const res = await fetch('/docs/course/packs.json', { credentials: 'same-origin' });
+        const data = await res.json();
+        coursePackOptions = Array.isArray(data && data.packs) ? data.packs : [];
+      } catch (_e) {
+        coursePackOptions = [];
+      }
+      if (!coursePackOptions.length) {
+        sel.innerHTML = '<option value=\"\">暂无课包（检查 packs.json）</option>';
+        return;
+      }
+      sel.innerHTML = coursePackOptions.map((p) => {
+        const id = String(p.packId || '');
+        const title = String(p.title || id);
+        const tag = p.status === 'demo' ? '（demo）' : '';
+        return '<option value=\"' + escapeHtml(id) + '\">' + escapeHtml(title + tag) + '</option>';
+      }).join('');
+    }
+
+    async function revokeCoursePack(packId) {
+      const phone = lastAcctPhone || selectedAcctPhone || '';
+      const id = String(packId || '').trim();
+      if (!phone || !id) {
+        setMsg($('acct-msg'), '缺少手机号或课包', false);
+        return;
+      }
+      if (!confirm('确认取消课包 ' + id + '？\n不会改动高级会员时长。')) return;
+      await postAcctAction({ action: 'revoke_course_pack', phone: phone, packId: id }, '已取消该课包');
+    }
+
+    if ($('btn-grant-student')) {
+      $('btn-grant-student').onclick = async () => {
+        const phone = ($('grant-phone').value || '').trim();
+        const packId = ($('grant-pack').value || '').trim();
+        const pack = coursePackOptions.find((p) => String(p.packId) === packId);
+        const password = ($('grant-pwd').value || '').trim();
+        const wechatNote = ($('grant-note').value || '').trim();
+        const resultBox = $('grant-result');
+        if (!phone) {
+          setMsg($('grant-msg'), '请填写手机号', false);
+          return;
+        }
+        if (!packId) {
+          setMsg($('grant-msg'), '请选择课包', false);
+          return;
+        }
+        if (password && password.length < 6) {
+          setMsg($('grant-msg'), '若填写密码，至少 6 位', false);
+          return;
+        }
+        const packTitle = pack && pack.title ? pack.title : packId;
+        if (!confirm(
+          '确认开通学员？\n手机号：' + phone +
+          '\n课包：' + packTitle +
+          '\n将写入：自今日起三年 Pro + 该课包永久'
+        )) return;
+        setMsg($('grant-msg'), '开通中…', true);
+        if (resultBox) resultBox.textContent = '';
+        const body = {
+          action: 'grant_course_student',
+          phone: phone,
+          packId: packId,
+          packTitle: packTitle
+        };
+        if (password) body.password = password;
+        if (wechatNote) body.wechatNote = wechatNote;
+        const { res, data } = await api('/api/membership/admin/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok || !(data && data.ok)) {
+          setMsg($('grant-msg'), (data && data.error) || '开通失败', false);
+          return;
+        }
+        setMsg($('grant-msg'), (data && data.tip) || '开通成功', true);
+        const acct = data.account;
+        let html = '';
+        if (data.initialPassword) {
+          html += '<div class=\"ent-banner member\"><div class=\"ent-main\">新账号初始密码（请私下告知用户）</div>' +
+            '<div class=\"ent-sub\"><code style=\"font-size:1.1em\">' +
+            escapeHtml(data.initialPassword) + '</code></div></div>';
+        }
+        if (acct) {
+          html += '<div class=\"tip\">手机号 ' + escapeHtml(acct.phone || phone) +
+            ' · ' + escapeHtml(levelLabel(acct)) +
+            ' · 到期 ' + escapeHtml(expireLabel(acct)) + '</div>';
+          const packs = acct.coursePacks || [];
+          if (packs.length) {
+            html += '<div class=\"tip\">课包：' +
+              escapeHtml(packs.map((p) => p.title || p.packId).join('、')) + '</div>';
+          }
+          patchAcctCache(acct);
+          showAcct(acct);
+          $('acct-phone').value = acct.phone || phone;
+        }
+        if (resultBox) resultBox.innerHTML = html;
+        $('grant-pwd').value = '';
+        try { await loadAcctList(); } catch (_e) {}
+      };
+    }
+
+    loadCoursePackOptions();
 
     let statsCache = null;
     let statsLoading = false;

@@ -6,6 +6,8 @@ import { getSecret } from './session.js';
 import { beijingDayKey, bumpDailyStats } from './daily-stats.js';
 
 const MAX_DEVICES = 3;
+/** 购课开通：站内 Pro 覆盖重算天数（与 tiers member_3y 一致） */
+const COURSE_PRO_DAYS = 1095;
 const ACCT_PREFIX = 'acct:';
 const PHONE_PREFIX = 'phone:';
 
@@ -88,7 +90,7 @@ async function saveAccount(env, acct) {
   return saveAccountRaw(env, acct);
 }
 
-/** 宣传/归因相关字段兜底（不改已有值） */
+/** 宣传/归因/课包字段兜底（不改已有值） */
 export function ensureAccountFields(acct) {
   if (!acct) return acct;
   if (acct.promoCode == null) acct.promoCode = null;
@@ -98,7 +100,45 @@ export function ensureAccountFields(acct) {
   if (acct.referralRewardCountMonth == null) acct.referralRewardCountMonth = 0;
   if (acct.referralRewardMonthKey == null) acct.referralRewardMonthKey = null;
   if (acct.referralRewardTotal == null) acct.referralRewardTotal = 0;
+  if (!Array.isArray(acct.coursePacks)) acct.coursePacks = [];
   return acct;
+}
+
+/** 归一课包清单（去重；永久可看，与 Pro 到期脱钩） */
+export function normalizeCoursePacks(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  const seen = new Set();
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    const packId = String(
+      (item && typeof item === 'object' ? item.packId : item) || ''
+    ).trim();
+    if (!packId || seen.has(packId)) continue;
+    seen.add(packId);
+    out.push({
+      packId,
+      title: String((item && item.title) || '').trim().slice(0, 80),
+      grantedAt: Number((item && item.grantedAt) || 0) || Date.now(),
+      source: String((item && item.source) || 'admin_grant').trim().slice(0, 40)
+    });
+  }
+  return out;
+}
+
+export function accountHasCoursePack(acct, packId) {
+  const id = String(packId || '').trim();
+  if (!id || !acct) return false;
+  return normalizeCoursePacks(acct.coursePacks).some((p) => p.packId === id);
+}
+
+function randomInitialPassword(len) {
+  const n = Math.min(16, Math.max(6, parseInt(len, 10) || 8));
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const buf = crypto.getRandomValues(new Uint8Array(n));
+  let s = '';
+  for (let i = 0; i < n; i++) s += chars[buf[i] % chars.length];
+  return s;
 }
 
 export async function findAccountByPhone(env, phone) {
@@ -134,6 +174,7 @@ function publicAccount(acct) {
     createdAt: acct.createdAt || null,
     lastActiveAt: accountLastActiveAt(acct),
     entitlement: acct.entitlement || null,
+    coursePacks: normalizeCoursePacks(acct.coursePacks),
     promoCode: acct.promoCode || null,
     referredByAccountId: acct.referredByAccountId || null,
     devices: (acct.devices || []).map((d) => ({
@@ -477,9 +518,113 @@ export async function adminRevokeMember(env, phoneRaw) {
     jti: prev.jti || null,
     redeemCode: prev.redeemCode || null
   };
+  // 故意不清 coursePacks：课包永久，与取消高级脱钩
   const saved = await saveAccount(env, acct);
   if (!saved.ok) return saved;
   return { ok: true, account: publicAccount(acct) };
 }
 
-export { MAX_DEVICES, publicAccount };
+/**
+ * 运营台：开通学员 = 三年 Pro（开通日起覆盖重算）+ 追加永久课包。
+ * 无账号则开户（可指定密码，否则随机生成并在 initialPassword 返回）。
+ * opts: { phone, packId, packTitle?, password?, displayName?, wechatNote? }
+ */
+export async function adminGrantCourseStudent(env, opts) {
+  const store = kv(env);
+  if (!store) return { ok: false, error: '未开通账号存储（MEMBERSHIP_KV）' };
+  const phone = normalizePhone(opts && opts.phone);
+  const packId = String((opts && opts.packId) || '').trim();
+  const packTitle = String((opts && opts.packTitle) || '').trim().slice(0, 80);
+  if (!phone) return { ok: false, error: '请填写正确的手机号' };
+  if (!packId) return { ok: false, error: '请选择课包' };
+
+  let acct = await findAccountByPhone(env, phone);
+  let created = false;
+  let initialPassword = null;
+
+  if (!acct) {
+    let password = String((opts && opts.password) || '');
+    if (password.length < 6) {
+      password = randomInitialPassword(8);
+    }
+    initialPassword = password;
+    const displayName =
+      normalizeDisplayName(opts && opts.displayName) ||
+      normalizeDisplayName('学员' + phone.slice(-4)) ||
+      '学员用户';
+    const secret = getSecret(env);
+    const pass = await newPassRecord(password, secret);
+    acct = {
+      accountId: crypto.randomUUID(),
+      phone,
+      displayName,
+      wechatNote: String((opts && opts.wechatNote) || '').trim().slice(0, 40),
+      passHash: pass.passHash,
+      saltB64: pass.saltB64,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      entitlement: { tierId: 'free', level: 'user', expiresAt: null, source: 'register' },
+      devices: [],
+      coursePacks: []
+    };
+    created = true;
+  } else if (opts && opts.wechatNote) {
+    const note = String(opts.wechatNote || '').trim().slice(0, 40);
+    if (note) acct.wechatNote = note;
+  }
+
+  ensureAccountFields(acct);
+  const now = Date.now();
+  const packs = normalizeCoursePacks(acct.coursePacks);
+  const alreadyHadPack = packs.some((p) => p.packId === packId);
+  if (!alreadyHadPack) {
+    packs.push({
+      packId,
+      title: packTitle,
+      grantedAt: now,
+      source: 'admin_grant'
+    });
+  }
+  acct.coursePacks = packs;
+
+  const prev = acct.entitlement || {};
+  acct.entitlement = {
+    tierId: 'member_3y',
+    level: 'member',
+    expiresAt: now + COURSE_PRO_DAYS * 86400000,
+    source: 'course_purchase',
+    redeemedAt: now,
+    jti: prev.jti || null,
+    redeemCode: prev.redeemCode || null,
+    lastCoursePackId: packId
+  };
+
+  const saved = await saveAccount(env, ensureAccountFields(acct));
+  if (!saved.ok) return saved;
+  return {
+    ok: true,
+    created,
+    alreadyHadPack,
+    initialPassword,
+    account: publicAccount(acct)
+  };
+}
+
+/** 运营台：仅撤销某一课包（不改 Pro） */
+export async function adminRevokeCoursePack(env, phoneRaw, packIdRaw) {
+  const packId = String(packIdRaw || '').trim();
+  if (!packId) return { ok: false, error: '缺少课包 ID' };
+  let acct = await findAccountByPhone(env, phoneRaw);
+  if (!acct) return { ok: false, error: '未找到该手机号' };
+  ensureAccountFields(acct);
+  const before = normalizeCoursePacks(acct.coursePacks);
+  if (!before.some((p) => p.packId === packId)) {
+    return { ok: false, error: '该账号没有此课包' };
+  }
+  acct.coursePacks = before.filter((p) => p.packId !== packId);
+  const saved = await saveAccount(env, acct);
+  if (!saved.ok) return saved;
+  return { ok: true, account: publicAccount(acct) };
+}
+
+export { MAX_DEVICES, COURSE_PRO_DAYS, publicAccount };

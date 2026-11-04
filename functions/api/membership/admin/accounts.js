@@ -6,7 +6,9 @@ import {
   adminUpdateNote,
   adminRemoveDevice,
   adminExtendMember,
-  adminRevokeMember
+  adminRevokeMember,
+  adminGrantCourseStudent,
+  adminRevokeCoursePack
 } from '../../../membership/accounts.js';
 import { accessLevel, normalizeEntitlement } from '../../../membership/session.js';
 import { referralSummaryForAdmin } from '../../../membership/referral.js';
@@ -68,6 +70,8 @@ export async function onRequestGet(context) {
  * { action: 'remove_device', phone, deviceId }
  * { action: 'extend_days', phone, days }
  * { action: 'revoke_member', phone }
+ * { action: 'grant_course_student', phone, packId, packTitle?, password?, displayName?, wechatNote? }
+ * { action: 'revoke_course_pack', phone, packId }
  */
 export async function onRequestPost(context) {
   const gate = await requireAdmin(context);
@@ -124,6 +128,40 @@ export async function onRequestPost(context) {
       ok: true,
       account: await enrich(result.account, context.env),
       tip: '已取消高级会员'
+    });
+  }
+  if (action === 'grant_course_student') {
+    const result = await adminGrantCourseStudent(context.env, {
+      phone,
+      packId: body && body.packId,
+      packTitle: body && body.packTitle,
+      password: body && body.password,
+      displayName: body && body.displayName,
+      wechatNote: body && body.wechatNote
+    });
+    if (!result.ok) return jsonResponse(result, 400);
+    const tips = [];
+    if (result.created) tips.push('已新开账号');
+    else tips.push('已写入现有账号');
+    if (result.alreadyHadPack) tips.push('课包原本已有（仍重算三年 Pro）');
+    else tips.push('已追加课包');
+    tips.push('Pro 自今日起三年');
+    return jsonResponse({
+      ok: true,
+      created: !!result.created,
+      alreadyHadPack: !!result.alreadyHadPack,
+      initialPassword: result.initialPassword || null,
+      account: await enrich(result.account, context.env),
+      tip: tips.join('；')
+    });
+  }
+  if (action === 'revoke_course_pack') {
+    const result = await adminRevokeCoursePack(context.env, phone, body && body.packId);
+    if (!result.ok) return jsonResponse(result, 400);
+    return jsonResponse({
+      ok: true,
+      account: await enrich(result.account, context.env),
+      tip: '已取消该课包（未改 Pro）'
     });
   }
   return jsonResponse({ ok: false, error: '未知操作' }, 400);

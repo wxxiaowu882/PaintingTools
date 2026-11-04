@@ -4,7 +4,7 @@ import {
   jsonResponse,
   accessLevel
 } from '../../membership/session.js';
-import { loadAccount } from '../../membership/accounts.js';
+import { loadAccount, normalizeCoursePacks } from '../../membership/accounts.js';
 import { ensurePromoCode, referralSummaryForAdmin } from '../../membership/referral.js';
 import { loadOpsSettings } from '../../membership/ops-settings.js';
 
@@ -16,6 +16,10 @@ export async function onRequestGet(context) {
   const accountId = entitlement && entitlement.accountId;
   if (accountId && (level === 'user' || level === 'member')) {
     try {
+      const acct = await loadAccount(context.env, accountId);
+      if (acct) {
+        out.coursePacks = normalizeCoursePacks(acct.coursePacks);
+      }
       const settings = await loadOpsSettings(context.env);
       out.referral = {
         enabled: !!settings.referralEnabled,
@@ -32,7 +36,6 @@ export async function onRequestGet(context) {
           out.promoCode = promo.code;
           out.promoUrl = promo.promoUrl;
         }
-        const acct = await loadAccount(context.env, accountId);
         if (acct) {
           const sum = referralSummaryForAdmin(acct);
           out.referralStats = {
