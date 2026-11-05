@@ -8,7 +8,7 @@ main = "./dist/worker/index.js"
 directory = "."
 binding = "ASSETS"
 # 默认先吐静态文件会绕过会员过滤；API 与课表 JSON 必须先走 Worker。
-# /CourseLearn*：正式站由 _middleware 拦成「筹备中」，测站/本地仍出完整 demo（见路线图 §4.5.2）
+# /CourseLearn*：正式站录播未开放前由 _middleware 拦成「筹备中」（COURSE_LEARN_PUBLIC=1 才放行）；测站/本地完整 demo（§4.5.2）
 run_worker_first = ["/api/*", "/docs/json/*", "/CourseLearn", "/CourseLearn/", "/CourseLearn.html"]
 # 与线上无后缀 URL 习惯对齐：/Solid → Solid.html
 html_handling = "auto-trailing-slash"

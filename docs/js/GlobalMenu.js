@@ -58,26 +58,27 @@
         
         { type: 'category', text: '造型基础' },
         { id: '01', text: '几何体 · 静物', url: '/Solid?sandbox=geometry', color: '#3B82F6' },
+        { id: '02', text: '几何体 · 静物写生沙盒', url: '/Solid?sandbox=geometrysketch', color: '#60A5FA' },
         
         { type: 'category', text: '肖像' },
-        { id: '02', text: '头骨 · 骨点 · 肌肉', url: '/Portrait_c?lib=anatomy', color: '#A855F7' },
-        { id: '03', text: '五官', url: '/Portrait_c?lib=facial', color: '#C026D3' },
-        { id: '04', text: '头部造型规律', url: '/Solid?sandbox=headform', color: '#D946EF' },
-        { id: '05', text: '肖像光影沙盒', url: '/Solid?sandbox=portrait', color: '#F43F5E' },
-        { id: '06', text: '吴晓的作品', url: '/Gallery', color: '#EC4899' },
-        { id: '07', text: '课程预约', url: '/Course', color: '#FBBF24' },
-        { id: '07b', text: '会员 · 兑换', url: '/member', color: '#E8C547' },
+        { id: '03', text: '头骨 · 骨点 · 肌肉', url: '/Portrait_c?lib=anatomy', color: '#A855F7' },
+        { id: '04', text: '五官', url: '/Portrait_c?lib=facial', color: '#C026D3' },
+        { id: '05', text: '头部造型规律', url: '/Solid?sandbox=headform', color: '#D946EF' },
+        { id: '06', text: '肖像光影沙盒', url: '/Solid?sandbox=portrait', color: '#F43F5E' },
+        { id: '07', text: '吴晓的作品', url: '/Gallery', color: '#EC4899' },
+        { id: '08', text: '课程预约', url: '/Course', color: '#FBBF24' },
+        { id: '09', text: '会员权益', url: '/member', color: '#E8C547' },
 
         { type: 'category', text: '实用工具' },
-        { id: '08', text: '晓阶 · 色阶 · 网格', url: '/GR', color: '#3B82F6' },
-        { id: '09', text: '晓色 · 调色助手', url: '/XStudio', color: '#A855F7' },
-        { id: '10', text: '晓摹 · 描摹助手', url: '/ARSketch', color: '#22C55E' },
+        { id: '10', text: '晓阶 · 色阶 · 网格', url: '/GR', color: '#3B82F6' },
+        { id: '11', text: '晓色 · 调色助手', url: '/XStudio', color: '#A855F7' },
+        { id: '12', text: '晓摹 · 描摹助手', url: '/ARSketch', color: '#22C55E' },
 
         { type: 'category', text: '游戏' },
-        { id: '11', text: '色感训练 · 光谱行者', url: '/games/ChromaWalker', color: '#F59E0B' },
+        { id: '13', text: '色感训练 · 光谱行者', url: '/games/ChromaWalker', color: '#F59E0B' },
 
         { type: 'category', text: '安装', cat: 'install' },
-        { id: '12', text: 'App下载', url: '/docs/app/', color: '#94A3B8', hideInAndroidShell: true },
+        { id: '14', text: 'App下载', url: '/docs/app/', color: '#94A3B8', hideInAndroidShell: true },
 
         { type: 'footer', text: '© 2026 手绘工坊 · 童画师吴晓' }
     ];

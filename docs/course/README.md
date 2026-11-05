@@ -2,7 +2,7 @@
 
 ## 权威试播课表
 
-- `demo-catalog.json`：学习页 `/CourseLearn` 本地/测站读取（正式站学习页仍筹备中）。
+- `demo-catalog.json`：学习页 `/CourseLearn` 本地/测站读取。**正式站录播未开放前**：学习页只「筹备中」、预告页无「学习入口」、play-url 不签发（见路线图 §4.5.2）。
 
 ## 字段（单课）
 

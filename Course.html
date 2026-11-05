@@ -287,13 +287,14 @@
       </div>
     </section>
 
+    <!-- 学习入口：仅测站/本机挂上；正式站录播未开放前不得露出（见路线图 §4.5.2） -->
     <section class="entry" id="course-entry" aria-label="学习入口" hidden>
       <h2>学习入口</h2>
       <p class="entry-lead" id="entry-lead">正在确认你的开通状态…</p>
       <div class="cta-row" id="course-entry-ctas"></div>
     </section>
 
-    <p class="note">本页仅为预告，暂不支持在线预约或付款报名。购课通道开放后，会在上方「学习入口」出现明确按钮。</p>
+    <p class="note" id="course-page-note">本页仅为预告，暂不支持在线预约或付款报名。开放购课与看课后，本页会更新说明。</p>
   </main>
   <script>
     (function () {
@@ -312,6 +313,13 @@
         if (h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0') return true;
         return /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h);
       }
+
+      // 正式站：整段拔掉，避免 hidden 仍留在 DOM / 文案提示「学习入口」
+      (function stripLearnEntryOnProd() {
+        if (hostAllowsLearnUi()) return;
+        var section = document.getElementById('course-entry');
+        if (section && section.parentNode) section.parentNode.removeChild(section);
+      })();
       function packsInclude(packs, packId) {
         if (!Array.isArray(packs)) return false;
         var i;
@@ -335,14 +343,19 @@
         return el('span', 'is-disabled', text);
       }
 
-      // 测站/本地：显示学习入口；正式站学习页仍筹备中，不挂「进入课堂」
+      // 测站/本地：显示学习入口；正式站录播未开放前不挂入口（也不保留区块）
       (function paintCourseEntry() {
         var section = document.getElementById('course-entry');
         var lead = document.getElementById('entry-lead');
         var row = document.getElementById('course-entry-ctas');
-        if (!section || !lead || !row) return;
+        var note = document.getElementById('course-page-note');
         if (!hostAllowsLearnUi()) return;
+        if (!section || !lead || !row) return;
         section.hidden = false;
+        if (note) {
+          note.textContent =
+            '本页仅为预告，暂不支持在线预约或付款报名。购课通道开放后，会在上方「学习入口」出现明确按钮。';
+        }
 
         function paint(state) {
           row.innerHTML = '';

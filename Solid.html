@@ -248,7 +248,7 @@
       try {
         var qs = new URLSearchParams(window.location.search || '');
         var sb = (qs.get('sandbox') || 'geometry').toLowerCase();
-        if (sb !== 'geometry' && sb !== 'portrait' && sb !== 'headform') sb = 'geometry';
+        if (sb !== 'geometry' && sb !== 'geometrysketch' && sb !== 'portrait' && sb !== 'headform') sb = 'geometry';
         window.__solidBootSandbox = sb;
         window.__solidCatalogPrefetch = fetch('/api/membership/catalog?sandbox=' + encodeURIComponent(sb), {
           credentials: 'same-origin',
@@ -2419,20 +2419,58 @@
         (function solidInitSandboxMeta() {
             const _qs0 = new URLSearchParams(window.location.search || '');
             let sk = String(_qs0.get('sandbox') || 'geometry').toLowerCase();
-            if (sk !== 'geometry' && sk !== 'portrait' && sk !== 'headform') sk = 'geometry';
+            if (sk !== 'geometry' && sk !== 'geometrysketch' && sk !== 'portrait' && sk !== 'headform') sk = 'geometry';
             window.__solidSandboxKey = sk;
             const metaBySandbox = {
-                geometry: { title: '几何光影观察 · 手绘工坊', description: '专为绘画初学者设计的3D几何体光影观察工具，实时调节光源位置、强度，模拟真实石膏素描明暗调子。', modalTitle: '几何体&静物学习地图' },
-                portrait: { title: '肖像光影沙盒 · 手绘工坊', description: '在3D光影画室里观察肖像明暗与体块，实时调节光源，练就写生眼力。', modalTitle: '肖像光影沙盒' },
-                headform: { title: '头部造型规律 · 手绘工坊', description: '用光影看头部体块与造型规律。', modalTitle: '头部造型规律' }
+                geometry: {
+                    title: '几何光影观察｜3D 场景课 - 童画师吴晓 · 手绘工坊',
+                    description: '3D 几何体光影观察：调光源看明暗调子，练石膏素描眼力。童画师吴晓手绘工坊免费场景课。',
+                    modalTitle: '几何体&静物学习地图'
+                },
+                geometrysketch: {
+                    title: '几何体 · 静物写生沙盒｜3D 场景课 - 童画师吴晓 · 手绘工坊',
+                    description: '几何体写生与静物写生对照练习：在 3D 场景里观察形体与光影。童画师吴晓手绘工坊场景课。',
+                    modalTitle: '几何体 · 静物写生沙盒'
+                },
+                portrait: {
+                    title: '肖像光影沙盒｜3D 场景课 - 童画师吴晓 · 手绘工坊',
+                    description: '肖像光影沙盒：在 3D 画室里看明暗与体块，实时调光。童画师吴晓手绘工坊免费场景课。',
+                    modalTitle: '肖像光影沙盒'
+                },
+                headform: {
+                    title: '头部造型规律｜外轮廓与明暗交界 - 童画师吴晓 · 手绘工坊',
+                    description: '头部造型规律：外轮廓起伏与明暗交界怎么走。童画师吴晓手绘工坊 3D 场景课，永久免费。',
+                    modalTitle: '头部造型规律'
+                }
             };
             const m = metaBySandbox[sk] || metaBySandbox.geometry;
+            const canon = 'https://www.wuxiaoart.com/Solid?sandbox=' + encodeURIComponent(sk);
             try { document.title = m.title; } catch (_eT) {}
             try {
                 let el = document.querySelector('meta[name="description"]');
                 if (!el) { el = document.createElement('meta'); el.setAttribute('name', 'description'); document.head.appendChild(el); }
                 el.setAttribute('content', m.description);
             } catch (_eD) {}
+            try {
+                const setProp = function (sel, attr, val) {
+                    let el = document.querySelector(sel);
+                    if (!el) {
+                        el = document.createElement(sel.indexOf('property') >= 0 ? 'meta' : 'link');
+                        if (sel.indexOf('property') >= 0) {
+                            const p = sel.match(/property="([^"]+)"/);
+                            if (p) el.setAttribute('property', p[1]);
+                        } else if (sel.indexOf('rel=') >= 0) {
+                            el.setAttribute('rel', 'canonical');
+                        }
+                        document.head.appendChild(el);
+                    }
+                    el.setAttribute(attr, val);
+                };
+                setProp('link[rel="canonical"]', 'href', canon);
+                setProp('meta[property="og:title"]', 'content', m.title);
+                setProp('meta[property="og:description"]', 'content', m.description);
+                setProp('meta[property="og:url"]', 'content', canon);
+            } catch (_eOg) {}
             try {
                 const mt = document.querySelector('#scene-grid-modal .modal-title');
                 if (mt) mt.textContent = m.modalTitle || '学习场景';
@@ -2502,7 +2540,9 @@
         solidMaybeMigrateFavKeys();
         // 【列表优先】尽早拉课表 JSON，与后续 WebGL / PathTracer init 并行；init 内调用有幂等 guard
         try { window.loadJSONData(); } catch (_eEarlyList) {}
-        const SOLID_SCENE_CATEGORIES_DEFAULT = ['几何体', '色彩', '氛围', '构图', '几何体写生', '静物写生'];
+        const SOLID_SCENE_CATEGORIES_GEOMETRY = ['几何体', '色彩', '氛围', '构图'];
+        const SOLID_SCENE_CATEGORIES_SKETCH = ['几何体写生', '静物写生'];
+        const SOLID_SCENE_CATEGORIES_DEFAULT = SOLID_SCENE_CATEGORIES_GEOMETRY;
         const SOLID_HEADFORM_LINE_CATS = ['外轮廓规律', '交界线规律'];
         // 「画室常用」与石膏/真人同级；放在石膏左侧；点开无二级芯片
         const SOLID_PORTRAIT_MATERIAL_CATS = ['画室常用', '石膏', '真人'];
@@ -2519,7 +2559,8 @@
             const sk = window.__solidSandboxKey || 'geometry';
             if (sk === 'headform') return SOLID_HEADFORM_LINE_CATS.slice();
             if (sk === 'portrait') return SOLID_PORTRAIT_MATERIAL_CATS.slice();
-            return SOLID_SCENE_CATEGORIES_DEFAULT;
+            if (sk === 'geometrysketch') return SOLID_SCENE_CATEGORIES_SKETCH.slice();
+            return SOLID_SCENE_CATEGORIES_GEOMETRY.slice();
         }
         function solidPortraitPrimaryGlbBase(sceneData) {
             try {
@@ -3205,14 +3246,15 @@
                 localStorage.setItem(solidFavViewStorageKey(), next);
             } catch (_e) {}
         }
-        /** 几何体 · 静物（别处语义仍用此名；课间导航请用 solidLessonNavEnabled） */
+        /** 几何体 · 静物 / 写生沙盒（类别 Tab 语义；课间导航请用 solidLessonNavEnabled） */
         function solidIsGeometrySandbox() {
-            return (window.__solidSandboxKey || 'geometry') === 'geometry';
+            const sk = window.__solidSandboxKey || 'geometry';
+            return sk === 'geometry' || sk === 'geometrysketch';
         }
-        /** 三沙盒共用左右「上一课/下一课」 */
+        /** 沙盒共用左右「上一课/下一课」 */
         function solidLessonNavEnabled() {
             const sk = window.__solidSandboxKey || 'geometry';
-            return sk === 'geometry' || sk === 'headform' || sk === 'portrait';
+            return sk === 'geometry' || sk === 'geometrysketch' || sk === 'headform' || sk === 'portrait';
         }
         /**
          * 课表邻课序列：与当前列表筛选同序同集合（2A）。

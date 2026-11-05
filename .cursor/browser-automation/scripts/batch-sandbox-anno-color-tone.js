@@ -17,19 +17,21 @@ const path = require('path');
 
 const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const DRY = process.env.DRY_RUN !== '0';
-const sandboxFilter = (process.env.SANDBOXES || 'geometry,headform,portrait')
+const sandboxFilter = (process.env.SANDBOXES || 'geometry,geometrysketch,headform,portrait')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
 
 const DIRS = {
   geometry: path.join(repoRoot, 'docs', 'json', '沙盒_几何体静物'),
+  geometrysketch: path.join(repoRoot, 'docs', 'json', '沙盒_几何体静物写生'),
   headform: path.join(repoRoot, 'docs', 'json', '沙盒_头部造型规律'),
   portrait: path.join(repoRoot, 'docs', 'json', '沙盒_肖像光影沙盒')
 };
 
 const MASTERS = {
   geometry: '沙盒_几何体静物.json',
+  geometrysketch: '沙盒_几何体静物写生.json',
   headform: '沙盒_头部造型规律.json',
   portrait: '沙盒_肖像光影沙盒.json'
 };

@@ -3,12 +3,17 @@
  * 仅在 test.wuxiaoart.com / soft-voice-f822-staging 生效；正式站原样透传（例外见下）。
  * 依赖 env.staging 的 assets.run_worker_first = true（见 wrangler.toml）；正式站勿开全量 Worker-first。
  *
- * 正式站例外：/CourseLearn* 在开发期由本中间件直接返回「筹备中」页，不吐出学习页 demo HTML
+ * 正式站例外：录播未对公开放前，/CourseLearn* 由本中间件直接返回「筹备中」页，不吐出学习页 demo HTML
  * （wrangler.toml 已把该路径列入 prod 的 run_worker_first）。测站全量 Worker-first，仍走静态 CourseLearn.html。
+ * 对公开放时：Worker 变量 COURSE_LEARN_PUBLIC=1，并同步放开 /Course 学习入口（见路线图 §4.5.2）。
  */
 function isStagingHost(host) {
   const h = String(host || '').toLowerCase();
   return h === 'test.wuxiaoart.com' || h.includes('soft-voice-f822-staging');
+}
+
+function isCourseLearnPublic(env) {
+  return String((env && env.COURSE_LEARN_PUBLIC) || '') === '1';
 }
 
 function isCourseLearnPath(pathname) {
@@ -48,7 +53,7 @@ function courseLearnComingSoonHtml() {
   <div class="box">
     <p class="brand">童画师吴晓 · 水彩课程</p>
     <h1>学习页筹备中</h1>
-    <p>站内课程播放还在打磨。开放时会从「课程预约」页给出入口。你也可先看看课程预告与会员权益。</p>
+    <p>站内课程播放还在打磨。正式开放前，课程预告页不会提供进入课堂的入口。你也可先看看课程预告与会员权益。</p>
     <p><a href="/Course">返回课程预告</a> · <a href="/">回首页</a></p>
   </div>
 </body>
@@ -69,8 +74,8 @@ export async function onRequest(context) {
   const url = new URL(context.request.url);
   const staging = isStagingHost(url.hostname);
 
-  // 正式站：学习页 demo 不对外露出完整 UI（产品口径 15B）
-  if (!staging && isCourseLearnPath(url.pathname)) {
+  // 正式站：录播未开放前，学习页只出「筹备中」（产品口径 §4.5.2；COURSE_LEARN_PUBLIC=1 才放行）
+  if (!staging && isCourseLearnPath(url.pathname) && !isCourseLearnPublic(context.env)) {
     return new Response(courseLearnComingSoonHtml(), {
       status: 200,
       headers: {

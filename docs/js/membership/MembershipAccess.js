@@ -809,6 +809,7 @@
       }
       var staticMap = {
         geometry: '/docs/json/沙盒_几何体静物/沙盒_几何体静物.json',
+        geometrysketch: '/docs/json/沙盒_几何体静物写生/沙盒_几何体静物写生.json',
         portrait: '/docs/json/沙盒_肖像光影沙盒/沙盒_肖像光影沙盒.json',
         headform: '/docs/json/沙盒_头部造型规律/沙盒_头部造型规律.json'
       };
@@ -836,6 +837,7 @@
   function localCatalogStaticUrl(sandbox) {
     var map = {
       geometry: '/docs/json/沙盒_几何体静物/沙盒_几何体静物.json',
+      geometrysketch: '/docs/json/沙盒_几何体静物写生/沙盒_几何体静物写生.json',
       portrait: '/docs/json/沙盒_肖像光影沙盒/沙盒_肖像光影沙盒.json',
       headform: '/docs/json/沙盒_头部造型规律/沙盒_头部造型规律.json'
     };
@@ -998,6 +1000,7 @@
       // localhost 无 Functions 时从静态全文里找
       var staticMap = {
         geometry: '/docs/json/沙盒_几何体静物/沙盒_几何体静物.json',
+        geometrysketch: '/docs/json/沙盒_几何体静物写生/沙盒_几何体静物写生.json',
         portrait: '/docs/json/沙盒_肖像光影沙盒/沙盒_肖像光影沙盒.json',
         headform: '/docs/json/沙盒_头部造型规律/沙盒_头部造型规律.json'
       };

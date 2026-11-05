@@ -43,6 +43,10 @@ function wantDemoLesson(lessonId) {
     .startsWith('demo');
 }
 
+function isCourseLearnPublic(env) {
+  return String((env && env.COURSE_LEARN_PUBLIC) || '') === '1';
+}
+
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
   const host = url.hostname;
@@ -57,14 +61,20 @@ export async function onRequestGet(context) {
   const level = accessLevel(ent);
   const r2Ready = isR2PresignConfigured(context.env);
 
-  // 正式站：未配 R2 前不开放
-  if (!staging && !local) {
-    if (!r2Ready) {
-      return jsonResponse(
-        { ok: false, error: '正课播放尚未开放', code: 'not_ready', lessonId },
-        503
-      );
-    }
+  // 正式站：与学习页同口径——未对公开放前一律不签发（即使已配 R2）
+  if (!staging && !local && !isCourseLearnPublic(context.env)) {
+    return jsonResponse(
+      { ok: false, error: '正课播放尚未开放', code: 'not_ready', lessonId },
+      503
+    );
+  }
+
+  // 正式站已开放但仍未配 R2：仍 503
+  if (!staging && !local && !r2Ready) {
+    return jsonResponse(
+      { ok: false, error: '正课播放尚未开放', code: 'not_ready', lessonId },
+      503
+    );
   }
 
   // 显式 demo 课 / 未配 R2 的本地测站回退：仍本机样片，方便搭 UI（不验课包）

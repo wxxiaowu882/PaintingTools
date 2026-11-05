@@ -6,6 +6,7 @@ const POLICY_ASSET = '/docs/membership/access-policy.json';
 
 const CATALOG_BY_SANDBOX = {
   geometry: '/docs/json/沙盒_几何体静物/沙盒_几何体静物.json',
+  geometrysketch: '/docs/json/沙盒_几何体静物写生/沙盒_几何体静物写生.json',
   portrait: '/docs/json/沙盒_肖像光影沙盒/沙盒_肖像光影沙盒.json',
   headform: '/docs/json/沙盒_头部造型规律/沙盒_头部造型规律.json'
 };
