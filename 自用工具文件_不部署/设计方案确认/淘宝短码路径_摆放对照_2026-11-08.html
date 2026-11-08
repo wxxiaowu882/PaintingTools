@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>设计确认 · 短码路径摆放 · A/C 对照</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --ink: #f3f1ec;
+      --mute: rgba(243,241,236,0.55);
+      --dim: rgba(243,241,236,0.28);
+      --line: rgba(255,255,255,0.1);
+      --gold: #cbb892;
+      --pick: #8faf7a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #020202;
+      color: var(--ink);
+      font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+      font-weight: 300;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 18px 90px; }
+    h1 {
+      margin: 0 0 8px;
+      font-weight: 200;
+      letter-spacing: 0.2em;
+      font-size: 0.95rem;
+    }
+    .lead {
+      max-width: 46em;
+      margin: 0 0 12px;
+      color: var(--mute);
+      font-size: 0.86rem;
+      line-height: 1.75;
+    }
+    .note, .reply {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      margin-bottom: 16px;
+      color: var(--mute);
+      background: #0a0a0a;
+    }
+    .note b { color: var(--gold); }
+    .reply {
+      border-color: rgba(143,175,122,0.35);
+      background: #0c120e;
+      font-size: 0.86rem;
+    }
+    .reply strong { color: var(--pick); }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #080808;
+      overflow: hidden;
+    }
+    .card.rec { border-color: rgba(203,184,146,0.42); }
+    .card-h { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+    .card-h .tag {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: var(--gold);
+      margin-bottom: 6px;
+    }
+    .card-h h2 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+    }
+    .card-h p {
+      margin: 0;
+      font-size: 0.78rem;
+      color: var(--mute);
+      line-height: 1.55;
+    }
+    .mock-wrap {
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+      background: #030303;
+    }
+    .phone {
+      width: 300px;
+      background: var(--bg);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+      padding-bottom: 12px;
+    }
+    .zh {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 12px 6px;
+      font-size: 9px;
+      letter-spacing: 0.24em;
+      color: var(--dim);
+    }
+    .zh i { flex: 1; height: 1px; background: rgba(255,255,255,0.08); }
+    .blk {
+      margin: 0 10px 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 3px;
+      background: #0a0a0a;
+      padding: 12px;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+    }
+    .blk.dim { color: var(--mute); font-size: 10px; }
+    .pro {
+      margin: 0 10px 8px;
+      border: 1px solid rgba(203,184,146,0.3);
+      border-radius: 3px;
+      background: #060606;
+      display: grid;
+      grid-template-columns: 0.36fr 1fr;
+      min-height: 88px;
+      overflow: hidden;
+    }
+    .pro-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-right: 1px solid rgba(203,184,146,0.16);
+      background: #000;
+      color: var(--gold);
+      font-size: 13px;
+      letter-spacing: 0.12em;
+    }
+    .pro-copy { padding: 12px 12px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+    .pro-copy .k { font-size: 8px; letter-spacing: 0.2em; color: rgba(203,184,146,0.7); }
+    .pro-copy .t { font-size: 14px; color: var(--gold); letter-spacing: 0.1em; }
+    .pro-copy .d { font-size: 9px; color: var(--mute); line-height: 1.4; }
+    .pro-cta {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(203,184,146,0.18);
+      font-size: 9px;
+      letter-spacing: 0.04em;
+      color: rgba(243,241,236,0.78);
+      line-height: 1.45;
+    }
+    .cta-out {
+      margin: 0 10px 8px;
+      padding: 12px 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 3px;
+      background: #0c0c0c;
+      text-align: center;
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      line-height: 1.5;
+      color: rgba(243,241,236,0.88);
+    }
+    .cta-out .sub {
+      display: block;
+      margin-top: 4px;
+      font-size: 9px;
+      color: var(--dim);
+      letter-spacing: 0.04em;
+    }
+    .mark {
+      margin: 0 10px 6px;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: #8faf7a;
+    }
+    .mark.warn { color: #c9a07a; }
+    .ghost {
+      margin: 0 10px 8px;
+      opacity: 0.45;
+      border: 1px dashed rgba(255,255,255,0.14);
+      border-radius: 3px;
+      padding: 10px;
+      font-size: 10px;
+      color: var(--mute);
+    }
+    .pros {
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--line);
+      font-size: 0.76rem;
+      color: var(--mute);
+      line-height: 1.6;
+      margin: 0;
+    }
+    .pros li { margin: 0 0 4px; }
+    .foot {
+      margin-top: 22px;
+      font-size: 0.74rem;
+      color: var(--dim);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>短码路径 · 摆放对照</h1>
+    <p class="lead">
+      「拍下收短码 → 官网兑换 → 即时开通」讲的是淘宝<strong>虚拟货怎么到手</strong>。
+      写生台 / 三工具 / Pro 都走这条路；约画是定制沟通，不绑短码。
+      下面只对比：放在 <b>Pro 下方</b>，还是塞进 <b>Pro 卡片里</b>。
+    </p>
+    <div class="note">
+      <b>本页只示意结构</b>，不改主确认页。你回代号后再落地。
+    </div>
+    <div class="reply">
+      聊天回复：<strong>选 A</strong>（Pro 下、课上 · 推荐）或 <strong>选 C</strong>（Pro 卡内）。
+    </div>
+
+    <div class="grid">
+      <section class="card rec">
+        <div class="card-h">
+          <div class="tag">推荐 · 方案 A</div>
+          <h2>Pro 下方 · 水彩课上方</h2>
+          <p>数字货讲完 → 一句收口怎么买 → 再进课预告 / 约画。短码覆盖上面整段，不绑死 Pro。</p>
+        </div>
+        <div class="mock-wrap">
+          <div class="phone">
+            <div class="zh"><span>写生台 / 工具</span><i></i></div>
+            <div class="blk dim">几何 · 肖像 · 晓阶 / 晓色 / 晓摹</div>
+            <div class="zh"><span>高级会员</span><i></i></div>
+            <div class="pro">
+              <div class="pro-logo">Pro</div>
+              <div class="pro-copy">
+                <div class="k">高级会员</div>
+                <div class="t">Pro</div>
+                <div class="d">写生台 + 三工具 + 课件库</div>
+              </div>
+            </div>
+            <div class="mark">↓ 短码路径放这里</div>
+            <div class="cta-out">
+              拍下收短码 → 官网兑换 → 即时开通
+              <span class="sub">写生台 / 工具 / Pro 均可</span>
+            </div>
+            <div class="zh"><span>水彩人像课</span><i></i></div>
+            <div class="ghost">课预告 · 2027 Q1…</div>
+            <div class="zh"><span>约画</span><i></i></div>
+            <div class="ghost">敢约说明 + 作品轮播</div>
+          </div>
+        </div>
+        <ul class="pros">
+          <li>用户感知：上面那些都能这样买。</li>
+          <li>课 / 约画前收口，不会和定制故事搅在一起。</li>
+          <li>副行「写生台 / 工具 / Pro 均可」可要可不要，定稿时再收。</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <div class="card-h">
+          <div class="tag">方案 C</div>
+          <h2>放进 Pro 卡片内部</h2>
+          <p>短码句嵌在 Pro 文案区底部。视觉上更「贴 Pro」，但容易被理解成只有 Pro 才走兑换。</p>
+        </div>
+        <div class="mock-wrap">
+          <div class="phone">
+            <div class="zh"><span>写生台 / 工具</span><i></i></div>
+            <div class="blk dim">几何 · 肖像 · 晓阶 / 晓色 / 晓摹</div>
+            <div class="zh"><span>高级会员</span><i></i></div>
+            <div class="mark warn">↓ 短码嵌在 Pro 卡内</div>
+            <div class="pro">
+              <div class="pro-logo">Pro</div>
+              <div class="pro-copy">
+                <div class="k">高级会员</div>
+                <div class="t">Pro</div>
+                <div class="d">写生台 + 三工具 + 课件库</div>
+                <div class="pro-cta">拍下收短码 → 官网兑换 → 即时开通</div>
+              </div>
+            </div>
+            <div class="zh"><span>水彩人像课</span><i></i></div>
+            <div class="ghost">课预告 · 2027 Q1…</div>
+            <div class="zh"><span>约画</span><i></i></div>
+            <div class="ghost">敢约说明 + 作品轮播</div>
+          </div>
+        </div>
+        <ul class="pros">
+          <li>好处：Pro 区更完整，少占一行楼层。</li>
+          <li>风险：写生台 / 单工具的购买路径变弱、易被忽略。</li>
+          <li>若坚持 C，建议卡内改成「以上虚拟商品：拍下收短码…」减轻误解。</li>
+        </ul>
+      </section>
+    </div>
+
+    <p class="foot">
+      主确认页暂未改。回 <b>选 A</b> / <b>选 C</b> 后，再改「深色画室」主确认页脚与 Pro 区。
+    </p>
+  </div>
+</body>
+</html>

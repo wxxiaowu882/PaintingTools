@@ -1,0 +1,1654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>设计确认 · 深色画室 · 高规格 v2（可调图）</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --ink: #f3f1ec;
+      --mute: rgba(243,241,236,0.52);
+      --dim: rgba(243,241,236,0.26);
+      --line: rgba(255,255,255,0.1);
+      --gold: #cbb892;
+      --gold-dim: rgba(203,184,146,0.62);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #020202;
+      color: var(--ink);
+      font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+      font-weight: 300;
+    }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 28px 18px 120px; }
+    .page-h {
+      margin: 0 0 8px;
+      font-weight: 200;
+      letter-spacing: 0.28em;
+      font-size: 0.92rem;
+    }
+    .page-lead {
+      max-width: 52em;
+      margin: 0 0 14px;
+      color: var(--mute);
+      font-size: 0.84rem;
+      line-height: 1.7;
+    }
+    .page-note {
+      border: 1px solid var(--line);
+      background: #0a0a0a;
+      padding: 12px 14px;
+      border-radius: 6px;
+      color: var(--mute);
+      font-size: 0.78rem;
+      line-height: 1.55;
+      margin-bottom: 16px;
+    }
+    .page-note b { color: var(--gold); }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .toolbar button {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: #101010;
+      color: rgba(255,255,255,0.78);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+    .toolbar button:hover { border-color: rgba(203,184,146,0.45); color: #fff; }
+    .toolbar .hint {
+      flex: 1 1 220px;
+      align-self: center;
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    .stages {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 36px;
+      align-items: start;
+    }
+    @media (max-width: 980px) { .stages { grid-template-columns: 1fr; } }
+    .label {
+      font-size: 10px;
+      letter-spacing: 0.32em;
+      color: var(--dim);
+      margin-bottom: 12px;
+    }
+
+    /* —— 手机（与上版 v2 同规格） —— */
+    .phone {
+      width: 340px;
+      background: var(--bg);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 30px;
+      overflow: hidden;
+      box-shadow: 0 36px 90px rgba(0,0,0,0.72);
+    }
+    .hero {
+      position: relative;
+      height: 448px;
+      overflow: hidden;
+      background: #000;
+    }
+    .hero .copy {
+      position: absolute; left: 20px; right: 20px; bottom: 24px; z-index: 3;
+      pointer-events: none;
+    }
+    .hero .who {
+      font-size: 10px;
+      letter-spacing: 0.38em;
+      color: rgba(255,255,255,0.48);
+      margin-bottom: 12px;
+      font-weight: 200;
+    }
+    .hero .title {
+      font-size: 17px;
+      font-weight: 200;
+      letter-spacing: 0.16em;
+      line-height: 1.55;
+      text-shadow: 0 10px 30px rgba(0,0,0,0.75);
+    }
+    .hero .warm {
+      margin-top: 12px;
+      font-size: 11px;
+      letter-spacing: 0.28em;
+      color: var(--gold-dim);
+    }
+
+    .strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 2px;
+      padding: 2px;
+      background: #000;
+    }
+    .phone .strip .slot {
+      position: relative;
+      height: 86px;
+      overflow: hidden;
+      background: #111;
+    }
+
+    .zone { padding: 24px 14px 6px; }
+    .zone-h {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 0 2px 14px;
+    }
+    .zone-h span {
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      color: var(--dim);
+      white-space: nowrap;
+      font-weight: 300;
+    }
+    .zone-h i {
+      flex: 1; height: 1px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.14), transparent);
+      display: block;
+    }
+
+    .cine {
+      position: relative;
+      overflow: hidden;
+      border-radius: 3px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: #090909;
+      min-height: 176px;
+    }
+    .cine.tall { min-height: 228px; }
+    .cine.tool { min-height: 210px; }
+    .cine .slot { position: absolute; inset: 0; }
+    .cine .cap {
+      position: absolute; left: 14px; right: 14px; bottom: 14px;
+      z-index: 3;
+      pointer-events: none;
+    }
+    .cine .cap b {
+      display: block;
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      margin-bottom: 5px;
+      text-shadow: 0 2px 14px rgba(0,0,0,0.85);
+    }
+    .cine .cap b .num {
+      display: inline-block;
+      margin-right: 0.35em;
+      font-style: normal;
+      font-weight: 300;
+      letter-spacing: 0;
+      color: rgba(203,184,146,0.55);
+      text-shadow: 0 1px 8px rgba(0,0,0,0.75);
+    }
+    .cine .cap span {
+      display: block;
+      font-size: 11px;
+      color: rgba(255,255,255,0.68);
+      line-height: 1.45;
+      font-weight: 300;
+      text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+    }
+
+    /* 约画 · 模拟淘宝轮播图海报 */
+    .carousel {
+      position: relative;
+      overflow: hidden;
+      border-radius: 3px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: #090909;
+      /* 对齐淘宝轮播横条观感（高/宽 ≈ 0.54） */
+      aspect-ratio: 100 / 54;
+    }
+    .carousel-track { position: absolute; inset: 0; }
+    .carousel-slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.45s ease;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .carousel-slide.is-on {
+      opacity: 1;
+      pointer-events: auto;
+      z-index: 1;
+    }
+    .carousel-slide .slot { position: absolute; inset: 0; }
+    .carousel .cap {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 28px;
+      z-index: 4;
+      pointer-events: none;
+    }
+    .carousel .cap b {
+      display: block;
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      margin-bottom: 5px;
+      text-shadow: 0 2px 14px rgba(0,0,0,0.85);
+    }
+    .carousel .cap span {
+      display: block;
+      font-size: 11px;
+      color: rgba(255,255,255,0.68);
+      line-height: 1.45;
+      font-weight: 300;
+      text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+    }
+    .carousel-dots {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 10px;
+      z-index: 5;
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    }
+    .carousel-dot {
+      width: 6px;
+      height: 6px;
+      border: 0;
+      padding: 0;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.32);
+      cursor: pointer;
+    }
+    .carousel-dot.is-on { background: rgba(255,255,255,0.92); }
+    .desk .carousel .cap b { font-size: 15px; }
+    .desk .carousel .cap span { font-size: 12.5px; }
+
+    /* 约画 · 敢约说明（方案 B：去掉课下扁三连） */
+    .trust-bar {
+      margin: 0 0 10px;
+      padding: 14px 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 3px;
+      background: #080808;
+    }
+    .trust-bar .trust-t {
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      margin: 0 0 6px;
+      color: var(--ink);
+      font-weight: 400;
+    }
+    .trust-bar .trust-d {
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.62);
+      font-weight: 300;
+    }
+    .desk .trust-bar { padding: 16px 20px; }
+    .desk .trust-bar .trust-t { font-size: 14px; letter-spacing: 0.14em; }
+    .desk .trust-bar .trust-d { font-size: 12.5px; }
+    .phone .trust-bar { padding: 12px 12px; }
+    .phone .trust-bar .trust-t { font-size: 11px; letter-spacing: 0.1em; }
+    .phone .trust-bar .trust-d { font-size: 10px; }
+
+    /* Pro · 高级会员：左 logo · 右文案 */
+    .pro-card {
+      display: grid;
+      grid-template-columns: minmax(96px, 0.4fr) 1fr;
+      align-items: stretch;
+      min-height: 168px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(203,184,146,0.3);
+      border-radius: 3px;
+      background: #060606;
+      overflow: hidden;
+    }
+    .pro-card .pro-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 12px;
+      background: #000;
+      border-right: 1px solid rgba(203,184,146,0.16);
+    }
+    .pro-card .pro-logo img {
+      display: block;
+      width: 100%;
+      max-width: 152px;
+      max-height: 132px;
+      height: auto;
+      object-fit: contain;
+    }
+    .pro-card .pro-copy {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+      padding: 20px 22px;
+    }
+    .pro-card .pro-kicker {
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: var(--gold-dim);
+      font-weight: 300;
+    }
+    .pro-card .pro-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 400;
+      letter-spacing: 0.14em;
+      color: var(--gold);
+      line-height: 1.25;
+    }
+    .pro-card .pro-rule {
+      width: 28px;
+      height: 1px;
+      margin: 2px 0 0;
+      background: rgba(203,184,146,0.42);
+    }
+    .pro-card .pro-desc {
+      margin: 0;
+      max-width: 28em;
+      font-size: 11.5px;
+      line-height: 1.55;
+      font-weight: 300;
+      color: rgba(243,241,236,0.58);
+    }
+    .pro-card .pro-pack {
+      margin: 0;
+      max-width: 32em;
+      font-size: 10.5px;
+      line-height: 1.5;
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      color: rgba(203,184,146,0.52);
+    }
+    .pro-card .pro-pack .n {
+      color: rgba(203,184,146,0.72);
+      letter-spacing: 0;
+    }
+
+    /* 水彩人像课：左文案 · 右封面偏宽，封面左缘渐隐入底 */
+    .course-card {
+      display: grid;
+      grid-template-columns: minmax(0, 0.38fr) minmax(0, 0.62fr);
+      align-items: stretch;
+      min-height: 148px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 3px;
+      background: #060606;
+      overflow: hidden;
+    }
+    .course-card .course-copy {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+      padding: 20px 18px 20px 22px;
+    }
+    .course-card .course-kicker {
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: var(--dim);
+      font-weight: 300;
+    }
+    .course-card .course-title {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      color: var(--ink);
+      line-height: 1.25;
+    }
+    .course-card .course-rule {
+      width: 28px;
+      height: 1px;
+      margin: 2px 0 0;
+      background: rgba(255,255,255,0.22);
+    }
+    .course-card .course-desc {
+      margin: 0;
+      max-width: 28em;
+      font-size: 11.5px;
+      line-height: 1.55;
+      font-weight: 300;
+      color: rgba(243,241,236,0.58);
+    }
+    .course-card .course-desc-line {
+      white-space: nowrap;
+    }
+    .course-card .course-note {
+      margin: 2px 0 0;
+      font-size: 11px;
+      line-height: 1.5;
+      font-weight: 300;
+      letter-spacing: 0.18em;
+      color: rgba(243,241,236,0.38);
+    }
+    .course-card .course-cover {
+      position: relative;
+      min-height: 120px;
+      background: #060606;
+      overflow: hidden;
+    }
+    .course-card .course-cover .slot {
+      position: absolute;
+      inset: 0;
+    }
+    .course-card .course-cover::after {
+      content: "";
+      position: absolute;
+      z-index: 3;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        90deg,
+        #060606 0%,
+        rgba(6, 6, 6, 0.88) 12%,
+        rgba(6, 6, 6, 0.35) 38%,
+        rgba(6, 6, 6, 0) 58%
+      );
+    }
+    /* 约画：同课卡规格，左图右文（封面右缘渐隐） */
+    .course-card.custom-card {
+      grid-template-columns: minmax(0, 0.62fr) minmax(0, 0.38fr);
+    }
+    .course-card.custom-card .course-copy {
+      padding: 20px 22px 20px 18px;
+    }
+    .course-card.custom-card .course-cover::after {
+      background: linear-gradient(
+        270deg,
+        #060606 0%,
+        rgba(6, 6, 6, 0.88) 12%,
+        rgba(6, 6, 6, 0.35) 38%,
+        rgba(6, 6, 6, 0) 58%
+      );
+    }
+    .zone .strip {
+      margin: 0 0 10px;
+      padding: 0;
+      gap: 3px;
+      background: transparent;
+    }
+
+    .pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .pair .cine { min-height: 210px; margin: 0; }
+    .pair .cine .cap b { font-size: 12px; }
+    .pair .cine .cap span { font-size: 10px; }
+
+    .quiet {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .quiet .tile {
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #0c0c0c;
+      border-radius: 3px;
+      padding: 16px 13px;
+      min-height: 96px;
+    }
+    .quiet .tile b {
+      display: block;
+      font-size: 12px;
+      font-weight: 400;
+      margin-bottom: 7px;
+      color: var(--gold-dim);
+    }
+    .quiet .tile span {
+      display: block;
+      font-size: 10.5px;
+      color: var(--mute);
+      line-height: 1.45;
+    }
+    .quiet .tile.has-slot {
+      padding: 0;
+      overflow: hidden;
+      position: relative;
+      min-height: 96px;
+    }
+    .quiet .tile.has-slot .cap-local {
+      position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+      padding: 14px 12px;
+      pointer-events: none;
+      background: linear-gradient(transparent, rgba(0,0,0,0.78));
+    }
+    .quiet .tile.has-slot .cap-local b { color: #f3f1ec; font-size: 12px; margin-bottom: 4px; }
+    .quiet .tile.has-slot .cap-local span { color: rgba(255,255,255,0.68); font-size: 10.5px; }
+
+    /* 数字货收口（轻）：脚注感，不可点；细线与课/约画分割 */
+    .checkout-close {
+      margin: 10px 2px 0;
+      padding: 0 0 18px;
+      pointer-events: none;
+      user-select: none;
+      cursor: default;
+    }
+    .checkout-close .checkout-line {
+      margin: 0;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 300;
+      letter-spacing: 0.06em;
+      line-height: 1.55;
+      color: var(--dim);
+    }
+    .checkout-close .checkout-line .scope {
+      color: rgba(203,184,146,0.48);
+      letter-spacing: 0.1em;
+    }
+    .checkout-close .checkout-line .dot {
+      display: inline-block;
+      margin: 0 0.55em;
+      opacity: 0.45;
+    }
+    .checkout-close .checkout-line .path {
+      color: rgba(243,241,236,0.42);
+      letter-spacing: 0.08em;
+    }
+    .checkout-close .checkout-line .arrow {
+      display: inline-block;
+      margin: 0 0.28em;
+      color: rgba(203,184,146,0.35);
+      letter-spacing: 0;
+    }
+    .checkout-close::after {
+      content: "";
+      display: block;
+      height: 1px;
+      margin: 16px 8% 0;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255,255,255,0.07) 50%,
+        transparent 100%
+      );
+    }
+    .zone.zone-after-checkout {
+      padding-top: 6px;
+    }
+
+    .foot { padding: 10px 14px 24px; text-align: center; }
+    .old {
+      margin-top: 6px;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      color: var(--dim);
+    }
+
+    /* —— PC —— */
+    .desk {
+      background: var(--bg);
+      border: 1px solid rgba(255,255,255,0.11);
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+    }
+    .desk-hero {
+      position: relative;
+      height: 420px;
+      overflow: hidden;
+      background: #000;
+    }
+    .desk-hero .copy {
+      position: absolute; left: 52px; bottom: 52px; max-width: 22em; z-index: 3;
+      pointer-events: none;
+    }
+    .desk-hero .who {
+      font-size: 11px;
+      letter-spacing: 0.4em;
+      color: rgba(255,255,255,0.46);
+      margin-bottom: 16px;
+      font-weight: 200;
+    }
+    .desk-hero .title {
+      font-size: 30px;
+      font-weight: 200;
+      letter-spacing: 0.16em;
+      line-height: 1.42;
+    }
+    .desk-hero .warm {
+      margin-top: 16px;
+      font-size: 13px;
+      letter-spacing: 0.28em;
+      color: var(--gold-dim);
+    }
+    .desk-body { padding: 24px 28px 32px; }
+    .desk .strip {
+      gap: 8px; padding: 0 0 20px;
+      background: transparent;
+      grid-template-columns: 1.15fr 1fr 1fr;
+    }
+    .desk .strip .slot {
+      position: relative;
+      height: 148px;
+      border-radius: 2px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+    .desk .zone { padding: 10px 0 8px; }
+    .desk .pair { gap: 14px; }
+    .desk .pair .cine { min-height: 300px; }
+    /* 手机三工具：窄窗 PC 那种一行三列竖长卡 */
+    .phone .tools {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+    .phone .tools .cine {
+      margin: 0;
+      min-height: 0;
+      /* 竖长条试版（参考窄窗 PC）；若太长可再压到 1/2.0 */
+      aspect-ratio: 1 / 2.2;
+      border-radius: 8px;
+    }
+    .phone .tools .cine .cap { left: 8px; right: 8px; bottom: 10px; }
+    .phone .tools .cine .cap b { font-size: 11px; margin-bottom: 3px; }
+    .phone .tools .cine .cap span {
+      font-size: 8.5px;
+      line-height: 1.35;
+    }
+
+    .desk .tools {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+    .desk .tools .cine {
+      margin: 0;
+      min-height: 0;
+      /* 与手机同竖长比例 */
+      aspect-ratio: 1 / 2.2;
+      border-radius: 8px;
+    }
+    .desk .pro-card { min-height: 208px; }
+    .desk .pro-card .pro-logo { padding: 28px 22px; }
+    .desk .pro-card .pro-logo img { max-width: 200px; max-height: 168px; }
+    .desk .pro-card .pro-copy { padding: 28px 36px; gap: 10px; }
+    .desk .pro-card .pro-kicker { font-size: 11px; letter-spacing: 0.32em; }
+    .desk .pro-card .pro-title { font-size: 26px; letter-spacing: 0.16em; }
+    .desk .pro-card .pro-desc { font-size: 13.5px; }
+    .desk .pro-card .pro-pack { font-size: 12px; letter-spacing: 0.06em; }
+    .desk .course-card {
+      min-height: 280px;
+      grid-template-columns: minmax(0, 0.36fr) minmax(0, 0.64fr);
+    }
+    .desk .course-card .course-copy { padding: 32px 28px 32px 40px; gap: 10px; }
+    .desk .course-card .course-kicker { font-size: 11px; letter-spacing: 0.32em; }
+    .desk .course-card .course-title { font-size: 24px; letter-spacing: 0.12em; }
+    .desk .course-card .course-desc { font-size: 13.5px; }
+    .desk .course-card .course-note { font-size: 12.5px; letter-spacing: 0.22em; }
+    .desk .course-card .course-cover { min-height: 280px; }
+    .desk .course-card .course-cover::after {
+      background: linear-gradient(
+        90deg,
+        #060606 0%,
+        rgba(6, 6, 6, 0.9) 10%,
+        rgba(6, 6, 6, 0.4) 36%,
+        rgba(6, 6, 6, 0) 56%
+      );
+    }
+    .desk .course-card.custom-card {
+      grid-template-columns: minmax(0, 0.64fr) minmax(0, 0.36fr);
+    }
+    .desk .course-card.custom-card .course-copy { padding: 32px 40px 32px 28px; }
+    .desk .course-card.custom-card .course-cover::after {
+      background: linear-gradient(
+        270deg,
+        #060606 0%,
+        rgba(6, 6, 6, 0.9) 10%,
+        rgba(6, 6, 6, 0.4) 36%,
+        rgba(6, 6, 6, 0) 56%
+      );
+    }
+    .desk .carousel { min-height: 240px; display: none; }
+    .phone .pro-card { min-height: 140px; }
+    .phone .pro-card .pro-logo { padding: 12px 8px; }
+    .phone .pro-card .pro-logo img { max-height: 108px; }
+    .phone .pro-card .pro-copy { padding: 14px 12px; gap: 6px; }
+    .phone .pro-card .pro-kicker { font-size: 8.5px; letter-spacing: 0.22em; }
+    .phone .pro-card .pro-title { font-size: 14px; letter-spacing: 0.1em; }
+    .phone .pro-card .pro-desc { font-size: 10px; line-height: 1.45; }
+    .phone .pro-card .pro-pack { font-size: 9px; line-height: 1.4; }
+    .phone .pro-card .pro-rule { width: 20px; }
+    .phone .course-card { min-height: 132px; }
+    .phone .course-card .course-copy { padding: 14px 12px; gap: 6px; }
+    .phone .course-card .course-kicker { font-size: 8.5px; letter-spacing: 0.12em; }
+    .phone .course-card .course-title { font-size: 14px; letter-spacing: 0.08em; }
+    .phone .course-card .course-desc { font-size: 9.5px; line-height: 1.45; }
+    .phone .course-card .course-note { font-size: 9.5px; letter-spacing: 0.14em; }
+    .phone .course-card .course-rule { width: 20px; }
+    .phone .course-card .course-cover { min-height: 132px; }
+    .phone .course-card.custom-card {
+      grid-template-columns: minmax(0, 0.58fr) minmax(0, 0.42fr);
+    }
+    .phone .course-card.custom-card .course-copy { padding: 14px 14px 14px 10px; }
+    .phone .strip .slot { height: 78px; }
+    .desk .cine .cap b { font-size: 15px; }
+    .desk .cine .cap span { font-size: 12.5px; }
+    .desk .quiet .tile { min-height: 118px; padding: 20px 18px; }
+    .desk .quiet .tile.has-slot { padding: 0; min-height: 118px; }
+    .desk .quiet .tile b { font-size: 14px; }
+    .desk .quiet .tile span { font-size: 12.5px; }
+    .desk .quiet .tile.has-slot .cap-local b { font-size: 14px; }
+    .desk .quiet .tile.has-slot .cap-local span { font-size: 12px; }
+    .desk .checkout-close { margin-top: 12px; padding-bottom: 22px; }
+    .desk .checkout-close::after { margin-top: 18px; }
+    .desk .checkout-close .checkout-line { font-size: 11.5px; letter-spacing: 0.08em; }
+    .phone .checkout-close { margin-top: 8px; padding-bottom: 14px; }
+    .phone .checkout-close::after { margin-top: 12px; margin-left: 6%; margin-right: 6%; }
+    .phone .checkout-close .checkout-line { font-size: 9px; letter-spacing: 0.04em; }
+
+    /* 图槽（虚拟剪裁：object-fit cover + object-position + scale） */
+    .slot {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    .hero .slot, .desk-hero .slot { position: absolute; inset: 0; }
+    .slot img.slot-fg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+      user-select: none;
+      z-index: 1;
+    }
+    .slot .shade {
+      position: absolute; inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .slot .edit-hit {
+      position: absolute;
+      z-index: 5;
+      right: 8px;
+      top: 8px;
+      opacity: 0;
+      transition: opacity .18s ease;
+      border: 1px solid rgba(255,255,255,0.28);
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      padding: 6px 8px;
+      cursor: pointer;
+      border-radius: 3px;
+      font-family: inherit;
+    }
+    .slot:hover .edit-hit,
+    .slot:focus-within .edit-hit { opacity: 1; }
+
+    .hint {
+      margin-top: 14px;
+      font-size: 0.76rem;
+      color: var(--dim);
+      line-height: 1.5;
+    }
+
+    /* 编辑弹层 */
+    .modal-mask {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+    .modal-mask.open { display: flex; }
+    .modal {
+      width: min(920px, 100%);
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      background: #0d0d0d;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 8px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.65);
+    }
+    .modal-h {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .modal-h strong { font-weight: 400; letter-spacing: 0.12em; font-size: 13px; }
+    .modal-h .acts { display: flex; gap: 8px; }
+    .modal-h button, .modal .btn {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: #161616;
+      color: #eee;
+      font-size: 11px;
+      padding: 7px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+    .modal-h button.primary, .modal .btn.primary {
+      border-color: rgba(203,184,146,0.55);
+      color: #f5ead2;
+    }
+    .modal-body {
+      display: grid;
+      grid-template-columns: 1.2fr 0.9fr;
+    }
+    @media (max-width: 820px) { .modal-body { grid-template-columns: 1fr; } }
+    .preview-box {
+      padding: 16px;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .preview-frame {
+      position: relative;
+      width: min(200px, 72%);
+      aspect-ratio: 1 / 2.2;
+      background: #000;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      cursor: grab;
+      touch-action: none;
+    }
+    .preview-frame.grabbing { cursor: grabbing; }
+    .preview-frame img#previewImg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .preview-frame .shade { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+    .preview-frame .demo-cap {
+      position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3;
+      pointer-events: none;
+    }
+    .preview-frame .demo-cap b {
+      display: block; font-size: 14px; margin-bottom: 4px; text-shadow: 0 2px 12px #000;
+    }
+    .preview-frame .demo-cap span {
+      display: block; font-size: 11px; color: rgba(255,255,255,0.7); text-shadow: 0 1px 8px #000;
+    }
+    .controls { padding: 14px 16px 18px; }
+    .controls h4 {
+      margin: 14px 0 8px;
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 0.16em;
+      color: var(--gold-dim);
+    }
+    .controls h4:first-child { margin-top: 0; }
+    .row {
+      display: grid;
+      grid-template-columns: 72px 1fr 42px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: var(--mute);
+    }
+    .row input[type=range] { width: 100%; }
+    .row .val { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .file-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+    .tip { margin-top: 10px; font-size: 11px; color: var(--dim); line-height: 1.5; }
+    #filePick { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="page-h">深色画室 · 高规格首页 v2（可调图）</h1>
+    <p class="page-lead">
+      左手机 + 右 PC 多列长条。悬停图片 → 编辑。约画与水彩课同构（左图右文，可调封面）；轮播暂藏。短码路径在 Pro 下轻脚注收口。
+      <strong>设置会写入仓库文件</strong>，关掉 Cursor / 换浏览器也能恢复（不只靠内嵌浏览器缓存）。
+    </p>
+    <div class="page-note">
+      <b>怎么才算记住</b>：换图 / 调参后务必点编辑窗的<strong>「完成」</strong>（或顶栏「立即保存到仓库」）。只换图不点完成 = 不会写入。<br />
+      <b>落盘位置</b>：`设计方案确认/淘宝店铺装修_深色画室_槽位状态.json`；本机换的图 → `atelier-src/user-slots/`。刷新后应显示「已从仓库文件恢复」。
+    </div>
+    <div class="toolbar">
+      <button type="button" id="btnReset">恢复默认图与参数</button>
+      <button type="button" id="btnExport">导出当前参数 JSON</button>
+      <button type="button" id="btnSaveNow">立即保存到仓库</button>
+      <span class="hint" id="saveStatus">保存状态：加载中…</span>
+    </div>
+
+    <div class="stages">
+      <div>
+        <div class="label">MOBILE（跟随同一套图参）</div>
+        <div class="phone" id="phone"></div>
+      </div>
+      <div>
+        <div class="label">DESKTOP · 主设计</div>
+        <div class="desk" id="desk"></div>
+        <p class="hint">素材：自用工具文件_不部署/淘宝店铺装修素材_2026-11/atelier-src/</p>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="filePick" accept="image/*" />
+
+  <div class="modal-mask" id="modalMask" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-h">
+        <strong id="modalTitle">编辑图片</strong>
+        <div class="acts">
+          <button type="button" id="btnResetSlot">本槽恢复默认</button>
+          <button type="button" id="btnClose">关闭</button>
+          <button type="button" class="primary" id="btnApply">完成</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="preview-box">
+          <div class="preview-frame" id="previewFrame">
+            <img id="previewImg" alt="" />
+            <div class="shade" id="previewShade"></div>
+            <div class="demo-cap">
+              <b id="previewCapTitle">标题预览</b>
+              <span id="previewCapDesc">说明文字预览</span>
+            </div>
+          </div>
+          <p class="tip">预览已缩小；拖拽或滑块调整取景与缩放。</p>
+        </div>
+        <div class="controls">
+          <h4>换图</h4>
+          <div class="file-row">
+            <button type="button" class="btn primary" id="btnPick">换成本机图片</button>
+            <button type="button" class="btn" id="btnRevertSrc">用回默认素材</button>
+          </div>
+          <h4>虚拟剪裁</h4>
+          <div class="row"><span>缩放</span><input type="range" id="rngZoom" min="100" max="220" step="1" /><span class="val" id="valZoom">1.00</span></div>
+          <div class="row"><span>水平</span><input type="range" id="rngX" min="0" max="100" step="1" /><span class="val" id="valX">50%</span></div>
+          <div class="row"><span>垂直</span><input type="range" id="rngY" min="0" max="100" step="1" /><span class="val" id="valY">50%</span></div>
+          <h4>底部暖深色遮罩</h4>
+          <div class="row"><span>起点</span><input type="range" id="rngG0" min="0" max="80" step="1" /><span class="val" id="valG0">28%</span></div>
+          <div class="row"><span>浓度</span><input type="range" id="rngGOp" min="40" max="100" step="1" /><span class="val" id="valGOp">0.78</span></div>
+          <div class="row"><span>暖度</span><input type="range" id="rngWarm" min="0" max="100" step="1" /><span class="val" id="valWarm">0</span></div>
+          <div class="row"><span>亮度压</span><input type="range" id="rngBright" min="70" max="110" step="1" /><span class="val" id="valBright">0.90</span></div>
+          <p class="tip">默认暖度=0，对齐上一版深黑衬字；调高暖度会偏画室炭褐（你截图里喜欢的沉浸感）。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const B = '/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/';
+    // 换 key，避免上一版可编辑页的 localStorage 把默认观感带偏
+    const STORE_KEY = 'taobao-atelier-v2-editable-2026-11-08-custom-card';
+    const SLOTS_API = '/__api/taobao-atelier-slots';
+    const CUSTOM_IDS = ['c1', 'c2', 'c3', 'c4', 'c5']; // 轮播暂藏，槽位保留便于以后开回
+
+    // 默认对齐上版 v2 终稿素材与取景（object-position），渐变对齐上版黑遮罩
+    const DEFAULTS = {
+      heroPhone: { src: B + 'hero-alt.png', zoom: 1, x: 50, y: 16, g0: 38, gOp: 0.92, warm: 0, bright: 0.94, mode: 'heroPhone', title: '', desc: '' },
+      heroDesk:  { src: B + 'hero-cover-dark.png', zoom: 1, x: 58, y: 22, g0: 42, gOp: 0.72, warm: 0, bright: 0.9, mode: 'heroDesk', title: '', desc: '' },
+      w1:   { src: B + 'work-siu.jpg', zoom: 1, x: 45, y: 18, g0: 70, gOp: 0.25, warm: 0, bright: 0.92, title: '', desc: '' },
+      w2:   { src: B + 'work-mia.jpg', zoom: 1, x: 50, y: 22, g0: 70, gOp: 0.25, warm: 0, bright: 0.92, title: '', desc: '' },
+      w3:   { src: B + 'work-warm.png', zoom: 1, x: 48, y: 20, g0: 70, gOp: 0.25, warm: 0, bright: 0.92, title: '', desc: '' },
+      geo:  { src: B + 'scene-geo-live.png', zoom: 1, x: 28, y: 62, g0: 28, gOp: 0.78, warm: 0, bright: 0.9, num: '①', title: '几何体静物「写生台」', desc: '网页 3D 场景练形体体积。一次开通，长期可用。' },
+      port: { src: B + 'scene-port-live.png', zoom: 1, x: 50, y: 28, g0: 28, gOp: 0.78, warm: 0, bright: 0.9, num: '②', title: '人物肖像「写生台」', desc: '可转可调光的 3D 人像写生。一次开通，长期可用。' },
+      jie:  { src: B + 'tool-jie-grid.png', zoom: 1, x: 50, y: 32, g0: 35, gOp: 0.82, warm: 0, bright: 0.98, num: '③', title: '「晓阶」', desc: '色阶分析 · 网格起形', tool: true },
+      se:   { src: B + 'tool-se-01.jpg', zoom: 1, x: 50, y: 22, g0: 35, gOp: 0.82, warm: 0, bright: 0.98, num: '④', title: '「晓色」', desc: '自动调色 · 练习 · 颜料盒', tool: true },
+      mu:   { src: B + 'tool-mu-immersive.png', zoom: 1, x: 48, y: 35, g0: 35, gOp: 0.82, warm: 0, bright: 0.96, num: '⑤', title: '「晓摹」', desc: '叠图描形 · 应急起型', tool: true },
+      pro:  { src: B + 'logo-pro.png', zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: 'Pro', desc: '写生台 + 三工具 + 课件库（非视频课）', pack: '含上面 <span class="n">①～⑤</span> 全部 · 另加课件库', logoOnly: true },
+      course:{ src: B + 'work-kamilla.png', zoom: 1, x: 50, y: 22, g0: 35, gOp: 0.55, warm: 0, bright: 0.9, title: '水彩人像课', kicker: '课预告 · 0基础可学', desc: '2027 年一季度内开通', note: '敬请期待…' },
+      custom:{ src: B + 'work-xinjiang.jpg', zoom: 1, x: 45, y: 18, g0: 40, gOp: 0.55, warm: 0, bright: 0.78, title: '约一幅肖像画', kicker: '肖像定制', desc: '儿童 / 人物手绘定制', note: '先聊构图 · 再动手绘' },
+      c1: { src: B + 'work-xinjiang.jpg', zoom: 1, x: 45, y: 18, g0: 40, gOp: 0.78, warm: 0, bright: 0.72, title: '', desc: '' },
+      c2: { src: B + 'work-kamilla.png', zoom: 1, x: 50, y: 20, g0: 40, gOp: 0.72, warm: 0, bright: 0.88, title: '', desc: '' },
+      c3: { src: B + 'work-siu.jpg', zoom: 1, x: 48, y: 22, g0: 42, gOp: 0.7, warm: 0, bright: 0.9, title: '', desc: '' },
+      c4: { src: B + 'work-mia.jpg', zoom: 1, x: 50, y: 24, g0: 42, gOp: 0.7, warm: 0, bright: 0.9, title: '', desc: '' },
+      c5: { src: B + 'work-warm.png', zoom: 1, x: 48, y: 20, g0: 40, gOp: 0.72, warm: 0, bright: 0.9, title: '', desc: '' }
+    };
+
+    const LABEL = {
+      heroPhone: '手机头图', heroDesk: 'PC头图',
+      w1: '作品条·左', w2: '作品条·中', w3: '作品条·右',
+      geo: '写生台·几何', port: '写生台·肖像', jie: '晓阶', se: '晓色', mu: '晓摹',
+      pro: 'Pro', course: '水彩课封面', custom: '约画封面',
+      c1: '约画轮播·1', c2: '约画轮播·2', c3: '约画轮播·3', c4: '约画轮播·4', c5: '约画轮播·5'
+    };
+
+    let state = clone(DEFAULTS);
+    let editingId = null;
+    let draft = null;
+    let customBlobUrls = {};
+    /** @type {Record<string,{ext:string,base64:string}>} */
+    let pendingImages = {};
+    let saveTimer = null;
+
+    function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+    function setSaveStatus(msg, ok) {
+      const el = document.getElementById('saveStatus');
+      if (!el) return;
+      el.textContent = msg;
+      el.style.color = ok === false ? '#e8a0a0' : ok === true ? 'rgba(180,200,160,0.85)' : 'var(--dim)';
+    }
+
+    function mergeSlots(parsed) {
+      const out = clone(DEFAULTS);
+      if (!parsed || typeof parsed !== 'object') return out;
+      Object.keys(out).forEach((k) => {
+        if (parsed[k]) out[k] = Object.assign({}, out[k], parsed[k]);
+        if (out[k].src && String(out[k].src).startsWith('blob:')) out[k].src = DEFAULTS[k].src;
+      });
+      // 轮播期 c1 有图、尚无 custom 封面时，把取景迁回约画封面
+      if (!(parsed.custom && parsed.custom.src) && parsed.c1 && parsed.c1.src) {
+        out.custom = Object.assign({}, DEFAULTS.custom, {
+          src: parsed.c1.src,
+          zoom: parsed.c1.zoom,
+          x: parsed.c1.x,
+          y: parsed.c1.y,
+          g0: parsed.c1.g0,
+          gOp: parsed.c1.gOp,
+          warm: parsed.c1.warm,
+          bright: parsed.c1.bright
+        });
+        if (out.custom.src && String(out.custom.src).startsWith('blob:')) out.custom.src = DEFAULTS.custom.src;
+      }
+      return out;
+    }
+
+    function loadStateFromLocal() {
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (!raw) return null;
+        return mergeSlots(JSON.parse(raw));
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function slotsLookLikeDefaults(slots) {
+      if (!slots) return true;
+      return Object.keys(DEFAULTS).every((k) => {
+        const a = slots[k] || {};
+        const b = DEFAULTS[k];
+        const srcA = String(a.src || '').split('?')[0];
+        const srcB = String(b.src || '').split('?')[0];
+        return srcA === srcB
+          && Number(a.x) === Number(b.x)
+          && Number(a.y) === Number(b.y)
+          && Number(a.zoom) === Number(b.zoom)
+          && Number(a.g0) === Number(b.g0)
+          && Number(a.warm) === Number(b.warm);
+      });
+    }
+
+    function slotsDifferFromDefaults(slots) {
+      return !slotsLookLikeDefaults(slots);
+    }
+
+    async function loadStateAsync() {
+      let disk = null;
+      let diskSavedAt = '';
+      try {
+        const res = await fetch(SLOTS_API, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.exists && data.slots) {
+            disk = mergeSlots(data.slots);
+            diskSavedAt = data.savedAt || '';
+          }
+        }
+      } catch (e) {
+        /* 静态服务未开或旧版无此 API */
+      }
+      const local = loadStateFromLocal();
+
+      // 仓库若只是「纯默认」而浏览器缓存里有你调过的，优先用缓存并提示马上落盘
+      if (disk && slotsLookLikeDefaults(disk) && local && slotsDifferFromDefaults(local)) {
+        setSaveStatus('发现浏览器里有你调过的参数，仓库还是默认。请点「立即保存到仓库」以免再丢。', false);
+        return local;
+      }
+      if (disk) {
+        setSaveStatus('已从仓库文件恢复 · ' + diskSavedAt, true);
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(disk)); } catch (e) {}
+        return disk;
+      }
+      if (local) {
+        setSaveStatus('已从本机浏览器缓存恢复（请点「立即保存到仓库」）', true);
+        return local;
+      }
+      setSaveStatus('当前为默认参数（尚未保存过）', null);
+      return clone(DEFAULTS);
+    }
+
+    function slotsPayloadForDisk() {
+      const toSave = clone(state);
+      Object.keys(toSave).forEach((k) => {
+        if (String(toSave[k].src || '').startsWith('blob:')) {
+          // 等 images 落盘后由服务端改写 src；先占位默认，避免写坏路径
+          if (!pendingImages[k]) toSave[k].src = DEFAULTS[k].src;
+        }
+      });
+      return toSave;
+    }
+
+    async function persistToDisk() {
+      setSaveStatus('正在写入仓库…', null);
+      const body = { slots: slotsPayloadForDisk(), images: pendingImages };
+      try {
+        localStorage.setItem(STORE_KEY, JSON.stringify(body.slots));
+      } catch (e) {}
+      try {
+        const res = await fetch(SLOTS_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
+        if (data.savedImages) {
+          Object.keys(data.savedImages).forEach((id) => {
+            if (state[id]) state[id].src = data.savedImages[id];
+          });
+          pendingImages = {};
+          paintAll();
+        }
+        setSaveStatus('已写入仓库 · ' + (data.savedAt || new Date().toLocaleString()), true);
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+        return true;
+      } catch (e) {
+        setSaveStatus('仓库写入失败（请确认本地 18080 服务是新版）。已尽量记入浏览器缓存。' + (e.message || ''), false);
+        return false;
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORE_KEY, JSON.stringify(slotsPayloadForDisk()));
+      } catch (e) {}
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => { persistToDisk(); }, 400);
+    }
+
+    function warmRgb(warm) {
+      const t = Math.max(0, Math.min(100, warm)) / 100;
+      // warm=0 → 纯黑系（对齐上版）；升高 → 炭褐
+      const r = Math.round(0 + t * 28);
+      const g = Math.round(0 + t * 14);
+      const b = Math.round(0 + t * 8);
+      return `${r},${g},${b}`;
+    }
+
+    function shadeCss(s) {
+      const rgb = warmRgb(s.warm);
+      const g0 = s.g0;
+      const mid = Math.min(98, g0 + (100 - g0) * 0.45);
+      const op = s.gOp;
+      const bottom = `linear-gradient(180deg, rgba(${rgb},0) 0%, rgba(${rgb},0) ${g0}%, rgba(${rgb},${(op * 0.55).toFixed(3)}) ${mid}%, rgba(${rgb},${op.toFixed(3)}) 100%)`;
+      if (s.mode === 'heroPhone') {
+        return `${bottom}, linear-gradient(90deg, rgba(5,5,5,0.28) 0%, transparent 48%)`;
+      }
+      if (s.mode === 'heroDesk') {
+        return `linear-gradient(105deg, rgba(5,5,5,0.88) 0%, rgba(5,5,5,0.45) 38%, rgba(5,5,5,0.12) 58%, rgba(5,5,5,0.55) 100%), ${bottom}`;
+      }
+      return bottom;
+    }
+
+    function clampPan(v) {
+      return Math.max(0, Math.min(100, v));
+    }
+
+    function applyImg(img, s) {
+      const x = Number(s.x);
+      const y = Number(s.y);
+      const z = Number(s.zoom) || 1;
+      img.style.left = '0';
+      img.style.top = '0';
+      img.style.right = '0';
+      img.style.bottom = '0';
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = 'cover';
+      img.style.objectPosition = `${x}% ${y}%`;
+      img.style.transformOrigin = `${x}% ${y}%`;
+      img.style.transform = z === 1 ? 'none' : `scale(${z})`;
+      const baseSat = s.tool ? 0.98 : 0.94;
+      const baseCon = s.tool ? 1.02 : 1.04;
+      img.style.filter = `saturate(${baseSat}) contrast(${baseCon}) brightness(${s.bright})`;
+    }
+
+    function paintSlotEl(root, id) {
+      const s = state[id];
+      const img = root.querySelector('img.slot-fg') || root.querySelector('img');
+      const shade = root.querySelector('.shade');
+      img.src = s.src;
+      applyImg(img, s);
+      shade.style.background = shadeCss(s);
+    }
+
+    function paintAll() {
+      document.querySelectorAll('[data-slot]').forEach((el) => {
+        paintSlotEl(el, el.getAttribute('data-slot'));
+      });
+    }
+
+    function slotHtml(id) {
+      return `<div class="slot" data-slot="${id}" tabindex="0">
+        <img class="slot-fg" alt="" draggable="false" />
+        <div class="shade"></div>
+        <button type="button" class="edit-hit" data-edit="${id}">编辑</button>
+      </div>`;
+    }
+
+    function previewAspectFor(id) {
+      if (id === 'jie' || id === 'se' || id === 'mu') return '1 / 2.2';
+      if (id === 'geo' || id === 'port') return '3 / 4';
+      if (id === 'heroPhone' || id === 'heroDesk') return '16 / 10';
+      if (id === 'course' || id === 'custom') return '3 / 4';
+      if (CUSTOM_IDS.includes(id)) return '100 / 54';
+      return '3 / 4';
+    }
+
+    function customCarouselHtml() {
+      // 轮播暂藏（静风格）；保留函数便于以后开回
+      return '';
+    }
+
+    function cine(id, extra) {
+      const d = DEFAULTS[id];
+      const num = d.num ? `<i class="num">${d.num}</i>` : '';
+      return `<article class="cine ${extra || ''}">
+        ${slotHtml(id)}
+        <div class="cap"><b>${num}${d.title}</b><span>${d.desc}</span></div>
+      </article>`;
+    }
+
+    function proCardHtml() {
+      const d = DEFAULTS.pro;
+      // logo 固定用素材，不吃旧槽位里的人像图
+      const pack = d.pack
+        ? `<p class="pro-pack">${d.pack}</p>`
+        : '';
+      return `<article class="pro-card" aria-label="Pro 高级会员">
+        <div class="pro-logo"><img src="${d.src}" alt="Pro logo" draggable="false" /></div>
+        <div class="pro-copy">
+          <div class="pro-kicker">高级会员</div>
+          <h3 class="pro-title">${d.title}</h3>
+          <i class="pro-rule" aria-hidden="true"></i>
+          <p class="pro-desc">${d.desc}</p>
+          ${pack}
+        </div>
+      </article>`;
+    }
+
+    function courseCardHtml() {
+      const d = DEFAULTS.course;
+      return `<article class="course-card" aria-label="水彩人像课">
+        <div class="course-copy">
+          <div class="course-kicker">${d.kicker || '课预告 · 0基础可学'}</div>
+          <h3 class="course-title">${d.title}</h3>
+          <i class="course-rule" aria-hidden="true"></i>
+          <p class="course-desc"><span class="course-desc-line">${d.desc}</span></p>
+          <p class="course-note">${d.note || '敬请期待…'}</p>
+        </div>
+        <div class="course-cover">${slotHtml('course')}</div>
+      </article>`;
+    }
+
+    function customCardHtml() {
+      const d = DEFAULTS.custom;
+      // 与水彩课同构，DOM 顺序改为左封面右文案
+      return `<article class="course-card custom-card" aria-label="约一幅肖像画">
+        <div class="course-cover">${slotHtml('custom')}</div>
+        <div class="course-copy">
+          <div class="course-kicker">${d.kicker || '肖像定制'}</div>
+          <h3 class="course-title">${d.title}</h3>
+          <i class="course-rule" aria-hidden="true"></i>
+          <p class="course-desc"><span class="course-desc-line">${d.desc}</span></p>
+          <p class="course-note">${d.note || '先聊构图 · 再动手绘'}</p>
+        </div>
+      </article>`;
+    }
+
+    function stripHtml() {
+      // 方案 B 暂不渲染；保留函数便于改回 A（看样三卡）时复用
+      return `<div class="strip">${slotHtml('w1')}${slotHtml('w2')}${slotHtml('w3')}</div>`;
+    }
+
+    function trustBarHtml() {
+      // 文案已并入约画卡 note；暂不单独占一行
+      return '';
+    }
+
+    function checkoutCloseHtml() {
+      // 轻脚注：说明上文三段怎么开通；不做成可点卡片
+      return `<div class="checkout-close" aria-hidden="true">
+        <p class="checkout-line">
+          <span class="scope">写生台 · 工具 · Pro</span><span class="dot">·</span><span class="path">拍下收短码<span class="arrow">→</span>官网兑换<span class="arrow">→</span>即时开通</span>
+        </p>
+      </div>`;
+    }
+
+    function zones(isDesk) {
+      // 手机 / PC 均为一行三列；手机用竖长比例（对齐窄窗 PC 观感）
+      const tools = `<div class="tools">${cine('jie', 'tool')}${cine('se', 'tool')}${cine('mu', 'tool')}</div>`;
+      return `
+      <section class="zone">
+        <div class="zone-h"><span>在线写生台</span><i></i></div>
+        <div class="pair">${cine('geo')}${cine('port')}</div>
+      </section>
+      <section class="zone">
+        <div class="zone-h"><span>画室工具</span><i></i></div>
+        ${tools}
+      </section>
+      <section class="zone">
+        <div class="zone-h"><span>高级会员</span><i></i></div>
+        ${proCardHtml()}
+        ${checkoutCloseHtml()}
+      </section>
+      <section class="zone zone-after-checkout">
+        <div class="zone-h"><span>水彩人像课</span><i></i></div>
+        ${courseCardHtml()}
+      </section>
+      <section class="zone">
+        <div class="zone-h"><span>约画</span><i></i></div>
+        ${customCardHtml()}
+      </section>
+      <div class="foot">
+        <div class="old">历史教程素材</div>
+      </div>`;
+    }
+
+    let carouselTimers = [];
+
+    function stopCarousels() {
+      carouselTimers.forEach((t) => clearInterval(t));
+      carouselTimers = [];
+    }
+
+    function bindCarousels() {
+      stopCarousels();
+      document.querySelectorAll('[data-carousel]').forEach((root) => {
+        const slides = Array.from(root.querySelectorAll('.carousel-slide'));
+        const dots = Array.from(root.querySelectorAll('.carousel-dot'));
+        if (!slides.length) return;
+        let idx = Math.max(0, slides.findIndex((s) => s.classList.contains('is-on')));
+        const go = (n) => {
+          idx = (n + slides.length) % slides.length;
+          slides.forEach((s, i) => s.classList.toggle('is-on', i === idx));
+          dots.forEach((d, i) => d.classList.toggle('is-on', i === idx));
+        };
+        dots.forEach((d) => {
+          d.addEventListener('click', (e) => {
+            e.stopPropagation();
+            go(Number(d.getAttribute('data-dot')) || 0);
+          });
+        });
+        let paused = false;
+        root.addEventListener('mouseenter', () => { paused = true; });
+        root.addEventListener('mouseleave', () => { paused = false; });
+        root.addEventListener('touchstart', () => { paused = true; }, { passive: true });
+        root.addEventListener('touchend', () => { paused = false; }, { passive: true });
+        carouselTimers.push(setInterval(() => {
+          if (!paused) go(idx + 1);
+        }, 3500));
+      });
+    }
+
+    function render() {
+      stopCarousels();
+      document.getElementById('phone').innerHTML = `
+        <header class="hero">
+          ${slotHtml('heroPhone')}
+          <div class="copy">
+            <div class="who">童画师吴晓 · 手绘工坊</div>
+            <div class="title">人物画学习 · 工具 · 肖像定制</div>
+            <div class="warm">做你喜欢的事</div>
+          </div>
+        </header>
+        ${zones(false)}`;
+
+      document.getElementById('desk').innerHTML = `
+        <header class="desk-hero">
+          ${slotHtml('heroDesk')}
+          <div class="copy">
+            <div class="who">童画师吴晓 · 手绘工坊</div>
+            <div class="title">人物画学习 · 工具 · 肖像定制</div>
+            <div class="warm">做你喜欢的事</div>
+          </div>
+        </header>
+        <div class="desk-body">
+          ${zones(true)}
+        </div>`;
+      paintAll();
+      bindCarousels();
+    }
+
+    function openEditor(id) {
+      editingId = id;
+      draft = clone(state[id]);
+      document.getElementById('modalTitle').textContent = '编辑 · ' + (LABEL[id] || id);
+      document.getElementById('previewCapTitle').textContent = draft.title || LABEL[id] || '标题';
+      document.getElementById('previewCapDesc').textContent = draft.desc || '底部遮罩用来衬字、收住画面';
+      const frame = document.getElementById('previewFrame');
+      frame.style.aspectRatio = previewAspectFor(id);
+      if (id === 'heroPhone' || id === 'heroDesk' || CUSTOM_IDS.includes(id)) {
+        frame.style.width = 'min(320px, 92%)';
+      } else if (id === 'jie' || id === 'se' || id === 'mu') {
+        frame.style.width = 'min(168px, 58%)';
+      } else if (id === 'course' || id === 'custom') {
+        frame.style.width = 'min(168px, 58%)';
+      } else {
+        frame.style.width = 'min(220px, 72%)';
+      }
+      syncControlsFromDraft();
+      paintPreview();
+      document.getElementById('modalMask').classList.add('open');
+      document.getElementById('modalMask').setAttribute('aria-hidden', 'false');
+    }
+
+    async function closeEditor(apply) {
+      if (apply && editingId && draft) {
+        // 等本机换图读完 base64，避免点太快导致图没写入仓库
+        if (draft._pendingRead) {
+          try { await draft._pendingRead; } catch (e) {}
+          delete draft._pendingRead;
+        }
+        state[editingId] = clone(draft);
+        delete state[editingId]._pendingRead;
+        paintAll();
+        await persistToDisk();
+      }
+      editingId = null;
+      draft = null;
+      document.getElementById('modalMask').classList.remove('open');
+      document.getElementById('modalMask').setAttribute('aria-hidden', 'true');
+    }
+
+    function syncControlsFromDraft() {
+      const d = draft;
+      document.getElementById('rngZoom').value = Math.round(d.zoom * 100);
+      document.getElementById('rngX').value = d.x;
+      document.getElementById('rngY').value = d.y;
+      document.getElementById('rngG0').value = d.g0;
+      document.getElementById('rngGOp').value = Math.round(d.gOp * 100);
+      document.getElementById('rngWarm').value = d.warm;
+      document.getElementById('rngBright').value = Math.round(d.bright * 100);
+      document.getElementById('valZoom').textContent = d.zoom.toFixed(2);
+      document.getElementById('valX').textContent = d.x + '%';
+      document.getElementById('valY').textContent = d.y + '%';
+      document.getElementById('valG0').textContent = d.g0 + '%';
+      document.getElementById('valGOp').textContent = d.gOp.toFixed(2);
+      document.getElementById('valWarm').textContent = d.warm;
+      document.getElementById('valBright').textContent = d.bright.toFixed(2);
+    }
+
+    function paintPreview() {
+      const img = document.getElementById('previewImg');
+      const shade = document.getElementById('previewShade');
+      img.src = draft.src;
+      applyImg(img, draft);
+      shade.style.background = shadeCss(draft);
+    }
+
+    function bindControls() {
+      const map = [
+        ['rngZoom', (v) => { draft.zoom = v / 100; document.getElementById('valZoom').textContent = draft.zoom.toFixed(2); }],
+        ['rngX', (v) => { draft.x = +v; document.getElementById('valX').textContent = draft.x + '%'; }],
+        ['rngY', (v) => { draft.y = +v; document.getElementById('valY').textContent = draft.y + '%'; }],
+        ['rngG0', (v) => { draft.g0 = +v; document.getElementById('valG0').textContent = draft.g0 + '%'; }],
+        ['rngGOp', (v) => { draft.gOp = v / 100; document.getElementById('valGOp').textContent = draft.gOp.toFixed(2); }],
+        ['rngWarm', (v) => { draft.warm = +v; document.getElementById('valWarm').textContent = draft.warm; }],
+        ['rngBright', (v) => { draft.bright = v / 100; document.getElementById('valBright').textContent = draft.bright.toFixed(2); }]
+      ];
+      map.forEach(([id, fn]) => {
+        document.getElementById(id).addEventListener('input', (e) => {
+          if (!draft) return;
+          fn(+e.target.value);
+          paintPreview();
+        });
+      });
+    }
+
+    (function bindDrag() {
+      const frame = document.getElementById('previewFrame');
+      let dragging = false, lastX = 0, lastY = 0;
+      frame.addEventListener('pointerdown', (e) => {
+        if (!draft) return;
+        dragging = true; lastX = e.clientX; lastY = e.clientY;
+        frame.classList.add('grabbing');
+        frame.setPointerCapture(e.pointerId);
+      });
+      frame.addEventListener('pointermove', (e) => {
+        if (!dragging || !draft) return;
+        const dx = e.clientX - lastX, dy = e.clientY - lastY;
+        lastX = e.clientX; lastY = e.clientY;
+        const rect = frame.getBoundingClientRect();
+        // 1:1 跟手：手指移动占框的百分比 = 取景移动百分比（所见即所得）
+        draft.x = clampPan(draft.x - (dx / rect.width) * 100);
+        draft.y = clampPan(draft.y - (dy / rect.height) * 100);
+        syncControlsFromDraft();
+        paintPreview();
+      });
+      const end = () => { dragging = false; frame.classList.remove('grabbing'); };
+      frame.addEventListener('pointerup', end);
+      frame.addEventListener('pointercancel', end);
+    })();
+
+    document.body.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-edit]');
+      if (btn) openEditor(btn.getAttribute('data-edit'));
+    });
+
+    document.getElementById('btnClose').addEventListener('click', () => { closeEditor(false); });
+    document.getElementById('btnApply').addEventListener('click', () => { closeEditor(true); });
+    document.getElementById('modalMask').addEventListener('click', (e) => {
+      if (e.target.id === 'modalMask') closeEditor(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('modalMask').classList.contains('open')) closeEditor(false);
+    });
+
+    document.getElementById('btnResetSlot').addEventListener('click', () => {
+      if (!editingId) return;
+      draft = clone(DEFAULTS[editingId]);
+      delete pendingImages[editingId];
+      syncControlsFromDraft();
+      paintPreview();
+    });
+    document.getElementById('btnPick').addEventListener('click', () => document.getElementById('filePick').click());
+    document.getElementById('filePick').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file || !draft || !editingId) return;
+      const id = editingId;
+      if (customBlobUrls[id]) URL.revokeObjectURL(customBlobUrls[id]);
+      const url = URL.createObjectURL(file);
+      customBlobUrls[id] = url;
+      draft.src = url;
+      draft._pendingRead = (async () => {
+        const buf = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let bin = '';
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) {
+          bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
+        let ext = (file.name.split('.').pop() || 'png').toLowerCase();
+        if (ext === 'jpeg') ext = 'jpg';
+        if (!/^(png|jpg|webp|gif)$/.test(ext)) ext = 'png';
+        pendingImages[id] = { ext, base64: btoa(bin) };
+      })();
+      paintPreview();
+    });
+    document.getElementById('btnRevertSrc').addEventListener('click', () => {
+      if (!draft || !editingId) return;
+      draft.src = DEFAULTS[editingId].src;
+      delete pendingImages[editingId];
+      paintPreview();
+    });
+    document.getElementById('btnReset').addEventListener('click', async () => {
+      if (!confirm('恢复全部默认图与剪裁/渐变参数？将清除仓库中的槽位状态文件。')) return;
+      state = clone(DEFAULTS);
+      localStorage.removeItem(STORE_KEY);
+      Object.keys(customBlobUrls).forEach((k) => URL.revokeObjectURL(customBlobUrls[k]));
+      customBlobUrls = {};
+      pendingImages = {};
+      try {
+        await fetch(SLOTS_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'clear' })
+        });
+      } catch (e) {}
+      setSaveStatus('已恢复默认，仓库状态已清除', true);
+      render();
+    });
+    document.getElementById('btnExport').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'taobao-atelier-v2-slots.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+    document.getElementById('btnSaveNow').addEventListener('click', () => { persistToDisk(); });
+
+    bindControls();
+    (async () => {
+      state = await loadStateAsync();
+      render();
+      // 仅当「浏览器有调过的参数、仓库还是默认」时自动落盘；禁止把纯默认悄悄盖掉你的稿
+      const st = document.getElementById('saveStatus');
+      if (st && /发现浏览器里有你调过的参数/.test(st.textContent || '')) {
+        await persistToDisk();
+      }
+    })();
+  </script>
+</body>
+</html>

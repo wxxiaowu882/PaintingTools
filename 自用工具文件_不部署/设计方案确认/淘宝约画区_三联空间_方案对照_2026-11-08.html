@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>设计确认 · 约画区三联空间 · A/B 对照</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --ink: #f3f1ec;
+      --mute: rgba(243,241,236,0.55);
+      --dim: rgba(243,241,236,0.28);
+      --line: rgba(255,255,255,0.1);
+      --gold: #cbb892;
+      --pick: #8faf7a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #020202;
+      color: var(--ink);
+      font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+      font-weight: 300;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 18px 100px; }
+    h1 {
+      margin: 0 0 8px;
+      font-weight: 200;
+      letter-spacing: 0.22em;
+      font-size: 0.95rem;
+    }
+    .lead {
+      max-width: 48em;
+      margin: 0 0 12px;
+      color: var(--mute);
+      font-size: 0.86rem;
+      line-height: 1.75;
+    }
+    .note {
+      border: 1px solid var(--line);
+      background: #0a0a0a;
+      padding: 12px 14px;
+      border-radius: 6px;
+      color: var(--mute);
+      font-size: 0.8rem;
+      line-height: 1.6;
+      margin-bottom: 22px;
+    }
+    .note b { color: var(--gold); }
+    .reply {
+      border: 1px solid rgba(143,175,122,0.35);
+      background: #0c120e;
+      padding: 14px 16px;
+      border-radius: 6px;
+      margin-bottom: 28px;
+      font-size: 0.86rem;
+      line-height: 1.65;
+    }
+    .reply strong { color: var(--pick); letter-spacing: 0.06em; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+    @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #080808;
+      overflow: hidden;
+    }
+    .card.rec { border-color: rgba(203,184,146,0.42); }
+    .card-h {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .card-h .tag {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: var(--gold);
+      margin-bottom: 6px;
+    }
+    .card-h h2 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+    }
+    .card-h p {
+      margin: 0;
+      color: var(--mute);
+      font-size: 0.78rem;
+      line-height: 1.55;
+    }
+    .mock-wrap {
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+      background: #030303;
+    }
+    .phone {
+      width: 320px;
+      background: var(--bg);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.65);
+    }
+    .zone-h {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 12px 6px;
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: var(--dim);
+    }
+    .zone-h i {
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+    }
+    .course {
+      margin: 0 10px 10px;
+      display: grid;
+      grid-template-columns: 0.42fr 0.58fr;
+      min-height: 108px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 3px;
+      overflow: hidden;
+      background: #060606;
+    }
+    .course-copy { padding: 12px 10px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+    .course-copy .k { font-size: 8px; letter-spacing: 0.12em; color: var(--gold); opacity: 0.85; }
+    .course-copy .t { font-size: 13px; letter-spacing: 0.06em; }
+    .course-copy .d { font-size: 9px; color: var(--mute); white-space: nowrap; }
+    .course-copy .n { font-size: 9px; color: var(--dim); letter-spacing: 0.12em; }
+    .course-pic {
+      background: #111 center/cover no-repeat;
+      position: relative;
+    }
+    .course-pic::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, #060606 0%, transparent 42%);
+    }
+    .gap-label {
+      margin: 2px 12px 8px;
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      color: #c98a7a;
+    }
+    .samples {
+      margin: 0 10px 8px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+    .sample {
+      position: relative;
+      aspect-ratio: 3 / 4;
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #0a0a0a center/cover no-repeat;
+    }
+    .sample span {
+      position: absolute;
+      left: 6px;
+      right: 6px;
+      bottom: 6px;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: #fff;
+      text-shadow: 0 1px 8px rgba(0,0,0,0.85);
+    }
+    .trust {
+      margin: 0 10px 10px;
+      padding: 12px 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 3px;
+      background: #080808;
+    }
+    .trust .t {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+    .trust .d {
+      font-size: 10px;
+      color: var(--mute);
+      line-height: 1.55;
+    }
+    .carousel {
+      position: relative;
+      margin: 0 10px 14px;
+      aspect-ratio: 100 / 54;
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #090909 center/cover no-repeat;
+    }
+    .carousel .cap {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 22px;
+      z-index: 2;
+    }
+    .carousel .cap b {
+      display: block;
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.85);
+    }
+    .carousel .cap span {
+      display: block;
+      font-size: 10px;
+      color: rgba(255,255,255,0.7);
+      text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+    }
+    .carousel .shade {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 48%);
+    }
+    .dots {
+      position: absolute;
+      left: 0; right: 0; bottom: 8px;
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+      z-index: 3;
+    }
+    .dots i {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+    }
+    .dots i.on { background: rgba(255,255,255,0.92); }
+    .old-strip {
+      margin: 0 10px 8px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px;
+      opacity: 0.55;
+    }
+    .old-strip div {
+      height: 52px;
+      border-radius: 2px;
+      background: #151515 center/cover no-repeat;
+      border: 1px dashed rgba(201,138,122,0.45);
+    }
+    .pros {
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--line);
+      font-size: 0.76rem;
+      color: var(--mute);
+      line-height: 1.6;
+    }
+    .pros li { margin: 0 0 4px; }
+    .foot-hint {
+      margin-top: 28px;
+      color: var(--dim);
+      font-size: 0.75rem;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>约画区 · 三联空间怎么用</h1>
+    <p class="lead">
+      水彩课和「约一幅肖像画」之间，原来那条扁扁三连图容易<strong>碎、断气</strong>，又和下面轮播抢「看作品」的戏。
+      你已倾向：这部分应服务<strong>约画样品</strong>。下面用手机宽度示意两套主方案，请直接回代号拍板。
+    </p>
+    <div class="note">
+      <b>对照规则：</b>两方案上方都保留「水彩人像课」；差异只在课与约画轮播之间。
+      实装仍走千牛楼层静帧；本页只定结构，不改线上。
+    </div>
+    <div class="reply">
+      聊天里直接回：<strong>选 A</strong>（推荐）或 <strong>选 B</strong>。
+      若要「三连上移做全店气质」，回 <strong>选 C</strong>。
+    </div>
+
+    <div class="grid">
+      <!-- A -->
+      <section class="card rec">
+        <div class="card-h">
+          <div class="tag">推荐 · 方案 A</div>
+          <h2>并进约画：看样三卡 + 轮播</h2>
+          <p>课结束 → 进入约画一整块：先三张加高样品定调，再轮播逛更多。中间不再单独占一个说不清的分区。</p>
+        </div>
+        <div class="mock-wrap">
+          <div class="phone">
+            <div class="zone-h"><span>水彩人像课</span><i></i></div>
+            <div class="course">
+              <div class="course-copy">
+                <div class="k">课预告 · 0基础可学</div>
+                <div class="t">水彩人像课</div>
+                <div class="d">2027 年一季度内开通</div>
+                <div class="n">敬请期待…</div>
+              </div>
+              <div class="course-pic" style="background-image:url('/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/work-kamilla.png')"></div>
+            </div>
+
+            <div class="zone-h"><span>约画</span><i></i></div>
+            <div class="samples">
+              <div class="sample" style="background-image:url('/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/work-siu.jpg')"><span>儿童</span></div>
+              <div class="sample" style="background-image:url('/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/work-mia.jpg')"><span>人物</span></div>
+              <div class="sample" style="background-image:url('/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/work-warm.png')"><span>氛围</span></div>
+            </div>
+            <div class="carousel" style="background-image:url('/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/work-xinjiang.jpg')">
+              <div class="shade"></div>
+              <div class="cap"><b>约一幅肖像画</b><span>儿童 / 人物手绘定制</span></div>
+              <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+        </div>
+        <ul class="pros">
+          <li>对准「样品墙」：少而稳的三张定调，轮播负责多逛。</li>
+          <li>加高竖卡，不再扁碎断气。</li>
+          <li>楼层叙事变成：课 → 约画（看样 + 轮播），一口气说完。</li>
+        </ul>
+      </section>
+
+      <!-- B -->
+      <section class="card">
+        <div class="card-h">
+          <div class="tag">方案 B</div>
+          <h2>去掉三连图 · 改「敢约」说明</h2>
+          <p>作品只留给下面轮播；课与约画之间改成一行流程/信任说明，页面更透气，也不抢戏。</p>
+        </div>
+        <div class="mock-wrap">
+          <div class="phone">
+            <div class="zone-h"><span>水彩人像课</span><i></i></div>
+            <div class="course">
+              <div class="course-copy">
+                <div class="k">课预告 · 0基础可学</div>
+                <div class="t">水彩人像课</div>
+                <div class="d">2027 年一季度内开通</div>
+                <div class="n">敬请期待…</div>
+              </div>
+              <div class="course-pic" style="background-image:url('/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/work-kamilla.png')"></div>
+            </div>
+
+            <div class="gap-label">（原扁三连位置 · 改为说明）</div>
+            <div class="old-strip" aria-hidden="true">
+              <div style="background-image:url('/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/work-siu.jpg')"></div>
+              <div style="background-image:url('/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/work-mia.jpg')"></div>
+              <div style="background-image:url('/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/work-warm.png')"></div>
+            </div>
+
+            <div class="zone-h"><span>约画</span><i></i></div>
+            <div class="trust">
+              <div class="t">先聊构图 · 再动手绘</div>
+              <div class="d">适儿童 / 成人 · 水彩或素描风 · 电子稿交付，装裱可选</div>
+            </div>
+            <div class="carousel" style="background-image:url('/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/work-xinjiang.jpg')">
+              <div class="shade"></div>
+              <div class="cap"><b>约一幅肖像画</b><span>儿童 / 人物手绘定制</span></div>
+              <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+        </div>
+        <ul class="pros">
+          <li>最透气：不再和轮播重复「看图」。</li>
+          <li>适合作品已经够多、只想把流程说清。</li>
+          <li>若仍想强化样品感，不如回 A。</li>
+        </ul>
+      </section>
+    </div>
+
+    <p class="foot-hint">
+      素材预览路径：自用工具文件_不部署/淘宝店铺装修素材_2026-11/atelier-src/ · 请用本地 HTTP 打开本页（常见 18080）。
+      你回代号后，再改主确认页楼层结构。
+    </p>
+  </div>
+</body>
+</html>

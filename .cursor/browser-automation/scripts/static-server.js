@@ -86,6 +86,19 @@ const GLB_DIR_HISTORY_BACKUP_DIR = path.join(
   'data',
   'dir-history-backups'
 );
+const TAOBAO_ATELIER_SLOTS_PATH = path.join(
+  repoRoot,
+  '自用工具文件_不部署',
+  '设计方案确认',
+  '淘宝店铺装修_深色画室_槽位状态.json'
+);
+const TAOBAO_ATELIER_USER_SLOTS_DIR = path.join(
+  repoRoot,
+  '自用工具文件_不部署',
+  '淘宝店铺装修素材_2026-11',
+  'atelier-src',
+  'user-slots'
+);
 
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -739,6 +752,87 @@ async function handlePickFolderApi(req, res) {
   res.end(JSON.stringify(result));
 }
 
+/** 淘宝深色画室确认页：槽位剪裁/渐变/自换图 → 落盘，关掉 Cursor 仍可恢复 */
+async function handleTaobaoAtelierSlotsApi(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  if (req.method === 'GET') {
+    try {
+      if (!fs.existsSync(TAOBAO_ATELIER_SLOTS_PATH)) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify({ ok: true, exists: false, slots: null }));
+        return;
+      }
+      const raw = fs.readFileSync(TAOBAO_ATELIER_SLOTS_PATH, 'utf8');
+      const parsed = JSON.parse(raw);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ ok: true, exists: true, ...parsed }));
+      return;
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: e.message || String(e) }));
+      return;
+    }
+  }
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: 'method not allowed' }));
+    return;
+  }
+  try {
+    const body = await readBody(req);
+    if (body.action === 'clear') {
+      if (fs.existsSync(TAOBAO_ATELIER_SLOTS_PATH)) fs.unlinkSync(TAOBAO_ATELIER_SLOTS_PATH);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, cleared: true }));
+      return;
+    }
+    const slots = body.slots;
+    if (!slots || typeof slots !== 'object') {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'missing slots' }));
+      return;
+    }
+    fs.mkdirSync(path.dirname(TAOBAO_ATELIER_SLOTS_PATH), { recursive: true });
+    fs.mkdirSync(TAOBAO_ATELIER_USER_SLOTS_DIR, { recursive: true });
+
+    const images = body.images && typeof body.images === 'object' ? body.images : {};
+    const publicBase =
+      '/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/user-slots/';
+    const savedImages = {};
+    for (const [id, meta] of Object.entries(images)) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(id)) continue;
+      const extRaw = String(meta.ext || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const ext = extRaw === 'jpeg' ? 'jpg' : extRaw || 'png';
+      const b64 = String(meta.base64 || '');
+      if (!b64) continue;
+      const buf = Buffer.from(b64, 'base64');
+      if (buf.length < 32 || buf.length > 25 * 1024 * 1024) continue;
+      const fileName = `${id}.${ext}`;
+      fs.writeFileSync(path.join(TAOBAO_ATELIER_USER_SLOTS_DIR, fileName), buf);
+      const url = `${publicBase}${fileName}?t=${Date.now()}`;
+      if (slots[id] && typeof slots[id] === 'object') slots[id].src = url;
+      savedImages[id] = url;
+    }
+
+    const payload = {
+      ok: true,
+      savedAt: new Date().toISOString(),
+      slots,
+    };
+    fs.writeFileSync(TAOBAO_ATELIER_SLOTS_PATH, JSON.stringify(payload, null, 2), 'utf8');
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: true, path: TAOBAO_ATELIER_SLOTS_PATH, savedImages, savedAt: payload.savedAt }));
+  } catch (e) {
+    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: e.message || String(e) }));
+  }
+}
+
 async function handleFsListApi(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') {
@@ -923,6 +1017,10 @@ const server = http.createServer(async (req, res) => {
       await handlePickFolderApi(req, res);
       return;
     }
+    if (urlPath === '/__api/taobao-atelier-slots') {
+      await handleTaobaoAtelierSlotsApi(req, res);
+      return;
+    }
     if (urlPath === '/__api/fs/list') {
       await handleFsListApi(req, res);
       return;
@@ -1007,5 +1105,6 @@ server.listen(port, () => {
   console.log(`GLB dir history API: POST/GET http://localhost:${port}/__api/glb-dir-history`);
   console.log(`Reveal in Explorer API: POST http://localhost:${port}/__api/reveal-in-explorer`);
   console.log(`Pick folder API: POST http://localhost:${port}/__api/pick-folder`);
+  console.log(`Taobao atelier slots: GET/POST http://localhost:${port}/__api/taobao-atelier-slots`);
   console.log(`FS list/read/write/delete: /__api/fs/*`);
 });
