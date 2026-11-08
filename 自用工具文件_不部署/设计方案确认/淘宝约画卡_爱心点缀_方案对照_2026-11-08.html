@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>设计确认 · 约画卡爱心点缀 · 脚注区对照</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --ink: #f3f1ec;
+      --mute: rgba(243, 241, 236, 0.55);
+      --dim: rgba(243, 241, 236, 0.28);
+      --line: rgba(255, 255, 255, 0.1);
+      --gold: #cbb892;
+      --pick: #8faf7a;
+      --panel: #441f0b;
+      --heart: #b57a6a;
+      --heart-soft: rgba(181, 122, 106, 0.72);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #020202;
+      color: var(--ink);
+      font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+      font-weight: 300;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 18px 110px; }
+    h1 {
+      margin: 0 0 8px;
+      font-weight: 200;
+      letter-spacing: 0.22em;
+      font-size: 0.95rem;
+    }
+    .lead {
+      max-width: 48em;
+      margin: 0 0 12px;
+      color: var(--mute);
+      font-size: 0.86rem;
+      line-height: 1.75;
+    }
+    .note {
+      border: 1px solid var(--line);
+      background: #0a0a0a;
+      padding: 12px 14px;
+      border-radius: 6px;
+      color: var(--mute);
+      font-size: 0.8rem;
+      line-height: 1.65;
+      margin-bottom: 18px;
+    }
+    .note b { color: var(--gold); }
+    .reply {
+      border: 1px solid rgba(143, 175, 122, 0.35);
+      background: #0c120e;
+      padding: 14px 16px;
+      border-radius: 6px;
+      margin-bottom: 28px;
+      font-size: 0.86rem;
+      line-height: 1.65;
+    }
+    .reply strong { color: var(--pick); letter-spacing: 0.06em; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+      align-items: start;
+    }
+    @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #080808;
+      overflow: hidden;
+    }
+    .card.rec { border-color: rgba(203, 184, 146, 0.42); }
+    .card-h {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .card-h .tag {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: var(--gold);
+      margin-bottom: 6px;
+    }
+    .card-h h2 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+    }
+    .card-h p {
+      margin: 0;
+      color: var(--mute);
+      font-size: 0.78rem;
+      line-height: 1.55;
+    }
+    .mock-wrap {
+      padding: 18px 16px 22px;
+      display: flex;
+      justify-content: center;
+      background: #030303;
+    }
+    .phone {
+      width: 320px;
+      background: var(--bg);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+    }
+    .mock-card {
+      display: grid;
+      grid-template-columns: 0.58fr 0.42fr;
+      min-height: 186px;
+      background: var(--panel);
+      position: relative;
+    }
+    .mock-cover {
+      position: relative;
+      min-height: 186px;
+      background:
+        radial-gradient(ellipse 70% 80% at 42% 38%, rgba(120, 90, 70, 0.35), transparent 70%),
+        linear-gradient(160deg, #2a1810 0%, #1a0e08 55%, #120905 100%);
+    }
+    .mock-cover::after {
+      content: "样图";
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(243, 241, 236, 0.22);
+      font-size: 11px;
+      letter-spacing: 0.35em;
+    }
+    .mock-copy {
+      padding: 16px 14px 28px 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      position: relative;
+      z-index: 2;
+    }
+    .kicker {
+      font-size: 8.5px;
+      letter-spacing: 0.12em;
+      color: rgba(243, 241, 236, 0.42);
+    }
+    .title {
+      margin: 0;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      font-weight: 400;
+      color: #f3f1ec;
+    }
+    .rule {
+      display: block;
+      width: 20px;
+      height: 1px;
+      background: rgba(243, 241, 236, 0.28);
+      margin: 2px 0 2px;
+    }
+    .desc {
+      margin: 0;
+      font-size: 9.5px;
+      line-height: 1.45;
+      color: rgba(243, 241, 236, 0.62);
+    }
+    .note-line {
+      margin: 4px 0 0;
+      font-size: 9.5px;
+      letter-spacing: 0.14em;
+      color: rgba(243, 241, 236, 0.38);
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0;
+    }
+    .heart {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      flex: 0 0 auto;
+      background: var(--heart-soft);
+      transform: rotate(-45deg);
+      border-radius: 1px;
+      position: relative;
+      opacity: 0.9;
+    }
+    .heart::before,
+    .heart::after {
+      content: "";
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: inherit;
+      border-radius: 50%;
+    }
+    .heart::before { top: -4px; left: 0; }
+    .heart::after { top: 0; left: 4px; }
+    .heart.sm {
+      width: 6px;
+      height: 6px;
+    }
+    .heart.sm::before,
+    .heart.sm::after {
+      width: 6px;
+      height: 6px;
+    }
+    .heart.sm::before { top: -3px; }
+    .heart.sm::after { left: 3px; }
+    .heart.md {
+      width: 9px;
+      height: 9px;
+    }
+    .heart.md::before,
+    .heart.md::after {
+      width: 9px;
+      height: 9px;
+    }
+    .heart.md::before { top: -4.5px; }
+    .heart.md::after { left: 4.5px; }
+
+    /* N1 前缀 */
+    .n1 .note-line { gap: 7px; }
+    .n1 .heart { margin-top: 1px; }
+
+    /* N2 分隔替换中间点 */
+    .n2 .note-line { gap: 5px; letter-spacing: 0.1em; }
+    .n2 .sep { color: rgba(243, 241, 236, 0.22); }
+    .n2 .heart { margin: 0 1px; opacity: 0.78; }
+
+    /* N3 尾缀 */
+    .n3 .note-line { gap: 6px; }
+    .n3 .heart { margin-top: 1px; opacity: 0.82; }
+
+    /* N4 脚注上方居中小印 */
+    .n4 .note-block {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 7px;
+      margin-top: 4px;
+    }
+    .n4 .heart-mark {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .n4 .heart-mark .dash {
+      width: 10px;
+      height: 1px;
+      background: rgba(181, 122, 106, 0.35);
+    }
+    .n4 .note-line { margin: 0; }
+
+    .fade {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 42%;
+      pointer-events: none;
+      background: linear-gradient(
+        180deg,
+        rgba(5, 5, 5, 0) 0%,
+        rgba(5, 5, 5, 0.55) 55%,
+        #050505 100%
+      );
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>约画卡 · 爱心点缀 · 设计确认</h1>
+    <p class="lead">
+      约定：爱心落在脚注「纪念 · 礼物 · 画你所爱」一带；气质为低饱和暖色实心/半透明，表达「订画是一种爱心」。
+      以下四套只改脚注区，主标题与短线不动。示意比例对齐手机约画卡。
+    </p>
+    <div class="note">
+      <b>策划要点</b>：爱心是「意思」而不是装饰花——宁小勿抢、宁暖勿艳。色取画室暖褐同系（约 <code>#b57a6a</code>），避免荧光粉红。
+      千牛落地时爱心可做成静帧里的图形，或文案旁小图标热区无关。
+    </div>
+    <div class="reply">
+      请回复代号：
+      <strong>选 N1</strong> ·
+      <strong>选 N2</strong> ·
+      <strong>选 N3</strong> ·
+      <strong>选 N4</strong>（推荐）
+      <br />也可说「N4，再淡一点」等微调。
+    </div>
+
+    <div class="grid">
+      <!-- N1 -->
+      <section class="card">
+        <div class="card-h">
+          <span class="tag">N1 · 脚注前缀</span>
+          <h2>爱心 + 整句脚注</h2>
+          <p>一句前面加一颗心，读起来像「带着心意说这句话」。最直白，也最常见。</p>
+        </div>
+        <div class="mock-wrap">
+          <div class="phone">
+            <div class="mock-card n1">
+              <div class="mock-cover"></div>
+              <div class="mock-copy">
+                <div class="kicker">肖像定制</div>
+                <h3 class="title">约一幅肖像画</h3>
+                <i class="rule" aria-hidden="true"></i>
+                <p class="desc">儿童 / 人物手绘定制</p>
+                <p class="note-line">
+                  <span class="heart sm" aria-hidden="true"></span>
+                  <span>纪念 · 礼物 · 画你所爱</span>
+                </p>
+              </div>
+              <div class="fade"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- N2 -->
+      <section class="card">
+        <div class="card-h">
+          <span class="tag">N2 · 分隔替换</span>
+          <h2>纪念 ♥ 礼物 ♥ 画你所爱</h2>
+          <p>用两颗小心换掉中间圆点。意思嵌进句式里，但略密，手机上要控制尺寸。</p>
+        </div>
+        <div class="mock-wrap">
+          <div class="phone">
+            <div class="mock-card n2">
+              <div class="mock-cover"></div>
+              <div class="mock-copy">
+                <div class="kicker">肖像定制</div>
+                <h3 class="title">约一幅肖像画</h3>
+                <i class="rule" aria-hidden="true"></i>
+                <p class="desc">儿童 / 人物手绘定制</p>
+                <p class="note-line">
+                  <span>纪念</span>
+                  <span class="heart sm" aria-hidden="true"></span>
+                  <span>礼物</span>
+                  <span class="heart sm" aria-hidden="true"></span>
+                  <span>画你所爱</span>
+                </p>
+              </div>
+              <div class="fade"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- N3 -->
+      <section class="card">
+        <div class="card-h">
+          <span class="tag">N3 · 句末点缀</span>
+          <h2>……画你所爱 ♥</h2>
+          <p>心落在「爱」字之后，像句读。轻、不抢，语义刚好落在「所爱」上。</p>
+        </div>
+        <div class="mock-wrap">
+          <div class="phone">
+            <div class="mock-card n3">
+              <div class="mock-cover"></div>
+              <div class="mock-copy">
+                <div class="kicker">肖像定制</div>
+                <h3 class="title">约一幅肖像画</h3>
+                <i class="rule" aria-hidden="true"></i>
+                <p class="desc">儿童 / 人物手绘定制</p>
+                <p class="note-line">
+                  <span>纪念 · 礼物 · 画你所爱</span>
+                  <span class="heart sm" aria-hidden="true"></span>
+                </p>
+              </div>
+              <div class="fade"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- N4 -->
+      <section class="card rec">
+        <div class="card-h">
+          <span class="tag">N4 · 推荐 · 脚注上方小印</span>
+          <h2>独立一小颗心，再读脚注</h2>
+          <p>心单独成「印章」，脚注文案保持原样。意思清楚、不挤字、深色画室也更静。</p>
+        </div>
+        <div class="mock-wrap">
+          <div class="phone">
+            <div class="mock-card n4">
+              <div class="mock-cover"></div>
+              <div class="mock-copy">
+                <div class="kicker">肖像定制</div>
+                <h3 class="title">约一幅肖像画</h3>
+                <i class="rule" aria-hidden="true"></i>
+                <p class="desc">儿童 / 人物手绘定制</p>
+                <div class="note-block">
+                  <div class="heart-mark" aria-hidden="true">
+                    <i class="dash"></i>
+                    <span class="heart md"></span>
+                    <i class="dash"></i>
+                  </div>
+                  <p class="note-line">纪念 · 礼物 · 画你所爱</p>
+                </div>
+              </div>
+              <div class="fade"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

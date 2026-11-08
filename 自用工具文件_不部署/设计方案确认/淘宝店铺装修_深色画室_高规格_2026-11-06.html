@@ -19,6 +19,9 @@
       /* 约画文案侧：取样工作室底图深褐（暖暗木/灯影均值） */
       --panel-custom: #441f0b;
       --panel-custom-rgb: 68, 31, 11;
+      /* 约画脚注爱心：低饱和暖褐，表达「订画是心意」 */
+      --heart: rgba(181, 122, 106, 0.72);
+      --heart-dash: rgba(181, 122, 106, 0.35);
     }
     * { box-sizing: border-box; }
     body {
@@ -473,13 +476,61 @@
         rgba(var(--panel-rgb), 0) 58%
       );
     }
-    /* 约画：同课卡规格，左图右文；文案侧轻炭褐呼应工作室灯色 */
+    /* 约画：左图右文；文案侧深褐。尝试：去底边 + 加高 + 下缘溶进页底，与工作室带衔接 */
     .course-card.custom-card {
+      position: relative;
       grid-template-columns: minmax(0, 0.62fr) minmax(0, 0.38fr);
       background: var(--panel-custom);
+      min-height: 198px;
+      margin-bottom: 0;
+      border-bottom: none;
+      border-radius: 3px 3px 0 0;
     }
     .course-card.custom-card .course-copy {
-      padding: 20px 22px 20px 18px;
+      padding: 22px 22px 32px 18px;
+    }
+    /* N4：脚注上方独立小爱心印 */
+    .course-card.custom-card .course-note-block {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .course-card.custom-card .course-heart-mark {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .course-card.custom-card .course-heart-mark .dash {
+      display: block;
+      width: 12px;
+      height: 1px;
+      background: var(--heart-dash);
+    }
+    .course-card.custom-card .course-heart {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      background: var(--heart);
+      transform: rotate(-45deg);
+      border-radius: 1px;
+      position: relative;
+      flex: 0 0 auto;
+    }
+    .course-card.custom-card .course-heart::before,
+    .course-card.custom-card .course-heart::after {
+      content: "";
+      position: absolute;
+      width: 9px;
+      height: 9px;
+      background: inherit;
+      border-radius: 50%;
+    }
+    .course-card.custom-card .course-heart::before { top: -4.5px; left: 0; }
+    .course-card.custom-card .course-heart::after { top: 0; left: 4.5px; }
+    .course-card.custom-card .course-note-block .course-note {
+      margin: 0;
     }
     .course-card.custom-card .course-cover {
       background: var(--panel-custom);
@@ -493,10 +544,27 @@
         rgba(var(--panel-custom-rgb), 0) 58%
       );
     }
+    .course-card.custom-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 48%;
+      z-index: 5;
+      pointer-events: none;
+      background: linear-gradient(
+        180deg,
+        rgba(5, 5, 5, 0) 0%,
+        rgba(5, 5, 5, 0.28) 38%,
+        rgba(5, 5, 5, 0.78) 72%,
+        #050505 100%
+      );
+    }
 
     /* 页末 · 工作室氛围带：图溶进背景 +「工作中…」 */
     .zone-studio {
-      padding-top: 18px;
+      padding-top: 0;
       padding-bottom: 4px;
     }
     .studio-band {
@@ -798,8 +866,27 @@
     }
     .desk .course-card.custom-card {
       grid-template-columns: minmax(0, 0.64fr) minmax(0, 0.36fr);
+      min-height: 400px;
+      margin-bottom: 0;
+      border-bottom: none;
+      border-radius: 3px 3px 0 0;
     }
-    .desk .course-card.custom-card .course-copy { padding: 32px 40px 32px 28px; }
+    .desk .course-card.custom-card .course-copy { padding: 40px 40px 56px 28px; }
+    .desk .course-card.custom-card .course-cover { min-height: 400px; }
+    .desk .course-card.custom-card .course-note-block { gap: 10px; margin-top: 6px; }
+    .desk .course-card.custom-card .course-heart-mark { gap: 9px; }
+    .desk .course-card.custom-card .course-heart-mark .dash { width: 16px; }
+    .desk .course-card.custom-card .course-heart {
+      width: 11px;
+      height: 11px;
+    }
+    .desk .course-card.custom-card .course-heart::before,
+    .desk .course-card.custom-card .course-heart::after {
+      width: 11px;
+      height: 11px;
+    }
+    .desk .course-card.custom-card .course-heart::before { top: -5.5px; }
+    .desk .course-card.custom-card .course-heart::after { left: 5.5px; }
     .desk .course-card.custom-card .course-cover::after {
       background: linear-gradient(
         270deg,
@@ -809,12 +896,12 @@
         rgba(var(--panel-custom-rgb), 0) 56%
       );
     }
-    .desk .zone-studio { padding-top: 28px; }
+    .desk .course-card.custom-card::before { height: 44%; }
+    .desk .zone-studio { padding-top: 0; }
     /* PC：加高画幅，多露工作室图上部 */
     .desk .studio-band { aspect-ratio: 16 / 11; border-radius: 3px; }
     .desk .studio-cap { bottom: 10%; }
     .desk .studio-cap span { font-size: 15px; letter-spacing: 0.55em; text-indent: 0.55em; }
-    .phone .zone-studio { padding-top: 14px; }
     .phone .studio-band { aspect-ratio: 5 / 4; }
     .phone .studio-cap { bottom: 8%; }
     .phone .studio-cap span { font-size: 10px; letter-spacing: 0.36em; text-indent: 0.36em; }
@@ -838,8 +925,29 @@
     .phone .course-card .course-cover { min-height: 132px; }
     .phone .course-card.custom-card {
       grid-template-columns: minmax(0, 0.58fr) minmax(0, 0.42fr);
+      min-height: 186px;
+      margin-bottom: 0;
+      border-bottom: none;
+      border-radius: 3px 3px 0 0;
     }
-    .phone .course-card.custom-card .course-copy { padding: 14px 14px 14px 10px; }
+    .phone .course-card.custom-card .course-copy { padding: 16px 14px 28px 10px; }
+    .phone .course-card.custom-card .course-cover { min-height: 186px; }
+    .phone .course-card.custom-card .course-note-block { gap: 7px; margin-top: 4px; }
+    .phone .course-card.custom-card .course-heart-mark { gap: 6px; }
+    .phone .course-card.custom-card .course-heart-mark .dash { width: 10px; }
+    .phone .course-card.custom-card .course-heart {
+      width: 7px;
+      height: 7px;
+    }
+    .phone .course-card.custom-card .course-heart::before,
+    .phone .course-card.custom-card .course-heart::after {
+      width: 7px;
+      height: 7px;
+    }
+    .phone .course-card.custom-card .course-heart::before { top: -3.5px; }
+    .phone .course-card.custom-card .course-heart::after { left: 3.5px; }
+    .phone .course-card.custom-card::before { height: 52%; }
+    .phone .zone-studio { padding-top: 0; }
     .phone .strip .slot { height: 78px; }
     .phone .work-grid { gap: 5px; margin-top: 8px; }
     .phone .work-grid .slot.is-empty::before { font-size: 8.5px; letter-spacing: 0.12em; }
@@ -1564,7 +1672,14 @@
           <h3 class="course-title">${d.title}</h3>
           <i class="course-rule" aria-hidden="true"></i>
           <p class="course-desc"><span class="course-desc-line">${d.desc}</span></p>
-          <p class="course-note">${d.note || '纪念 · 礼物 · 画你所爱'}</p>
+          <div class="course-note-block">
+            <div class="course-heart-mark" aria-hidden="true" title="订画是一种爱心的表达">
+              <i class="dash"></i>
+              <span class="course-heart"></span>
+              <i class="dash"></i>
+            </div>
+            <p class="course-note">${d.note || '纪念 · 礼物 · 画你所爱'}</p>
+          </div>
         </div>
       </article>`;
     }
