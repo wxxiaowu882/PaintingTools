@@ -13,6 +13,12 @@
       --line: rgba(255,255,255,0.1);
       --gold: #cbb892;
       --gold-dim: rgba(203,184,146,0.62);
+      /* 画室暖炭：课卡轻暖；约画文案侧再轻抬一档，呼应工作室灯褐 */
+      --panel: #0c0a08;
+      --panel-rgb: 12, 10, 8;
+      /* 约画文案侧：取样工作室底图深褐（暖暗木/灯影均值） */
+      --panel-custom: #441f0b;
+      --panel-custom-rgb: 68, 31, 11;
     }
     * { box-sizing: border-box; }
     body {
@@ -392,7 +398,7 @@
       margin-bottom: 10px;
       border: 1px solid rgba(255,255,255,0.1);
       border-radius: 3px;
-      background: #060606;
+      background: var(--panel);
       overflow: hidden;
     }
     .course-card .course-copy {
@@ -446,7 +452,7 @@
     .course-card .course-cover {
       position: relative;
       min-height: 120px;
-      background: #060606;
+      background: var(--panel);
       overflow: hidden;
     }
     .course-card .course-cover .slot {
@@ -461,33 +467,110 @@
       pointer-events: none;
       background: linear-gradient(
         90deg,
-        #060606 0%,
-        rgba(6, 6, 6, 0.88) 12%,
-        rgba(6, 6, 6, 0.35) 38%,
-        rgba(6, 6, 6, 0) 58%
+        rgb(var(--panel-rgb)) 0%,
+        rgba(var(--panel-rgb), 0.88) 12%,
+        rgba(var(--panel-rgb), 0.35) 38%,
+        rgba(var(--panel-rgb), 0) 58%
       );
     }
-    /* 约画：同课卡规格，左图右文（封面右缘渐隐） */
+    /* 约画：同课卡规格，左图右文；文案侧轻炭褐呼应工作室灯色 */
     .course-card.custom-card {
       grid-template-columns: minmax(0, 0.62fr) minmax(0, 0.38fr);
+      background: var(--panel-custom);
     }
     .course-card.custom-card .course-copy {
       padding: 20px 22px 20px 18px;
     }
+    .course-card.custom-card .course-cover {
+      background: var(--panel-custom);
+    }
     .course-card.custom-card .course-cover::after {
       background: linear-gradient(
         270deg,
-        #060606 0%,
-        rgba(6, 6, 6, 0.88) 12%,
-        rgba(6, 6, 6, 0.35) 38%,
-        rgba(6, 6, 6, 0) 58%
+        rgb(var(--panel-custom-rgb)) 0%,
+        rgba(var(--panel-custom-rgb), 0.9) 12%,
+        rgba(var(--panel-custom-rgb), 0.38) 38%,
+        rgba(var(--panel-custom-rgb), 0) 58%
       );
+    }
+
+    /* 页末 · 工作室氛围带：图溶进背景 +「工作中…」 */
+    .zone-studio {
+      padding-top: 18px;
+      padding-bottom: 4px;
+    }
+    .studio-band {
+      position: relative;
+      margin: 0;
+      aspect-ratio: 16 / 10;
+      overflow: hidden;
+      background: #050505;
+      border-radius: 2px;
+    }
+    .studio-band .slot {
+      position: absolute;
+      inset: 0;
+    }
+    .studio-cap {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 9%;
+      z-index: 4;
+      text-align: center;
+      pointer-events: none;
+    }
+    .studio-cap span {
+      display: inline-block;
+      font-size: 12px;
+      letter-spacing: 0.48em;
+      font-weight: 300;
+      color: rgba(243, 241, 236, 0.52);
+      text-indent: 0.48em;
+      text-shadow: 0 2px 28px rgba(0, 0, 0, 0.75);
     }
     .zone .strip {
       margin: 0 0 10px;
       padding: 0;
       gap: 3px;
       background: transparent;
+    }
+
+    /* 约画下 · 3列×4行作品格（3:4，圆角对齐三工具，可逐张编辑） */
+    .work-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      margin: 10px 0 0;
+    }
+    .work-grid .slot {
+      position: relative;
+      aspect-ratio: 3 / 4;
+      overflow: hidden;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #121212;
+    }
+    /* 与全局槽一致：默认隐藏编辑钮，悬停/聚焦才显示 */
+    .work-grid .slot .edit-hit {
+      opacity: 0;
+    }
+    .work-grid .slot:hover .edit-hit,
+    .work-grid .slot:focus-within .edit-hit {
+      opacity: 1;
+    }
+    .work-grid .slot.is-empty::before {
+      content: "待换图";
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: rgba(243,241,236,0.28);
     }
 
     .pair {
@@ -649,6 +732,8 @@
       overflow: hidden;
       border: 1px solid rgba(255,255,255,0.07);
     }
+    .desk .work-grid { gap: 10px; margin-top: 12px; }
+    .desk .work-grid .slot.is-empty::before { font-size: 12px; letter-spacing: 0.22em; }
     .desk .zone { padding: 10px 0 8px; }
     .desk .pair { gap: 14px; }
     .desk .pair .cine { min-height: 300px; }
@@ -705,10 +790,10 @@
     .desk .course-card .course-cover::after {
       background: linear-gradient(
         90deg,
-        #060606 0%,
-        rgba(6, 6, 6, 0.9) 10%,
-        rgba(6, 6, 6, 0.4) 36%,
-        rgba(6, 6, 6, 0) 56%
+        rgb(var(--panel-rgb)) 0%,
+        rgba(var(--panel-rgb), 0.9) 10%,
+        rgba(var(--panel-rgb), 0.4) 36%,
+        rgba(var(--panel-rgb), 0) 56%
       );
     }
     .desk .course-card.custom-card {
@@ -718,12 +803,21 @@
     .desk .course-card.custom-card .course-cover::after {
       background: linear-gradient(
         270deg,
-        #060606 0%,
-        rgba(6, 6, 6, 0.9) 10%,
-        rgba(6, 6, 6, 0.4) 36%,
-        rgba(6, 6, 6, 0) 56%
+        rgb(var(--panel-custom-rgb)) 0%,
+        rgba(var(--panel-custom-rgb), 0.92) 10%,
+        rgba(var(--panel-custom-rgb), 0.4) 36%,
+        rgba(var(--panel-custom-rgb), 0) 56%
       );
     }
+    .desk .zone-studio { padding-top: 28px; }
+    /* PC：加高画幅，多露工作室图上部 */
+    .desk .studio-band { aspect-ratio: 16 / 11; border-radius: 3px; }
+    .desk .studio-cap { bottom: 10%; }
+    .desk .studio-cap span { font-size: 15px; letter-spacing: 0.55em; text-indent: 0.55em; }
+    .phone .zone-studio { padding-top: 14px; }
+    .phone .studio-band { aspect-ratio: 5 / 4; }
+    .phone .studio-cap { bottom: 8%; }
+    .phone .studio-cap span { font-size: 10px; letter-spacing: 0.36em; text-indent: 0.36em; }
     .desk .carousel { min-height: 240px; display: none; }
     .phone .pro-card { min-height: 140px; }
     .phone .pro-card .pro-logo { padding: 12px 8px; }
@@ -747,6 +841,8 @@
     }
     .phone .course-card.custom-card .course-copy { padding: 14px 14px 14px 10px; }
     .phone .strip .slot { height: 78px; }
+    .phone .work-grid { gap: 5px; margin-top: 8px; }
+    .phone .work-grid .slot.is-empty::before { font-size: 8.5px; letter-spacing: 0.12em; }
     .desk .cine .cap b { font-size: 15px; }
     .desk .cine .cap span { font-size: 12.5px; }
     .desk .quiet .tile { min-height: 118px; padding: 20px 18px; }
@@ -922,8 +1018,39 @@
     }
     .row input[type=range] { width: 100%; }
     .row .val { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .row-color {
+      display: grid;
+      grid-template-columns: 72px 1fr 42px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: var(--mute);
+    }
+    .row-color input[type=text] {
+      width: 100%;
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: #121212;
+      color: #eee;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      padding: 7px 8px;
+      border-radius: 4px;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+    .row-color input[type=color] {
+      width: 42px;
+      height: 30px;
+      padding: 0;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: transparent;
+      cursor: pointer;
+      border-radius: 4px;
+    }
     .file-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
     .tip { margin-top: 10px; font-size: 11px; color: var(--dim); line-height: 1.5; }
+    #panelColorBlock { display: none; }
     #filePick { display: none; }
   </style>
 </head>
@@ -931,7 +1058,7 @@
   <div class="wrap">
     <h1 class="page-h">深色画室 · 高规格首页 v2（可调图）</h1>
     <p class="page-lead">
-      左手机 + 右 PC 多列长条。悬停图片 → 编辑。约画与水彩课同构（左图右文，可调封面）；轮播暂藏。短码路径在 Pro 下轻脚注收口。
+      左手机 + 右 PC。悬停图片 → 编辑。约画：左图右文卡（作品格暂藏）。页末工作室氛围带可调溶边 / 暖度，文案「工作中…」。短码路径在 Pro 下轻脚注。
       <strong>设置会写入仓库文件</strong>，关掉 Cursor / 换浏览器也能恢复（不只靠内嵌浏览器缓存）。
     </p>
     <div class="page-note">
@@ -992,12 +1119,21 @@
           <div class="row"><span>缩放</span><input type="range" id="rngZoom" min="100" max="220" step="1" /><span class="val" id="valZoom">1.00</span></div>
           <div class="row"><span>水平</span><input type="range" id="rngX" min="0" max="100" step="1" /><span class="val" id="valX">50%</span></div>
           <div class="row"><span>垂直</span><input type="range" id="rngY" min="0" max="100" step="1" /><span class="val" id="valY">50%</span></div>
-          <h4>底部暖深色遮罩</h4>
+          <div id="panelColorBlock">
+            <h4>约画文案底色</h4>
+            <div class="row-color">
+              <span>色值</span>
+              <input type="text" id="inpPanelColor" spellcheck="false" placeholder="#441f0b" maxlength="20" />
+              <input type="color" id="clrPanelColor" title="取色" />
+            </div>
+            <p class="tip">支持 `#441f0b` 或 `441f0b`；改完即时预览，点「完成」写入仓库。</p>
+          </div>
+          <h4 id="shadeTitle">底部暖深色遮罩</h4>
           <div class="row"><span>起点</span><input type="range" id="rngG0" min="0" max="80" step="1" /><span class="val" id="valG0">28%</span></div>
           <div class="row"><span>浓度</span><input type="range" id="rngGOp" min="40" max="100" step="1" /><span class="val" id="valGOp">0.78</span></div>
           <div class="row"><span>暖度</span><input type="range" id="rngWarm" min="0" max="100" step="1" /><span class="val" id="valWarm">0</span></div>
           <div class="row"><span>亮度压</span><input type="range" id="rngBright" min="70" max="110" step="1" /><span class="val" id="valBright">0.90</span></div>
-          <p class="tip">默认暖度=0，对齐上一版深黑衬字；调高暖度会偏画室炭褐（你截图里喜欢的沉浸感）。</p>
+          <p class="tip" id="shadeTip">默认暖度=0，对齐上一版深黑衬字；调高暖度会偏画室炭褐（你截图里喜欢的沉浸感）。</p>
         </div>
       </div>
     </div>
@@ -1006,9 +1142,14 @@
   <script>
     const B = '/%E8%87%AA%E7%94%A8%E5%B7%A5%E5%85%B7%E6%96%87%E4%BB%B6_%E4%B8%8D%E9%83%A8%E7%BD%B2/%E6%B7%98%E5%AE%9D%E5%BA%97%E9%93%BA%E8%A3%85%E4%BF%AE%E7%B4%A0%E6%9D%90_2026-11/atelier-src/';
     // 换 key，避免上一版可编辑页的 localStorage 把默认观感带偏
-    const STORE_KEY = 'taobao-atelier-v2-editable-2026-11-08-custom-card';
+    const STORE_KEY = 'taobao-atelier-v2-editable-2026-11-08-studio-copy';
     const SLOTS_API = '/__api/taobao-atelier-slots';
     const CUSTOM_IDS = ['c1', 'c2', 'c3', 'c4', 'c5']; // 轮播暂藏，槽位保留便于以后开回
+    const GRID_IDS = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8', 'g9', 'g10', 'g11', 'g12'];
+    // 空占位：深灰底，待本机换图（方案 B）
+    const EMPTY_SRC = 'data:image/svg+xml,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400"><rect width="100%" height="100%" fill="#121212"/></svg>'
+    );
 
     // 默认对齐上版 v2 终稿素材与取景（object-position），渐变对齐上版黑遮罩
     const DEFAULTS = {
@@ -1021,15 +1162,34 @@
       port: { src: B + 'scene-port-live.png', zoom: 1, x: 50, y: 28, g0: 28, gOp: 0.78, warm: 0, bright: 0.9, num: '②', title: '人物肖像「写生台」', desc: '可转可调光的 3D 人像写生。一次开通，长期可用。' },
       jie:  { src: B + 'tool-jie-grid.png', zoom: 1, x: 50, y: 32, g0: 35, gOp: 0.82, warm: 0, bright: 0.98, num: '③', title: '「晓阶」', desc: '色阶分析 · 网格起形', tool: true },
       se:   { src: B + 'tool-se-01.jpg', zoom: 1, x: 50, y: 22, g0: 35, gOp: 0.82, warm: 0, bright: 0.98, num: '④', title: '「晓色」', desc: '自动调色 · 练习 · 颜料盒', tool: true },
-      mu:   { src: B + 'tool-mu-immersive.png', zoom: 1, x: 48, y: 35, g0: 35, gOp: 0.82, warm: 0, bright: 0.96, num: '⑤', title: '「晓摹」', desc: '叠图描形 · 应急起型', tool: true },
-      pro:  { src: B + 'logo-pro.png', zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: 'Pro', desc: '写生台 + 三工具 + 课件库（非视频课）', pack: '含上面 <span class="n">①～⑤</span> 全部 · 另加课件库', logoOnly: true },
+      mu:   { src: B + 'tool-mu-immersive.png', zoom: 1, x: 48, y: 35, g0: 35, gOp: 0.82, warm: 0, bright: 0.96, num: '⑤', title: '「晓摹」', desc: '叠图描形 · 应急起型 · 型准核对', tool: true },
+      pro:  { src: B + 'logo-pro.png', zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: 'Pro', desc: '写生台 + 三新手工具 + 课件库（非视频课）', pack: '含上面 <span class="n">①～⑤</span> 全部 · 另加课件库', logoOnly: true },
       course:{ src: B + 'work-kamilla.png', zoom: 1, x: 50, y: 22, g0: 35, gOp: 0.55, warm: 0, bright: 0.9, title: '水彩人像课', kicker: '课预告 · 0基础可学', desc: '2027 年一季度内开通', note: '敬请期待…' },
-      custom:{ src: B + 'work-xinjiang.jpg', zoom: 1, x: 45, y: 18, g0: 40, gOp: 0.55, warm: 0, bright: 0.78, title: '约一幅肖像画', kicker: '肖像定制', desc: '儿童 / 人物手绘定制', note: '先聊构图 · 再动手绘' },
+      custom:{ src: B + 'work-xinjiang.jpg', zoom: 1, x: 45, y: 18, g0: 40, gOp: 0.55, warm: 0, bright: 0.78, title: '约一幅肖像画', kicker: '肖像定制', desc: '儿童 / 人物手绘定制', note: '纪念 · 礼物 · 画你所爱', panelColor: '#441f0b' },
       c1: { src: B + 'work-xinjiang.jpg', zoom: 1, x: 45, y: 18, g0: 40, gOp: 0.78, warm: 0, bright: 0.72, title: '', desc: '' },
       c2: { src: B + 'work-kamilla.png', zoom: 1, x: 50, y: 20, g0: 40, gOp: 0.72, warm: 0, bright: 0.88, title: '', desc: '' },
       c3: { src: B + 'work-siu.jpg', zoom: 1, x: 48, y: 22, g0: 42, gOp: 0.7, warm: 0, bright: 0.9, title: '', desc: '' },
       c4: { src: B + 'work-mia.jpg', zoom: 1, x: 50, y: 24, g0: 42, gOp: 0.7, warm: 0, bright: 0.9, title: '', desc: '' },
-      c5: { src: B + 'work-warm.png', zoom: 1, x: 48, y: 20, g0: 40, gOp: 0.72, warm: 0, bright: 0.9, title: '', desc: '' }
+      c5: { src: B + 'work-warm.png', zoom: 1, x: 48, y: 20, g0: 40, gOp: 0.72, warm: 0, bright: 0.9, title: '', desc: '' },
+      g1: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      g2: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      g3: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      g4: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      g5: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      g6: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      g7: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      g8: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      g9: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      g10: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      g11: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      g12: { src: EMPTY_SRC, zoom: 1, x: 50, y: 50, g0: 0, gOp: 0, warm: 0, bright: 1, title: '', desc: '', empty: true },
+      /* 页末工作室：四边溶进暖炭底；暖度/浓度/起点/缩放均可调 */
+      studio: {
+        src: B + 'studio-atelier.png',
+        zoom: 1.06, x: 46, y: 28,
+        g0: 32, gOp: 0.9, warm: 48, bright: 0.9,
+        mode: 'studio', title: '工作中…', desc: ''
+      }
     };
 
     const LABEL = {
@@ -1037,7 +1197,12 @@
       w1: '作品条·左', w2: '作品条·中', w3: '作品条·右',
       geo: '写生台·几何', port: '写生台·肖像', jie: '晓阶', se: '晓色', mu: '晓摹',
       pro: 'Pro', course: '水彩课封面', custom: '约画封面',
-      c1: '约画轮播·1', c2: '约画轮播·2', c3: '约画轮播·3', c4: '约画轮播·4', c5: '约画轮播·5'
+      c1: '约画轮播·1', c2: '约画轮播·2', c3: '约画轮播·3', c4: '约画轮播·4', c5: '约画轮播·5',
+      g1: '约画作品·1', g2: '约画作品·2', g3: '约画作品·3',
+      g4: '约画作品·4', g5: '约画作品·5', g6: '约画作品·6',
+      g7: '约画作品·7', g8: '约画作品·8', g9: '约画作品·9',
+      g10: '约画作品·10', g11: '约画作品·11', g12: '约画作品·12',
+      studio: '工作室氛围'
     };
 
     let state = clone(DEFAULTS);
@@ -1078,6 +1243,12 @@
         });
         if (out.custom.src && String(out.custom.src).startsWith('blob:')) out.custom.src = DEFAULTS.custom.src;
       }
+      // 作品格：已落真实图则清掉 empty 占位标记
+      GRID_IDS.forEach((id) => {
+        if (!out[id]) return;
+        const src = String(out[id].src || '');
+        if (src && !src.startsWith('data:image/svg+xml') && !src.startsWith('blob:')) out[id].empty = false;
+      });
       return out;
     }
 
@@ -1204,6 +1375,35 @@
       return `${r},${g},${b}`;
     }
 
+    function normalizeHex(raw) {
+      let s = String(raw || '').trim();
+      if (!s) return null;
+      if (!s.startsWith('#')) s = '#' + s;
+      if (/^#[0-9a-fA-F]{3}$/.test(s)) {
+        s = '#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3];
+      }
+      if (!/^#[0-9a-fA-F]{6}$/.test(s)) return null;
+      return s.toLowerCase();
+    }
+
+    function hexToRgbCss(hex) {
+      const n = normalizeHex(hex);
+      if (!n) return null;
+      return [
+        parseInt(n.slice(1, 3), 16),
+        parseInt(n.slice(3, 5), 16),
+        parseInt(n.slice(5, 7), 16)
+      ].join(', ');
+    }
+
+    function applyCustomPanelColor(hex) {
+      const n = normalizeHex(hex) || DEFAULTS.custom.panelColor || '#441f0b';
+      const rgb = hexToRgbCss(n) || '68, 31, 11';
+      document.documentElement.style.setProperty('--panel-custom', n);
+      document.documentElement.style.setProperty('--panel-custom-rgb', rgb);
+      return n;
+    }
+
     function shadeCss(s) {
       const rgb = warmRgb(s.warm);
       const g0 = s.g0;
@@ -1215,6 +1415,18 @@
       }
       if (s.mode === 'heroDesk') {
         return `linear-gradient(105deg, rgba(5,5,5,0.88) 0%, rgba(5,5,5,0.45) 38%, rgba(5,5,5,0.12) 58%, rgba(5,5,5,0.55) 100%), ${bottom}`;
+      }
+      if (s.mode === 'studio') {
+        // 起点 g0 越大 → 边缘溶带越薄；浓度 gOp → 溶边深浅；暖度 → 溶进炭褐而非冷黑
+        const band = Math.max(10, Math.min(48, 52 - g0 * 0.45));
+        const o = Number(op).toFixed(3);
+        const oMid = (op * 0.55).toFixed(3);
+        const top = `linear-gradient(180deg, rgba(${rgb},${o}) 0%, rgba(${rgb},${oMid}) ${band * 0.35}%, rgba(${rgb},0) ${band * 1.15}%)`;
+        const bot = `linear-gradient(0deg, rgba(${rgb},${o}) 0%, rgba(${rgb},${oMid}) ${band * 0.4}%, rgba(${rgb},0) ${band * 1.2}%)`;
+        const left = `linear-gradient(90deg, rgba(${rgb},${o}) 0%, rgba(${rgb},0) ${band * 0.95}%)`;
+        const right = `linear-gradient(270deg, rgba(${rgb},${o}) 0%, rgba(${rgb},0) ${band * 0.95}%)`;
+        const rad = `radial-gradient(ellipse 82% 76% at 48% 46%, rgba(${rgb},0) 28%, rgba(${rgb},${(op * 0.35).toFixed(3)}) 100%)`;
+        return `${top}, ${bot}, ${left}, ${right}, ${rad}`;
       }
       return bottom;
     }
@@ -1242,6 +1454,13 @@
       img.style.filter = `saturate(${baseSat}) contrast(${baseCon}) brightness(${s.bright})`;
     }
 
+    function isGridEmpty(s) {
+      if (!s) return true;
+      if (s.empty) return true;
+      const src = String(s.src || '');
+      return src.startsWith('data:image/svg+xml');
+    }
+
     function paintSlotEl(root, id) {
       const s = state[id];
       const img = root.querySelector('img.slot-fg') || root.querySelector('img');
@@ -1249,16 +1468,21 @@
       img.src = s.src;
       applyImg(img, s);
       shade.style.background = shadeCss(s);
+      if (GRID_IDS.includes(id)) root.classList.toggle('is-empty', isGridEmpty(s));
+      else root.classList.remove('is-empty');
     }
 
     function paintAll() {
       document.querySelectorAll('[data-slot]').forEach((el) => {
         paintSlotEl(el, el.getAttribute('data-slot'));
       });
+      const panel = (state.custom && state.custom.panelColor) || DEFAULTS.custom.panelColor;
+      applyCustomPanelColor(panel);
     }
 
     function slotHtml(id) {
-      return `<div class="slot" data-slot="${id}" tabindex="0">
+      const emptyCls = (GRID_IDS.includes(id) && isGridEmpty(DEFAULTS[id])) ? ' is-empty' : '';
+      return `<div class="slot${emptyCls}" data-slot="${id}" tabindex="0">
         <img class="slot-fg" alt="" draggable="false" />
         <div class="shade"></div>
         <button type="button" class="edit-hit" data-edit="${id}">编辑</button>
@@ -1269,9 +1493,19 @@
       if (id === 'jie' || id === 'se' || id === 'mu') return '1 / 2.2';
       if (id === 'geo' || id === 'port') return '3 / 4';
       if (id === 'heroPhone' || id === 'heroDesk') return '16 / 10';
+      if (id === 'studio') return '16 / 10';
       if (id === 'course' || id === 'custom') return '3 / 4';
+      if (GRID_IDS.includes(id)) return '3 / 4';
       if (CUSTOM_IDS.includes(id)) return '100 / 54';
       return '3 / 4';
+    }
+
+    function studioHtml() {
+      const title = (state.studio && state.studio.title) || DEFAULTS.studio.title || '工作中…';
+      return `<div class="studio-band" aria-label="工作室 · 工作中">
+        ${slotHtml('studio')}
+        <div class="studio-cap"><span>${title}</span></div>
+      </div>`;
     }
 
     function customCarouselHtml() {
@@ -1330,9 +1564,17 @@
           <h3 class="course-title">${d.title}</h3>
           <i class="course-rule" aria-hidden="true"></i>
           <p class="course-desc"><span class="course-desc-line">${d.desc}</span></p>
-          <p class="course-note">${d.note || '先聊构图 · 再动手绘'}</p>
+          <p class="course-note">${d.note || '纪念 · 礼物 · 画你所爱'}</p>
         </div>
       </article>`;
+    }
+
+    function workGridHtml() {
+      // 暂藏：3×4 并置抢戏、过渡方案未定；槽位 g1–g12 与 CSS 保留，定稿后开回
+      return '';
+      // return `<div class="work-grid" aria-label="约画作品 3×4">
+      //   ${GRID_IDS.map((id) => slotHtml(id)).join('')}
+      // </div>`;
     }
 
     function stripHtml() {
@@ -1363,7 +1605,7 @@
         <div class="pair">${cine('geo')}${cine('port')}</div>
       </section>
       <section class="zone">
-        <div class="zone-h"><span>画室工具</span><i></i></div>
+        <div class="zone-h"><span>新手工具</span><i></i></div>
         ${tools}
       </section>
       <section class="zone">
@@ -1378,6 +1620,10 @@
       <section class="zone">
         <div class="zone-h"><span>约画</span><i></i></div>
         ${customCardHtml()}
+        ${workGridHtml()}
+      </section>
+      <section class="zone zone-studio">
+        ${studioHtml()}
       </section>
       <div class="foot">
         <div class="old">历史教程素材</div>
@@ -1454,15 +1700,41 @@
       draft = clone(state[id]);
       document.getElementById('modalTitle').textContent = '编辑 · ' + (LABEL[id] || id);
       document.getElementById('previewCapTitle').textContent = draft.title || LABEL[id] || '标题';
-      document.getElementById('previewCapDesc').textContent = draft.desc || '底部遮罩用来衬字、收住画面';
+      document.getElementById('previewCapDesc').textContent =
+        id === 'studio' ? '四边溶进暖炭底，衬「工作中…」' : (draft.desc || '底部遮罩用来衬字、收住画面');
+      const shadeTitle = document.getElementById('shadeTitle');
+      const shadeTip = document.getElementById('shadeTip');
+      const rngGOp = document.getElementById('rngGOp');
+      const panelBlock = document.getElementById('panelColorBlock');
+      if (panelBlock) panelBlock.style.display = id === 'custom' ? 'block' : 'none';
+      if (id === 'custom') {
+        const pc = normalizeHex(draft.panelColor) || DEFAULTS.custom.panelColor;
+        draft.panelColor = pc;
+        document.getElementById('inpPanelColor').value = pc;
+        document.getElementById('clrPanelColor').value = pc;
+        applyCustomPanelColor(pc);
+      }
+      if (id === 'studio') {
+        if (shadeTitle) shadeTitle.textContent = '溶边 · 暖炭氛围';
+        if (shadeTip) shadeTip.textContent = '起点：溶带厚薄｜浓度：溶边深浅｜暖度：冷黑→画室炭褐｜亮度压：整体明暗｜缩放：画面大小。';
+        if (rngGOp) rngGOp.min = '20';
+      } else {
+        if (shadeTitle) shadeTitle.textContent = '底部暖深色遮罩';
+        if (shadeTip) shadeTip.textContent = '默认暖度=0，对齐上一版深黑衬字；调高暖度会偏画室炭褐（你截图里喜欢的沉浸感）。';
+        if (rngGOp) rngGOp.min = '40';
+      }
       const frame = document.getElementById('previewFrame');
       frame.style.aspectRatio = previewAspectFor(id);
       if (id === 'heroPhone' || id === 'heroDesk' || CUSTOM_IDS.includes(id)) {
         frame.style.width = 'min(320px, 92%)';
+      } else if (id === 'studio') {
+        frame.style.width = 'min(360px, 94%)';
       } else if (id === 'jie' || id === 'se' || id === 'mu') {
         frame.style.width = 'min(168px, 58%)';
       } else if (id === 'course' || id === 'custom') {
         frame.style.width = 'min(168px, 58%)';
+      } else if (GRID_IDS.includes(id)) {
+        frame.style.width = 'min(280px, 78%)';
       } else {
         frame.style.width = 'min(220px, 72%)';
       }
@@ -1479,10 +1751,13 @@
           try { await draft._pendingRead; } catch (e) {}
           delete draft._pendingRead;
         }
-        state[editingId] = clone(draft);
+          state[editingId] = clone(draft);
         delete state[editingId]._pendingRead;
         paintAll();
         await persistToDisk();
+      } else {
+        // 取消时恢复约画底色（编辑中可能已实时预览改过）
+        applyCustomPanelColor((state.custom && state.custom.panelColor) || DEFAULTS.custom.panelColor);
       }
       editingId = null;
       draft = null;
@@ -1517,6 +1792,32 @@
     }
 
     function bindControls() {
+      const setPanelColorLive = (raw) => {
+        if (!draft || editingId !== 'custom') return;
+        const n = normalizeHex(raw);
+        if (!n) return;
+        draft.panelColor = n;
+        document.getElementById('inpPanelColor').value = n;
+        document.getElementById('clrPanelColor').value = n;
+        applyCustomPanelColor(n);
+      };
+      document.getElementById('inpPanelColor').addEventListener('input', (e) => {
+        setPanelColorLive(e.target.value);
+      });
+      document.getElementById('inpPanelColor').addEventListener('change', (e) => {
+        const n = normalizeHex(e.target.value);
+        if (!n) {
+          const fallback = (draft && draft.panelColor) || DEFAULTS.custom.panelColor;
+          e.target.value = fallback;
+          document.getElementById('clrPanelColor').value = fallback;
+          return;
+        }
+        setPanelColorLive(n);
+      });
+      document.getElementById('clrPanelColor').addEventListener('input', (e) => {
+        setPanelColorLive(e.target.value);
+      });
+
       const map = [
         ['rngZoom', (v) => { draft.zoom = v / 100; document.getElementById('valZoom').textContent = draft.zoom.toFixed(2); }],
         ['rngX', (v) => { draft.x = +v; document.getElementById('valX').textContent = draft.x + '%'; }],
@@ -1591,6 +1892,7 @@
       const url = URL.createObjectURL(file);
       customBlobUrls[id] = url;
       draft.src = url;
+      draft.empty = false;
       draft._pendingRead = (async () => {
         const buf = await file.arrayBuffer();
         const bytes = new Uint8Array(buf);
@@ -1608,7 +1910,10 @@
     });
     document.getElementById('btnRevertSrc').addEventListener('click', () => {
       if (!draft || !editingId) return;
-      draft.src = DEFAULTS[editingId].src;
+      const def = DEFAULTS[editingId];
+      draft.src = def.src;
+      if (GRID_IDS.includes(editingId)) draft.empty = !!def.empty;
+      else delete draft.empty;
       delete pendingImages[editingId];
       paintPreview();
     });
