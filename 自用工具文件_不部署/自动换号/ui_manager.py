@@ -11,6 +11,7 @@ import numpy as np
 
 import config
 import detect_tip
+import ui_cursor
 import win_util
 from logutil import log
 
@@ -19,6 +20,8 @@ SC_RESTORE = 0xF120
 
 # 本进程内：若管家提示需「注入」才启用无感换号，只点一次「注入」
 _inject_clicked_once = False
+# 换号时短暂最小化的 Cursor 编辑器 hwnd，点完/失败后还原
+_minimized_cursor_hwnds: list = []
 
 
 def _manager_title_hit(title: str) -> bool:
@@ -48,7 +51,46 @@ def find_manager_hwnd() -> Optional[Tuple[int, str]]:
     return hits[0]
 
 
+def _foreground_title() -> str:
+    try:
+        fg = ctypes.windll.user32.GetForegroundWindow()
+        if not fg:
+            return ""
+        return (win_util._window_text(int(fg)) or "")[:48]
+    except Exception:
+        return ""
+
+
+def restore_minimized_cursor() -> list:
+    """换号结束（成功或失败）后还原被短暂最小化的 Cursor。返回已在屏 hwnd。"""
+    global _minimized_cursor_hwnds
+    restored: list = []
+    if not _minimized_cursor_hwnds:
+        return restored
+    try:
+        restored = ui_cursor.restore_editors_after_switch(list(_minimized_cursor_hwnds))
+    finally:
+        _minimized_cursor_hwnds = []
+    return restored or []
+
+
+def release_manager_after_switch() -> list:
+    """点完无感换号并等待生效后：取消管家置顶 + 还原 Cursor。返回已还原 hwnd。"""
+    found = find_manager_hwnd()
+    if found:
+        try:
+            win_util.set_topmost(int(found[0]), False)
+        except Exception:
+            pass
+    return restore_minimized_cursor()
+
+
 def focus_manager() -> bool:
+    """
+    还原并置前续杯管家。若 Cursor 抢前台导致只闪任务栏：
+    短暂最小化 Cursor 编辑器，再置顶管家（失败截图曾证实截到的仍是 Cursor）。
+    """
+    global _minimized_cursor_hwnds
     hits = find_manager_hwnds()
     if not hits:
         log("管家 前置窗口 结果=失败 原因=未找到")
@@ -71,47 +113,86 @@ def focus_manager() -> bool:
             f"在屏={'是' if win_util.is_onscreen(hwnd) else '否'} "
             f"矩形={rect[0]},{rect[1]}-{rect[2]},{rect[3]}"
         )
-        # 托盘/最小化：先 PostMessage+placement 再置前（仅 force 常拉不回来）
-        if win_util.is_iconic(hwnd) or not win_util.is_onscreen(hwnd):
+        ok = False
+        for attempt in range(1, 4):
+            # 1) 托盘/最小化：先还原管家
+            if win_util.is_iconic(hwnd) or not win_util.is_onscreen(hwnd):
+                try:
+                    ctypes.windll.user32.PostMessageW(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0)
+                except Exception:
+                    pass
+                win_util.restore_window_onscreen(hwnd)
+                time.sleep(0.35 if attempt == 1 else 0.55)
+
+            # 2) 一律先硬最小化 Cursor（已验证：不缩 Cursor 时截图仍是编辑器）
+            log(
+                f"管家 前置步骤 尝试={attempt} "
+                f"当前前台={_foreground_title() or '-'} → 先最小化Cursor"
+            )
+            newly = ui_cursor.minimize_editors_for_switch()
+            for h in newly:
+                if h not in _minimized_cursor_hwnds:
+                    _minimized_cursor_hwnds.append(h)
+            time.sleep(0.3)
+
+            # 3) AHK 激活管家（严格以前台为准）；失败再 Win32 置顶
+            ahk_ok = False
+            if win_util.find_autohotkey():
+                ahk_ok = win_util.activate_via_ahk(int(hwnd), minimize_hwnd=None)
+                log(f"管家 AHK激活 结果={'成功' if ahk_ok else '失败'}")
+            if not ahk_ok:
+                win_util.force_foreground(hwnd, keep_topmost=True)
+                time.sleep(0.2)
             try:
-                ctypes.windll.user32.PostMessageW(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0)
+                if not win_util.is_zoomed(hwnd):
+                    win_util.maximize(hwnd)
+                    time.sleep(0.25)
             except Exception:
                 pass
-            win_util.restore_window_onscreen(hwnd)
-            time.sleep(0.45)
-        win_util.force_foreground(hwnd)
-        time.sleep(0.3)
-        # 已在屏且已最大化则不再反复 maximize（减少任务栏狂闪）
-        if win_util.is_onscreen(hwnd) and win_util.is_zoomed(hwnd):
-            log("管家 前置窗口 结果=成功 最大化=是（已置顶）")
+            win_util.set_topmost(hwnd, True)
+            time.sleep(0.25)
+
+            onscreen = win_util.is_onscreen(hwnd)
+            iconic = win_util.is_iconic(hwnd)
+            fg_ok = win_util.is_foreground(hwnd)
+            zoomed = win_util.is_zoomed(hwnd)
+            cursor_away = bool(_minimized_cursor_hwnds)
+
+            # 成功：管家在屏，且（真前台 或 Cursor 已让开）
+            if onscreen and not iconic and (fg_ok or cursor_away):
+                # 若仍非前台但 Cursor 已缩：再 AHK/置顶一次提高点击命中
+                if not fg_ok and win_util.find_autohotkey():
+                    win_util.activate_via_ahk(int(hwnd))
+                    fg_ok = win_util.is_foreground(hwnd)
+                log(
+                    f"管家 前置窗口 结果=成功 尝试={attempt} "
+                    f"前台={'是' if fg_ok else '否'} "
+                    f"最小化Cursor={'是' if cursor_away else '否'} "
+                    f"最大化={'是' if zoomed else '否'}（置顶中）"
+                )
+                ok = True
+                break
+            log(
+                f"管家 前置窗口 重试={attempt} "
+                f"在屏={'是' if onscreen else '否'} 最小化={'是' if iconic else '否'} "
+                f"前台窗={_foreground_title() or '-'} "
+                f"已缩Cursor={'是' if cursor_away else '否'}"
+            )
+            time.sleep(0.4)
+        if ok:
             return True
         try:
-            win_util.maximize(hwnd)
-            time.sleep(0.55)
-            win_util.force_foreground(hwnd)
+            win_util.set_topmost(hwnd, False)
         except Exception:
             pass
-        if win_util.is_onscreen(hwnd):
-            zoomed = "是" if win_util.is_zoomed(hwnd) else "否"
-            log(f"管家 前置窗口 结果=成功 最大化={zoomed}")
-            return True
-        win_util.restore_window_onscreen(hwnd)
-        win_util.force_foreground(hwnd)
-        try:
-            win_util.maximize(hwnd)
-        except Exception:
-            pass
-        time.sleep(0.7)
-        if win_util.is_onscreen(hwnd):
-            log("管家 前置窗口 结果=成功 方式=二次还原+最大化")
-            return True
 
     log("管家 前置窗口 结果=失败 原因=未能还原到屏幕上（请先手动打开续杯管家窗口）")
+    restore_minimized_cursor()
     return False
 
 
 def _manager_match_scales(ww: int) -> tuple[float, ...]:
-    """模板来自整屏约 1024 宽截图；实机管家窗常更宽，多档尺度。"""
+    """模板来自整屏约 1024 宽截图；实机管家窗常更宽。无感换号优先窄档，少扫加速。"""
     prefer = round(max(0.85, min(2.5, ww / 700.0)), 2)
     ordered: list[float] = []
     for s in (
@@ -121,15 +202,10 @@ def _manager_match_scales(ww: int) -> tuple[float, ...]:
         prefer - 0.2,
         prefer + 0.2,
         1.0,
-        1.15,
         1.3,
-        0.9,
         1.5,
-        0.8,
-        1.7,
         2.0,
         2.2,
-        2.4,
     ):
         s = round(float(s), 2)
         if 0.75 <= s <= 2.6 and s not in ordered:
@@ -342,13 +418,22 @@ def _expand_ocr_to_blue_btn(
     roi: np.ndarray, lx: int, ly: int, tw: int, th: int
 ) -> Tuple[int, int, int, int]:
     """
-    OCR 文字框往往偏右；扩到浅蓝钮连通域，过宽则只取左半（无感|指定 粘连）。
+    OCR/模板文字框往往偏右；扩到浅蓝钮连通域，过宽则只取左半（无感|指定 粘连）。
+    只扫命中框附近底带，避免整窗连通域拖慢。
     返回 (lx,ly,tw,th)。
     """
     cx0 = lx + max(1, tw) // 2
     cy0 = ly + max(1, th) // 2
     h, w = roi.shape[:2]
-    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    pad_x, pad_y = 80, 50
+    x0 = max(0, lx - pad_x)
+    y0 = max(0, ly - pad_y)
+    x1 = min(w, lx + tw + pad_x + max(tw, 120))
+    y1 = min(h, ly + th + pad_y)
+    sub = roi[y0:y1, x0:x1]
+    if sub.size == 0:
+        return lx, ly, tw, th
+    hsv = cv2.cvtColor(sub, cv2.COLOR_BGR2HSV)
     mask = (
         (hsv[:, :, 0] >= 90)
         & (hsv[:, :, 0] <= 130)
@@ -363,12 +448,14 @@ def _expand_ocr_to_blue_btn(
     )
     n, _lab, stats, _c = cv2.connectedComponentsWithStats(mask_u8, 8)
     best = None
+    cx_l = cx0 - x0
+    cy_l = cy0 - y0
     for i in range(1, n):
         x, y, bw, bh, ar = stats[i]
         if ar < 1500 or bw < 80 or bh < 22 or bh > 100:
             continue
-        if x - 8 <= cx0 <= x + bw + 8 and y - 12 <= cy0 <= y + bh + 12:
-            best = (ar, x, y, bw, bh)
+        if x - 8 <= cx_l <= x + bw + 8 and y - 12 <= cy_l <= y + bh + 12:
+            best = (ar, x + x0, y + y0, bw, bh)
             break
     if best is None:
         return lx, ly, tw, th
@@ -377,7 +464,6 @@ def _expand_ocr_to_blue_btn(
     if bw > int(w * 0.28):
         bw = max(tw + 40, bw // 2)
         log(f"管家 蓝钮过宽已取左半 宽={bw}")
-    # 中心略偏左，避开接缝
     return int(x), int(y), int(bw), int(bh)
 
 
@@ -396,12 +482,14 @@ def _account_fingerprint(roi: np.ndarray) -> str:
 
 def _ocr_manager_lines(
     roi: np.ndarray,
+    *,
+    y0: int = 0,
 ) -> list:
-    """管家窗 OCR，返回 [(text, score, lx,ly,rx,by) 相对 roi]。"""
+    """管家窗 OCR，返回 [(text, score, lx,ly,rx,by) 相对完整 roi（含 y0 偏移）]。"""
     ocr = detect_tip._get_ocr_engine()
     if ocr is None or roi is None or roi.size == 0:
         return []
-    max_w = int(getattr(config, "MANAGER_OCR_MAX_WIDTH", 1200))
+    max_w = int(getattr(config, "MANAGER_OCR_MAX_WIDTH", 900))
     scale = 1.0
     work = roi
     if roi.shape[1] > max_w:
@@ -421,9 +509,9 @@ def _ocr_manager_lines(
         xs = [float(p[0]) for p in box]
         ys = [float(p[1]) for p in box]
         lx = int(min(xs) / scale)
-        ly = int(min(ys) / scale)
+        ly = int(min(ys) / scale) + int(y0)
         rx = int(max(xs) / scale)
-        by = int(max(ys) / scale)
+        by = int(max(ys) / scale) + int(y0)
         out.append((str(text or ""), float(score), lx, ly, rx, by))
     return out
 
@@ -433,10 +521,15 @@ def _locate_seamless_btn_ocr(
 ) -> Optional[Tuple[float, int, int, int, int]]:
     """
     OCR 定位底栏大钮「无感换号」。
+    只扫窗高下半，避免整窗 OCR 拖到近 10 秒。
     拒侧栏说明/「激活无感换号」开关文案；优先与「指定Cursor路径」同行者。
     返回 (score, lx, ly, tw, th) 相对 roi。
     """
-    lines = _ocr_manager_lines(roi)
+    h = int(roi.shape[0])
+    y_off = int(h * float(getattr(config, "SEAMLESS_OCR_Y0_FRAC", 0.48)))
+    y_off = max(0, min(h - 40, y_off))
+    sub = roi[y_off:, :]
+    lines = _ocr_manager_lines(sub, y0=y_off)
     if not lines:
         return None
     path_ys = []
@@ -512,14 +605,15 @@ def _grab_manager_roi(
     return roi, mon_l, mon_t, x0, y0, ww
 
 
-def _locate_seamless_any(
+def _locate_seamless_template(
     roi: np.ndarray, ww: int
 ) -> Tuple[Optional[Tuple[float, int, int, int, int]], str]:
-    """OCR → 模板。返回 (loc, way)。"""
-    loc = _locate_seamless_btn_ocr(roi)
-    if loc is not None:
-        return loc, "OCR"
+    """底栏模板匹配「无感换号」（通常比整窗/大半窗 OCR 更快）。"""
     thr = float(getattr(config, "SEAMLESS_SWITCH_THRESHOLD", 0.80))
+    h = int(roi.shape[0])
+    y_off = int(h * float(getattr(config, "SEAMLESS_OCR_Y0_FRAC", 0.48)))
+    y_off = max(0, min(h - 40, y_off))
+    sub = roi[y_off:, :]
     for name in ("btn_seamless_switch.png", "btn_seamless_switch_text.png"):
         if not (config.TEMPLATES_DIR / name).is_file():
             continue
@@ -527,11 +621,12 @@ def _locate_seamless_any(
         if tpl is None:
             continue
         hit = detect_tip._match_scaled(
-            roi, tpl, thr, scales=_manager_match_scales(ww)
+            sub, tpl, thr, scales=_manager_match_scales(ww)
         )
         if hit is None:
             continue
         score, lx, ly, tw, th = hit
+        ly = ly + y_off
         if _seamless_y_ok(ly, th, roi.shape[0]) and _seamless_x_ok(
             lx, tw, roi.shape[1]
         ):
@@ -539,17 +634,59 @@ def _locate_seamless_any(
     return None, ""
 
 
+def _locate_seamless_any(
+    roi: np.ndarray, ww: int
+) -> Tuple[Optional[Tuple[float, int, int, int, int]], str]:
+    """模板（底栏）→ OCR（底栏）。返回 (loc, way)。优先模板以缩短点前等待。"""
+    loc, way = _locate_seamless_template(roi, ww)
+    if loc is not None:
+        return loc, way
+    loc = _locate_seamless_btn_ocr(roi)
+    if loc is not None:
+        return loc, "OCR"
+    return None, ""
+
+
+def _mark_inject_done() -> None:
+    """无感换号已能点到 → 视为注入就绪，后续跳过注入 OCR。"""
+    global _inject_clicked_once
+    _inject_clicked_once = True
+    try:
+        config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        (config.LOGS_DIR / "_inject_done.flag").write_text("1", encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _inject_already_done() -> bool:
+    global _inject_clicked_once
+    if _inject_clicked_once:
+        return True
+    try:
+        if (config.LOGS_DIR / "_inject_done.flag").is_file():
+            _inject_clicked_once = True
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def _ensure_inject_if_needed(
     roi: np.ndarray, mon_l: int, mon_t: int, x0: int, y0: int
 ) -> bool:
     """
     v15.7+ 红字「点击注入启用无感换号」时，先点一次右上「注入」。
-    本进程只点一次，避免每轮换号都点。返回本轮是否刚点了注入。
+    仅在底栏「无感换号」定位失败时才调用（避免每轮/重启后白跑慢 OCR）。
+    返回本轮是否刚点了注入。
     """
-    global _inject_clicked_once
-    if _inject_clicked_once:
+    if _inject_already_done():
         return False
-    lines = _ocr_manager_lines(roi)
+    h = int(roi.shape[0])
+    y1 = int(h * float(getattr(config, "MANAGER_INJECT_OCR_Y1_FRAC", 0.40)))
+    y1 = max(40, min(h, y1))
+    t_ocr = time.time()
+    lines = _ocr_manager_lines(roi[:y1, :], y0=0)
+    log(f"管家 注入检测OCR耗时={time.time() - t_ocr:.2f}s 行数={len(lines)}")
     need = False
     inject_box = None
     for text, sc, lx, ly, rx, by in lines:
@@ -562,12 +699,14 @@ def _ensure_inject_if_needed(
             if cy < int(roi.shape[0] * 0.35) and sc >= 0.7:
                 inject_box = (lx, ly, rx - lx, by - ly)
     if not need or inject_box is None:
+        # 无红字提示：也记为已处理，避免下次再白跑 OCR
+        _mark_inject_done()
         return False
     lx, ly, tw, th = inject_box
     cx = mon_l + x0 + lx + tw // 2
     cy = mon_t + y0 + ly + th // 2
     win_util.click_screen_hard(int(cx), int(cy))
-    _inject_clicked_once = True
+    _mark_inject_done()
     log(f"管家 已单击注入一次 坐标={cx},{cy}（启用无感换号）")
     time.sleep(0.55)
     return True
@@ -575,45 +714,62 @@ def _ensure_inject_if_needed(
 
 def click_seamless_switch() -> bool:
     """
-    前置续杯管家 → 定位「无感换号」→ 硬单击一次 → 立刻返回。
-    不验效、不连点；OCR/模板空时等一拍重定位一次，再蓝钮兜底一次。
-    切回 Cursor 由调用方马上做。
+    前置续杯管家 → 先模板定位「无感换号」→ 硬单击一次 → 立刻返回。
+    注入 OCR 仅在模板/底栏 OCR 都找不到按钮时才跑（日志里曾因此白等约 10s）。
+    切回 Cursor 由调用方在 SWITCH_WAIT 后再做。
     """
+    t0 = time.time()
+    hwnd = 0
+    clicked_ok = False
     if not focus_manager():
         return False
-    time.sleep(float(getattr(config, "SEAMLESS_PRECLICK_WAIT", 0.35)))
+    time.sleep(float(getattr(config, "SEAMLESS_PRECLICK_WAIT", 0.25)))
 
     found = find_manager_hwnd()
     if found is None:
         log("点击 无感换号 结果=失败 原因=窗口丢失")
+        release_manager_after_switch()
         return False
     hwnd, title = found
-    win_util.force_foreground(hwnd)
-    time.sleep(0.15)
+    win_util.force_foreground(hwnd, keep_topmost=True)
+    time.sleep(0.12)
 
     grabbed = _grab_manager_roi(hwnd)
     if grabbed is None:
         log("点击 无感换号 结果=失败 原因=截屏ROI无效或窗口过小")
+        release_manager_after_switch()
         return False
     roi, mon_l, mon_t, x0, y0, ww = grabbed
 
     try:
-        just_injected = _ensure_inject_if_needed(roi, mon_l, mon_t, x0, y0)
-        # 注入后界面可能刷新，重截再定位
-        if just_injected:
-            time.sleep(0.25)
-            grabbed2 = _grab_manager_roi(hwnd)
-            if grabbed2 is not None:
-                del roi
-                roi, mon_l, mon_t, x0, y0, ww = grabbed2
+        # 1) 快路径：底栏模板（不动注入 OCR）
+        t_loc = time.time()
+        loc, way = _locate_seamless_template(roi, ww)
+        log(f"管家 模板定位耗时={time.time() - t_loc:.2f}s 命中={'是' if loc else '否'}")
 
-        loc, way = _locate_seamless_any(roi, ww)
+        # 2) 模板空：底栏 OCR（仍不先跑注入）
         if loc is None:
-            # WebView 偶发未画完：只重定位一次，绝不连点
-            wait_r = float(getattr(config, "SEAMLESS_RELOCATE_WAIT", 0.7))
-            log(f"管家 无感换号首轮未定位 等待={wait_r:.2f}s后重截")
-            time.sleep(max(0.2, wait_r))
-            win_util.force_foreground(hwnd)
+            t_ocr = time.time()
+            loc = _locate_seamless_btn_ocr(roi)
+            if loc is not None:
+                way = "OCR"
+            log(
+                f"管家 底栏OCR定位耗时={time.time() - t_ocr:.2f}s "
+                f"命中={'是' if loc else '否'}"
+            )
+
+        # 3) 仍空：再强制置顶重截一次（常因 Cursor 压住导致截到错画面）
+        if loc is None:
+            just_injected = _ensure_inject_if_needed(roi, mon_l, mon_t, x0, y0)
+            wait_r = float(getattr(config, "SEAMLESS_RELOCATE_WAIT", 0.45))
+            if just_injected:
+                time.sleep(0.25)
+            else:
+                log(f"管家 无感换号首轮未定位 等待={wait_r:.2f}s后重截")
+                time.sleep(max(0.2, wait_r))
+            win_util.force_foreground(hwnd, keep_topmost=True)
+            win_util.set_topmost(hwnd, True)
+            time.sleep(0.2)
             grabbed3 = _grab_manager_roi(hwnd)
             if grabbed3 is not None:
                 del roi
@@ -626,14 +782,20 @@ def click_seamless_switch() -> bool:
             cx = mon_l + x0 + lx + max(1, int(tw * 0.42))
             cy = mon_t + y0 + ly + th // 2
             _click_seamless_at(cx, cy, hwnd=hwnd)
+            _mark_inject_done()
+            clicked_ok = True
             log(
                 f"点击 无感换号 结果=已单击一次 方式={way}+蓝钮 分数={score:.2f} "
-                f"坐标={cx},{cy} 框={lx},{ly},{tw}x{th} 标题={title[:36]}"
+                f"坐标={cx},{cy} 框={lx},{ly},{tw}x{th} "
+                f"前置到点击耗时={time.time() - t0:.2f}s 标题={title[:36]}"
             )
             return True
 
-        # OCR+模板仍空：蓝钮网格兜底（v15.7.5 距底带已放宽）
+        # 模板+OCR仍空：蓝钮网格兜底（v15.7.5 距底带已放宽）
         if _click_blue_grid_fallback(roi, mon_l, mon_t, x0, y0, "无感换号"):
+            _mark_inject_done()
+            clicked_ok = True
+            log(f"点击 无感换号 蓝钮兜底 前置到点击耗时={time.time() - t0:.2f}s")
             return True
 
         try:
@@ -642,13 +804,20 @@ def click_seamless_switch() -> bool:
             log(f"管家 定位失败已存截图 {dump.name}")
         except Exception:
             pass
-        log("点击 无感换号 结果=失败 原因=OCR与模板与蓝钮均未定位")
+        log(
+            f"点击 无感换号 结果=失败 原因=OCR与模板与蓝钮均未定位 "
+            f"耗时={time.time() - t0:.2f}s 前台={_foreground_title() or '-'}"
+        )
         return False
     finally:
         try:
             del roi
         except Exception:
             pass
+        # 成功：保持管家置顶 + Cursor 最小化，留给调用方等 3 秒再生效切回
+        # 失败：立刻还原，避免 Cursor 一直缩在任务栏
+        if not clicked_ok:
+            release_manager_after_switch()
 
 
 def click_reset_machine() -> bool:

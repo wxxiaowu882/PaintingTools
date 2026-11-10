@@ -64,6 +64,100 @@ def focus_cursor() -> bool:
     return win_util.force_foreground(hwnd)
 
 
+def minimize_editors_for_switch() -> list:
+    """
+    换号抢前台失败时：短暂最小化 Cursor 编辑器（不含续杯管家/登录助手）。
+    返回被最小化的 hwnd 列表，点完管家后应还原。
+    注意：前台句柄常是 Electron 子窗，必须打根窗；旧逻辑依赖 IsIconic 会误判失败。
+    """
+    minimized = []
+    seen = set()
+    candidates = []
+
+    # 1) 当前前台根窗（最重要：用户看见的就是它）
+    try:
+        fg = int(win_util.user32.GetForegroundWindow() or 0)
+        root = win_util.get_root_hwnd(fg) if fg else 0
+        if root:
+            title = win_util._window_text(root)
+            if title and "Cursor" in title and not _is_non_editor_cursor_title(title):
+                candidates.append((root, title, "前台根窗"))
+    except Exception as e:
+        log(f"Cursor 取前台根窗异常 {e}")
+
+    # 2) 标题枚举到的编辑器顶窗
+    for hwnd, title in find_cursor_hwnds():
+        root = win_util.get_root_hwnd(hwnd)
+        candidates.append((root, title, "标题枚举"))
+
+    log(f"Cursor 最小化候选数={len(candidates)}")
+    for hwnd, title, src in candidates:
+        try:
+            h = int(hwnd)
+            if not h or h in seen:
+                continue
+            seen.add(h)
+            if not win_util.user32.IsWindow(h):
+                continue
+            if win_util.is_iconic(h):
+                log(f"Cursor 已是最小化 来源={src} 标题={(title or '')[:40]}")
+                minimized.append(h)
+                continue
+            ok = win_util.minimize(h)
+            iconic = win_util.is_iconic(h)
+            rect = win_util.get_rect(h)
+            log(
+                f"Cursor 最小化尝试 来源={src} 结果={'成功' if ok else '失败'} "
+                f"iconic={'是' if iconic else '否'} "
+                f"矩形={rect} 标题={(title or '')[:40]}"
+            )
+            if ok:
+                minimized.append(h)
+        except Exception as e:
+            log(f"Cursor 最小化异常 {e}")
+    if minimized:
+        log(f"Cursor 已短暂最小化 窗口数={len(minimized)}（便于管家露脸）")
+    else:
+        log("Cursor 最小化结果=失败 无窗口被最小化（将导致管家仍被挡住）")
+    return minimized
+
+
+def restore_editors_after_switch(hwnds: list) -> list:
+    """
+    还原 minimize_editors_for_switch 最小化的编辑器，并立刻硬铺满工作区。
+    禁止停在旧的「窗口态」尺寸（曾卡在 1650x1044）。
+    """
+    restored = []
+    if not hwnds:
+        return restored
+    for hwnd in hwnds:
+        try:
+            h = int(hwnd)
+            if not win_util.user32.IsWindow(h):
+                log(f"Cursor 还原跳过 原因=句柄失效 hwnd={h}")
+                continue
+            win_util.restore_window_hard(h)
+            # 关键：还原后立刻铺满，不依赖后续偶然成功
+            filled = win_util.fill_monitor_work_area(h)
+            if not filled:
+                filled = _ensure_cursor_maximized(h, rounds=3)
+            rect = win_util.get_rect(h)
+            work = win_util.get_monitor_work_area(h)
+            title = (win_util._window_text(h) or "")[:48]
+            log(
+                f"Cursor 硬还原+铺满 结果={'成功' if filled else '失败'} "
+                f"覆盖工作区={'是' if win_util.is_covering_work_area(h) else '否'} "
+                f"窗={rect} 工作区={work} 标题={title}"
+            )
+            if win_util.is_onscreen(h) or filled:
+                restored.append(h)
+        except Exception as e:
+            log(f"Cursor 还原异常 {e}")
+            continue
+    log(f"Cursor 已还原编辑器 成功={len(restored)}/{len(hwnds)}")
+    return restored
+
+
 def dismiss_external_site_dialog(timeout: float = 4.0) -> str:
     """
     关掉「是否要 Cursor 打开外部网站？」弹窗（点「取消」）。
@@ -960,58 +1054,234 @@ def find_paintingtools_hwnd(timeout: float = 12.0):
     """
     找标题含 PaintingTools 的 Cursor 工程窗（排除登录助手）。
     CLI 打开后标题可能晚几秒才变成工程名。
+    换号还原瞬间可能仍 iconic：先硬还原再判定在屏。
     """
     deadline = time.time() + timeout
     last = []
     while time.time() < deadline:
         last = find_cursor_hwnds()
         for hwnd, title in last:
-            if "PaintingTools" in title and win_util.is_onscreen(hwnd):
+            if "PaintingTools" not in (title or "") and "手绘工坊" not in (title or ""):
+                continue
+            if win_util.is_iconic(hwnd) or not win_util.is_onscreen(hwnd):
+                win_util.restore_window_hard(hwnd)
+            if win_util.is_onscreen(hwnd):
                 return hwnd, title
-        time.sleep(0.4)
+        time.sleep(0.35)
     # 退回：最大的 Cursor 主窗
     found = _largest_cursor_rect()
     if found:
         hwnd, _rect = found
+        if win_util.is_iconic(hwnd) or not win_util.is_onscreen(hwnd):
+            win_util.restore_window_hard(hwnd)
         title = ""
         for h, t in last:
             if h == hwnd:
                 title = t
                 break
-        return hwnd, title or "Cursor"
+        if win_util.is_onscreen(hwnd):
+            return hwnd, title or "Cursor"
     return None
 
 
-def bring_paintingtools_front_max(fast: bool = False) -> bool:
-    """把 PaintingTools 工程窗口置前并最大化，方便后续关 tip / 续写。"""
-    found = find_paintingtools_hwnd(timeout=1.2 if fast else 12.0)
-    if not found:
+def bring_paintingtools_front_max(
+    fast: bool = False,
+    prefer_hwnds: list | None = None,
+) -> bool:
+    """
+    把 PaintingTools 工程窗口置前并最大化，方便后续关 tip / 续写。
+    prefer_hwnds：换号时记下的编辑器句柄，优先使用（避免还原后标题/在屏判定漏找）。
+    """
+    hwnd = 0
+    title = ""
+    # 1) 优先用换号前记下的句柄
+    for h in prefer_hwnds or []:
+        try:
+            h = int(h)
+            if not win_util.user32.IsWindow(h):
+                continue
+            if win_util.is_iconic(h) or not win_util.is_onscreen(h):
+                win_util.restore_window_hard(h)
+            if win_util.user32.IsWindow(h):
+                hwnd = h
+                title = win_util._window_text(h) or "Cursor"
+                log(f"置前工程窗 使用换号前句柄 hwnd={h} 标题={title[:48]}")
+                break
+        except Exception:
+            continue
+
+    # 2) 再按标题找
+    if not hwnd:
+        # 换号刚还原时给多一点时间（fast 路径以前 1.2s 太紧）
+        found = find_paintingtools_hwnd(timeout=4.0 if fast else 12.0)
+        if found:
+            hwnd, title = found
+
+    # 3) 任意最大 Cursor 编辑器
+    if not hwnd:
+        found = _largest_cursor_rect()
+        if found:
+            hwnd, _rect = found
+            title = win_util._window_text(hwnd) or "Cursor"
+            log(f"置前工程窗 回退最大Cursor窗 标题={title[:48]}")
+
+    if not hwnd:
         log("置前工程窗 结果=失败 原因=未找到")
         return False
-    hwnd, title = found
-    win_util.force_foreground(hwnd)
-    time.sleep(0.05 if fast else 0.25)
-    already = win_util.is_zoomed(hwnd)
-    zoomed = already or win_util.maximize(hwnd)
-    if not zoomed and not fast:
+
+    # 管家可能仍置顶：先清置顶，再优先用 AutoHotkey 抢前台（可顺带最小化管家）
+    mgr_hwnd = 0
+    try:
+        import ui_manager as _um
+
+        mgr = _um.find_manager_hwnd()
+        if mgr:
+            mgr_hwnd = int(mgr[0])
+            win_util.set_topmost(mgr_hwnd, False)
+    except Exception:
+        pass
+
+    ahk_ok = False
+    if win_util.find_autohotkey():
+        ahk_ok = win_util.activate_via_ahk(
+            int(hwnd), minimize_hwnd=(mgr_hwnd or None)
+        )
+        log(f"置前工程窗 AHK激活 结果={'成功' if ahk_ok else '失败'}")
+    else:
+        log("置前工程窗 AHK=未安装 回退Win32")
+
+    if not ahk_ok:
+        win_util.force_foreground(hwnd, keep_topmost=True)
+        time.sleep(0.08 if fast else 0.25)
+        # Win32 回退：短暂最小化管家再抢
+        if mgr_hwnd:
+            try:
+                win_util.minimize(mgr_hwnd)
+                time.sleep(0.2)
+            except Exception:
+                pass
+        win_util.force_foreground(hwnd, keep_topmost=True)
+        win_util.set_topmost(hwnd, True)
+        time.sleep(0.08 if fast else 0.35)
+        win_util.set_topmost(hwnd, False)
+
+    # 再确认前台后，强制覆盖工作区（AHK 激活常把窗留在旧窗口态 1650x1044）
+    if not win_util.is_foreground(hwnd):
+        if win_util.find_autohotkey():
+            win_util.activate_via_ahk(int(hwnd), minimize_hwnd=(mgr_hwnd or None))
+        else:
+            win_util.force_foreground(hwnd, keep_topmost=True)
+    zoomed = _ensure_cursor_maximized(hwnd, rounds=4)
+    rect = win_util.get_rect(hwnd) or (0, 0, 0, 0)
+    work = win_util.get_monitor_work_area(hwnd)
+    w, h = rect[2] - rect[0], rect[3] - rect[1]
+    fg_ok = win_util.is_foreground(hwnd)
+    covering = win_util.is_covering_work_area(hwnd)
+    zoom_flag = (
+        "是"
+        if win_util.is_zoomed(hwnd)
+        else ("铺满" if covering else "否")
+    )
+    log(
+        f"置前工程窗 结果=成功 标题={title} 尺寸={w}x{h} "
+        f"最大化={zoom_flag} 前台={'是' if fg_ok else '否'} "
+        f"方式={'AHK' if ahk_ok else 'Win32'} 工作区={work}"
+    )
+    if not covering:
+        log("置前工程窗 警告=未覆盖工作区（续写将再强制铺满）")
+    return True
+
+
+def _ensure_cursor_maximized(hwnd: int, rounds: int = 4) -> bool:
+    """
+    强制 Cursor「视觉全屏」：必须以所在显示器工作区为基准判定。
+    曾误把 1650x1044 当成铺满 —— 已改为 is_covering_work_area。
+    """
+    if not hwnd:
+        return False
+
+    def _full_enough() -> bool:
+        return win_util.is_covering_work_area(hwnd)
+
+    for i in range(max(1, rounds)):
+        if _full_enough():
+            rect = win_util.get_rect(hwnd)
+            work = win_util.get_monitor_work_area(hwnd)
+            log(
+                f"置前工程窗 全屏已达标 重试={i} "
+                f"窗={rect} 工作区={work} zoomed={'是' if win_util.is_zoomed(hwnd) else '否'}"
+            )
+            return True
+        # 1) pywinauto UIA maximize + set_focus
+        try:
+            from pywinauto import Application
+
+            app = Application(backend="uia").connect(handle=int(hwnd))
+            w = app.window(handle=int(hwnd))
+            try:
+                w.restore()
+            except Exception:
+                pass
+            try:
+                w.maximize()
+            except Exception:
+                pass
+            try:
+                w.set_focus()
+            except Exception:
+                pass
+            time.sleep(0.2)
+            if _full_enough():
+                log(f"置前工程窗 全屏方式=pywinauto 重试={i + 1}")
+                return True
+        except Exception as e:
+            log(f"置前工程窗 pywinauto最大化异常 {e}")
+        # 2) Win+Up
         try:
             import pyautogui
 
             pyautogui.FAILSAFE = False
+            win_util.force_foreground(hwnd, keep_topmost=True)
+            time.sleep(0.06)
             pyautogui.hotkey("win", "up")
-            time.sleep(0.35)
-            zoomed = win_util.is_zoomed(hwnd)
+            time.sleep(0.25)
         except Exception:
             pass
-    win_util.force_foreground(hwnd)
-    time.sleep(0.05 if fast else 0.35)
-    rect = win_util.get_rect(hwnd) or (0, 0, 0, 0)
-    w, h = rect[2] - rect[0], rect[3] - rect[1]
-    log(
-        f"置前工程窗 结果=成功 标题={title} 尺寸={w}x{h} "
-        f"最大化={'是' if zoomed else '否'}"
-    )
-    return True
+        if _full_enough():
+            return True
+        # 3) AHK
+        try:
+            win_util.maximize_via_ahk(hwnd)
+            time.sleep(0.15)
+            if _full_enough():
+                log(f"置前工程窗 全屏方式=AHK 重试={i + 1}")
+                return True
+        except Exception:
+            pass
+        # 4) 硬铺满工作区（最终保险）
+        try:
+            if win_util.fill_monitor_work_area(hwnd) and _full_enough():
+                log(f"置前工程窗 全屏方式=硬铺满 重试={i + 1}")
+                return True
+        except Exception as e:
+            log(f"置前工程窗 硬铺满异常 {e}")
+        rect = win_util.get_rect(hwnd)
+        work = win_util.get_monitor_work_area(hwnd)
+        log(
+            f"置前工程窗 最大化重试={i + 1}/{rounds} "
+            f"窗={rect} 工作区={work}"
+        )
+    # 最后再硬铺一次
+    try:
+        win_util.fill_monitor_work_area(hwnd)
+    except Exception:
+        pass
+    ok = _full_enough()
+    if not ok:
+        rect = win_util.get_rect(hwnd)
+        work = win_util.get_monitor_work_area(hwnd)
+        log(f"置前工程窗 全屏失败 窗={rect} 工作区={work}")
+    return bool(ok)
 
 
 def _set_clipboard(text: str) -> None:
@@ -1106,41 +1376,95 @@ def send_continue_in_chat(
 ) -> bool:
     """
     底部 chat 输入框：点进去，输入续写文案，Ctrl+Enter 发送。
-    优先剪贴板粘贴（中文稳）；失败再试 Unicode 直输。
-    fast=True：换号后路径，缩短落稳等待。
+    换号后路径：必须先覆盖工作区，再用 pywinauto 聚焦 + 抬高点击。
     """
-    found = find_paintingtools_hwnd(timeout=1.0 if fast else 3.0)
+    found = find_paintingtools_hwnd(timeout=4.0 if fast else 3.0)
+    if not found:
+        big = _largest_cursor_rect()
+        if big:
+            hwnd0, _r = big
+            found = (hwnd0, win_util._window_text(hwnd0) or "Cursor")
+            log(f"续写 回退最大Cursor窗 标题={(found[1] or '')[:48]}")
     if not found:
         log("续写 结果=失败 原因=未找到工程窗")
         return False
     hwnd, _title = found
-    win_util.force_foreground(hwnd)
-    time.sleep(0.06 if fast else 0.35)
+    if win_util.is_iconic(hwnd) or not win_util.is_onscreen(hwnd):
+        win_util.restore_window_hard(hwnd)
+
+    # pywinauto 聚焦
+    try:
+        from pywinauto import Application
+
+        app = Application(backend="uia").connect(handle=int(hwnd))
+        w = app.window(handle=int(hwnd))
+        try:
+            w.set_focus()
+        except Exception:
+            win_util.force_foreground(hwnd, keep_topmost=True)
+    except Exception:
+        win_util.force_foreground(hwnd, keep_topmost=True)
+
+    # 硬门槛：不覆盖工作区就不点（避免假成功）
+    if not win_util.is_covering_work_area(hwnd):
+        filled = _ensure_cursor_maximized(hwnd, rounds=4)
+        if not filled and not win_util.fill_monitor_work_area(hwnd):
+            log(
+                f"续写 结果=失败 原因=无法全屏 "
+                f"窗={win_util.get_rect(hwnd)} 工作区={win_util.get_monitor_work_area(hwnd)}"
+            )
+            return False
+    time.sleep(0.2 if fast else 0.35)
+
     rect = win_util.get_rect(hwnd)
     if not rect:
         log("续写 结果=失败 原因=无窗口矩形")
         return False
     l, t, r, b = rect
-    rx, ry = config.CHAT_INPUT_REL
-    cx = int(l + (r - l) * rx)
-    cy = int(t + (b - t) * ry)
-    # 强制贴底：避免误点到右侧 Files 列表区域
-    cy = max(cy, b - 48)
+    if fast:
+        rx, ry = getattr(config, "CHAT_INPUT_REL_AFTER_SWITCH", (0.58, 0.88))
+        cx = int(l + (r - l) * rx)
+        cy = int(t + (b - t) * ry)
+        cy = min(max(cy, t + int((b - t) * 0.78)), b - 100)
+    else:
+        rx, ry = config.CHAT_INPUT_REL
+        cx = int(l + (r - l) * rx)
+        cy = int(t + (b - t) * ry)
+        cy = max(cy, b - 48)
     cx = min(max(cx, l + 120), r - 120)
     text = prompt if prompt else config.CONTINUE_PROMPT
+
+    # 先关可能挡输入的 tip（Esc），再点输入
+    try:
+        import pyautogui
+
+        pyautogui.FAILSAFE = False
+        pyautogui.press("esc")
+        time.sleep(0.15)
+    except Exception:
+        pass
+
     try:
         import pyautogui
 
         pyautogui.FAILSAFE = False
         detect_tip._click_screen(cx, cy)
-        time.sleep(0.1 if fast else 0.45)
-        # 清空输入框残留
+        time.sleep(0.1)
+        detect_tip._click_screen(cx, cy)
+        time.sleep(0.15 if fast else 0.4)
+        # Cursor Agent：Ctrl+L 常能聚焦聊天输入（失败也无害）
+        if fast:
+            try:
+                pyautogui.hotkey("ctrl", "l")
+                time.sleep(0.12)
+            except Exception:
+                pass
         pyautogui.hotkey("ctrl", "a")
-        time.sleep(0.04 if fast else 0.12)
+        time.sleep(0.05)
         method = "clipboard"
         try:
             _set_clipboard(text)
-            time.sleep(0.06 if fast else 0.15)
+            time.sleep(0.08)
             pyautogui.hotkey("ctrl", "v")
         except Exception as e1:
             method = "unicode"
@@ -1149,10 +1473,15 @@ def send_continue_in_chat(
             except Exception as e2:
                 log(f"续写 结果=失败 原因=输入失败 clip={e1} unicode={e2}")
                 return False
-        time.sleep(0.08 if fast else 0.35)
+        time.sleep(0.12)
         pyautogui.hotkey("ctrl", "enter")
-        time.sleep(0.06 if fast else 0.25)
-        log(f"续写 结果=成功 坐标={cx},{cy} 内容={text} 方式={method} 发送=Ctrl+Enter")
+        time.sleep(0.1)
+        covering = win_util.is_covering_work_area(hwnd)
+        log(
+            f"续写 结果=成功 坐标={cx},{cy} 内容={text} 方式={method} "
+            f"发送=Ctrl+Enter 全屏={'是' if covering else '否'} "
+            f"窗={rect}"
+        )
         return True
     except Exception as e:
         log(f"续写 结果=失败 原因={e}")

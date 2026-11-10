@@ -27,6 +27,8 @@ class Monitor:
         self.grace_until: float = 0.0
         self._switching = False
         self._fail_cooldown_until: float = 0.0
+        # 无感换号成功点击后的最短间隔（默认 60s 内不再点）
+        self._seamless_click_until: float = 0.0
         self._tip_streak_kind: str | None = None
         self._tip_streak_count: int = 0
         self._conn_resume_until: float = 0.0
@@ -35,6 +37,9 @@ class Monitor:
 
     def in_grace(self) -> bool:
         return time.time() < self.grace_until
+
+    def in_seamless_click_cooldown(self) -> bool:
+        return time.time() < self._seamless_click_until
 
     def _reset_tip_streak(self) -> None:
         self._tip_streak_kind = None
@@ -45,6 +50,12 @@ class Monitor:
         self._reset_tip_streak()
         end = datetime.fromtimestamp(self.grace_until).strftime("%H:%M:%S")
         log(f"宽限 开始 结束于={end} 时长={config.GRACE_SECONDS}秒")
+
+    def start_seamless_click_cooldown(self) -> None:
+        sec = float(getattr(config, "SEAMLESS_CLICK_COOLDOWN", 60))
+        self._seamless_click_until = time.time() + max(1.0, sec)
+        end = datetime.fromtimestamp(self._seamless_click_until).strftime("%H:%M:%S")
+        log(f"换号 点击冷却 结束于={end} 时长={sec:.0f}秒（期内不再点无感换号）")
 
     def do_network_resume(self) -> None:
         """Connection Error：关 tip → 发送网络恢复续写，不换号。"""
@@ -159,23 +170,44 @@ class Monitor:
                 self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
                 return
 
-            wait_s = float(getattr(config, "SEAMLESS_SWITCH_WAIT", 0.35))
+            # 一点即进入 1 分钟冷却，避免宽限内 tip 未消又连点
+            self.start_seamless_click_cooldown()
+
+            wait_s = float(getattr(config, "SEAMLESS_SWITCH_WAIT", 3.0))
             after_s = float(getattr(config, "SEAMLESS_AFTER_FRONT", 0.08))
-            log(f"换号 已单击无感换号 立刻切回Cursor（不重试点击）")
+            log(f"换号 已单击无感换号 等待生效={wait_s:.1f}s后切回Cursor（不重试点击）")
             time.sleep(max(0.1, wait_s))
-            # 点完马上离开管家，回到 Cursor
+            # 等切换生效后：取消管家置顶、硬还原 Cursor，再用记下的句柄置前
+            restored_hwnds: list = []
+            try:
+                restored_hwnds = ui_manager.release_manager_after_switch() or []
+            except Exception as e:
+                log(f"换号 还原Cursor异常 {e}")
             t_front = time.time()
-            ui_cursor.bring_paintingtools_front_max(fast=True)
-            time.sleep(max(0.02, after_s))
+            ok_front = ui_cursor.bring_paintingtools_front_max(
+                fast=True, prefer_hwnds=restored_hwnds
+            )
+            if not ok_front:
+                # 再硬试一次：多等半拍 + 不走 fast 短超时
+                time.sleep(0.4)
+                try:
+                    restored_hwnds = ui_manager.release_manager_after_switch() or restored_hwnds
+                except Exception:
+                    pass
+                ok_front = ui_cursor.bring_paintingtools_front_max(
+                    fast=False, prefer_hwnds=restored_hwnds
+                )
+            time.sleep(max(0.15, after_s))
+            # 换号前 tip 绝对坐标在最小化/还原后会失效，切回后禁止再用旧 hint
             try:
                 # 硬规则：只关 ×，绝不点 Upgrade to Pro
-                detect_tip.close_tip_fast(hint=tip_hint)
+                detect_tip.close_tip_fast(hint=None)
             except Exception as e:
                 log(f"换号 快关tip 异常 {e}")
             ok = ui_cursor.send_continue_in_chat(fast=True)
             if not ok:
                 try:
-                    detect_tip.close_tip_fast(hint=tip_hint)
+                    detect_tip.close_tip_fast(hint=None)
                 except Exception:
                     pass
                 ok = ui_cursor.send_continue_in_chat(fast=True)
@@ -190,6 +222,11 @@ class Monitor:
             log(f"错误 换号异常 {e}")
             self._fail_cooldown_until = time.time() + config.SWITCH_FAIL_COOLDOWN
         finally:
+            # 兜底：异常时也不让 Cursor 一直缩着
+            try:
+                ui_manager.release_manager_after_switch()
+            except Exception:
+                pass
             self._switching = False
             self.state = "监控中"
             log("状态 监控中")
@@ -256,13 +293,23 @@ class Monitor:
             self._reset_tip_streak()
             return
 
-        # 宽限内：续写后又撞用量 → 继续换号循环；低分可能是 chat 历史误匹配则忽略
+        # 1 分钟内最多点一次无感换号（含宽限内再次用量）
+        if hit.kind in ("usage_limit", "error_resume") and self.in_seamless_click_cooldown():
+            left = max(0.0, self._seamless_click_until - time.time())
+            log(
+                f"提示 {cn} 动作=忽略 原因=无感换号点击冷却中 "
+                f"剩余={left:.0f}s 分数={hit.score:.2f}"
+            )
+            self._reset_tip_streak()
+            return
+
+        # 宽限内：默认识忽略；仅当点击冷却已过且高分用量 tip 仍在，才允许再换
         if self.in_grace():
             grace_min = float(getattr(config, "GRACE_USAGE_RERUN_MIN_SCORE", 0.86))
             if hit.kind in ("usage_limit", "error_resume") and hit.score >= grace_min:
                 log(
                     f"提示 {cn} 动作=换号 原因=宽限内再次用量 "
-                    f"分数={hit.score:.2f}（续写→再换号循环）"
+                    f"分数={hit.score:.2f}（冷却已过才允许）"
                 )
                 self._reset_tip_streak()
                 self._last_tip_hit = hit
@@ -306,8 +353,23 @@ class Monitor:
         log("状态 监控中")
         log(
             f"配置 工程={config.PROJECT_PATH} 轮询={config.POLL_INTERVAL}秒 "
-            f"宽限={config.GRACE_SECONDS}秒 连续确认={config.TIP_CONFIRM_POLLS}次"
+            f"宽限={config.GRACE_SECONDS}秒 "
+            f"无感点击冷却={getattr(config, 'SEAMLESS_CLICK_COOLDOWN', 60)}秒 "
+            f"连续确认={config.TIP_CONFIRM_POLLS}次"
         )
+        try:
+            import win_util as _wu
+
+            ahk = _wu.find_autohotkey()
+            if ahk:
+                log(f"配置 AutoHotkey=已找到 版本主={ahk[1]} 路径={ahk[0]}")
+            else:
+                log(
+                    "配置 AutoHotkey=未找到 "
+                    "（切回Cursor可能只闪任务栏；请安装 AutoHotkey v2）"
+                )
+        except Exception as e:
+            log(f"配置 AutoHotkey检测异常 {e}")
         poll_n = 0
         gc_every = int(getattr(config, "GC_EVERY_POLLS", 120))
         # 关更新广告极易拖死轮询（曾卡数分钟导致永远检不到用量 tip）→ 降频+短超时

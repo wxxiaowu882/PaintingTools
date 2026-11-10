@@ -4,13 +4,19 @@ Windows 常驻脚本：发现 Cursor 右下角限额 tip 后，驱动「Cursor�
 
 **无 AI API**；建议以管理员身份运行（与 `Cursor [管理员]`、管家「管理员运行模式」对齐）。
 
+**AutoHotkey（推荐）**：切到管家 / 切回 Cursor 抢前台时优先调用本机 AHK（`ahk/activate_window*.ahk`）。  
+已可用 winget 安装：`winget install AutoHotkey.AutoHotkey`。启动日志应出现 `配置 AutoHotkey=已找到`。
+
+**切回全屏**：以「是否覆盖显示器工作区」硬判定（禁止把 1650×1044 窗口态当成全屏）。失败则 `SetWindowPos` 硬铺满 + pywinauto UIA maximize。续写前不达标会直接失败重试，避免假「续写成功」。
+
 ## 怎么启动
 
 1. 安装 Python 3，并确保 `python` 在 PATH 中。
-2. **先打开「Cursor续杯管家」**（须可见，不要只靠托盘）。
-3. 首次可双击 `启动_自动换号监控.bat`（会提权；缺依赖时自动 `pip install -r requirements.txt`）。
+2. **建议安装 AutoHotkey v2**（抢前台更稳；未装则回退 Win32，可能只闪任务栏）。
+3. **先打开「Cursor续杯管家」**（须可见，不要只靠托盘）。
+4. 首次可双击 `启动_自动换号监控.bat`（会提权；缺依赖时自动 `pip install -r requirements.txt`）。
    若已有旧监控在跑，**会自动结束旧进程并接管**，不必再手动关 `python monitor.py`。
-4. 或手动：
+5. 或手动：
 
 ```bat
 cd /d "自用工具文件_不部署\自动换号"
@@ -26,8 +32,9 @@ python monitor.py
 | **更新提示** | **Update recommended / Update Available 一律只关闭（Close / × / Esc），绝不点 Update 或 Download Update，不换号**；与用量 tip 严格区分；**仅在 Cursor 窗口内**扫 |
 | Connection Error（普通） | 关 tip → 输入「刚才网络断了，现在请继续」并 Ctrl+Enter（不换号） |
 | **Too many free trials** | 点管家「重置机器码」→「确认重置」确定 →「强制关闭 Cursor」确定 → **等重启** → 开工程 → 发「请继续你的工作」→ 宽限 |
-| **无感换号** | 关 tip → 全部保存 → 前置续杯管家 → 点「无感换号」→ 等待约 5 秒 → **不重启** → 工程窗置前 → 发「请继续你的工作」→ 宽限 |
-| 宽限内（续写后 2 分钟） | 用量 tip 忽略；Connection Error 仍走网络续写；更新提示仍关闭 |
+| **无感换号** | 关 tip → 全部保存 → 前置续杯管家（抢不到前台则**短暂最小化 Cursor**）→ 点「无感换号」→ 等待约 **3 秒** → **不重启** → 还原/置前工程窗 → 发「请继续你的工作」→ 宽限 |
+| 宽限内（续写后约 12 秒） | 用量 tip 默认忽略；Connection Error 仍走网络续写；更新提示仍关闭 |
+| **无感换号点击冷却** | 成功点一次后 **60 秒内**不再点「无感换号」（防短时重复换号） |
 | 换号中 | 忽略新 tip，避免连点 |
 | 管家未开 / 点不到按钮 | 失败冷却，不发继续语 |
 
@@ -67,7 +74,7 @@ python monitor.py
 | `tip_close_x.png` | tip 右上角关闭 |
 | `dlg_update_*.png` / `btn_*update*` | 更新提示只关不点 Update（见既有说明） |
 
-分辨率或管家皮肤变了导致匹配失败时：从新截图裁「无感换号」覆盖同名文件，必要时在 `config.py` 调 `SEAMLESS_SWITCH_THRESHOLD` / `SEAMLESS_SWITCH_WAIT`。
+分辨率或管家皮肤变了导致匹配失败时：从新截图裁「无感换号」覆盖同名文件，必要时在 `config.py` 调 `SEAMLESS_SWITCH_THRESHOLD` / `SEAMLESS_SWITCH_WAIT`（点后等切回秒数，默认 3）。
 
 **用量 tip 检测（已换技术路线）**：主路径为 **RapidOCR** 读右下 chat 区文案（如 `You've hit your usage limit` / `Upgrade to Pro`），按语义判定，不靠死模板像素；`tip_usage_*.png` 仅兜底。依赖见 `requirements.txt` 的 `rapidocr_onnxruntime`。
 

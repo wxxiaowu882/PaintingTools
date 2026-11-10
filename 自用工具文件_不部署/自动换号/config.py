@@ -29,16 +29,20 @@ SEAMLESS_SWITCH_LABEL = "无感换号"
 SEAMLESS_SWITCH_THRESHOLD = 0.80
 # 近失放宽：曾用 0.68～0.72 误点窗底 y≈1374，现关闭（仅≥阈值才点）
 SEAMLESS_SWITCH_SOFT_OK = 0.92
-# 点无感换号后、切回 Cursor 前：极短暂等 token（秒）
-SEAMLESS_SWITCH_WAIT = 0.35
+# 点无感换号后、切回 Cursor 前：等账号切换生效（秒）
+SEAMLESS_SWITCH_WAIT = 3.0
 # 切回 Cursor 后落稳（秒）；之后立刻快关 tip + 续写
 SEAMLESS_AFTER_FRONT = 0.08
-# 管家最大化后、点击前等待 WebView 就绪
-SEAMLESS_PRECLICK_WAIT = 0.45
-# 单击后等待「已切换」/账号变化
+# 管家最大化后、点击前等待 WebView 就绪（尽量短，定位本身会耗时）
+SEAMLESS_PRECLICK_WAIT = 0.25
+# 单击后等待「已切换」/账号变化（旧验效路径；现主流程用 SWITCH_WAIT）
 SEAMLESS_VERIFY_WAIT = 1.4
-# 管家窗 OCR 最大宽
-MANAGER_OCR_MAX_WIDTH = 1200
+# 管家窗 OCR 最大宽（底栏裁剪后可更小，加快定位）
+MANAGER_OCR_MAX_WIDTH = 900
+# 无感换号定位：只扫窗高下半（相对顶边起算比例），整窗 OCR 过慢
+SEAMLESS_OCR_Y0_FRAC = 0.48
+# 「注入」检测：只扫窗顶一带
+MANAGER_INJECT_OCR_Y1_FRAC = 0.40
 # 无感换号 Y：用「距底边比例」——同按钮在 1119 高窗约 0.19、在 1399 高窗约 0.35（相对顶会漂）
 # 拒中部发送条（距底>~0.45）与贴底假阳（距底<0.08）
 SEAMLESS_HIT_FROM_BOTTOM = (0.10, 0.42)
@@ -48,13 +52,15 @@ SEAMLESS_BLUE_FROM_BOTTOM = (0.10, 0.42)
 SEAMLESS_HIT_X_MIN = 0.45
 SEAMLESS_HIT_X_MAX = 0.72
 # OCR/模板均空时：再等 WebView 一拍后重截一次（不连点，只重定位）
-SEAMLESS_RELOCATE_WAIT = 0.7
+SEAMLESS_RELOCATE_WAIT = 0.45
 
 # 轮询与超时（秒）
 POLL_INTERVAL = 2.0
-# 换号成功并续写后的短静默（防同一次 tip 连点）；期内高分用量 tip 仍会再换号
+# 换号成功并续写后的短静默（防同一次 tip 连点）
 GRACE_SECONDS = 12
-# 宽限内再次触发换号的最低分数（真实用量 tip，避开 chat 历史误匹配）
+# 无感换号：成功点击后最短间隔（秒）；1 分钟内最多点一次，覆盖「宽限内再换号」
+SEAMLESS_CLICK_COOLDOWN = 60
+# 宽限内再次触发换号的最低分数（仍受 SEAMLESS_CLICK_COOLDOWN 约束）
 GRACE_USAGE_RERUN_MIN_SCORE = 0.86
 # 用量 tip：检出即换号（1=立刻；曾用 2 防误匹配，现按业务要求立即执行）
 TIP_CONFIRM_POLLS = 1
@@ -97,6 +103,8 @@ RESET_MACHINE_COOLDOWN = 90  # 重置流程后冷却，防连点
 # chat 输入框安全点击点（相对工程窗口）：
 # x 略靠中右，y 贴近底部，避免误点右侧 Files 列表
 CHAT_INPUT_REL = (0.64, 0.96)
+# 换号切回后：略抬高，避开用量 tip / 底栏，避免「续写成功」实则点空
+CHAT_INPUT_REL_AFTER_SWITCH = (0.58, 0.88)
 
 # Tip 类型中文名
 # 注意：update_prompt（更新提示）不是 tip，不进换号；仅日志/文档对照用

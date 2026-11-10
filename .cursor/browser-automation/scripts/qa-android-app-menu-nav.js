@@ -1,5 +1,5 @@
 /**
- * 验收：菜单「安卓 App 下载」必须跳到 /docs/app/（首页 + Solid）。
+ * 验收：菜单「App下载」必须跳到 /docs/app/（首页 + Solid）。
  *   PORT=18080 node scripts/qa-android-app-menu-nav.js
  */
 require('./_playwright-browsers-path');
@@ -26,14 +26,14 @@ async function openMenuGoDownload(page, fromLabel, errors) {
     if (typeof window.toggleMenu === 'function') window.toggleMenu();
   });
   await page.waitForTimeout(700);
-  const item = page.locator('.menu-item', { hasText: '安卓 App 下载' });
+  const item = page.locator('.menu-item', { hasText: 'App下载' });
   if ((await item.count()) < 1) {
-    errors.push(fromLabel + ': 安卓 App 下载 not found');
+    errors.push(fromLabel + ': App下载 not found');
     return;
   }
   const cls = await item.first().getAttribute('class');
   if (fromLabel === 'home' && cls && /\bactive\b/.test(cls)) {
-    errors.push('home: 安卓 App 下载 incorrectly active (' + cls + ')');
+    errors.push('home: App下载 incorrectly active (' + cls + ')');
   }
   await Promise.all([
     page.waitForURL(/\/docs\/app\/?/, { timeout: 10000 }),
@@ -46,7 +46,7 @@ async function openMenuGoDownload(page, fromLabel, errors) {
     errors.push(fromLabel + ': expected /docs/app/, got ' + page.url());
   }
   const title = await page.title();
-  if (!/安卓 App 下载/.test(title)) {
+  if (!/App下载/.test(title)) {
     errors.push(fromLabel + ': title mismatch: ' + title);
   }
   if ((await page.locator('#btnDownload').count()) < 1) {

@@ -28,6 +28,12 @@ if %errorlevel% neq 0 (
   )
 )
 
+if not exist "%ProgramFiles%\AutoHotkey\v2\AutoHotkey64.exe" if not exist "%ProgramFiles%\AutoHotkey\AutoHotkey.exe" (
+  echo [提示] 未检测到 AutoHotkey。切回 Cursor 抢前台可能不稳。
+  echo 可执行: winget install AutoHotkey.AutoHotkey
+  echo.
+)
+
 echo 启动自动换号监控（日志见 logs 目录）...
 echo 请先打开「Cursor续杯管家」并保持窗口可见（不要缩到托盘）。
 echo 用量 tip 时会点「无感换号」，不重启 Cursor，再发「请继续你的工作」。
