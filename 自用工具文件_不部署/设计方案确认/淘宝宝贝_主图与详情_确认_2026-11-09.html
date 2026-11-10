@@ -1464,6 +1464,7 @@
       <b>文字分工</b>：图上叠字 → 烤进图；图外说明 → 真文字（确认页与上架同向，勿再烤成纯字长图）。
       槽位草稿存本机浏览器；功能升级会<strong>自动合并旧版草稿</strong>，勿再靠改存储键名清数据。
       重要进度请点「导出草稿」留一份 JSON。
+      <b>补图安全</b>：「从备份只补空图」只填空槽，不改现有文案/取景；导入/清空前会<strong>自动再下一份安全快照</strong>到下载目录。
     </div>
     <div class="reply">
       请验收：<strong>主图字体（非宋体）</strong> /
@@ -1478,8 +1479,8 @@
       <button type="button" id="btnPreviewDetail">预览详情</button>
       <button type="button" id="btnToggleCopy">隐藏示意文案</button>
       <button type="button" id="btnExportDraft">导出草稿</button>
-      <button type="button" id="btnImportDraft">导入草稿</button>
-      <button type="button" id="btnRestoreBackup">从备份恢复贴图</button>
+      <button type="button" id="btnImportDraft">导入草稿（整份替换）</button>
+      <button type="button" id="btnRestoreBackup">从备份只补空图</button>
       <button type="button" id="btnFillScaleCatalog">填入课表规模长图</button>
       <button type="button" id="btnClearProduct">清空本品已贴图</button>
       <button type="button" id="btnClearAll">清空全部草稿</button>
@@ -1961,22 +1962,37 @@
         if (el) el.textContent = '保存失败（图太大可换小图）';
       }
     }
-    function exportDraftFile() {
+    function exportDraftFile(opts) {
+      const reason = (opts && opts.reason) ? String(opts.reason) : '';
+      const silentHint = !!(opts && opts.silentHint);
       const payload = {
         schema: DRAFT_SCHEMA,
         kind: 'tb-product-detail-draft',
         exportedAt: new Date().toISOString(),
+        safetyReason: reason || undefined,
         store: store
       };
       const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
       const a = document.createElement('a');
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      const prefix = reason ? ('淘宝主图详情草稿_安全快照_' + reason + '_') : '淘宝主图详情草稿_';
       a.href = URL.createObjectURL(blob);
-      a.download = '淘宝主图详情草稿_' + stamp + '.json';
+      a.download = prefix + stamp + '.json';
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      const el = document.getElementById('saveHint');
-      if (el) el.textContent = '已导出草稿文件';
+      if (!silentHint) {
+        const el = document.getElementById('saveHint');
+        if (el) el.textContent = reason ? ('已自动导出安全快照（' + reason + '）') : '已导出草稿文件';
+      }
+    }
+    /** 危险操作前强制留底：下载目录多一份，避免整份覆盖/清空后无回滚 */
+    function safetySnapshotBefore(reason) {
+      try {
+        exportDraftFile({ reason: String(reason || 'op'), silentHint: true });
+        return true;
+      } catch (e) {
+        return false;
+      }
     }
     function fillMissingImagesFromStore(backupStore) {
       const bakRoot = backupStore && typeof backupStore === 'object' ? backupStore : {};
@@ -3440,17 +3456,18 @@
     const DRAFT_BACKUP_URL = '/.cursor/browser-automation/runs/taobao-draft-restore.json';
     async function restoreDraftFromBackup(opts) {
       const silent = !!(opts && opts.silent);
-      if (!silent && !confirm('用本地备份补回贴图？会保留你现在的文案，只把空图槽用备份填上（建议先「导出草稿」）。')) return false;
+      if (!silent && !confirm('只补空图槽？\n\n会保留你现在的文案与已有取景；仅把「没图」的槽用备份填上。\n操作前会自动再下一份安全快照。')) return false;
+      safetySnapshotBefore('补空图前');
       try {
         const res = await fetch(DRAFT_BACKUP_URL, { cache: 'no-store' });
         if (!res.ok) throw new Error('找不到备份文件（HTTP ' + res.status + '）');
         const payload = await res.json();
         importDraftObject(payload, { fillMissing: true });
-        setSaveHint('已从备份补回贴图');
+        setSaveHint('已只补空图（文案/取景未改；安全快照已下载）');
         return true;
       } catch (err) {
         alert('恢复失败：' + (err && err.message ? err.message : '未知错误') +
-          '\n也可点「导入草稿」，选 Downloads 里最新的「淘宝主图详情草稿_….json」。');
+          '\n也可点「导入草稿（整份替换）」，选 Downloads 里最新的「淘宝主图详情草稿_….json」。');
         return false;
       }
     }
@@ -3555,11 +3572,13 @@
       const file = e.target.files && e.target.files[0];
       e.target.value = '';
       if (!file) return;
-      if (!confirm('用所选文件替换当前全部草稿？建议先点「导出草稿」备份。')) return;
+      if (!confirm('用所选文件【整份替换】当前全部草稿？\n\n文案、取景、贴图都会变成文件里的内容。\n确认后会先自动下载一份「安全快照」，再导入。')) return;
+      safetySnapshotBefore('整份导入前');
       const reader = new FileReader();
       reader.onload = () => {
         try {
           importDraftObject(JSON.parse(String(reader.result || '{}')));
+          setSaveHint('已整份导入（导入前安全快照已下载）');
         } catch (err) {
           alert('导入失败：' + (err && err.message ? err.message : '无法解析 JSON'));
         }
@@ -3567,7 +3586,8 @@
       reader.readAsText(file);
     });
     document.getElementById('btnClearProduct').addEventListener('click', () => {
-      if (!confirm('清空「' + currentId + '」已贴图片与参数？（各类文案改动会保留）')) return;
+      if (!confirm('清空「' + currentId + '」已贴图片与参数？（各类文案改动会保留）\n会先自动下载安全快照。')) return;
+      safetySnapshotBefore('清本品图前');
       const cur = store[currentId] || {};
       store[currentId] = {
         mains: {},
@@ -3580,13 +3600,15 @@
       };
       saveStore();
       render(currentId);
+      setSaveHint('已清空本品贴图（安全快照已下载）');
     });
     document.getElementById('btnClearAll').addEventListener('click', () => {
-      if (!confirm('清空全部槽位草稿？')) return;
+      if (!confirm('清空全部槽位草稿？\n会先自动下载安全快照。')) return;
+      safetySnapshotBefore('清空全部前');
       store = {};
       localStorage.removeItem(STORE_KEY);
       LEGACY_STORE_KEYS.forEach((k) => localStorage.removeItem(k));
-      document.getElementById('saveHint').textContent = '草稿已清空';
+      document.getElementById('saveHint').textContent = '草稿已清空（安全快照已下载）';
       render(currentId);
     });
 
