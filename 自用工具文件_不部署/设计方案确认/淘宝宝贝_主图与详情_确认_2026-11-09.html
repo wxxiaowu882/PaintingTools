@@ -1,0 +1,3593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>设计确认 · 淘宝宝贝主图与详情 · 7 品</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- 与官网首页「手绘工坊」同栈：Inter + 苹方 / 微软雅黑（中文走系统无衬线，非宋体） -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #050505;
+      --ink: #f3f1ec;
+      --mute: rgba(243,241,236,0.82);
+      --dim: rgba(243,241,236,0.58);
+      --line: rgba(255,255,255,0.1);
+      --gold: #cbb892;
+      --gold-dim: rgba(203,184,146,0.72);
+      --pick: #8faf7a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #020202;
+      color: var(--ink);
+      font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+      font-weight: 300;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 18px 120px; }
+    h1 {
+      margin: 0 0 8px;
+      font-weight: 200;
+      letter-spacing: 0.22em;
+      font-size: 0.95rem;
+    }
+    .lead {
+      max-width: 54em;
+      margin: 0 0 14px;
+      color: var(--mute);
+      font-size: 0.86rem;
+      line-height: 1.75;
+    }
+    .note, .reply {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 0.8rem;
+      line-height: 1.65;
+      color: var(--mute);
+      background: #0a0a0a;
+    }
+    .reply {
+      border-color: rgba(143,175,122,0.35);
+      background: #0c120e;
+    }
+    .reply strong { color: var(--pick); }
+    .note b { color: var(--gold); }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 16px;
+      align-items: center;
+    }
+    .toolbar button, .edit-hit, .modal .btn, .modal-h button {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: #12100e;
+      color: var(--mute);
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .toolbar button:hover, .edit-hit:hover, .modal .btn:hover, .modal-h button:hover {
+      border-color: rgba(203,184,146,0.45);
+      color: var(--ink);
+    }
+    .modal-h button.primary, .modal .btn.primary {
+      border-color: rgba(203,184,146,0.55);
+      color: #f5ead2;
+      border-radius: 4px;
+    }
+    .modal-h button, .modal .btn { border-radius: 4px; padding: 7px 10px; font-size: 11px; }
+    .toolbar .hint {
+      font-size: 11px;
+      color: var(--dim);
+      letter-spacing: 0.04em;
+    }
+    .toolbar button.is-preview-on {
+      border-color: rgba(143,175,122,0.55);
+      color: #d7e8c8;
+      background: #0c120e;
+    }
+    /* —— 预览详情：只留买家在宝贝详情里会看到的图与字 —— */
+    body.preview-detail .intro,
+    body.preview-detail .reply,
+    body.preview-detail .shared,
+    body.preview-detail .side,
+    body.preview-detail .tabs,
+    body.preview-detail #saveHint,
+    body.preview-detail .toolbar > button:not(#btnPreviewDetail),
+    body.preview-detail .mains,
+    body.preview-detail .main-tip,
+    body.preview-detail .phone-h,
+    body.preview-detail .bh,
+    body.preview-detail .dyn-hint,
+    body.preview-detail .edit-hit,
+    body.preview-detail .no,
+    body.preview-detail .draft-badge,
+    body.preview-detail .h-handle,
+    body.preview-detail .dyn-acts,
+    body.preview-detail .btn-add-pic,
+    body.preview-detail .btn-insert-pic,
+    body.preview-detail .dyn-sort,
+    /* 预览：空文案不露「说明（可空）」等占位 */
+    body.preview-detail .ov-slot [contenteditable].is-blank,
+    body.preview-detail .block [contenteditable].is-blank,
+    body.preview-detail .main-slot [contenteditable].is-blank,
+    body.preview-detail .ov-slot .k.is-blank,
+    body.preview-detail .ov-slot .s.is-blank,
+    body.preview-detail .ov-slot .tag.is-blank {
+      display: none !important;
+    }
+    body.preview-detail .annot > label,
+    body.preview-detail .annot.is-empty,
+    body.preview-detail .pic-slot .empty,
+    body.preview-detail .pic-slot:not(.has-img),
+    body.preview-detail .view-toggle .hint,
+    body.preview-detail .dyn-pic:has(.pic-slot:not(.has-img)),
+    body.preview-detail .overview-card:has(.ov-slot:not(.has-img)) {
+      display: none !important;
+    }
+    body.preview-detail .layout {
+      grid-template-columns: 1fr;
+    }
+    body.preview-detail .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      padding: 10px 0 12px;
+      margin-bottom: 10px;
+      background: linear-gradient(180deg, #070706 70%, rgba(7,7,6,0));
+    }
+    body.preview-detail .view-toggle {
+      position: sticky;
+      top: 48px;
+      z-index: 39;
+      background: rgba(7,7,6,0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 8px 0;
+      margin-bottom: 8px;
+    }
+    body.preview-detail .phone {
+      margin: 0 auto 40px;
+      border-color: rgba(255,255,255,0.1);
+      box-shadow: 0 18px 48px rgba(0,0,0,0.45);
+    }
+    body.preview-detail .dyn-pic {
+      border: 0;
+      padding: 0;
+      background: transparent;
+      margin: 0 0 10px;
+    }
+    body.preview-detail .annot {
+      border: 0;
+      background: transparent;
+      padding: 0 2px 2px;
+      margin: 0 0 8px;
+      border-radius: 0;
+    }
+    body.preview-detail .annot textarea {
+      border: 0;
+      background: transparent;
+      color: rgba(243,241,236,0.88);
+      padding: 0 0 10px;
+      resize: none;
+      overflow: hidden;
+      pointer-events: none;
+      /* 图外真文字：跟淘宝可达字体，不用 Inter */
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.7;
+      letter-spacing: normal;
+      max-height: none;
+      field-sizing: content;
+    }
+    body.preview-detail [contenteditable="true"] {
+      pointer-events: none;
+      caret-color: transparent;
+      box-shadow: none !important;
+      background: transparent !important;
+      cursor: default;
+    }
+    body.preview-detail .block {
+      margin: 0;
+      padding: 12px 0 14px;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    body.preview-detail .block.important {
+      padding: 12px 14px 14px;
+    }
+    body.preview-detail .block.warm,
+    body.preview-detail .block.psy,
+    body.preview-detail .block.visual {
+      background: transparent;
+    }
+    body.preview-detail .overview-card {
+      margin: 0 !important;
+    }
+    /* 预览：图外文字仍留左右边距；图本身贴边 */
+    body.preview-detail .block.visual > h3,
+    body.preview-detail .block.visual > p,
+    body.preview-detail .block.visual > .annot,
+    body.preview-detail .block.visual > .dyn-hint,
+    body.preview-detail .block.visual > .ov-bridge {
+      padding-left: 14px;
+      padding-right: 14px;
+      box-sizing: border-box;
+    }
+    /* 预览：四屏贴边连读，仅靠细缝衔接 */
+    body.preview-detail .overview-stack {
+      gap: 0;
+    }
+    body.preview-detail .overview-card + .overview-card {
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    body.preview-detail .ov-slot {
+      border: 0;
+      border-radius: 0;
+      min-height: 0;
+    }
+    body.preview-detail .ov-bridge {
+      margin: 18px 0 8px;
+      padding: 0 14px;
+    }
+    body.preview-detail .detail {
+      padding: 0;
+    }
+    body.preview-detail .phone {
+      background: #000;
+    }
+    #filePick { display: none; }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 18px 0 22px;
+    }
+    .tabs button {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #0a0a0a;
+      color: var(--mute);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .tabs button.on {
+      color: var(--ink);
+      border-color: rgba(203,184,146,0.45);
+      background: #14110e;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(520px, 640px) 1fr;
+      gap: 22px;
+      align-items: start;
+    }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .stage { min-width: 0; }
+    .phone {
+      width: 100%;
+      max-width: 360px;
+      margin: 0 auto;
+      background: var(--bg);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.65);
+      transition: max-width .2s ease;
+    }
+    .phone.is-pc {
+      max-width: 790px;
+      border-radius: 10px;
+    }
+    .view-toggle {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 10px;
+      align-items: center;
+    }
+    .view-toggle button {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #0a0a0a;
+      color: var(--mute);
+      padding: 6px 11px;
+      border-radius: 999px;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .view-toggle button.on {
+      color: var(--ink);
+      border-color: rgba(203,184,146,0.45);
+      background: #14110e;
+    }
+    .view-toggle .hint {
+      font-size: 11px;
+      color: var(--dim);
+    }
+    .main-board {
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #030303;
+      margin-bottom: 18px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.45);
+    }
+    .main-block {
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding: 10px 10px 12px;
+    }
+    .main-block:first-of-type { border-top: 0; }
+    .main-tip {
+      margin: 0 0 8px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(203,184,146,0.22);
+      background: rgba(18,16,12,0.95);
+    }
+    .main-tip .mt-h {
+      margin: 0 0 4px;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--gold);
+      font-weight: 400;
+    }
+    .main-tip .mt-role {
+      color: rgba(243,241,236,0.88);
+    }
+    .main-tip p {
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.55;
+      color: rgba(243,241,236,0.76);
+    }
+    .main-tip .warn {
+      color: rgba(201,160,106,0.95);
+    }
+    .main-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 176px;
+      gap: 12px;
+      align-items: start;
+    }
+    .main-sync {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-top: 2px;
+      align-items: center;
+    }
+    .sync-block { display: grid; gap: 4px; }
+    .sync-block .lab {
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: var(--dim);
+      text-align: center;
+    }
+    /* 同图缩小：固定参考画布 + scale，字图比例与左侧大图一致（淘宝搜索/推荐也是同一张 1:1 缩小） */
+    .sync-thumb {
+      width: 168px;
+      height: 168px;
+      max-width: 100%;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.12);
+      position: relative;
+      pointer-events: none;
+      background: #0a0806;
+      margin: 0 auto;
+    }
+    .sync-thumb.feed {
+      width: 120px;
+      height: 120px;
+    }
+    .sync-thumb .sync-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 480px;
+      height: 480px;
+      transform-origin: top left;
+      transform: scale(0.35); /* 168/480；JS 会按左侧实宽重算 */
+    }
+    .sync-thumb.feed .sync-canvas {
+      transform: scale(0.25); /* 120/480 兜底 */
+    }
+    .sync-thumb .main-slot {
+      min-height: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      aspect-ratio: auto;
+      padding: 0 !important;
+      border: 0;
+      border-radius: 0;
+    }
+    .sync-thumb .main-slot .edit-hit,
+    .sync-thumb .main-slot .no { display: none !important; }
+    body.hide-draft-copy .main-slot .copy,
+    body.hide-draft-copy .ov-slot .copy { visibility: hidden; }
+    .draft-badge {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: rgba(203,184,146,0.9);
+      border: 1px solid rgba(203,184,146,0.35);
+      vertical-align: middle;
+    }
+    .phone-h {
+      padding: 12px 14px 8px;
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: var(--dim);
+      border-bottom: 1px solid var(--line);
+    }
+    .mains {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      padding: 8px;
+      background: #030303;
+    }
+    .mains.compact {
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+    }
+    .main-slot, .pic-slot {
+      position: relative;
+      overflow: hidden;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: linear-gradient(160deg, #1a120c, #0a0806 70%);
+    }
+    .main-slot {
+      aspect-ratio: 1;
+      min-height: 300px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      flex-direction: column;
+      gap: 0;
+      padding: 0;
+      text-align: center;
+      container-type: inline-size;
+      container-name: mainslot;
+      background:
+        radial-gradient(ellipse 70% 55% at 40% 35%, rgba(120,80,50,0.28), transparent 70%),
+        linear-gradient(165deg, #2a1810, #0a0705 75%);
+    }
+    .mains.compact .main-slot {
+      min-height: 0;
+      padding: 0;
+      aspect-ratio: 1;
+    }
+    .main-slot .fg, .pic-slot .fg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+      z-index: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+    .main-slot.has-img .fg, .pic-slot.has-img .fg { display: block; }
+    /* 文案落在图下方留白：底部实底+大字，缩略图也要能认 */
+    .main-slot .shade, .pic-slot .shade {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .main-slot.has-img .shade, .pic-slot.has-img .shade { opacity: 1; }
+    .main-slot .copy {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 3px;
+      width: 100%;
+      /* 底部文案区相对主图的左右留白（文本框外沿）；框内文字另计，勿再给 .t 加左右内边距 */
+      padding: 5% 7% 5.5%;
+      box-sizing: border-box;
+      overflow: visible; /* 角标可略探出标题行，仍受 .main-slot 裁切 */
+      /* 硬边阴影：缩略时避免大模糊晕导致「糊字」 */
+      text-shadow: 0 1px 2px rgba(0,0,0,0.95);
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(0,0,0,0.35) 22%,
+        rgba(0,0,0,0.88) 70%,
+        rgba(0,0,0,0.94) 100%
+      );
+    }
+    .main-slot .no {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      z-index: 4;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: rgba(203,184,146,0.75);
+    }
+    .main-slot .k.is-blank:not([contenteditable="true"]),
+    .main-slot .tag.is-blank:not([contenteditable="true"]),
+    .main-slot .s.is-blank:not([contenteditable="true"]) { display: none; }
+    /* 主图字：对齐官网首页「手绘工坊」——Inter 细字 + 苹方/雅黑，非宋体 */
+    .main-slot .k,
+    .main-slot .t,
+    .main-slot .s,
+    .main-slot .tag {
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .main-slot .k {
+      font-size: clamp(11px, 3.2cqi, 15px);
+      letter-spacing: 0.2em;
+      color: rgba(245,234,210,0.88);
+      font-weight: 200;
+      min-width: 4em;
+    }
+    .main-slot .t-wrap {
+      position: relative;
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      overflow: visible;
+    }
+    .main-slot .t {
+      /* 字号由 fitMainTitles 按「文本框内宽」实测撑满；此处为未跑 JS 时的回退 */
+      font-size: clamp(26px, 11cqi, 56px);
+      letter-spacing: 0.2em;
+      color: rgba(255,255,255,0.92);
+      font-weight: 100;
+      line-height: 1.15;
+      white-space: nowrap;
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 0; /* 框内左右不留白，字才撑满文本框 */
+      box-sizing: border-box;
+      overflow: hidden;
+      text-overflow: clip;
+      text-align: center;
+    }
+    /*
+      第 1 张主图标题右上角附属字（默认 Pro+）。
+      与标题「3D」同栈：Inter 细白字、无底框；字号明显小于主标题，像附属。
+      硬门槛：推荐≈120 仍须能辨认「Pro+」。
+    */
+    .main-slot .t-badge {
+      position: absolute;
+      right: 0;
+      top: 0;
+      z-index: 4;
+      /* 贴在标题行正上方右角；略探出标题右缘 */
+      transform: translate(28%, -118%);
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+      /* 回退字号；正式以 fitMainBadge 写入的 px 为准 */
+      font-size: clamp(18px, 5.5cqi, 36px);
+      font-weight: 100;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      white-space: nowrap;
+      color: rgba(255,255,255,0.92);
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+      text-shadow: none;
+      cursor: text;
+      min-width: 0;
+      text-align: right;
+      box-sizing: border-box;
+    }
+    .main-slot .t-badge.is-blank:not([contenteditable="true"]) { display: none; }
+    .mains.compact .main-slot .t-badge {
+      font-size: 8px;
+      letter-spacing: 0.06em;
+    }
+    .main-slot .s {
+      font-size: clamp(13px, 4.2cqi, 18px);
+      line-height: 1.4;
+      color: rgba(247,243,234,0.88);
+      max-width: 22em;
+      font-weight: 200;
+      letter-spacing: 0.08em;
+      white-space: pre-line;
+    }
+    .main-slot .bul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: clamp(11px, 3.2cqi, 15px);
+      line-height: 1.35;
+      color: rgba(255,255,255,0.92);
+      text-align: center;
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-weight: 200;
+    }
+    .main-slot .tag {
+      margin-top: 2px;
+      font-size: clamp(10px, 2.8cqi, 13px);
+      letter-spacing: 0.16em;
+      color: #f5ead2;
+      border: 1px solid rgba(245,234,210,0.4);
+      padding: 4px 10px;
+      border-radius: 2px;
+      background: rgba(0,0,0,0.28);
+      font-weight: 200;
+      min-width: 3em;
+    }
+    .main-slot [contenteditable="true"] {
+      outline: none;
+      cursor: text;
+      border-radius: 0;
+      margin: 0;
+      padding: 0;
+      box-shadow: inset 0 0 0 1px transparent;
+      transition: box-shadow 0.15s ease;
+    }
+    .main-slot .t-badge[contenteditable="true"] {
+      border-radius: 3px;
+    }
+    .main-slot [contenteditable="true"]:hover {
+      box-shadow: inset 0 0 0 1px rgba(203,184,146,0.28);
+    }
+    .main-slot [contenteditable="true"]:focus {
+      box-shadow: inset 0 0 0 1px rgba(203,184,146,0.55);
+      background: rgba(0,0,0,0.18);
+    }
+    .main-slot [contenteditable="true"].is-blank::before,
+    .ov-slot [contenteditable="true"].is-blank::before,
+    .block [contenteditable="true"].is-blank::before {
+      content: attr(data-placeholder);
+      color: rgba(255,255,255,0.28);
+      font-weight: 200;
+      letter-spacing: 0.12em;
+      pointer-events: none;
+    }
+    .ov-slot [contenteditable="true"],
+    .block [contenteditable="true"] {
+      outline: none;
+      cursor: text;
+      border-radius: 2px;
+      box-shadow: inset 0 0 0 1px transparent;
+      transition: box-shadow 0.15s ease;
+    }
+    .ov-slot [contenteditable="true"]:hover,
+    .block [contenteditable="true"]:hover {
+      box-shadow: inset 0 0 0 1px rgba(203,184,146,0.28);
+    }
+    .ov-slot [contenteditable="true"]:focus,
+    .block [contenteditable="true"]:focus {
+      box-shadow: inset 0 0 0 1px rgba(203,184,146,0.55);
+      background: rgba(0,0,0,0.16);
+    }
+    .block [contenteditable="true"] {
+      display: inline;
+    }
+    .block h3[contenteditable="true"],
+    .block p[contenteditable="true"],
+    .block li[contenteditable="true"],
+    .block .flow span[contenteditable="true"] {
+      display: block;
+    }
+    .block li[contenteditable="true"] {
+      display: list-item;
+    }
+    .mains.compact .main-slot .k,
+    .mains.compact .main-slot .s,
+    .mains.compact .main-slot .bul,
+    .mains.compact .main-slot .tag,
+    .mains.compact .main-slot .no { display: none; }
+    .mains.compact .main-slot .t {
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      color: rgba(243,241,236,0.68);
+      white-space: nowrap;
+    }
+
+    /* —— 详情总览四屏：与主图解耦；无框、贴边连读，仅细缝衔接 —— */
+    .overview-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin: 4px 0 0;
+    }
+    .overview-card {
+      margin: 0;
+    }
+    .overview-card + .overview-card {
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+    .ov-slot {
+      aspect-ratio: 1;
+      min-height: 280px;
+      position: relative;
+      overflow: hidden;
+      border-radius: 0;
+      border: 0;
+      display: block;
+      text-align: center;
+      padding: 0;
+      background:
+        radial-gradient(ellipse 70% 55% at 40% 35%, rgba(120,80,50,0.28), transparent 70%),
+        linear-gradient(165deg, #2a1810, #0a0705 75%);
+    }
+    .ov-slot .fg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+      z-index: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+    .ov-slot.has-img .fg { display: block; }
+    .ov-slot .shade {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .ov-slot.has-img .shade { opacity: 1; }
+    /* 文案底衬：默认=电脑端口径（位置/字号恢复上版）；手机见下方 .phone:not(.is-pc) */
+    .ov-slot .copy {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 14% 8% 7%;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.95);
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(0,0,0,0.35) 22%,
+        rgba(0,0,0,0.88) 70%,
+        rgba(0,0,0,0.94) 100%
+      );
+    }
+    .ov-slot .no {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      z-index: 4;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: rgba(203,184,146,0.75);
+    }
+    .ov-slot .k:empty,
+    .ov-slot .tag:empty { display: none; }
+    .ov-slot .k {
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: rgba(243,241,236,0.72);
+    }
+    .ov-slot .t {
+      font-size: 18px;
+      letter-spacing: 0.12em;
+      color: #f3f1ec;
+      font-weight: 400;
+      line-height: 1.35;
+    }
+    .ov-slot .s {
+      font-size: 12px;
+      line-height: 1.6;
+      color: rgba(243,241,236,0.86);
+      max-width: 22em;
+    }
+    .ov-slot .bul {
+      margin: 4px 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: 11px;
+      line-height: 1.7;
+      color: rgba(243,241,236,0.78);
+      text-align: left;
+    }
+    .ov-slot .tag {
+      margin-top: 8px;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: rgba(203,184,146,0.92);
+      border: 1px solid rgba(203,184,146,0.42);
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    /* 仅手机详情宽：略收字号，但行距/间距保持透气，不挤成一团 */
+    .phone:not(.is-pc) .ov-slot .copy {
+      gap: 5px;
+      padding: 13% 8% 6%;
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(0,0,0,0.28) 26%,
+        rgba(0,0,0,0.84) 72%,
+        rgba(0,0,0,0.93) 100%
+      );
+    }
+    .phone:not(.is-pc) .ov-slot .k {
+      font-size: 9px;
+      letter-spacing: 0.22em;
+    }
+    .phone:not(.is-pc) .ov-slot .t {
+      font-size: 16px;
+      letter-spacing: 0.1em;
+      line-height: 1.4;
+    }
+    .phone:not(.is-pc) .ov-slot .s {
+      font-size: 11px;
+      line-height: 1.55;
+    }
+    .phone:not(.is-pc) .ov-slot .bul {
+      margin-top: 3px;
+      font-size: 10px;
+      line-height: 1.65;
+    }
+    .phone:not(.is-pc) .ov-slot .tag {
+      margin-top: 6px;
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      padding: 4px 9px;
+    }
+    .ov-slot .edit-hit {
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      z-index: 5;
+    }
+    .edit-hit {
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      z-index: 5;
+      padding: 4px 8px;
+      font-size: 10px;
+      opacity: 0.9;
+      border-radius: 3px;
+    }
+    .pic-slot {
+      min-height: 160px;
+      aspect-ratio: 16 / 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pic-slot.tall { aspect-ratio: 3 / 4; min-height: 220px; }
+    .pic-slot.square { aspect-ratio: 1; min-height: 140px; }
+    .pic-slot .empty {
+      position: relative;
+      z-index: 3;
+      text-align: center;
+      padding: 16px;
+      color: rgba(243,241,236,0.55);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      line-height: 1.6;
+      pointer-events: none;
+    }
+    .pic-slot.has-img .empty { display: none; }
+    .pic-slot .empty b {
+      display: block;
+      color: rgba(203,184,146,0.85);
+      font-weight: 400;
+      margin-bottom: 4px;
+      letter-spacing: 0.14em;
+    }
+    .annot {
+      margin: 0 0 8px;
+      border: 1px dashed rgba(203,184,146,0.35);
+      border-radius: 4px;
+      padding: 8px 10px;
+      background: rgba(0,0,0,0.35);
+    }
+    .annot label {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: var(--dim);
+      margin-bottom: 4px;
+    }
+    .annot textarea {
+      width: 100%;
+      min-height: 44px;
+      max-height: 480px;
+      resize: vertical;
+      border: 0;
+      outline: none;
+      background: transparent;
+      box-sizing: border-box;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: normal;
+      line-height: 1.7;
+      color: rgba(243,241,236,0.9);
+    }
+    .dyn-list { display: grid; gap: 10px; margin-top: 4px; }
+    .dyn-pic {
+      position: relative;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 8px;
+      background: #080806;
+    }
+    .dyn-pic .pic-slot {
+      width: 100%;
+      min-height: 80px;
+      aspect-ratio: auto;
+      border-radius: 4px;
+    }
+    .dyn-pic .h-handle {
+      height: 14px;
+      margin-top: 2px;
+      border-radius: 0 0 4px 4px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(203,184,146,0.18));
+      border: 1px dashed rgba(203,184,146,0.35);
+      border-top: 0;
+      cursor: ns-resize;
+      touch-action: none;
+      position: relative;
+      user-select: none;
+    }
+    .dyn-pic .h-handle::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 5px;
+      width: 36px;
+      height: 3px;
+      margin-left: -18px;
+      border-radius: 2px;
+      background: rgba(203,184,146,0.55);
+    }
+    .region-foot,
+    .detail .region-foot {
+      margin: 14px 0 4px;
+      text-align: center;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      color: rgba(243, 241, 236, 0.55);
+      line-height: 1.5;
+    }
+    /* 总览 → 场景功能：安静过桥，不用破折号长句 */
+    .ov-bridge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin: 22px 0 10px;
+      padding: 0 8px;
+    }
+    .ov-bridge::before,
+    .ov-bridge::after {
+      content: '';
+      flex: 1 1 0;
+      max-width: 72px;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(203,184,146,0.45),
+        transparent
+      );
+    }
+    .ov-bridge .region-foot {
+      margin: 0;
+      flex: 0 0 auto;
+      font-size: 12px;
+      letter-spacing: 0.22em;
+      color: rgba(203,184,146,0.78);
+      white-space: nowrap;
+    }
+    .dyn-acts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+      align-items: center;
+    }
+    .dyn-acts button, .btn-add-pic {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: #12100e;
+      color: var(--mute);
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .dyn-acts button:hover, .btn-add-pic:hover {
+      border-color: rgba(203,184,146,0.45);
+      color: var(--ink);
+    }
+    .btn-add-pic {
+      margin-top: 10px;
+      width: 100%;
+      padding: 9px 12px;
+      border-style: dashed;
+      border-color: rgba(203,184,146,0.35);
+      color: rgba(203,184,146,0.9);
+      background: rgba(0,0,0,0.25);
+    }
+    .btn-insert-pic {
+      appearance: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      margin: 0;
+      padding: 6px 10px;
+      border: 1px dashed rgba(203,184,146,0.28);
+      border-radius: 999px;
+      background: transparent;
+      color: rgba(203,184,146,0.72);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-insert-pic:hover {
+      border-color: rgba(203,184,146,0.55);
+      color: #f5ead2;
+      background: rgba(203,184,146,0.06);
+    }
+    .btn-insert-pic::before,
+    .btn-insert-pic::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(203,184,146,0.22);
+    }
+    .dyn-pic.is-dragging {
+      opacity: 0.45;
+    }
+    .dyn-pic.drag-over-before {
+      box-shadow: inset 0 2px 0 0 rgba(203,184,146,0.85);
+    }
+    .dyn-pic.drag-over-after {
+      box-shadow: inset 0 -2px 0 0 rgba(203,184,146,0.85);
+    }
+    .dyn-sort {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 6px;
+    }
+    .dyn-sort .drag-handle {
+      appearance: none;
+      flex: 0 0 auto;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: #12100e;
+      color: var(--dim);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      cursor: grab;
+      font-family: inherit;
+      user-select: none;
+      touch-action: none;
+    }
+    .dyn-sort .drag-handle:active { cursor: grabbing; }
+    .dyn-sort .ord {
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 0.08em;
+    }
+    .dyn-hint {
+      margin: 0 0 8px;
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 0.04em;
+      line-height: 1.5;
+    }
+    .h-val {
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 0.06em;
+      margin-left: auto;
+    }
+    .block h4 {
+      margin: 12px 0 6px;
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      color: rgba(203,184,146,0.9);
+    }
+    .status-pill {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: #0c120e;
+      background: var(--pick);
+      vertical-align: middle;
+    }
+    /*
+      详情「图外真文字」= 按淘宝买家端可达字体预览（不是官网 Inter）：
+      苹方 / 雅黑常规字重；字号靠层级；字距默认。
+      叠在图上的字（.ov-slot / .main-slot）仍可走 Inter，因会烤进图。
+    */
+    .detail {
+      padding: 0 0 18px;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif;
+      color: rgba(243,241,236,0.88);
+      -webkit-font-smoothing: antialiased;
+    }
+    .block {
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding: 16px 16px 14px;
+    }
+    .block .bh {
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      color: var(--dim);
+      margin-bottom: 8px;
+      font-weight: 400;
+    }
+    .block h3,
+    .detail h3 {
+      margin: 0 0 10px;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif;
+      font-size: 17px;
+      font-weight: 500;
+      letter-spacing: normal;
+      line-height: 1.4;
+      color: rgba(255,255,255,0.94);
+    }
+    .block p,
+    .block li,
+    .detail p,
+    .detail li {
+      margin: 0 0 9px;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: normal;
+      line-height: 1.7;
+      color: rgba(243,241,236,0.88);
+    }
+    .block ul { margin: 0; padding-left: 1.15em; }
+    .block.warm { background: rgba(68,31,11,0.35); }
+    .block.psy { background: #090909; }
+    .block.visual { background: #070706; }
+    /* 详情前方「重要说明」框图 */
+    .block.important {
+      margin: 4px 0 8px;
+      border: 1px solid rgba(203,184,146,0.38);
+      border-radius: 8px;
+      background: rgba(203,184,146,0.07);
+      padding: 14px 14px 12px;
+    }
+    .block.important .bh { color: rgba(203,184,146,0.85); }
+    .block.important .imp-lead {
+      margin: 0 0 12px;
+      padding: 0 0 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.96);
+    }
+    .block.important .imp-points {
+      margin: 0 0 10px;
+      padding-left: 1.1em;
+    }
+    .block.important .imp-points li {
+      margin: 0 0 8px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .block.important .imp-points li.pri {
+      font-weight: 500;
+      color: rgba(255,255,255,0.94);
+    }
+    .block.important .imp-points li.sec {
+      color: rgba(243,241,236,0.78);
+      font-size: 13px;
+    }
+    .block.important .imp-foot {
+      margin: 8px 0 0;
+      font-size: 12px;
+      color: rgba(243,241,236,0.55);
+    }
+    body.preview-detail .block.important {
+      border-color: rgba(203,184,146,0.32);
+      background: rgba(203,184,146,0.05);
+    }
+    .flow {
+      display: grid;
+      gap: 6px;
+      margin: 10px 0;
+    }
+    .flow span {
+      display: block;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      padding: 9px 11px;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: normal;
+      line-height: 1.55;
+      color: rgba(243,241,236,0.88);
+    }
+    .nav-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .nav-grid i {
+      display: block;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      padding: 10px 8px;
+      font-style: normal;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif;
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: normal;
+      color: rgba(243,241,236,0.78);
+      text-align: center;
+    }
+    .nav-grid i.on {
+      color: var(--ink);
+      border-color: rgba(203,184,146,0.4);
+      background: rgba(203,184,146,0.08);
+    }
+    .side {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #080808;
+      padding: 16px;
+    }
+    .side h2 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+    }
+    .side h3 {
+      margin: 16px 0 8px;
+      font-size: 0.82rem;
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      color: var(--gold);
+    }
+    .side p, .side li {
+      color: var(--mute);
+      font-size: 0.8rem;
+      line-height: 1.65;
+    }
+    .side .chip {
+      display: inline-block;
+      margin: 2px 4px 2px 0;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.18);
+      font-size: 10px;
+      color: var(--mute);
+    }
+    .check li { margin-bottom: 6px; }
+    .check .ok { color: var(--pick); }
+    .check .warn { color: #c9a06a; }
+    .shared {
+      margin-top: 28px;
+      border-top: 1px solid var(--line);
+      padding-top: 18px;
+    }
+    .shared h2 {
+      margin: 0 0 10px;
+      font-size: 0.9rem;
+      font-weight: 300;
+      letter-spacing: 0.16em;
+    }
+    .shared-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 920px) { .shared-grid { grid-template-columns: 1fr; } }
+    .shared-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #0a0a0a;
+    }
+    .shared-card .c { font-size: 10px; letter-spacing: 0.2em; color: var(--gold); margin-bottom: 6px; }
+    .shared-card h3 { margin: 0 0 6px; font-size: 13px; font-weight: 400; }
+    .shared-card p { margin: 0; font-size: 12px; color: var(--mute); line-height: 1.55; }
+
+    /* 编辑弹层（对齐店铺装修确认页） */
+    .modal-mask {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+    .modal-mask.open { display: flex; }
+    .modal {
+      width: min(920px, 100%);
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      background: #0d0d0d;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 8px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.65);
+    }
+    .modal-h {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .modal-h strong { font-weight: 400; letter-spacing: 0.12em; font-size: 13px; }
+    .modal-h .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+    .modal-body {
+      display: grid;
+      grid-template-columns: 1.2fr 0.9fr;
+    }
+    @media (max-width: 820px) { .modal-body { grid-template-columns: 1fr; } }
+    .preview-box {
+      padding: 16px;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .preview-frame {
+      position: relative;
+      width: min(280px, 88%);
+      aspect-ratio: 1;
+      background: #000;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      cursor: grab;
+      touch-action: none;
+    }
+    .preview-frame.grabbing { cursor: grabbing; }
+    .preview-frame img#previewImg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .preview-frame .shade { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+    .preview-frame .demo-cap {
+      position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3;
+      pointer-events: none;
+      text-align: center;
+    }
+    .preview-frame .demo-cap b {
+      display: block; font-size: 13px; margin-bottom: 4px; text-shadow: 0 2px 12px #000; font-weight: 400;
+    }
+    .preview-frame .demo-cap span {
+      display: block; font-size: 11px; color: rgba(255,255,255,0.72); text-shadow: 0 1px 8px #000;
+    }
+    .controls { padding: 14px 16px 18px; }
+    .controls h4 {
+      margin: 14px 0 8px;
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 0.16em;
+      color: var(--gold-dim);
+    }
+    .controls h4:first-child { margin-top: 0; }
+    .row {
+      display: grid;
+      grid-template-columns: 72px 1fr 46px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: var(--mute);
+    }
+    .row input[type=range] { width: 100%; }
+    .row .val { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .file-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+    .tip { margin-top: 10px; font-size: 11px; color: var(--dim); line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>淘宝宝贝 · 主图与详情 · 设计确认</h1>
+    <p class="lead">
+      当前：<b style="color:#cbb892;font-weight:400">静物写生台 = 细稿样板</b>。
+      上方主图 = 淘宝轮播<strong style="font-weight:400;color:#f3f1ec">极短版</strong>（只留大标题；字体对齐官网「手绘工坊」；点字可改）。
+      详情 = <strong style="font-weight:400;color:#f3f1ec">配图 + 图外真文字</strong>（总览卡等<strong>叠在图上</strong>的字仍跟图走，可烤 Inter；品牌/说明/列表/图上说明等<strong>图外文案用文字</strong>，按淘宝可达的苹方/雅黑常规字重预览；均可点改，草稿自动存）。
+      主图 / 详情<strong style="font-weight:400;color:#f3f1ec">不印官网域名</strong>（域名在拍后发货消息里）。
+      口吻：老师聊天、有人情味；对外勿写「永久」；痛点勿用虚飘套话。
+    </p>
+    <div class="note">
+      <b>文档</b>：`docs/淘宝主图与详情_规则与装修机制.md`（含高质量主图标准）·
+      卖点库口径「一次开通，长期可用」。
+      <b>文字分工</b>：图上叠字 → 烤进图；图外说明 → 真文字（确认页与上架同向，勿再烤成纯字长图）。
+      槽位草稿存本机浏览器；功能升级会<strong>自动合并旧版草稿</strong>，勿再靠改存储键名清数据。
+      重要进度请点「导出草稿」留一份 JSON。
+    </div>
+    <div class="reply">
+      请验收：<strong>主图字体（非宋体）</strong> /
+      <strong>主图标题单行 · 字号随框宽</strong> /
+      <strong>图外真文字统一样式</strong> /
+      <strong>总览与主图解耦</strong> /
+      <strong>不印域名</strong>。
+      回复例如 <strong>预览 OK</strong>。未定稿不实施千牛。
+    </div>
+
+    <div class="toolbar">
+      <button type="button" id="btnPreviewDetail">预览详情</button>
+      <button type="button" id="btnToggleCopy">隐藏示意文案</button>
+      <button type="button" id="btnExportDraft">导出草稿</button>
+      <button type="button" id="btnImportDraft">导入草稿</button>
+      <button type="button" id="btnRestoreBackup">从备份恢复贴图</button>
+      <button type="button" id="btnFillScaleCatalog">填入课表规模长图</button>
+      <button type="button" id="btnClearProduct">清空本品已贴图</button>
+      <button type="button" id="btnClearAll">清空全部草稿</button>
+      <span class="hint" id="saveHint">草稿自动保存</span>
+    </div>
+    <input type="file" id="filePick" accept="image/*" />
+    <input type="file" id="draftPick" accept="application/json,.json" style="display:none" />
+
+    <div class="tabs" id="tabs"></div>
+
+    <div class="layout">
+      <div class="stage" id="stage"></div>
+      <aside class="side" id="side"></aside>
+    </div>
+
+    <section class="shared">
+      <h2>共通元素（只设计一次 · 7 品复用）</h2>
+      <div class="shared-grid">
+        <div class="shared-card"><div class="c">C0</div><h3>品牌条</h3><p>静物样板详情暂不放；主图气质承载即可</p></div>
+        <div class="shared-card"><div class="c">C1</div><h3>兑换三步</h3><p>拍下收短码 → 按发货说明兑换 → 即时开通（约画除外）</p></div>
+        <div class="shared-card"><div class="c">C2</div><h3>学习心态</h3><p>留给 Pro 订阅宝贝再做（本品详情不放）</p></div>
+        <div class="shared-card"><div class="c">C3</div><h3>售后注意</h3><p>虚拟品；勿分享短码；不索验证码</p></div>
+        <div class="shared-card"><div class="c">C4</div><h3>系列导航</h3><p>7 品互指；千牛关联宝贝落地</p></div>
+        <div class="shared-card"><div class="c">C5</div><h3>开通指引</h3><p>发货消息含地址；可提官网或 App，烤图不印网址</p></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-mask" id="modalMask" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-h">
+        <strong id="modalTitle">编辑图片</strong>
+        <div class="acts">
+          <button type="button" id="btnResetParams">参数归零</button>
+          <button type="button" id="btnClearSrc">去掉图片</button>
+          <button type="button" id="btnClose">关闭</button>
+          <button type="button" class="primary" id="btnApply">完成</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="preview-box">
+          <div class="preview-frame" id="previewFrame">
+            <img id="previewImg" alt="" />
+            <div class="shade" id="previewShade"></div>
+            <div class="demo-cap">
+              <b id="previewCapTitle">预览</b>
+              <span id="previewCapDesc">拖拽画面调取景；右侧滑块调参数</span>
+            </div>
+          </div>
+          <p class="tip">预览已缩小；拖拽或滑块调整取景与缩放。主图框为 1:1（对齐淘宝主图）。</p>
+        </div>
+        <div class="controls">
+          <h4>换图</h4>
+          <div class="file-row">
+            <button type="button" class="btn primary" id="btnPick">换成本机图片</button>
+          </div>
+          <h4>虚拟剪裁</h4>
+          <div class="row"><span>缩放</span><input type="range" id="rngZoom" min="100" max="280" step="1" /><span class="val" id="valZoom">1.00</span></div>
+          <div class="row"><span>水平</span><input type="range" id="rngX" min="0" max="100" step="1" /><span class="val" id="valX">50%</span></div>
+          <div class="row"><span>垂直</span><input type="range" id="rngY" min="0" max="100" step="1" /><span class="val" id="valY">50%</span></div>
+          <h4>画面参数</h4>
+          <div class="row"><span>亮度</span><input type="range" id="rngBright" min="60" max="140" step="1" /><span class="val" id="valBright">1.00</span></div>
+          <div class="row"><span>对比</span><input type="range" id="rngContrast" min="80" max="140" step="1" /><span class="val" id="valContrast">1.04</span></div>
+          <div class="row"><span>饱和</span><input type="range" id="rngSat" min="60" max="130" step="1" /><span class="val" id="valSat">0.96</span></div>
+          <h4>衬字遮罩</h4>
+          <div class="row"><span>起点</span><input type="range" id="rngG0" min="0" max="90" step="1" /><span class="val" id="valG0">35%</span></div>
+          <div class="row"><span>浓度</span><input type="range" id="rngGOp" min="0" max="100" step="1" /><span class="val" id="valGOp">0.55</span></div>
+          <div class="row"><span>暖度</span><input type="range" id="rngWarm" min="0" max="100" step="1" /><span class="val" id="valWarm">0</span></div>
+          <p class="tip">主图建议：主体居中偏大、字少可读、导出按 1440×1440、避免二次压缩。虚拟权益不必硬做第 5 张纯白底实物图。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* 稳定键名：功能升级只扩字段，禁止再改键名导致「空库覆盖」。旧版键仅用于合并读入。 */
+    const STORE_KEY = 'tb-product-detail-slots';
+    const LEGACY_STORE_KEYS = [
+      'tb-product-detail-slots-2026-11-09-v3',
+      'tb-product-detail-slots-2026-11-09-v2',
+      'tb-product-detail-slots-2026-11-09-v1',
+      'tb-product-detail-slots-2026-11-09'
+    ];
+    const DRAFT_SCHEMA = 1;
+    const IMG_DEFAULTS = {
+      zoom: 1, x: 50, y: 50,
+      bright: 1, contrast: 1.04, saturate: 0.96,
+      g0: 35, gOp: 0.55, warm: 0,
+      viewH: 180
+    };
+    const VIEW_H_MIN = 80;
+    /* 课表整夜长图等需要很高可见区；原 520 会把整表裁成一截 */
+    const VIEW_H_MAX = 4800;
+    const CAPTION_H_DEFAULT = 44;
+    const CAPTION_H_MIN = 44;
+    const CAPTION_H_MAX = 480;
+    const GEO_REGIONS = [
+      { id: 'scene', bh: '长图 · 场景实拍', title: '打开就是可写生的静物空间' },
+      { id: 'ctrl', bh: '长图 · 控制条功能', title: '下方面板：灯光 · 视角 · 氛围' },
+      {
+        id: 'scale',
+        bh: '长图 · 规模一眼可见',
+        title: '课表缩略拼图（场景数量）',
+        foot: '更多场景扩容中…'
+      }
+    ];
+    /** 详情文案初始稿（框架固定；具体字可改，存 detailText） */
+    const DETAIL_DEFAULTS = {
+      brand: {
+        h3: '手绘工坊 · 童画师吴晓',
+        paras: [
+          '人物画学习 · 工具 · 肖像定制',
+          '这是自有站「手绘工坊」的学习权益开通码。拍下后发短码；按发货说明，在官网或 App 兑换即可。'
+        ]
+      },
+      who: {
+        h3: '认真想练形体的人',
+        items: [
+          '想练体积 / 转折，却缺石膏与布光',
+          '觉得形体总对不稳，却说不清问题在哪',
+          '希望打开就能练一会儿，不必出门占画室'
+        ]
+      },
+      /* 详情前方「重要说明」：主次分明；下方长文不再重复这些 */
+      important: {
+        h3: '拍前看清',
+        lead: '卖的是学习权益开通码，不是网站账号密码，也不是网盘打包课。',
+        items: [
+          '一次开通，长期可用（以兑换成功后会员页展示为准）',
+          '电脑 · 手机 · 平板都能练：浏览器即可；安卓可装 App（见发货说明）',
+          '默认预览模式就够练；「追光」更细腻但看设备——开不出也不影响学习'
+        ],
+        flows: [
+          '① 拍下 → 自动收到兑换短码',
+          '② 按发货说明打开官网或 App → 登录',
+          '③ 会员页「权益兑换」粘贴短码 → 即时开通'
+        ],
+        foot: '开通地址写在拍后发货说明里，详情不印网址。'
+      },
+      /* 扩容提示下方：只留补充，不重复重要说明 */
+      supplement: {
+        h3: '补充说明',
+        items: [
+          '本链接：静物写生台权益；不含肖像写生台、三工具、Pro、录播课（可另购或见系列）',
+          '苹果暂用手机浏览器即可，不必单独找 App',
+          '追光建议：电脑约 2G 及以上独显更从容；偏老设备可能较慢或不开放'
+        ]
+      },
+      device: {
+        h3: '电脑 · 手机 · 平板都能练',
+        items: [
+          '电脑浏览器、手机浏览器都能用；安卓可装 App（获取方式见发货说明 / 开通后站内菜单）',
+          '苹果暂用手机浏览器打开即可，不必单独找 App',
+          '默认预览模式就够学：调角度、调灯光、看转折——日常练习够用',
+          '想要更细的光影质感，可开「追光 / 高级渲染」（以站内按钮名为准）',
+          '追光建议：电脑约 2G 及以上独显更从容；手机 / 平板建议当前主流机型。偏老设备追光可能较慢或不开放',
+          '追光开不出或觉得卡，不影响写生练习——默认模式就是为学习准备的'
+        ]
+      },
+      gain: {
+        h3: '本链接权益说明',
+        items: [
+          '静物写生台学习权益：可进入对应 3D 写生场景练习',
+          '一次开通，长期可用（以兑换成功后会员页展示为准）',
+          '本链接不含肖像写生台、三工具、Pro、录播课（可另购或见系列）'
+        ]
+      },
+      how: {
+        h3: '拍下 → 按说明兑换 → 开通',
+        flows: [
+          '① 拍下本商品 → 自动收到兑换短码（卡密）',
+          '② 按发货说明，打开官网或 App → 注册 / 登录',
+          '③ 会员页「权益兑换」→ 粘贴短码 → 即时开通'
+        ],
+        note: '卖的是学习权益开通码，不是网站账号密码，也不是网盘打包课。开通地址见拍后发货说明。'
+      },
+      psy: {
+        h3: '学画，最难的往往不是工具',
+        paras: [
+          '刚开始热情高、进步快；稍有成绩后，容易对自己松一点。松了几天再捡起来，手生了，就容易自责——再往后，找各种理由停下来。'
+        ],
+        flows: [
+          '① 开始练 → ② 稍有感觉 → ③ 松劲 → ④ 手生挫败',
+          '★ 回到 ① 再练一轮 · 别急着跟自己和解成「算了」'
+        ],
+        closing: '写生台是练场：帮你把形与光摊开看清楚——不是替你画完，是让你敢看、敢改、敢再来一轮。'
+      },
+      combo: {
+        h3: '和别的品什么关系',
+        items: [
+          '只练静物形体 → 买本链接即可',
+          '还要练人像 → 加「肖像写生台」',
+          '起形 / 调色 / 叠图核对 → 看晓阶、晓色、晓摹',
+          '一段时间内打包用 → 看 Pro（按时长；非视频课）',
+          '想要约一幅手绘 → 看「约画」（要画 ≠ 要课）'
+        ]
+      },
+      after: {
+        h3: '请先读完再拍',
+        items: [
+          '虚拟商品：未兑换可协商退；已兑换请联系客服，按实际使用情况处理',
+          '短码一码一用，请勿分享；不提供账号出租',
+          '我们不会索要短信验证码、登录密码或支付密码',
+          '设备台数与同时在线次数，以会员说明为准'
+        ]
+      },
+      series: {
+        h3: '还可以搭配'
+      },
+      overviewBoard: {
+        h3: '',
+        hint: '与上方淘宝主图无共用贴图、无共用文案：此处为详情通览初版（字稍长、字号按详情阅读），请单独贴图。',
+        /* 过桥短标；旧草稿「—— 下面…」渲染时会归一到此 */
+        foot: '场景与功能'
+      }
+    };
+    let currentId = 'geo';
+    let editing = null; // { pid, kind, key, label }
+    let draft = null;
+    let store = loadStore();
+    let detailView = 'phone'; // phone | pc
+    let hideDraftCopy = false;
+    let previewDetail = false;
+
+    const PRODUCTS = [
+      {
+        id: 'geo',
+        name: '静物写生台',
+        sample: true,
+        title: '几何体静物「写生台」',
+        one: '网页 3D 场景练形体体积',
+        pain: '体积立不起来、大形对不准',
+        get: [
+          '网页打开 3D 几何体与静物场景，专门练形体和体积',
+          '可转角度、可调灯光与氛围，不用买石膏、不用布灯',
+          '一次开通，长期可用（以兑换页 / 会员页说明为准）'
+        ],
+        mains: ['身份卡', '烦恼共鸣', '你得到什么', '兑换三步', '系列导航'],
+        /* 淘宝轮播主图 · 极短（主图 A）；与详情五屏总览无共用文案/贴图 */
+        mainCards: [
+          { kicker: '', title: '3D 静物写生台', body: '', tag: '', badge: 'Pro+' },
+          { kicker: '', title: '缺石膏、缺布光', body: '', tag: '' },
+          { kicker: '', title: '可转视角 · 可调灯光', body: '', tag: '' },
+          { kicker: '', title: '拍下收短码', body: '', tag: '' },
+          { kicker: '', title: '还可以搭配', body: '', tag: '' }
+        ],
+        /* 详情五屏总览 · 初版通览（详情够宽，完整字；独立贴图槽 overview） */
+        overviewCards: [
+          {
+            role: '这是什么',
+            kicker: '手绘工坊 · 在线写生台',
+            title: '几何体静物「写生台」',
+            body: '想认真练形体，却老被场地卡住？咱们把画室条件先备齐——网页打开就能进 3D 静物场景，转角度、调灯光，不必自备石膏与布光。',
+            tag: '兑换码 · 一次开通，长期可用'
+          },
+          {
+            role: '卡在哪',
+            kicker: '你是不是也这样',
+            title: '体积立不起来？\n大形对不准？',
+            body: '石膏买了占地方，灯不好布，出门画室又耗时。不是你不用功——是缺一块能随时打开、能看清楚的练场。',
+            tag: ''
+          },
+          {
+            role: '你得到什么',
+            kicker: '开通后你得到',
+            title: '你的私人艺术修炼空间',
+            body: '转视角 · 调灯光 · 加氛围 · 形体光影看得清',
+            bullets: [],
+            tag: '不出门，也有理想写生条件'
+          },
+          {
+            role: '怎么开通',
+            kicker: '怎么开始用',
+            title: '三步开通',
+            body: '① 拍下收码 → ② 按发货说明登录 → ③ 会员页粘贴兑换',
+            bullets: [],
+            tag: '不是账号密码 · 不是网盘整站课'
+          }
+          /* 原「总览 5/5 · 系列」已去掉；系列互指改走详情底部共通「系列导航」 */
+        ],
+        detailFull: true,
+        custom: false
+      },
+      {
+        id: 'port', name: '肖像写生台', title: '人物肖像「写生台」', one: '可转可调光的 3D 人像写生',
+        pain: '五官对不齐、人画像面具',
+        get: ['可转头、可调光的人像写生场景', '把五官关系与明暗看清楚', '一次开通，长期可用'],
+        mains: ['身份卡', '烦恼共鸣', '你得到什么', '兑换三步', '系列导航'], custom: false
+      },
+      {
+        id: 'jie', name: '晓阶', title: '「晓阶」', one: '色阶分析 · 网格起形',
+        pain: '明暗糊成一团，大形摆不准',
+        get: ['把明暗拆成几档来看', '网格辅助起形与比例', '起稿、找关系时用'],
+        mains: ['身份卡', '能干什么', '使用场景', '兑换三步', '系列导航'], custom: false
+      },
+      {
+        id: 'se', name: '晓色', title: '「晓色」', one: '自动调色 · 练习 · 颜料盒',
+        pain: '调色靠蒙，配方留不住',
+        get: ['对着目标色给调色参考', '自己练调色', '配方收进颜料盒'],
+        mains: ['身份卡', '能干什么', '使用场景', '兑换三步', '系列导航'], custom: false
+      },
+      {
+        id: 'mu', name: '晓摹', title: '「晓摹」', one: '叠图描形 · 应急起型 · 型准核对',
+        pain: '临摹对不齐，型漂了自己看不出',
+        get: ['叠图描形', '应急起型', '型准核对'],
+        mains: ['身份卡', '能干什么', '使用场景', '兑换三步', '系列导航'], custom: false
+      },
+      {
+        id: 'pro', name: 'Pro', title: 'Pro', one: '写生台 + 三新手工具 + 课件库（非视频课）',
+        pain: '想一段时间内系统练，又不想东拼西凑',
+        get: ['会员期内：写生台 + 晓阶/晓色/晓摹', '课件库：可交互 3D 场景课件', '非视频课'],
+        mains: ['身份卡', '包含什么', '非视频课说明', '兑换三步', '系列导航'], custom: false
+      },
+      {
+        id: 'custom', name: '约画', title: '约一幅肖像画', one: '儿童 / 人物手绘定制',
+        pain: '想留一幅手绘肖像（不是自学课）',
+        get: ['沟通题材与尺寸', '手绘绘制与修改约定', '交付成品'],
+        mains: ['身份卡', '作品气质', '定制流程', '适用对象', '系列导航'], custom: true
+      }
+    ];
+
+    function readStoreRaw(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const o = JSON.parse(raw);
+        return o && typeof o === 'object' && !Array.isArray(o) ? o : null;
+      } catch (e) { return null; }
+    }
+    function slotHasSrc(slot) {
+      return !!(slot && typeof slot.src === 'string' && slot.src);
+    }
+    function preferSlot(a, b) {
+      if (slotHasSrc(a)) return normalizeSlot(a);
+      if (slotHasSrc(b)) return normalizeSlot(b);
+      if (a && typeof a === 'object') return normalizeSlot(a);
+      if (b && typeof b === 'object') return normalizeSlot(b);
+      return normalizeSlot({});
+    }
+    function mergeProductBags(preferred, fallback) {
+      const a = preferred && typeof preferred === 'object' ? preferred : {};
+      const b = fallback && typeof fallback === 'object' ? fallback : {};
+      const out = { mains: {}, detail: {}, overview: {}, regions: {}, mainCopy: {}, overviewCopy: {}, detailText: {} };
+      const mainKeys = new Set([
+        ...Object.keys(a.mains || {}),
+        ...Object.keys(b.mains || {})
+      ]);
+      mainKeys.forEach((k) => {
+        out.mains[k] = preferSlot((a.mains || {})[k], (b.mains || {})[k]);
+      });
+      const detailKeys = new Set([
+        ...Object.keys(a.detail || {}),
+        ...Object.keys(b.detail || {})
+      ]);
+      detailKeys.forEach((k) => {
+        out.detail[k] = preferSlot((a.detail || {})[k], (b.detail || {})[k]);
+      });
+      const overviewKeys = new Set([
+        ...Object.keys(a.overview || {}),
+        ...Object.keys(b.overview || {})
+      ]);
+      overviewKeys.forEach((k) => {
+        out.overview[k] = preferSlot((a.overview || {})[k], (b.overview || {})[k]);
+      });
+      const regionIds = new Set([
+        ...Object.keys(a.regions || {}),
+        ...Object.keys(b.regions || {})
+      ]);
+      regionIds.forEach((rid) => {
+        const ra = (a.regions || {})[rid];
+        const rb = (b.regions || {})[rid];
+        const ia = ra && Array.isArray(ra.items) ? ra.items : [];
+        const ib = rb && Array.isArray(rb.items) ? rb.items : [];
+        /* 按序号合并：有 src 的优先；避免空 src 槽挡住备份图 */
+        const n = Math.max(ia.length, ib.length);
+        const items = [];
+        for (let i = 0; i < n; i++) {
+          items.push(preferSlot(ia[i], ib[i]));
+        }
+        out.regions[rid] = { items };
+      });
+      /* 文案覆盖：扩字段合并，不丢旧稿 */
+      const copyKeys = new Set([
+        ...Object.keys(a.mainCopy || {}),
+        ...Object.keys(b.mainCopy || {})
+      ]);
+      copyKeys.forEach((k) => {
+        out.mainCopy[k] = Object.assign(
+          {},
+          (b.mainCopy && b.mainCopy[k]) || {},
+          (a.mainCopy && a.mainCopy[k]) || {}
+        );
+      });
+      const ovKeys = new Set([
+        ...Object.keys(a.overviewCopy || {}),
+        ...Object.keys(b.overviewCopy || {})
+      ]);
+      ovKeys.forEach((k) => {
+        const ba = (b.overviewCopy && b.overviewCopy[k]) || {};
+        const aa = (a.overviewCopy && a.overviewCopy[k]) || {};
+        out.overviewCopy[k] = Object.assign({}, ba, aa);
+        if (Array.isArray(aa.bullets) || Array.isArray(ba.bullets)) {
+          out.overviewCopy[k].bullets = Array.isArray(aa.bullets) ? aa.bullets.slice()
+            : (Array.isArray(ba.bullets) ? ba.bullets.slice() : []);
+        }
+      });
+      const dtKeys = new Set([
+        ...Object.keys(a.detailText || {}),
+        ...Object.keys(b.detailText || {})
+      ]);
+      dtKeys.forEach((k) => {
+        const ba = (b.detailText && b.detailText[k]) || {};
+        const aa = (a.detailText && a.detailText[k]) || {};
+        out.detailText[k] = Object.assign({}, ba, aa);
+        ['paras', 'items', 'flows'].forEach((arrKey) => {
+          if (Array.isArray(aa[arrKey]) || Array.isArray(ba[arrKey])) {
+            out.detailText[k][arrKey] = Array.isArray(aa[arrKey]) ? aa[arrKey].slice()
+              : ba[arrKey].slice();
+          }
+        });
+      });
+      return out;
+    }
+    function mergeStores(preferred, fallback) {
+      const a = preferred && typeof preferred === 'object' ? preferred : {};
+      const b = fallback && typeof fallback === 'object' ? fallback : {};
+      const out = {};
+      const ids = new Set([...Object.keys(a), ...Object.keys(b)]);
+      ids.forEach((pid) => {
+        if (pid === '_meta') return;
+        out[pid] = mergeProductBags(a[pid], b[pid]);
+      });
+      if (a._meta || b._meta) out._meta = Object.assign({}, b._meta || {}, a._meta || {});
+      return out;
+    }
+    function loadStore() {
+      let merged = readStoreRaw(STORE_KEY) || {};
+      let fromLegacy = false;
+      LEGACY_STORE_KEYS.forEach((key) => {
+        const legacy = readStoreRaw(key);
+        if (!legacy) return;
+        merged = mergeStores(merged, legacy);
+        fromLegacy = true;
+      });
+      if (fromLegacy) {
+        try {
+          localStorage.setItem(STORE_KEY, JSON.stringify(merged));
+        } catch (e) { /* ignore quota on migrate write */ }
+      }
+      return merged && typeof merged === 'object' ? merged : {};
+    }
+    function saveStore() {
+      try {
+        store._meta = Object.assign({}, store._meta || {}, {
+          schema: DRAFT_SCHEMA,
+          updatedAt: new Date().toISOString()
+        });
+        localStorage.setItem(STORE_KEY, JSON.stringify(store));
+        const el = document.getElementById('saveHint');
+        if (el) el.textContent = '已保存 ' + new Date().toLocaleTimeString();
+      } catch (e) {
+        const el = document.getElementById('saveHint');
+        if (el) el.textContent = '保存失败（图太大可换小图）';
+      }
+    }
+    function exportDraftFile() {
+      const payload = {
+        schema: DRAFT_SCHEMA,
+        kind: 'tb-product-detail-draft',
+        exportedAt: new Date().toISOString(),
+        store: store
+      };
+      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      a.href = URL.createObjectURL(blob);
+      a.download = '淘宝主图详情草稿_' + stamp + '.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      const el = document.getElementById('saveHint');
+      if (el) el.textContent = '已导出草稿文件';
+    }
+    function importDraftObject(payload, opts) {
+      let next = null;
+      if (payload && payload.store && typeof payload.store === 'object') next = payload.store;
+      else if (payload && typeof payload === 'object' && !payload.kind) next = payload;
+      if (!next) throw new Error('文件格式不对');
+      /* fillMissing：当前草稿优先，备份只补空图（恢复贴图用）；整文件导入仍以文件为准 */
+      const fillMissing = !!(opts && opts.fillMissing);
+      store = fillMissing ? mergeStores(store, next) : mergeStores(next, {});
+      saveStore();
+      render(currentId);
+      const el = document.getElementById('saveHint');
+      if (el) el.textContent = fillMissing ? '已从备份补回贴图' : '已导入草稿';
+    }
+    function productBag(pid) {
+      if (!store[pid]) {
+        store[pid] = { mains: {}, detail: {}, overview: {}, regions: {}, mainCopy: {}, overviewCopy: {}, detailText: {} };
+      }
+      if (!store[pid].mains) store[pid].mains = {};
+      if (!store[pid].detail) store[pid].detail = {};
+      if (!store[pid].overview) store[pid].overview = {};
+      if (!store[pid].regions) store[pid].regions = {};
+      if (!store[pid].mainCopy) store[pid].mainCopy = {};
+      if (!store[pid].overviewCopy) store[pid].overviewCopy = {};
+      if (!store[pid].detailText) store[pid].detailText = {};
+      return store[pid];
+    }
+    function resolveMainCard(p, i) {
+      const base = (p.mainCards && p.mainCards[i]) || {};
+      const over = (productBag(p.id).mainCopy || {})[String(i)] || {};
+      const pick = (field) => (Object.prototype.hasOwnProperty.call(over, field) ? over[field] : (base[field] || ''));
+      return {
+        title: String(pick('title') || ''),
+        badge: String(pick('badge') || '')
+      };
+    }
+    function resolveOverviewCard(p, i) {
+      const base = (p.overviewCards && p.overviewCards[i]) || {};
+      const over = (productBag(p.id).overviewCopy || {})[String(i)] || {};
+      const pick = (field) => (Object.prototype.hasOwnProperty.call(over, field) ? over[field] : (base[field] || ''));
+      const bullets = Array.isArray(over.bullets) ? over.bullets.slice()
+        : (Array.isArray(base.bullets) ? base.bullets.slice() : []);
+      return {
+        role: base.role || '',
+        kicker: String(pick('kicker') || ''),
+        title: String(pick('title') || ''),
+        body: String(pick('body') || ''),
+        tag: String(pick('tag') || ''),
+        bullets: bullets
+      };
+    }
+    function resolveDetailBlock(pid, blockId) {
+      const def = DETAIL_DEFAULTS[blockId] || {};
+      const over = (productBag(pid).detailText || {})[blockId] || {};
+      const out = Object.assign({}, def, over);
+      ['paras', 'items', 'flows'].forEach((arrKey) => {
+        if (Array.isArray(over[arrKey])) out[arrKey] = over[arrKey].slice();
+        else if (Array.isArray(def[arrKey])) out[arrKey] = def[arrKey].slice();
+      });
+      return out;
+    }
+    function blankClass(s) {
+      return String(s || '').trim() ? '' : ' is-blank';
+    }
+    function edDetail(blockId, field, text, opts) {
+      const o = opts || {};
+      const tag = o.tag || 'div';
+      const classes = ((o.extraClass || '') + blankClass(text)).trim();
+      const cls = classes ? ` class="${esc(classes)}"` : '';
+      const ph = o.ph ? ` data-placeholder="${esc(o.ph)}"` : '';
+      const idx = (o.index != null) ? ` data-detail-index="${o.index}"` : '';
+      return `<${tag}${cls} contenteditable="true" data-detail-block="${esc(blockId)}" data-detail-field="${esc(field)}"${idx}${ph} spellcheck="false">${esc(text || '')}</${tag}>`;
+    }
+    function slotData(pid, kind, key) {
+      const bag = productBag(pid);
+      let bucket;
+      if (kind === 'main') bucket = bag.mains;
+      else if (kind === 'overview') bucket = bag.overview;
+      else bucket = bag.detail;
+      if (!bucket[key]) bucket[key] = normalizeSlot({});
+      else bucket[key] = normalizeSlot(bucket[key]);
+      return bucket[key];
+    }
+    function uid() {
+      return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+    function clampViewH(n) {
+      const v = Number(n);
+      if (!Number.isFinite(v)) return IMG_DEFAULTS.viewH;
+      return Math.max(VIEW_H_MIN, Math.min(VIEW_H_MAX, Math.round(v)));
+    }
+    /** 手机用 viewH；电脑用 viewHPc（未单独拖过则暂时回退到 viewH，拖过后互不覆盖） */
+    function readViewH(item, mode) {
+      const m = mode || detailView;
+      if (!item) return IMG_DEFAULTS.viewH;
+      if (m === 'pc' && item.viewHPc != null && item.viewHPc !== '') {
+        return clampViewH(item.viewHPc);
+      }
+      return clampViewH(item.viewH);
+    }
+    function writeViewH(item, h, mode) {
+      if (!item) return;
+      const next = clampViewH(h);
+      if ((mode || detailView) === 'pc') item.viewHPc = next;
+      else item.viewH = next;
+    }
+    function viewHLabel(h, mode) {
+      const m = mode || detailView;
+      return (m === 'pc' ? '电脑可见高 ' : '手机可见高 ') + clampViewH(h) + 'px';
+    }
+    function clampCaptionH(n) {
+      const v = Number(n);
+      if (!Number.isFinite(v) || v <= 0) return CAPTION_H_DEFAULT;
+      return Math.max(CAPTION_H_MIN, Math.min(CAPTION_H_MAX, Math.round(v)));
+    }
+    function normalizeSlot(raw) {
+      const o = Object.assign({}, IMG_DEFAULTS, raw || {});
+      o.id = o.id || uid();
+      o.src = o.src || '';
+      o.caption = o.caption || '';
+      o.captionH = clampCaptionH(o.captionH);
+      o.zoom = Number(o.zoom) || 1;
+      o.x = clampPan(Number(o.x));
+      o.y = clampPan(Number(o.y));
+      o.bright = Number(o.bright) || 1;
+      o.contrast = Number(o.contrast) || 1.04;
+      o.saturate = Number(o.saturate) || 0.96;
+      o.g0 = Number.isFinite(Number(o.g0)) ? Number(o.g0) : 35;
+      o.gOp = Number.isFinite(Number(o.gOp)) ? Number(o.gOp) : 0.55;
+      o.warm = Number(o.warm) || 0;
+      o.viewH = clampViewH(o.viewH);
+      if (raw && raw.viewHPc != null && raw.viewHPc !== '') {
+        o.viewHPc = clampViewH(raw.viewHPc);
+      } else if (Object.prototype.hasOwnProperty.call(o, 'viewHPc') && (o.viewHPc == null || o.viewHPc === '')) {
+        delete o.viewHPc;
+      }
+      return o;
+    }
+    function regionItems(pid, rid) {
+      const bag = productBag(pid);
+      if (!bag.regions[rid]) bag.regions[rid] = { items: [] };
+      if (!Array.isArray(bag.regions[rid].items)) bag.regions[rid].items = [];
+      bag.regions[rid].items = bag.regions[rid].items.map((it) => normalizeSlot(it));
+      return bag.regions[rid].items;
+    }
+    function findRegionItem(pid, rid, itemId) {
+      return regionItems(pid, rid).find((it) => it.id === itemId) || null;
+    }
+    function setSaveHint(msg) {
+      const el = document.getElementById('saveHint');
+      if (el) el.textContent = msg;
+    }
+    function readCaptionBoxH(ta) {
+      const h = Math.round(ta.getBoundingClientRect().height || ta.offsetHeight || 0);
+      return clampCaptionH(h || CAPTION_H_DEFAULT);
+    }
+    /** 把页面上所有「图片说明」写回 store（切品/重绘前先冲一次，防丢） */
+    function flushCaptionFields(root) {
+      const scope = root || document.getElementById('stage') || document;
+      let n = 0;
+      scope.querySelectorAll('textarea[data-region-caption]').forEach((ta) => {
+        const rid = ta.getAttribute('data-region-caption');
+        const iid = ta.getAttribute('data-item-id');
+        const item = findRegionItem(currentId, rid, iid);
+        if (!item) return;
+        const nextH = readCaptionBoxH(ta);
+        let changed = false;
+        if (item.caption !== ta.value) {
+          item.caption = ta.value;
+          changed = true;
+        }
+        if (clampCaptionH(item.captionH) !== nextH) {
+          item.captionH = nextH;
+          changed = true;
+        }
+        if (changed) n += 1;
+      });
+      if (n) saveStore();
+      return n;
+    }
+    function bindCaptionAutosave(stage) {
+      stage.querySelectorAll('textarea[data-region-caption]').forEach((ta) => {
+        let t = null;
+        let hTimer = null;
+        const persist = (why) => {
+          const rid = ta.getAttribute('data-region-caption');
+          const iid = ta.getAttribute('data-item-id');
+          const item = findRegionItem(currentId, rid, iid);
+          if (!item) return;
+          item.caption = ta.value;
+          item.captionH = readCaptionBoxH(ta);
+          const wrap = ta.closest('.annot');
+          if (wrap) wrap.classList.toggle('is-empty', !String(ta.value || '').trim());
+          saveStore();
+          if (why === 'resize') setSaveHint('说明框高度已保存');
+          else if (why === 'blur') setSaveHint('图片说明已保存');
+          else setSaveHint('草稿自动保存中…');
+        };
+        ta.addEventListener('input', () => {
+          const wrap = ta.closest('.annot');
+          if (wrap) wrap.classList.toggle('is-empty', !String(ta.value || '').trim());
+          if (t) clearTimeout(t);
+          t = setTimeout(() => persist('input'), 280);
+        });
+        ta.addEventListener('change', () => persist('change'));
+        ta.addEventListener('blur', () => {
+          if (t) { clearTimeout(t); t = null; }
+          persist('blur');
+        });
+        /* 右下角拖高后记住高度（每张各自） */
+        if (typeof ResizeObserver !== 'undefined') {
+          const ro = new ResizeObserver(() => {
+            if (hTimer) clearTimeout(hTimer);
+            hTimer = setTimeout(() => {
+              const rid = ta.getAttribute('data-region-caption');
+              const iid = ta.getAttribute('data-item-id');
+              const item = findRegionItem(currentId, rid, iid);
+              if (!item) return;
+              const nextH = readCaptionBoxH(ta);
+              if (clampCaptionH(item.captionH) === nextH) return;
+              item.captionH = nextH;
+              saveStore();
+              setSaveHint('说明框高度已保存');
+            }, 120);
+          });
+          ro.observe(ta);
+        }
+      });
+    }
+    function addRegionItem(pid, rid, atIndex) {
+      const bag = productBag(pid);
+      const items = regionItems(pid, rid);
+      const item = normalizeSlot({ id: uid(), caption: '', src: '', viewH: 180 });
+      const idx = (atIndex == null || atIndex < 0 || atIndex > items.length)
+        ? items.length
+        : Number(atIndex);
+      items.splice(idx, 0, item);
+      bag.regions[rid].items = items;
+      saveStore();
+      return item;
+    }
+    function removeRegionItem(pid, rid, itemId) {
+      const bag = productBag(pid);
+      const items = regionItems(pid, rid);
+      bag.regions[rid].items = items.filter((it) => it.id !== itemId);
+      saveStore();
+    }
+    function moveRegionItem(pid, rid, fromId, toIndex) {
+      const bag = productBag(pid);
+      const items = regionItems(pid, rid).slice();
+      const from = items.findIndex((it) => it.id === fromId);
+      if (from < 0) return false;
+      let dest = Number(toIndex);
+      if (!Number.isFinite(dest)) return false;
+      dest = Math.max(0, Math.min(items.length - 1, dest));
+      if (from === dest) return false;
+      const [moved] = items.splice(from, 1);
+      items.splice(dest, 0, moved);
+      bag.regions[rid].items = items;
+      saveStore();
+      setSaveHint('图片顺序已保存');
+      return true;
+    }
+    function clone(o) { return JSON.parse(JSON.stringify(o)); }
+    function clampPan(n) {
+      const v = Number(n);
+      if (!Number.isFinite(v)) return 50;
+      return Math.max(0, Math.min(100, v));
+    }
+    function esc(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function nl2br(s) { return esc(s).replace(/\n/g, '<br>'); }
+
+    function applyImg(img, s) {
+      if (!img || !s) return;
+      if (s.src) img.src = s.src;
+      const z = Number(s.zoom) || 1;
+      const x = clampPan(s.x);
+      const y = clampPan(s.y);
+      img.style.objectFit = 'cover';
+      img.style.objectPosition = x + '% ' + y + '%';
+      img.style.transformOrigin = x + '% ' + y + '%';
+      img.style.transform = z === 1 ? 'none' : 'scale(' + z + ')';
+      img.style.filter = 'saturate(' + s.saturate + ') contrast(' + s.contrast + ') brightness(' + s.bright + ')';
+    }
+    function shadeCss(s) {
+      const warm = Number(s.warm) || 0;
+      const r = Math.round(18 + warm * 0.95);
+      const g = Math.round(10 + warm * 0.38);
+      const b = Math.round(6 + warm * 0.12);
+      const g0 = Number(s.g0);
+      const op = Number(s.gOp);
+      return 'linear-gradient(180deg, transparent ' + g0 + '%, rgba(' + r + ',' + g + ',' + b + ',' + op + ') 100%)';
+    }
+
+    function insertGapHtml(rid, atIndex) {
+      return `<button type="button" class="btn-insert-pic" data-insert-region="${esc(rid)}" data-insert-at="${atIndex}">＋ 在此插入</button>`;
+    }
+
+    function dynPicHtml(pid, rid, item, idx) {
+      const has = !!item.src;
+      const h = readViewH(item);
+      return `
+        <div class="dyn-pic" data-region="${esc(rid)}" data-item="${esc(item.id)}" data-ord="${idx}">
+          <div class="dyn-sort">
+            <button type="button" class="drag-handle" data-drag-handle="1" title="按住拖动改变顺序">⋮⋮ 拖动排序</button>
+            <span class="ord">第 ${idx + 1} 张</span>
+          </div>
+          <div class="annot${String(item.caption || '').trim() ? '' : ' is-empty'}">
+            <label>图片说明（写在图上方 · 离开框即保存 · 拖高也会记住）</label>
+            <textarea data-region-caption="${esc(rid)}" data-item-id="${esc(item.id)}" rows="2" placeholder="例如：可转视角 · 看清转折" style="height:${clampCaptionH(item.captionH)}px">${esc(item.caption || '')}</textarea>
+          </div>
+          <div class="pic-slot${has ? ' has-img' : ''}" data-kind="region" data-region="${esc(rid)}" data-key="${esc(item.id)}" data-label="详情图 ${idx + 1}" style="height:${h}px">
+            <img class="fg" alt="" draggable="false" />
+            <div class="shade"></div>
+            <button type="button" class="edit-hit" data-edit="1">编辑</button>
+            <div class="empty"><b>点「编辑」换图</b>底边可拖调可见高度（手机/电脑分开记）</div>
+          </div>
+          <div class="h-handle" data-h-drag="${esc(rid)}" data-item-id="${esc(item.id)}" title="拖动调整当前预览端可见高度（手机/电脑互不影响）"></div>
+          <div class="dyn-acts">
+            <button type="button" data-edit="1">编辑取景</button>
+            <button type="button" data-del-item="1">删除此图</button>
+            <span class="h-val">${viewHLabel(h)}</span>
+          </div>
+        </div>`;
+    }
+
+    function regionBlockHtml(pid, region) {
+      const items = regionItems(pid, region.id);
+      const blockId = 'region_' + region.id;
+      if (!DETAIL_DEFAULTS[blockId]) {
+        DETAIL_DEFAULTS[blockId] = {
+          bh: region.bh,
+          h3: region.title,
+          hint: '区域内可添加多图：上方写「图片说明」；两图之间可「在此插入」；按住「拖动排序」可插队；底边拖条调可见高度。',
+          foot: region.foot || ''
+        };
+      } else if (region.foot && DETAIL_DEFAULTS[blockId].foot == null) {
+        DETAIL_DEFAULTS[blockId].foot = region.foot;
+      }
+      const txt = resolveDetailBlock(pid, blockId);
+      const footText = (txt.foot != null && txt.foot !== '') ? txt.foot : (region.foot || '');
+      let listHtml = '';
+      if (!items.length) {
+        listHtml = '<p class="dyn-hint" style="margin:0">暂无图片，点下方添加。</p>';
+      } else {
+        items.forEach((it, i) => {
+          listHtml += insertGapHtml(region.id, i);
+          listHtml += dynPicHtml(pid, region.id, it, i);
+        });
+      }
+      return `
+        <div class="block visual" data-region-block="${esc(region.id)}">
+          ${edDetail(blockId, 'bh', txt.bh || region.bh, { tag: 'div', extraClass: 'bh' })}
+          ${edDetail(blockId, 'h3', txt.h3 || region.title, { tag: 'h3' })}
+          ${edDetail(blockId, 'hint', txt.hint || '', { tag: 'p', extraClass: 'dyn-hint' })}
+          <div class="dyn-list" data-dyn-list="${esc(region.id)}">
+            ${listHtml}
+          </div>
+          <button type="button" class="btn-add-pic" data-add-region="${esc(region.id)}">＋ 添加图片（末尾）</button>
+          ${footText !== '' ? edDetail(blockId, 'foot', footText, { tag: 'p', extraClass: 'region-foot' }) : ''}
+        </div>`;
+    }
+
+    function overviewSlotInner(c, i, total) {
+      const key = String(i);
+      const n = total || 1;
+      return `
+        <div class="ov-slot" data-kind="overview" data-key="${key}" data-label="详情总览 ${i + 1}" data-ov-edit="1">
+          <img class="fg" alt="" draggable="false" />
+          <div class="shade"></div>
+          <button type="button" class="edit-hit" data-edit="1">编辑贴图</button>
+          <div class="no">详情总览 ${i + 1}/${n} · 独立贴图 <span class="draft-badge">点字改文案</span></div>
+          ${overviewCopyHtml(c)}
+        </div>`;
+    }
+
+    function overviewBoardHtml(p) {
+      const cards = p.overviewCards || [];
+      if (!cards.length) return '';
+      const n = cards.length;
+      const board = resolveDetailBlock(p.id, 'overviewBoard');
+      /* 「先看全貌」已删；旧草稿若仍存此四字也不再显示 */
+      const h3Raw = String(board.h3 || '').trim();
+      const h3Show = h3Raw && h3Raw !== '先看全貌' ? h3Raw : '';
+      let footShow = String(board.foot || '').trim();
+      if (!footShow || /下面把场景和功能摊开看/.test(footShow)) {
+        footShow = '场景与功能';
+      }
+      return `
+        <div class="block visual" data-overview-board="1">
+          <div class="bh">详情 · 总览（${n} 屏）</div>
+          ${h3Show ? edDetail('overviewBoard', 'h3', h3Show, { tag: 'h3' }) : ''}
+          ${edDetail('overviewBoard', 'hint', board.hint, { tag: 'p', extraClass: 'dyn-hint' })}
+          <div class="overview-stack">
+          ${cards.map((_base, i) => {
+            const c = resolveOverviewCard(p, i);
+            return `
+            <div class="overview-card">
+              <div class="phone-h">总览 ${i + 1}/${n} · ${esc(c.role || '')}</div>
+              ${overviewSlotInner(c, i, n)}
+            </div>`;
+          }).join('')}
+          </div>
+          <div class="ov-bridge">
+            ${edDetail('overviewBoard', 'foot', footShow, { tag: 'p', extraClass: 'region-foot' })}
+          </div>
+        </div>`;
+    }
+
+    function importantBlockHtml(pid) {
+      const imp = resolveDetailBlock(pid, 'important');
+      const items = Array.isArray(imp.items) ? imp.items : [];
+      return `
+        <div class="block important">
+          <div class="bh">重要说明</div>
+          ${edDetail('important', 'h3', imp.h3, { tag: 'h3' })}
+          ${edDetail('important', 'lead', imp.lead, { tag: 'p', extraClass: 'imp-lead' })}
+          <ul class="imp-points">
+            ${items.map((t, i) =>
+              edDetail('important', 'items', t, {
+                tag: 'li',
+                index: i,
+                extraClass: i === 0 ? 'pri' : 'sec'
+              })
+            ).join('')}
+          </ul>
+          ${flowsHtml('important', imp.flows)}
+          ${edDetail('important', 'foot', imp.foot, { tag: 'p', extraClass: 'imp-foot' })}
+        </div>`;
+    }
+
+    function listItemsHtml(blockId, items) {
+      return `<ul>${(items || []).map((t, i) =>
+        edDetail(blockId, 'items', t, { tag: 'li', index: i })
+      ).join('')}</ul>`;
+    }
+    function parasHtml(blockId, paras) {
+      return (paras || []).map((t, i) =>
+        edDetail(blockId, 'paras', t, { tag: 'p', index: i })
+      ).join('');
+    }
+    function flowsHtml(blockId, flows) {
+      return `<div class="flow">${(flows || []).map((t, i) =>
+        edDetail(blockId, 'flows', t, { tag: 'span', index: i })
+      ).join('')}</div>`;
+    }
+
+    function geoDetailBlocks(p) {
+      const pid = p.id;
+      /* 品牌 / 适合谁：本品详情不再展示（2026-11-10） */
+      /* 学习心态：留给 Pro 订阅宝贝再做；DETAIL_DEFAULTS.psy 仍保留草稿骨架 */
+      /* 设备/权益/兑换主文案 → 前方「重要说明」；下方只留补充，避免重复 */
+      const supplement = resolveDetailBlock(pid, 'supplement');
+      const combo = resolveDetailBlock(pid, 'combo');
+      const after = resolveDetailBlock(pid, 'after');
+      const series = resolveDetailBlock(pid, 'series');
+      return `
+        ${importantBlockHtml(pid)}
+        ${overviewBoardHtml(p)}
+        ${GEO_REGIONS.map((r) => regionBlockHtml(pid, r)).join('')}
+        <div class="block">
+          <div class="bh">补充</div>
+          ${edDetail('supplement', 'h3', supplement.h3, { tag: 'h3' })}
+          ${listItemsHtml('supplement', supplement.items)}
+        </div>
+        <div class="block">
+          <div class="bh">单买 / 搭配</div>
+          ${edDetail('combo', 'h3', combo.h3, { tag: 'h3' })}
+          ${listItemsHtml('combo', combo.items)}
+        </div>
+        <div class="block">
+          <div class="bh">售后与注意</div>
+          ${edDetail('after', 'h3', after.h3, { tag: 'h3' })}
+          ${listItemsHtml('after', after.items)}
+        </div>
+        <div class="block">
+          <div class="bh">系列</div>
+          ${edDetail('series', 'h3', series.h3, { tag: 'h3' })}
+          <div class="nav-grid">
+            ${PRODUCTS.map((x) => `<i class="${x.id === p.id ? 'on' : ''}">${x.name}</i>`).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function commonBlocks(p) {
+      if (p.detailFull) return geoDetailBlocks(p);
+      const steps = p.custom
+        ? `<div class="block"><div class="bh">定制流程</div><h3>约画怎么走</h3>
+            <div class="flow"><span>① 沟通需求与参考图</span><span>② 确认尺寸 / 周期 / 修改次数</span><span>③ 绘制与确认</span><span>④ 交付成品</span></div>
+            <p>要画 ≠ 要课。</p></div>`
+        : `<div class="block"><div class="bh">怎么用</div><h3>拍下 → 按说明兑换</h3>
+            <div class="flow"><span>① 拍下 → 自动收到兑换短码</span><span>② 按发货说明打开官网或 App → 登录</span><span>③「权益兑换」粘贴短码 → 即时开通</span></div>
+            <p>具体开通地址见拍后发货说明。</p></div>`;
+      const psy = p.custom
+        ? `<div class="block psy"><div class="bh">心意</div><h3>订画，是一种珍重</h3><p>纪念、礼物、画你所爱。</p></div>`
+        : `<div class="block psy"><div class="bh">学习心态</div><h3>学人物画，最难的往往不是颜料</h3>
+            <p>工具和写生台是练场：帮你把形与光摊开看清楚——不是替你画完。</p></div>`;
+      return `
+        <div class="block"><div class="bh">品牌</div><h3>手绘工坊 · 童画师吴晓</h3><p>人物画学习 · 工具 · 肖像定制</p></div>
+        <div class="block warm"><div class="bh">本品 · 骨架</div><h3>${esc(p.pain)}</h3><p>${esc(p.one)}</p>
+          <ul>${p.get.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+          <p style="color:rgba(203,184,146,0.85)">待静物样板通过后写细并加可编辑图位。</p></div>
+        ${steps}${psy}
+        <div class="block"><div class="bh">售后</div><h3>售后与注意</h3>
+          <ul><li>${p.custom ? '定制以商品页为准；肖像须授权。' : '虚拟商品；勿分享短码；不索验证码。'}</li></ul></div>
+        <div class="block"><div class="bh">系列</div><h3>还可以搭配</h3>
+          <div class="nav-grid">${PRODUCTS.map((x) => `<i class="${x.id === p.id ? 'on' : ''}">${x.name}</i>`).join('')}</div></div>`;
+    }
+
+    /** 淘宝主图 A：大标题；第 1 张可带右上角文本角标（如 Pro+） */
+    function mainCopyHtml(c, opts) {
+      const editable = !!(opts && opts.editable);
+      const mirror = !!(opts && opts.mirror) || editable;
+      const badge = String((c && c.badge) || '');
+      const badgeHtml = badge
+        ? (editable
+          ? `<span class="t-badge${blankClass(badge)}" contenteditable="true" data-copy-field="badge" data-placeholder="角标" spellcheck="false">${esc(badge)}</span>`
+          : `<span class="t-badge" data-copy-field="badge">${esc(badge)}</span>`)
+        : '';
+      if (!mirror) {
+        return `
+        <div class="copy">
+          <div class="t-wrap">
+            <div class="t">${nl2br(c.title || '')}</div>
+            ${badgeHtml}
+          </div>
+        </div>`;
+      }
+      const tAttr = editable
+        ? ' contenteditable="true" data-copy-field="title" data-placeholder="主标题" spellcheck="false"'
+        : ' data-copy-field="title"';
+      return `
+        <div class="copy">
+          <div class="t-wrap">
+            <div class="t${blankClass(c.title)}"${tAttr}>${esc(c.title || '')}</div>
+            ${badgeHtml}
+          </div>
+        </div>`;
+    }
+
+    function overviewCopyHtml(c) {
+      const attr = (field, ph) =>
+        ` contenteditable="true" data-ov-field="${field}" data-placeholder="${esc(ph)}" spellcheck="false"`;
+      const bullets = Array.isArray(c.bullets) ? c.bullets : [];
+      return `
+        <div class="copy">
+          <div class="k${blankClass(c.kicker)}"${attr('kicker', '眉题（可空）')}>${esc(c.kicker || '')}</div>
+          <div class="t${blankClass(c.title)}"${attr('title', '标题')}>${esc(c.title || '')}</div>
+          <div class="s${blankClass(c.body)}"${attr('body', '说明（可空）')}>${esc(c.body || '')}</div>
+          ${bullets.length ? `<ul class="bul">${bullets.map((b, bi) =>
+            `<li contenteditable="true" data-ov-field="bullet" data-ov-index="${bi}" spellcheck="false">${esc(b || '')}</li>`
+          ).join('')}</ul>` : ''}
+          <div class="tag${blankClass(c.tag)}"${attr('tag', '角标（可空）')}>${esc(c.tag || '')}</div>
+        </div>`;
+    }
+
+    function mainSlotInner(c, i, opts) {
+      const key = String(i);
+      const editable = !!(opts && opts.editable);
+      const sync = !!(opts && opts.sync);
+      return `
+        <div class="main-slot" data-kind="main" data-key="${key}" data-label="主图 ${i + 1}"${sync ? ' data-sync="1"' : ''}${editable ? ' data-copy-edit="1"' : ''}>
+          <img class="fg" alt="" draggable="false" />
+          <div class="shade"></div>
+          ${editable ? '<button type="button" class="edit-hit" data-edit="1">编辑贴图</button>' : ''}
+          ${editable ? `<div class="no">设计稿 · 主图 ${i + 1}/5 · 1:1 <span class="draft-badge">点字改文案</span></div>` : ''}
+          ${mainCopyHtml(c, { editable: editable, mirror: sync || editable })}
+        </div>`;
+    }
+
+    const MAIN_TIPS = [
+      {
+        role: '身份卡 · 搜索/推荐第一眼',
+        body: '画面：主体大而清（约六成以上）。文字闸门：烤进主图的字按<strong style="font-weight:400;color:#f3f1ec">推荐≈120</strong>验收——只用大标题级字；副句/角标进详情总览，勿在主图 A 堆小字。禁价签/促销/二维码/极限词/「永久」。右列＝同图缩小。'
+      },
+      {
+        role: '烦恼共鸣 · 点痛点',
+        body: '作用：让人对上「缺场地 / 缺石膏布光 / 体积立不起来」等烦恼。画面：必须有实景/场景底图，<span class="warn">不能整张纯文字</span>。主图 A 仍宜少字；痛点写具体，勿虚飘套话。语气共鸣即可，别太丧。'
+      },
+      {
+        role: '你得到什么 · 权益短清单',
+        body: '作用：说清开通后得到什么（可写生、可调光等）。画面：优先用写生台场景或控制条实拍做底，勿空喊卖点。文字：短条目即可；勿虚报未含权益；仍忌促销价与极限词。'
+      },
+      {
+        role: '怎么用 · 兑换三步',
+        body: '作用：拍下 → 收短码 → 按发货说明兑换。画面：最好有会员页/兑换界面截图做底。内容：不是账号密码、不是网盘整站课；禁「永久」。（开通地址写在发货说明，勿写进主图正文。）'
+      },
+      {
+        role: '系列导航 · 还可搭配',
+        body: '作用：互指其它品（肖像台 / 三工具 / Pro / 约画）。画面：多品缩略或场景拼贴 + 少量字，<span class="warn">不要纯文字目录</span>。本店虚拟兑换码<strong style="color:#f3f1ec;font-weight:400">不强求</strong>第 5 张纯白底实物；约画要画≠要课说清即可。'
+      }
+    ];
+
+    function mainTipHtml(i) {
+      const tip = MAIN_TIPS[i] || MAIN_TIPS[0];
+      return `<div class="main-tip">
+        <div class="mt-h">主图 ${i + 1}/5 · <span class="mt-role">${tip.role}</span></div>
+        <p>${tip.body}</p>
+      </div>`;
+    }
+
+    function renderMains(p) {
+      if (p.mainCards && p.mainCards.length) {
+        return `<div class="main-board">
+          <div class="phone-h">淘宝主图 · 极短版 · ${esc(p.name)} · 点左侧大图文字可改 · 右列＝同图缩小 · 详情五屏另贴</div>
+          ${p.mainCards.map((_base, i) => {
+            const c = resolveMainCard(p, i);
+            return `
+          <div class="main-block">
+            ${mainTipHtml(i)}
+            <div class="main-row">
+              ${mainSlotInner(c, i, { editable: true })}
+              <div class="main-sync" aria-hidden="true">
+                <div class="sync-block">
+                  <div class="lab">同图缩小 · 搜索约168</div>
+                  <div class="sync-thumb list"><div class="sync-canvas">${mainSlotInner(c, i, { sync: true })}</div></div>
+                </div>
+                <div class="sync-block">
+                  <div class="lab">同图缩小 · 推荐约120</div>
+                  <div class="sync-thumb feed"><div class="sync-canvas">${mainSlotInner(c, i, { sync: true })}</div></div>
+                </div>
+              </div>
+            </div>
+          </div>`;
+          }).join('')}
+        </div>`;
+      }
+      return `<div class="mains compact">
+        <div class="main-slot"><div class="t">${esc(p.title)}</div></div>
+        ${p.mains.slice(1).map((label) => `<div class="main-slot"><div class="t">${esc(label)}</div></div>`).join('')}
+      </div>`;
+    }
+
+    function resolveSlotData(kind, key, regionId) {
+      if (kind === 'main') return slotData(currentId, 'main', key);
+      if (kind === 'overview') return slotData(currentId, 'overview', key);
+      if (kind === 'region') return findRegionItem(currentId, regionId, key);
+      return slotData(currentId, 'detail', key);
+    }
+
+    function paintStageSlots() {
+      document.querySelectorAll('#stage [data-kind][data-key]').forEach((el) => {
+        if (el.getAttribute('data-sync') === '1') {
+          // sync thumbs still use main keys; fall through
+        }
+        const kind = el.getAttribute('data-kind');
+        const key = el.getAttribute('data-key');
+        const regionId = el.getAttribute('data-region');
+        let data;
+        if (kind === 'main') data = slotData(currentId, 'main', key);
+        else if (kind === 'overview') data = slotData(currentId, 'overview', key);
+        else if (kind === 'region') data = findRegionItem(currentId, regionId, key);
+        else data = slotData(currentId, 'detail', key);
+        if (!data) return;
+        const img = el.querySelector('img.fg');
+        const shade = el.querySelector('.shade');
+        if (kind === 'region') {
+          el.style.height = readViewH(data) + 'px';
+        }
+        if (data.src) {
+          el.classList.add('has-img');
+          applyImg(img, data);
+          if (shade) shade.style.background = shadeCss(data);
+        } else {
+          el.classList.remove('has-img');
+          if (img) { img.removeAttribute('src'); img.style.filter = ''; img.style.transform = ''; }
+          if (shade) shade.style.background = '';
+        }
+      });
+      applyRegionViewHeights();
+      syncThumbScales();
+    }
+
+    /** 按当前手机/电脑预览端刷新详情图可见高度（两端高度字段分开） */
+    function applyRegionViewHeights() {
+      document.querySelectorAll('#stage .dyn-pic').forEach((card) => {
+        const rid = card.getAttribute('data-region');
+        const iid = card.getAttribute('data-item');
+        const item = findRegionItem(currentId, rid, iid);
+        if (!item) return;
+        const h = readViewH(item);
+        const slot = card.querySelector('.pic-slot');
+        const val = card.querySelector('.h-val');
+        if (slot) slot.style.height = h + 'px';
+        if (val) val.textContent = viewHLabel(h);
+      });
+    }
+
+    /** 右列小图 = 左侧大图的真实缩小（字图比例一致）；淘宝搜索/推荐也是同一张 1:1 缩小 */
+    function syncThumbScales() {
+      document.querySelectorAll('#stage .main-row').forEach((row) => {
+        const large = row.querySelector('.main-slot:not([data-sync])');
+        if (!large) return;
+        const ref = Math.max(240, Math.round(large.getBoundingClientRect().width)) || 480;
+        row.querySelectorAll('.sync-thumb').forEach((thumb) => {
+          const canvas = thumb.querySelector('.sync-canvas');
+          const slot = canvas && canvas.querySelector('.main-slot');
+          if (!canvas || !slot) return;
+          const target = thumb.classList.contains('feed') ? 120 : 168;
+          canvas.style.width = ref + 'px';
+          canvas.style.height = ref + 'px';
+          canvas.style.transform = 'scale(' + (target / ref) + ')';
+        });
+      });
+      fitAllMainTitles();
+    }
+
+    /** 测单行标题固有宽（勿用 width:100% 时的 scrollWidth，那会等于框宽） */
+    function measureMainTitleWidth(el) {
+      const prevW = el.style.width;
+      const prevMax = el.style.maxWidth;
+      el.style.width = 'max-content';
+      el.style.maxWidth = 'none';
+      const w = el.scrollWidth;
+      el.style.width = prevW;
+      el.style.maxWidth = prevMax;
+      return w;
+    }
+
+    /** 主图大标题：单行；只调字号撑满文本框内宽（不改字距、不做水平拉伸） */
+    function fitMainTitleEl(el) {
+      if (!el) return;
+      const host = el.closest('.main-slot');
+      const copy = el.closest('.copy');
+      if (!host || !copy) return;
+      const text = readCopyFieldText(el).replace(/\n/g, ' ').trim();
+      const compact = !!host.closest('.mains.compact');
+      const cs = getComputedStyle(copy);
+      const padL = parseFloat(cs.paddingLeft) || 0;
+      const padR = parseFloat(cs.paddingRight) || 0;
+      /* 文本框内可写宽度 = copy 内容区（外沿相对主图仍有 7% 留白） */
+      const maxW = Math.max(20, copy.clientWidth - padL - padR);
+      /* 上限给足，靠二分字号贴齐框宽；字距固定走 CSS，禁止用字距/scaleX 撑满 */
+      const maxPx = compact
+        ? Math.min(14, Math.max(8, maxW * 0.14))
+        : Math.min(120, Math.max(28, maxW * 0.28));
+      const minPx = compact
+        ? Math.max(5, maxW * 0.045)
+        : Math.max(12, maxW * 0.03);
+      el.style.whiteSpace = 'nowrap';
+      el.style.letterSpacing = '';
+      el.style.width = '100%';
+      el.style.maxWidth = '100%';
+      el.style.padding = '0';
+      el.style.margin = '0';
+      el.style.transform = '';
+      if (!text) {
+        el.style.fontSize = Math.min(maxPx, 40) + 'px';
+        return;
+      }
+      let lo = minPx;
+      let hi = maxPx;
+      let best = minPx;
+      for (let i = 0; i < 20; i++) {
+        const mid = (lo + hi) / 2;
+        el.style.fontSize = mid + 'px';
+        if (measureMainTitleWidth(el) <= maxW + 0.5) {
+          best = mid;
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+      el.style.fontSize = best + 'px';
+    }
+
+    /** 附属字跟标题走：同 Inter 细白字；约为标题一半出头，仍明显小于主标题；推荐≈120 字高 ≥9px */
+    function fitMainBadge(slot) {
+      if (!slot) return;
+      const t = slot.querySelector('.t');
+      const b = slot.querySelector('.t-badge');
+      if (!t || !b) return;
+      const titleFs = parseFloat(getComputedStyle(t).fontSize) || 40;
+      const slotW = Math.max(120, slot.clientWidth || 480);
+      const minForFeed120 = 9 * (slotW / 120);
+      const byTitle = titleFs * 0.5;
+      let badgeFs = Math.max(minForFeed120, byTitle);
+      badgeFs = Math.min(badgeFs, titleFs * 0.55);
+      b.style.fontSize = badgeFs + 'px';
+      b.style.fontWeight = '100';
+      b.style.letterSpacing = '0.08em';
+      b.style.color = 'rgba(255,255,255,0.92)';
+      b.style.background = 'transparent';
+      b.style.border = 'none';
+      b.style.boxShadow = 'none';
+      b.style.padding = '0';
+      const wrap = t.closest('.t-wrap');
+      if (wrap) wrap.style.paddingTop = '';
+    }
+
+    function fitAllMainTitles() {
+      const stage = document.getElementById('stage');
+      if (!stage) return;
+      stage.querySelectorAll('.main-row').forEach((row) => {
+        const large = row.querySelector('.main-slot:not([data-sync])');
+        const largeT = large && large.querySelector('.t');
+        if (!largeT) return;
+        fitMainTitleEl(largeT);
+        fitMainBadge(large);
+        const fs = largeT.style.fontSize;
+        const badge = large.querySelector('.t-badge');
+        const badgeFs = badge ? badge.style.fontSize : '';
+        row.querySelectorAll('.main-slot[data-sync="1"]').forEach((peerSlot) => {
+          const peer = peerSlot.querySelector('.t');
+          if (peer) {
+            peer.style.whiteSpace = 'nowrap';
+            peer.style.fontSize = fs;
+            peer.style.letterSpacing = '';
+            peer.style.transform = '';
+            peer.style.padding = '0';
+            peer.style.margin = '0';
+          }
+          const peerWrap = peerSlot.querySelector('.t-wrap');
+          if (peerWrap) peerWrap.style.paddingTop = '';
+          const peerBadge = peerSlot.querySelector('.t-badge');
+          if (peerBadge && badgeFs) {
+            peerBadge.style.fontSize = badgeFs;
+            peerBadge.style.fontWeight = '100';
+            peerBadge.style.letterSpacing = '0.08em';
+            peerBadge.style.color = 'rgba(255,255,255,0.92)';
+            peerBadge.style.background = 'transparent';
+            peerBadge.style.border = 'none';
+            peerBadge.style.boxShadow = 'none';
+            peerBadge.style.padding = '0';
+          }
+        });
+      });
+      stage.querySelectorAll('.mains.compact .main-slot').forEach((slot) => {
+        const t = slot.querySelector('.t');
+        if (t) fitMainTitleEl(t);
+        fitMainBadge(slot);
+      });
+    }
+
+    function bindHeightHandles(stage) {
+      stage.querySelectorAll('[data-h-drag]').forEach((handle) => {
+        let dragging = false;
+        let startY = 0;
+        let startH = 180;
+        const rid = handle.getAttribute('data-h-drag');
+        const iid = handle.getAttribute('data-item-id');
+        handle.addEventListener('pointerdown', (e) => {
+          const item = findRegionItem(currentId, rid, iid);
+          if (!item) return;
+          dragging = true;
+          startY = e.clientY;
+          startH = readViewH(item);
+          handle.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        });
+        handle.addEventListener('pointermove', (e) => {
+          if (!dragging) return;
+          const item = findRegionItem(currentId, rid, iid);
+          if (!item) return;
+          const next = clampViewH(startH + (e.clientY - startY));
+          writeViewH(item, next);
+          const card = handle.closest('.dyn-pic');
+          const slot = card && card.querySelector('.pic-slot');
+          const val = card && card.querySelector('.h-val');
+          if (slot) slot.style.height = next + 'px';
+          if (val) val.textContent = viewHLabel(next);
+        });
+        const end = () => {
+          if (!dragging) return;
+          dragging = false;
+          saveStore();
+        };
+        handle.addEventListener('pointerup', end);
+        handle.addEventListener('pointercancel', end);
+      });
+    }
+
+    let regionDragArmed = null;
+    let regionDragId = '';
+    let regionDragRid = '';
+    function clearRegionDragArm() {
+      if (!regionDragArmed) return;
+      if (regionDragArmed.classList.contains('is-dragging')) return;
+      regionDragArmed.removeAttribute('draggable');
+      regionDragArmed = null;
+    }
+    window.addEventListener('pointerup', clearRegionDragArm);
+    window.addEventListener('pointercancel', clearRegionDragArm);
+
+    function bindRegionReorder(stage) {
+      regionDragId = '';
+      regionDragRid = '';
+      regionDragArmed = null;
+      stage.querySelectorAll('.dyn-pic').forEach((card) => {
+        const handle = card.querySelector('[data-drag-handle]');
+        if (!handle) return;
+        handle.addEventListener('pointerdown', (e) => {
+          if (e.button != null && e.button !== 0) return;
+          regionDragArmed = card;
+          card.setAttribute('draggable', 'true');
+        });
+        card.addEventListener('dragstart', (e) => {
+          if (regionDragArmed !== card || !card.getAttribute('draggable')) {
+            e.preventDefault();
+            return;
+          }
+          const t = e.target;
+          if (t && (t.closest('textarea') || t.closest('[data-h-drag]') || t.closest('.annot'))) {
+            e.preventDefault();
+            card.removeAttribute('draggable');
+            regionDragArmed = null;
+            return;
+          }
+          regionDragId = card.getAttribute('data-item') || '';
+          regionDragRid = card.getAttribute('data-region') || '';
+          card.classList.add('is-dragging');
+          try {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', regionDragId);
+          } catch (err) { /* ignore */ }
+        });
+        card.addEventListener('dragend', () => {
+          card.removeAttribute('draggable');
+          card.classList.remove('is-dragging');
+          stage.querySelectorAll('.dyn-pic').forEach((c) => {
+            c.classList.remove('drag-over-before', 'drag-over-after');
+          });
+          regionDragId = '';
+          regionDragRid = '';
+          regionDragArmed = null;
+        });
+        card.addEventListener('dragover', (e) => {
+          if (!regionDragId || regionDragRid !== card.getAttribute('data-region')) return;
+          if (card.getAttribute('data-item') === regionDragId) return;
+          e.preventDefault();
+          try { e.dataTransfer.dropEffect = 'move'; } catch (err) { /* ignore */ }
+          const rect = card.getBoundingClientRect();
+          const before = (e.clientY - rect.top) < rect.height / 2;
+          card.classList.toggle('drag-over-before', before);
+          card.classList.toggle('drag-over-after', !before);
+        });
+        card.addEventListener('dragleave', () => {
+          card.classList.remove('drag-over-before', 'drag-over-after');
+        });
+        card.addEventListener('drop', (e) => {
+          e.preventDefault();
+          const targetId = card.getAttribute('data-item');
+          const rid = card.getAttribute('data-region');
+          if (!regionDragId || !rid || rid !== regionDragRid || targetId === regionDragId) return;
+          const items = regionItems(currentId, rid);
+          const from = items.findIndex((it) => it.id === regionDragId);
+          let to = items.findIndex((it) => it.id === targetId);
+          if (from < 0 || to < 0) return;
+          const rect = card.getBoundingClientRect();
+          const before = (e.clientY - rect.top) < rect.height / 2;
+          if (!before) to += 1;
+          if (from < to) to -= 1;
+          flushCaptionFields();
+          if (moveRegionItem(currentId, rid, regionDragId, to)) render(currentId);
+          else card.classList.remove('drag-over-before', 'drag-over-after');
+        });
+      });
+    }
+
+    function readCopyFieldText(el) {
+      return String(el.innerText || '').replace(/\u00a0/g, ' ').replace(/\r/g, '').replace(/\n+$/g, '');
+    }
+    function syncBlankClass(el) {
+      const blank = !readCopyFieldText(el).trim();
+      el.classList.toggle('is-blank', blank);
+    }
+    function wireEditableField(el, onSave) {
+      syncBlankClass(el);
+      el.addEventListener('focus', () => {
+        if (el.classList.contains('is-blank')) {
+          el.textContent = '';
+          el.classList.remove('is-blank');
+        }
+      });
+      el.addEventListener('blur', () => syncBlankClass(el));
+      el.addEventListener('keydown', (e) => {
+        const field = el.getAttribute('data-copy-field')
+          || el.getAttribute('data-ov-field')
+          || el.getAttribute('data-detail-field');
+        if (e.key === 'Enter' && field && field !== 'body' && field !== 'title' && field !== 'hint' && field !== 'note' && field !== 'closing' && field !== 'paras') {
+          e.preventDefault();
+        }
+      });
+      el.addEventListener('input', () => {
+        onSave(readCopyFieldText(el));
+        syncBlankClass(el);
+        saveStore();
+      });
+    }
+
+    function bindMainCopyEditors(stage) {
+      stage.querySelectorAll('.main-slot[data-copy-edit="1"] [data-copy-field]').forEach((el) => {
+        /* 主图标题：不换行，Enter 直接拦掉 */
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') e.preventDefault();
+        });
+        wireEditableField(el, (val) => {
+          const host = el.closest('.main-slot');
+          if (!host) return;
+          const key = host.getAttribute('data-key');
+          const field = el.getAttribute('data-copy-field');
+          const oneLine = String(val || '').replace(/\r?\n/g, ' ').replace(/\s+/g, ' ');
+          if (oneLine !== val) {
+            el.textContent = oneLine;
+            val = oneLine;
+          }
+          const bag = productBag(currentId);
+          if (!bag.mainCopy[key]) bag.mainCopy[key] = {};
+          bag.mainCopy[key][field] = val;
+          const sel = '.main-slot[data-sync="1"][data-key="' + key.replace(/"/g, '') + '"] [data-copy-field="' + field + '"]';
+          stage.querySelectorAll(sel).forEach((peer) => {
+            peer.textContent = val;
+            syncBlankClass(peer);
+          });
+          fitAllMainTitles();
+        });
+      });
+    }
+
+    function bindOverviewCopyEditors(stage) {
+      stage.querySelectorAll('.ov-slot[data-ov-edit="1"] [data-ov-field]').forEach((el) => {
+        wireEditableField(el, (val) => {
+          const host = el.closest('.ov-slot');
+          if (!host) return;
+          const key = host.getAttribute('data-key');
+          const field = el.getAttribute('data-ov-field');
+          const bag = productBag(currentId);
+          if (!bag.overviewCopy[key]) bag.overviewCopy[key] = {};
+          if (field === 'bullet') {
+            const p = PRODUCTS.find((x) => x.id === currentId) || PRODUCTS[0];
+            const resolved = resolveOverviewCard(p, Number(key));
+            const bullets = resolved.bullets.slice();
+            const idx = Number(el.getAttribute('data-ov-index') || 0);
+            bullets[idx] = val;
+            bag.overviewCopy[key].bullets = bullets;
+          } else {
+            bag.overviewCopy[key][field] = val;
+          }
+        });
+      });
+    }
+
+    function bindDetailTextEditors(stage) {
+      stage.querySelectorAll('[data-detail-block][data-detail-field]').forEach((el) => {
+        wireEditableField(el, (val) => {
+          const blockId = el.getAttribute('data-detail-block');
+          const field = el.getAttribute('data-detail-field');
+          const bag = productBag(currentId);
+          if (!bag.detailText[blockId]) bag.detailText[blockId] = {};
+          if (field === 'paras' || field === 'items' || field === 'flows') {
+            const idx = Number(el.getAttribute('data-detail-index') || 0);
+            const base = resolveDetailBlock(currentId, blockId);
+            const arr = Array.isArray(base[field]) ? base[field].slice() : [];
+            arr[idx] = val;
+            bag.detailText[blockId][field] = arr;
+          } else {
+            bag.detailText[blockId][field] = val;
+          }
+        });
+      });
+    }
+
+    function bindStageEditors() {
+      const stage = document.getElementById('stage');
+      stage.querySelectorAll('[data-edit]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          let host = btn.closest('[data-kind][data-key]');
+          if (!host) {
+            const card = btn.closest('.dyn-pic');
+            host = card ? card.querySelector('[data-kind][data-key]') : null;
+          }
+          if (!host || host.getAttribute('data-sync') === '1') return;
+          const kind = host.getAttribute('data-kind');
+          openEditor({
+            pid: currentId,
+            kind: kind,
+            key: host.getAttribute('data-key'),
+            region: host.getAttribute('data-region') || '',
+            label: host.getAttribute('data-label') || host.getAttribute('data-key')
+          });
+        });
+      });
+      bindCaptionAutosave(stage);
+      bindMainCopyEditors(stage);
+      bindOverviewCopyEditors(stage);
+      bindDetailTextEditors(stage);
+      stage.querySelectorAll('[data-add-region]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          flushCaptionFields();
+          addRegionItem(currentId, btn.getAttribute('data-add-region'));
+          render(currentId);
+        });
+      });
+      stage.querySelectorAll('[data-insert-region]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          flushCaptionFields();
+          const rid = btn.getAttribute('data-insert-region');
+          const at = Number(btn.getAttribute('data-insert-at'));
+          addRegionItem(currentId, rid, at);
+          setSaveHint('已在中间插入图片');
+          render(currentId);
+        });
+      });
+      stage.querySelectorAll('[data-del-item]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const card = btn.closest('.dyn-pic');
+          if (!card) return;
+          if (!confirm('删除这张详情图？')) return;
+          flushCaptionFields();
+          removeRegionItem(currentId, card.getAttribute('data-region'), card.getAttribute('data-item'));
+          render(currentId);
+        });
+      });
+      bindRegionReorder(stage);
+      bindHeightHandles(stage);
+      const btnPhone = stage.querySelector('[data-view="phone"]');
+      const btnPc = stage.querySelector('[data-view="pc"]');
+      if (btnPhone) btnPhone.onclick = () => { detailView = 'phone'; applyDetailView(); };
+      if (btnPc) btnPc.onclick = () => { detailView = 'pc'; applyDetailView(); };
+      paintStageSlots();
+      applyDetailView();
+    }
+
+    function applyDetailView() {
+      const phone = document.getElementById('detailFrame');
+      if (!phone) return;
+      phone.classList.toggle('is-pc', detailView === 'pc');
+      document.querySelectorAll('#stage [data-view]').forEach((b) => {
+        b.classList.toggle('on', b.getAttribute('data-view') === detailView);
+      });
+      const hint = document.getElementById('detailViewHint');
+      if (hint) {
+        hint.textContent = detailView === 'pc'
+          ? '电脑端预览宽约 790 · 底边拖高只记电脑，与手机互不影响'
+          : '手机端预览宽约 360 · 底边拖高只记手机，与电脑互不影响';
+      }
+      applyRegionViewHeights();
+    }
+
+    function openEditor(target) {
+      editing = target;
+      let data;
+      if (target.kind === 'main') data = slotData(target.pid, 'main', target.key);
+      else if (target.kind === 'overview') data = slotData(target.pid, 'overview', target.key);
+      else if (target.kind === 'region') data = findRegionItem(target.pid, target.region, target.key);
+      else data = slotData(target.pid, 'detail', target.key);
+      if (!data) return;
+      draft = clone(data);
+      document.getElementById('modalTitle').textContent = '编辑 · ' + (target.label || target.key);
+      document.getElementById('previewCapTitle').textContent = target.label || '图位';
+      document.getElementById('previewCapDesc').textContent =
+        target.kind === 'main' ? '主图 1:1 取景 · 拖拽调位置'
+          : (target.kind === 'overview' ? '详情总览贴图 · 与主图独立 · 拖拽调位置'
+            : '详情图取景 · 拖拽调位置（可见高度在卡片底边拖）');
+      const frame = document.getElementById('previewFrame');
+      if (target.kind === 'main' || target.kind === 'overview') {
+        frame.style.aspectRatio = '1';
+        frame.style.width = 'min(280px, 88%)';
+        frame.style.height = '';
+      } else {
+        const h = readViewH(draft);
+        frame.style.aspectRatio = 'auto';
+        frame.style.width = 'min(320px, 92%)';
+        frame.style.height = Math.min(280, h) + 'px';
+      }
+      syncControlsFromDraft();
+      paintPreview();
+      document.getElementById('modalMask').classList.add('open');
+      document.getElementById('modalMask').setAttribute('aria-hidden', 'false');
+    }
+
+    function closeEditor(apply) {
+      if (apply && editing && draft) {
+        let data;
+        if (editing.kind === 'main') data = slotData(editing.pid, 'main', editing.key);
+        else if (editing.kind === 'overview') data = slotData(editing.pid, 'overview', editing.key);
+        else if (editing.kind === 'region') data = findRegionItem(editing.pid, editing.region, editing.key);
+        else data = slotData(editing.pid, 'detail', editing.key);
+        if (data) {
+          const keepId = data.id;
+          const keepCaption = data.caption;
+          const keepH = data.viewH;
+          const keepHPc = data.viewHPc;
+          const keepCapH = data.captionH;
+          Object.assign(data, normalizeSlot(draft));
+          if (editing.kind === 'region') {
+            data.id = keepId || data.id;
+            data.caption = (draft.caption != null ? draft.caption : keepCaption) || '';
+            data.viewH = clampViewH(draft.viewH != null ? draft.viewH : keepH);
+            if (keepHPc != null && keepHPc !== '') data.viewHPc = clampViewH(keepHPc);
+            else delete data.viewHPc;
+            data.captionH = clampCaptionH(keepCapH);
+          }
+          saveStore();
+          render(currentId);
+        }
+      }
+      editing = null;
+      draft = null;
+      const frame = document.getElementById('previewFrame');
+      if (frame) { frame.style.height = ''; frame.style.aspectRatio = '1'; }
+      document.getElementById('modalMask').classList.remove('open');
+      document.getElementById('modalMask').setAttribute('aria-hidden', 'true');
+    }
+
+    function syncControlsFromDraft() {
+      const d = draft;
+      if (!d) return;
+      document.getElementById('rngZoom').value = Math.round(d.zoom * 100);
+      document.getElementById('rngX').value = d.x;
+      document.getElementById('rngY').value = d.y;
+      document.getElementById('rngBright').value = Math.round(d.bright * 100);
+      document.getElementById('rngContrast').value = Math.round(d.contrast * 100);
+      document.getElementById('rngSat').value = Math.round(d.saturate * 100);
+      document.getElementById('rngG0').value = d.g0;
+      document.getElementById('rngGOp').value = Math.round(d.gOp * 100);
+      document.getElementById('rngWarm').value = d.warm;
+      document.getElementById('valZoom').textContent = d.zoom.toFixed(2);
+      document.getElementById('valX').textContent = d.x + '%';
+      document.getElementById('valY').textContent = d.y + '%';
+      document.getElementById('valBright').textContent = d.bright.toFixed(2);
+      document.getElementById('valContrast').textContent = d.contrast.toFixed(2);
+      document.getElementById('valSat').textContent = d.saturate.toFixed(2);
+      document.getElementById('valG0').textContent = d.g0 + '%';
+      document.getElementById('valGOp').textContent = d.gOp.toFixed(2);
+      document.getElementById('valWarm').textContent = d.warm;
+    }
+
+    function paintPreview() {
+      if (!draft) return;
+      const img = document.getElementById('previewImg');
+      const shade = document.getElementById('previewShade');
+      if (draft.src) {
+        applyImg(img, draft);
+        img.style.display = 'block';
+      } else {
+        img.removeAttribute('src');
+        img.style.display = 'none';
+      }
+      shade.style.background = shadeCss(draft);
+    }
+
+    function bindControls() {
+      const map = [
+        ['rngZoom', (v) => { draft.zoom = v / 100; document.getElementById('valZoom').textContent = draft.zoom.toFixed(2); }],
+        ['rngX', (v) => { draft.x = +v; document.getElementById('valX').textContent = draft.x + '%'; }],
+        ['rngY', (v) => { draft.y = +v; document.getElementById('valY').textContent = draft.y + '%'; }],
+        ['rngBright', (v) => { draft.bright = v / 100; document.getElementById('valBright').textContent = draft.bright.toFixed(2); }],
+        ['rngContrast', (v) => { draft.contrast = v / 100; document.getElementById('valContrast').textContent = draft.contrast.toFixed(2); }],
+        ['rngSat', (v) => { draft.saturate = v / 100; document.getElementById('valSat').textContent = draft.saturate.toFixed(2); }],
+        ['rngG0', (v) => { draft.g0 = +v; document.getElementById('valG0').textContent = draft.g0 + '%'; }],
+        ['rngGOp', (v) => { draft.gOp = v / 100; document.getElementById('valGOp').textContent = draft.gOp.toFixed(2); }],
+        ['rngWarm', (v) => { draft.warm = +v; document.getElementById('valWarm').textContent = draft.warm; }]
+      ];
+      map.forEach(([id, fn]) => {
+        document.getElementById(id).addEventListener('input', (e) => {
+          if (!draft) return;
+          fn(+e.target.value);
+          paintPreview();
+        });
+      });
+    }
+
+    (function bindDrag() {
+      const frame = document.getElementById('previewFrame');
+      let dragging = false, lastX = 0, lastY = 0;
+      frame.addEventListener('pointerdown', (e) => {
+        if (!draft || !draft.src) return;
+        dragging = true; lastX = e.clientX; lastY = e.clientY;
+        frame.classList.add('grabbing');
+        frame.setPointerCapture(e.pointerId);
+      });
+      frame.addEventListener('pointermove', (e) => {
+        if (!dragging || !draft) return;
+        const dx = e.clientX - lastX, dy = e.clientY - lastY;
+        lastX = e.clientX; lastY = e.clientY;
+        const rect = frame.getBoundingClientRect();
+        draft.x = clampPan(draft.x - (dx / rect.width) * 100);
+        draft.y = clampPan(draft.y - (dy / rect.height) * 100);
+        syncControlsFromDraft();
+        paintPreview();
+      });
+      const end = () => { dragging = false; frame.classList.remove('grabbing'); };
+      frame.addEventListener('pointerup', end);
+      frame.addEventListener('pointercancel', end);
+    })();
+
+    function render(id) {
+      flushCaptionFields();
+      currentId = id;
+      const p = PRODUCTS.find((x) => x.id === id) || PRODUCTS[0];
+      document.querySelectorAll('.tabs button').forEach((b) => {
+        b.classList.toggle('on', b.dataset.id === p.id);
+      });
+      document.body.classList.toggle('hide-draft-copy', hideDraftCopy);
+      const copyBtn = document.getElementById('btnToggleCopy');
+      if (copyBtn) copyBtn.textContent = hideDraftCopy ? '显示示意文案' : '隐藏示意文案';
+      syncPreviewUi();
+
+      document.getElementById('stage').innerHTML = `
+        ${renderMains(p)}
+        <div class="view-toggle">
+          <button type="button" data-view="phone" class="${detailView === 'phone' ? 'on' : ''}">手机详情</button>
+          <button type="button" data-view="pc" class="${detailView === 'pc' ? 'on' : ''}">电脑详情</button>
+          <span class="hint" id="detailViewHint"></span>
+        </div>
+        <div class="phone${detailView === 'pc' ? ' is-pc' : ''}" id="detailFrame">
+          <div class="phone-h">详情长图 · ${esc(p.name)} · 同一套叙事</div>
+          <div class="detail">${commonBlocks(p)}</div>
+        </div>
+      `;
+      bindStageEditors();
+      document.getElementById('side').innerHTML = p.sample ? `
+        <h2>${esc(p.name)} <span class="status-pill">细稿样板</span></h2>
+        <p><b style="color:#cbb892;font-weight:400">淘宝主图</b>：极短版只留<strong style="font-weight:400;color:#f3f1ec">大标题</strong>（无副句/角标）；旁侧同图缩小；字体对齐官网「手绘工坊」；点字可改。</p>
+        <p><b style="color:#cbb892;font-weight:400">详情</b>：框架固定；五屏总览与各段落<strong style="font-weight:400;color:#f3f1ec">均可点字改</strong>（草稿自动存，清空贴图不丢文案）。</p>
+        <p><b style="color:#cbb892;font-weight:400">展开区</b>：场景实拍 / 控制条 / 课表规模（你加图）；分区标题也可改。</p>
+        <p><b style="color:#cbb892;font-weight:400">不印域名</b>：兑换靠发货说明；可提官网或 App。</p>
+        <p>手机/电脑同一套叙事，可切换预览宽度。</p>
+        <h3>淘宝高质量主图 · 本店对齐</h3>
+        <ul class="check">
+          <li class="ok">比例 1:1 · 建议导出 1440×1440</li>
+          <li class="ok">第 1 张字少主体清；缩略图也要能认</li>
+          <li class="ok">原图质量导出，避免二次压缩</li>
+          <li class="ok">禁价格/联系方式/二维码/极限词/「永久」</li>
+          <li class="warn">虚拟兑换码不强求第 5 张白底实物</li>
+        </ul>
+      ` : `
+        <h2>${esc(p.name)}</h2>
+        <p>骨架；样板通过后按同结构加可编辑图位。</p>
+        <div>${p.mains.map((m) => `<span class="chip">${esc(m)}</span>`).join('')}</div>
+      `;
+    }
+
+    document.getElementById('btnPick').addEventListener('click', () => document.getElementById('filePick').click());
+    document.getElementById('filePick').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file || !draft) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        draft.src = String(reader.result || '');
+        paintPreview();
+      };
+      reader.readAsDataURL(file);
+    });
+    document.getElementById('btnClose').addEventListener('click', () => closeEditor(false));
+    document.getElementById('btnApply').addEventListener('click', () => closeEditor(true));
+    document.getElementById('modalMask').addEventListener('click', (e) => {
+      if (e.target.id === 'modalMask') closeEditor(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('modalMask').classList.contains('open')) closeEditor(false);
+    });
+    document.getElementById('btnResetParams').addEventListener('click', () => {
+      if (!draft) return;
+      const src = draft.src;
+      const caption = draft.caption;
+      draft = normalizeSlot({ src, caption });
+      syncControlsFromDraft();
+      paintPreview();
+    });
+    document.getElementById('btnClearSrc').addEventListener('click', () => {
+      if (!draft) return;
+      draft.src = '';
+      paintPreview();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushCaptionFields();
+    });
+    window.addEventListener('pagehide', () => { flushCaptionFields(); });
+    function fitPreviewCaptions(on) {
+      document.querySelectorAll('textarea[data-region-caption]').forEach((ta) => {
+        if (on) {
+          if (ta.dataset.editH === undefined) ta.dataset.editH = ta.style.height || '';
+          ta.style.height = 'auto';
+          ta.style.height = Math.max(ta.scrollHeight, 24) + 'px';
+          ta.style.overflow = 'hidden';
+        } else if (ta.dataset.editH !== undefined) {
+          ta.style.height = ta.dataset.editH;
+          delete ta.dataset.editH;
+          ta.style.overflow = '';
+        }
+      });
+    }
+    function syncPreviewUi() {
+      document.body.classList.toggle('preview-detail', !!previewDetail);
+      const btn = document.getElementById('btnPreviewDetail');
+      if (btn) {
+        btn.textContent = previewDetail ? '退出预览' : '预览详情';
+        btn.classList.toggle('is-preview-on', !!previewDetail);
+        btn.title = previewDetail
+          ? '返回编辑：显示工具条、主图稿与说明'
+          : '只看宝贝详情里会出现的图和字（隐藏编辑控件与主图区）';
+      }
+      fitPreviewCaptions(!!previewDetail);
+    }
+    document.getElementById('btnPreviewDetail').addEventListener('click', () => {
+      previewDetail = !previewDetail;
+      syncPreviewUi();
+      if (previewDetail) {
+        requestAnimationFrame(() => fitPreviewCaptions(true));
+        const frame = document.getElementById('detailFrame');
+        if (frame) frame.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        setSaveHint('预览中：所见即详情稿');
+      } else {
+        setSaveHint('已退出预览');
+      }
+    });
+    document.getElementById('btnToggleCopy').addEventListener('click', () => {
+      hideDraftCopy = !hideDraftCopy;
+      render(currentId);
+    });
+    document.getElementById('btnExportDraft').addEventListener('click', () => exportDraftFile());
+    document.getElementById('btnImportDraft').addEventListener('click', () => {
+      document.getElementById('draftPick').click();
+    });
+    const DRAFT_BACKUP_URL = '/.cursor/browser-automation/runs/taobao-draft-restore.json';
+    async function restoreDraftFromBackup(opts) {
+      const silent = !!(opts && opts.silent);
+      if (!silent && !confirm('用本地备份补回贴图？会保留你现在的文案，只把空图槽用备份填上（建议先「导出草稿」）。')) return false;
+      try {
+        const res = await fetch(DRAFT_BACKUP_URL, { cache: 'no-store' });
+        if (!res.ok) throw new Error('找不到备份文件（HTTP ' + res.status + '）');
+        const payload = await res.json();
+        importDraftObject(payload, { fillMissing: true });
+        setSaveHint('已从备份补回贴图');
+        return true;
+      } catch (err) {
+        alert('恢复失败：' + (err && err.message ? err.message : '未知错误') +
+          '\n也可点「导入草稿」，选 Downloads 里最新的「淘宝主图详情草稿_….json」。');
+        return false;
+      }
+    }
+    document.getElementById('btnRestoreBackup').addEventListener('click', () => {
+      restoreDraftFromBackup({ silent: false });
+    });
+    /** 静物写生台列表整夜长图（缩略）→ 详情「课表规模」区 */
+    const GEO_SCALE_CATALOG_URL = new URL('./assets/geo-catalog-scale-long.jpg', location.href).href;
+    function blobToDataUrl(blob) {
+      return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result || ''));
+        fr.onerror = () => reject(fr.error || new Error('read fail'));
+        fr.readAsDataURL(blob);
+      });
+    }
+    function loadImageNaturalSize(src) {
+      return new Promise((resolve, reject) => {
+        const im = new Image();
+        im.onload = () => resolve({ w: im.naturalWidth || im.width, h: im.naturalHeight || im.height });
+        im.onerror = () => reject(new Error('图片无法解码'));
+        im.src = src;
+      });
+    }
+    /** 按详情预览框宽，算出整张长图完整露出所需高度 */
+    function naturalViewHForWidth(imgW, imgH, frameW) {
+      const w = Math.max(120, Number(frameW) || 360);
+      const iw = Math.max(1, Number(imgW) || 1);
+      const ih = Math.max(1, Number(imgH) || 1);
+      return clampViewH(Math.round(w * (ih / iw)));
+    }
+    async function fillGeoScaleCatalogLong(opts) {
+      const silent = !!(opts && opts.silent);
+      const onlyIfEmpty = !!(opts && opts.onlyIfEmpty);
+      const forceFullHeight = !!(opts && opts.forceFullHeight);
+      try {
+        const items = regionItems('geo', 'scale');
+        const hasImg = items.some((it) => it && it.src);
+        if (onlyIfEmpty && hasImg && !forceFullHeight) return { ok: true, skipped: true };
+        if (!silent && hasImg && !forceFullHeight && !confirm('覆盖「课表规模」区已有贴图，换成场景列表整夜长图？')) {
+          return { ok: false, cancelled: true };
+        }
+        const res = await fetch(GEO_SCALE_CATALOG_URL, { cache: 'no-store' });
+        if (!res.ok) throw new Error('找不到长图资源（HTTP ' + res.status + '）');
+        const dataUrl = await blobToDataUrl(await res.blob());
+        const nat = await loadImageNaturalSize(dataUrl);
+        /* 手机框约 360、电脑约 790；按比例撑满整表，避免只露上截 */
+        const viewHPhone = naturalViewHForWidth(nat.w, nat.h, 360);
+        const viewHPc = naturalViewHForWidth(nat.w, nat.h, 790);
+        const bag = productBag('geo');
+        const item = normalizeSlot({
+          id: 'scale-catalog-long',
+          src: dataUrl,
+          caption: '静物写生台各场景一览',
+          captionH: 56,
+          zoom: 1,
+          x: 50,
+          y: 0,
+          viewH: viewHPhone,
+          viewHPc: viewHPc,
+          g0: 8,
+          gOp: 0.12,
+          warm: 0,
+          bright: 1,
+          contrast: 1.02,
+          saturate: 0.95
+        });
+        bag.regions.scale = { items: [item] };
+        saveStore();
+        if (currentId === 'geo') render('geo');
+        /* 按当前预览框实宽再校正一次，保证整表完整露出 */
+        requestAnimationFrame(() => {
+          const slot = document.querySelector('[data-region-block="scale"] .pic-slot');
+          const cur = findRegionItem('geo', 'scale', 'scale-catalog-long');
+          if (!slot || !cur) return;
+          const realW = slot.clientWidth || 360;
+          const hNow = naturalViewHForWidth(nat.w, nat.h, realW);
+          if (detailView === 'pc') writeViewH(cur, hNow, 'pc');
+          else writeViewH(cur, hNow, 'phone');
+          /* 另一端也按典型宽度写好，切换预览不用再点一次 */
+          if (detailView !== 'pc') writeViewH(cur, viewHPc, 'pc');
+          else writeViewH(cur, viewHPhone, 'phone');
+          slot.style.height = hNow + 'px';
+          const val = slot.parentElement && slot.parentElement.querySelector('.h-val');
+          if (val) val.textContent = viewHLabel(hNow);
+          applyImg(slot.querySelector('img.fg'), cur);
+          saveStore();
+        });
+        setSaveHint('已填入课表规模长图（整表高度约 ' + viewHPhone + ' / ' + viewHPc + '）');
+        return { ok: true, nat, viewHPhone, viewHPc };
+      } catch (err) {
+        if (!silent) {
+          alert('填入失败：' + (err && err.message ? err.message : '未知错误'));
+        }
+        return { ok: false, error: String(err && err.message ? err.message : err) };
+      }
+    }
+    document.getElementById('btnFillScaleCatalog').addEventListener('click', () => {
+      fillGeoScaleCatalogLong({ silent: false });
+    });
+    document.getElementById('draftPick').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      if (!confirm('用所选文件替换当前全部草稿？建议先点「导出草稿」备份。')) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          importDraftObject(JSON.parse(String(reader.result || '{}')));
+        } catch (err) {
+          alert('导入失败：' + (err && err.message ? err.message : '无法解析 JSON'));
+        }
+      };
+      reader.readAsText(file);
+    });
+    document.getElementById('btnClearProduct').addEventListener('click', () => {
+      if (!confirm('清空「' + currentId + '」已贴图片与参数？（各类文案改动会保留）')) return;
+      const cur = store[currentId] || {};
+      store[currentId] = {
+        mains: {},
+        detail: {},
+        overview: {},
+        regions: {},
+        mainCopy: cur.mainCopy || {},
+        overviewCopy: cur.overviewCopy || {},
+        detailText: cur.detailText || {}
+      };
+      saveStore();
+      render(currentId);
+    });
+    document.getElementById('btnClearAll').addEventListener('click', () => {
+      if (!confirm('清空全部槽位草稿？')) return;
+      store = {};
+      localStorage.removeItem(STORE_KEY);
+      LEGACY_STORE_KEYS.forEach((k) => localStorage.removeItem(k));
+      document.getElementById('saveHint').textContent = '草稿已清空';
+      render(currentId);
+    });
+
+    bindControls();
+    let syncScaleTimer = 0;
+    window.addEventListener('resize', () => {
+      clearTimeout(syncScaleTimer);
+      syncScaleTimer = setTimeout(() => {
+        syncThumbScales();
+      }, 80);
+    });
+    const tabs = document.getElementById('tabs');
+    PRODUCTS.forEach((p) => {
+      const b = document.createElement('button');
+      b.textContent = p.sample ? (p.name + ' · 样板') : p.name;
+      b.dataset.id = p.id;
+      b.onclick = () => render(p.id);
+      tabs.appendChild(b);
+    });
+    render('geo');
+    /* 静物样板：课表规模空则填整夜长图；已有但可见高过矮（旧 520 上限）则抬到整表 */
+    (async () => {
+      const items = regionItems('geo', 'scale');
+      const it = items.find((x) => x && x.src);
+      if (!it) {
+        await fillGeoScaleCatalogLong({ silent: true, onlyIfEmpty: true });
+        return;
+      }
+      if (clampViewH(it.viewH) >= 1200 && (it.viewHPc == null || clampViewH(it.viewHPc) >= 1200)) return;
+      try {
+        const nat = await loadImageNaturalSize(it.src);
+        const phoneH = naturalViewHForWidth(nat.w, nat.h, 360);
+        const pcH = naturalViewHForWidth(nat.w, nat.h, 790);
+        writeViewH(it, phoneH, 'phone');
+        writeViewH(it, pcH, 'pc');
+        saveStore();
+        if (currentId === 'geo') render('geo');
+        setSaveHint('课表规模已改为整表高度');
+      } catch (_e) {
+        await fillGeoScaleCatalogLong({ silent: true, forceFullHeight: true });
+      }
+    })();
+    /* ?restore=1：本页自动从本地备份恢复贴图（防丢急救） */
+    try {
+      const q = new URLSearchParams(location.search || '');
+      if (q.get('restore') === '1') {
+        restoreDraftFromBackup({ silent: true }).then((ok) => {
+          if (!ok) return;
+          q.delete('restore');
+          const next = location.pathname + (q.toString() ? ('?' + q.toString()) : '') + location.hash;
+          history.replaceState(null, '', next);
+        });
+      }
+    } catch (e) { /* ignore */ }
+  </script>
+</body>
+</html>
