@@ -31,7 +31,8 @@ const LIBS = {
       { name: '耳朵详解', url: 'docs/json/结构_五官/01 耳朵详解.json' },
       { name: '鼻子详解', url: 'docs/json/结构_五官/02 鼻子详解.json' },
       { name: '嘴巴详解', url: 'docs/json/结构_五官/03 嘴巴详解.json' },
-      { name: '眼眉详解', url: 'docs/json/结构_五官/04 眼眉详解.json' }
+      { name: '眼眉详解', url: 'docs/json/结构_五官/04 眼眉详解.json' },
+      { name: '五官综合详解', url: 'docs/json/结构_五官/05 五官综合详解.json' }
     ]
   }
 };

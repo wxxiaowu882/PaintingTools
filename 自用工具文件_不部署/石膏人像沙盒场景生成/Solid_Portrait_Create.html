@@ -2502,9 +2502,11 @@
         files.sort((a,b) => a.name.localeCompare(b.name, 'zh-CN', {numeric: true})); if(files.length === 0) { window.showToast("未找到以数字开头的场景文件！", true); return; }
         let mergedData = []; let mergedNames = []; for(const fileHandle of files) { if(fileHandle.name === window.targetMasterFilename) continue; const file = await fileHandle.getFile(); const text = await file.text();
         try { const data = JSON.parse(text); mergedData.push(data); mergedNames.push(fileHandle.name); } catch(e) { window.hwLog(fileHandle.name + " 解析跳过"); } }
-        // uid：文件名前缀全局唯一（几何/肖像）→ 用文件号；前缀撞号（头部造型多模同课）→ 保留三位数补齐，切勿用文件号冲掉
+        // uid：文件名前缀全局唯一（几何/肖像/写生）→ 与文件号对齐（含可选字母后缀，如 2403b）；
+        // 前缀撞号（头部造型多模同课，如多个 102_*）→ 保留三位数补齐，切勿用文件号冲掉。
+        // 天坑：旧正则只取纯数字，2403 与 2403b 会被当成同一前缀 → 误走三位数重编号，整库变成 001/002…
         try {
-            const fileNumOf = (name) => { const m = String(name || '').match(/^(\d{1,10})/); return m ? m[1] : ''; };
+            const fileNumOf = (name) => { const m = String(name || '').match(/^(\d{1,10}[A-Za-z]?)/); return m ? m[1] : ''; };
             const nums = mergedNames.map(fileNumOf);
             const freq = new Map();
             for (const n of nums) { if (!n) continue; freq.set(n, (freq.get(n) || 0) + 1); }
@@ -2512,8 +2514,8 @@
             if (uniquePrefix) {
                 for (let i = 0; i < mergedData.length; i++) {
                     const sc = mergedData[i]; if (!sc || typeof sc !== 'object') continue;
-                    const cur = sc.uid != null ? String(sc.uid).trim() : '';
-                    if (!cur && nums[i]) sc.uid = nums[i];
+                    // 权威在文件号：合并时强制对齐，可自愈误写成 001/002 的统合清单
+                    if (nums[i]) sc.uid = nums[i];
                 }
             } else {
                 const used = new Set();
