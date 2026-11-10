@@ -1819,6 +1819,22 @@
       if (b && typeof b === 'object') return normalizeSlot(b);
       return normalizeSlot({});
     }
+    /* 只补空图：保留当前 caption / 取景；仅在无 src 时从备份拷贝图与取景 */
+    function fillSlotImageOnly(cur, bak) {
+      const c = normalizeSlot(cur || {});
+      const b = normalizeSlot(bak || {});
+      if (slotHasSrc(c)) return c;
+      if (!slotHasSrc(b)) return c;
+      const out = normalizeSlot(Object.assign({}, c, {
+        src: b.src,
+        zoom: b.zoom, x: b.x, y: b.y,
+        bright: b.bright, contrast: b.contrast, saturate: b.saturate,
+        g0: b.g0, gOp: b.gOp, warm: b.warm, viewH: b.viewH
+      }));
+      /* 当前若已有说明文案，绝不被备份盖掉 */
+      if (c.caption) out.caption = c.caption;
+      return out;
+    }
     function mergeProductBags(preferred, fallback) {
       const a = preferred && typeof preferred === 'object' ? preferred : {};
       const b = fallback && typeof fallback === 'object' ? fallback : {};
@@ -1962,18 +1978,55 @@
       const el = document.getElementById('saveHint');
       if (el) el.textContent = '已导出草稿文件';
     }
+    function fillMissingImagesFromStore(backupStore) {
+      const bakRoot = backupStore && typeof backupStore === 'object' ? backupStore : {};
+      const ids = new Set([...Object.keys(store), ...Object.keys(bakRoot)]);
+      ids.forEach((pid) => {
+        if (pid === '_meta') return;
+        const cur = productBag(pid);
+        const bak = bakRoot[pid] || {};
+        ['mains', 'overview', 'detail'].forEach((bagName) => {
+          const cb = cur[bagName] || (cur[bagName] = {});
+          const bb = bak[bagName] || {};
+          Object.keys(bb).forEach((k) => {
+            cb[k] = fillSlotImageOnly(cb[k], bb[k]);
+          });
+        });
+        const cRegions = cur.regions || (cur.regions = {});
+        const bRegions = bak.regions || {};
+        Object.keys(bRegions).forEach((rid) => {
+          const ci = ((cRegions[rid] || {}).items) || [];
+          const bi = ((bRegions[rid] || {}).items) || [];
+          const n = Math.max(ci.length, bi.length);
+          const items = [];
+          for (let i = 0; i < n; i++) {
+            if (bi[i] && (!ci[i] || !slotHasSrc(ci[i]))) {
+              /* 备份多出的图：整槽补入；已有槽只补图 */
+              items.push(ci[i] ? fillSlotImageOnly(ci[i], bi[i]) : normalizeSlot(bi[i]));
+            } else if (ci[i]) {
+              items.push(fillSlotImageOnly(ci[i], bi[i]));
+            } else if (bi[i]) {
+              items.push(normalizeSlot(bi[i]));
+            }
+          }
+          cRegions[rid] = { items };
+        });
+      });
+      if (bakRoot._meta) store._meta = Object.assign({}, bakRoot._meta, store._meta || {});
+    }
     function importDraftObject(payload, opts) {
       let next = null;
       if (payload && payload.store && typeof payload.store === 'object') next = payload.store;
       else if (payload && typeof payload === 'object' && !payload.kind) next = payload;
       if (!next) throw new Error('文件格式不对');
-      /* fillMissing：当前草稿优先，备份只补空图（恢复贴图用）；整文件导入仍以文件为准 */
+      /* fillMissing：只补空图与备份多出的图槽，绝不覆盖已有文案/取景 */
       const fillMissing = !!(opts && opts.fillMissing);
-      store = fillMissing ? mergeStores(store, next) : mergeStores(next, {});
+      if (fillMissing) fillMissingImagesFromStore(next);
+      else store = mergeStores(next, {});
       saveStore();
       render(currentId);
       const el = document.getElementById('saveHint');
-      if (el) el.textContent = fillMissing ? '已从备份补回贴图' : '已导入草稿';
+      if (el) el.textContent = fillMissing ? '已从备份补回贴图（未改文案）' : '已导入草稿';
     }
     function productBag(pid) {
       if (!store[pid]) {
