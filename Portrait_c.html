@@ -3,17 +3,17 @@
 <meta name="description" content="头骨·骨点·肌肉与五官 3D 互动结构课。童画师吴晓手绘工坊为水彩人物与肖像画学习者准备的解剖认识工具，可旋转观察骨点与五官体表。永久免费。">
 <meta name="keywords" content="头骨,五官,骨点,艺用解剖,肖像画教程,水彩人物教程,手绘教程,3D解剖,童画师吴晓,手绘工坊">
 <meta name="author" content="童画师吴晓">
-<link rel="canonical" href="https://www.wuxiaoart.com/Portrait_c">
+<link rel="canonical" href="https://www.wuxiaoart.com/Portrait_c?lib=anatomy">
 <link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-32.png?v=fav7" type="image/png" sizes="32x32">
 <link rel="icon" data-wuxiao-brand-icon="1" href="/docs/img/brand/favicon-192.png?v=fav7" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" data-wuxiao-brand-icon="1" href="/apple-touch-icon.png?v=fav8" sizes="180x180">
-<meta property="og:title" content="头骨 · 五官 3D 结构课 - 童画师吴晓">
-<meta property="og:description" content="头骨骨点肌肉与五官结构互动课。手绘工坊 · 童画师吴晓免费工具。">
+<meta property="og:title" content="头骨 · 骨点 · 肌肉｜3D 结构课 - 童画师吴晓">
+<meta property="og:description" content="头骨、骨点与肌肉 3D 互动结构课。手绘工坊 · 童画师吴晓免费工具。">
 <meta property="og:image" content="https://www.wuxiaoart.com/docs/img/wuxiao_s.jpg">
-<meta property="og:url" content="https://www.wuxiaoart.com/Portrait_c">
+<meta property="og:url" content="https://www.wuxiaoart.com/Portrait_c?lib=anatomy">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="手绘工坊 · 童画师吴晓">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"头骨 · 五官 3D 结构课","description":"头骨骨点肌肉与五官结构互动观察","url":"https://www.wuxiaoart.com/Portrait_c","author":{"@type":"Person","name":"童画师吴晓"},"applicationCategory":"EducationalApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"CNY"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"头骨 · 骨点 · 肌肉 3D 结构课","description":"头骨骨点肌肉与五官结构互动观察","url":"https://www.wuxiaoart.com/Portrait_c?lib=anatomy","author":{"@type":"Person","name":"童画师吴晓"},"applicationCategory":"EducationalApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"CNY"}}</script>
 <style>
   :root { --theme-color: #d4af37; --bg-glass: rgba(15, 16, 20, 0.75); --text-main: #eaeaea; --text-sub: #8a8d93; }
   * { -webkit-tap-highlight-color: transparent; }
@@ -60,7 +60,9 @@
     .course-meta { font-size: 10px; line-height: 1.4; }
   }
   #control-panel { position: absolute; background: var(--bg-glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05); z-index: 40; display: none; flex-direction: column; transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease; }
-  .panel-header { display: flex; flex-direction: column; padding: 0 20px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; touch-action: none; }
+  .panel-header { display: flex; flex-direction: column; padding: 0 20px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; touch-action: none; position: relative; }
+  .drawer-bar-row { position: relative; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; }
+  .drawer-toggle-btn { display: none; } /* PC 无底栏开合 */
   .drawer-header-trigger { padding: 15px 0 10px 0; width: 100%; display: flex; justify-content: center; align-items: center; }
   .drawer-handle { display: none; width: 36px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; pointer-events: none; } .tab-container { display: flex; justify-content: space-evenly; width: 100%; }
   .tab-btn { background: none; border: none; color: var(--text-sub); font-size: 14px; font-weight: 500; cursor: pointer; padding: 0 0 5px 0; transition: 0.3s; border-bottom: 2px solid transparent; letter-spacing: 1px; touch-action: none; position: relative; }
@@ -95,14 +97,36 @@
   .tour-ctrl-btn svg { fill: currentColor; width: 18px; height: 18px; transition: 0.2s; } .tour-ctrl-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--theme-color); transform: scale(1.1); box-shadow: none; }
   .tour-ctrl-btn.playing { background: rgba(255, 255, 255, 0.08); color: var(--theme-color); } .tour-mode-hidden { opacity: 0 !important; pointer-events: none !important; }
   @media (min-width: 769px) { #control-panel { top: 80px; left: 30px; width: 340px; bottom: 30px; border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-  #control-panel.collapsed { transform: none !important; } .panel-header { cursor: default; padding-top: 20px; } .drawer-header-trigger { display: none; }
+  #control-panel.collapsed { transform: none !important; } .panel-header { cursor: default; padding-top: 20px; } .drawer-bar-row, .drawer-header-trigger, .drawer-toggle-btn { display: none !important; }
   #subtitle-panel { bottom: 85px; } .tab-container { justify-content: center; gap: 85px; } .auto-tour-btn { right: -60px; } }
   @media (max-width: 768px) { #top-bar { height: 60px; }
 .custom-select-container { top: 10px; left: 100px; right: auto; } .custom-select-trigger { padding: 6px 12px; font-size: 13px; }
   .drawer-handle { display: block; }
-  #control-panel { top: auto; bottom: 0; left: 0; width: 100%; height: 35vh; border-radius: 16px 16px 0 0; padding-bottom: env(safe-area-inset-bottom); border-bottom: none; box-shadow: 0 -10px 30px rgba(0,0,0,0.6); }
+  /* 收起 peek 恢复旧口径 55px；开合钮在右侧，不抬高整条 */
+  #control-panel { top: auto; bottom: 0; left: 0; width: 100%; height: 35vh; min-height: 120px; max-height: 88vh; border-radius: 16px 16px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); border-bottom: none; box-shadow: 0 -10px 30px rgba(0,0,0,0.6); }
   #control-panel.collapsed { transform: translateY(calc(100% - 55px)); }
-  .panel-header { padding: 0 15px 8px; } .drawer-header-trigger { padding: 10px 0 8px 0; } .drawer-handle { width: 32px; height: 4px; }
+  #control-panel.is-drawer-dragging { transition: none !important; }
+  .panel-header { padding: 0 15px 8px; cursor: ns-resize; }
+  .drawer-bar-row { min-height: 0; padding-top: 0; }
+  .drawer-toggle-btn {
+    display: flex; align-items: center; justify-content: center;
+    position: absolute; right: 12px; left: auto; top: 50%; transform: translateY(-50%);
+    width: 30px; height: 30px; margin: 0; padding: 0; z-index: 3;
+    border: none; border-radius: 50%; cursor: pointer;
+    background: rgba(255,255,255,0.06); color: rgba(234,234,234,0.88);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
+    touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  }
+  .drawer-toggle-btn:active { background: rgba(255,255,255,0.12); color: #fff; }
+  .drawer-toggle-btn svg { width: 16px; height: 16px; display: block; transition: transform 0.22s ease; }
+  /* 收起：箭头朝上；展开：朝下 */
+  #control-panel:not(.collapsed) .drawer-toggle-btn svg { transform: rotate(180deg); }
+  .drawer-header-trigger { padding: 10px 0 8px 0; cursor: ns-resize; } .drawer-handle { width: 32px; height: 4px; }
+  /* 课名+播放作为一组真正居中；右侧圆钮不占文档流 */
+  .tab-container { justify-content: center; align-items: center; padding: 0 44px; box-sizing: border-box; min-height: 0; }
+  #snap-tab-wrap, #pts-tab-wrap { justify-content: center; }
+  .auto-tour-btn { position: static; right: auto; margin-left: 10px; flex-shrink: 0; }
+  #control-panel.collapsed .scroll-area { visibility: hidden; pointer-events: none; }
   .tab-btn { font-size: 13px; } .scroll-area { padding: 10px 15px; } .list-item { padding: 8px 12px; margin-bottom: 8px; gap: 10px; border-radius: 6px; } .item-thumb { width: 40px; height: 30px; border-radius: 3px; }
   .item-title { font-size: 12px; } .item-index { font-size: 9px; } .item-details { font-size: 11px; padding-top: 8px; }
   #subtitle-panel { bottom: 80px; width: 95%; padding: 40px 15px 15px 15px; }
@@ -158,8 +182,19 @@
   <svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true"> <defs> <filter id="filter-posterize"> <feComponentTransfer id="posterize-transfer">
   <feFuncR type="discrete" tableValues="0 1"/> <feFuncG type="discrete" tableValues="0 1"/>
   <feFuncB type="discrete" tableValues="0 1"/> </feComponentTransfer> </filter> </defs> </svg> <svg id="ink-overlay"></svg>
-  <div id="control-panel" class="collapsed"> <div class="panel-header"> <div class="drawer-header-trigger" onclick="window.toggleDrawer(event)">
-  <div class="drawer-handle"></div> </div> <div class="tab-container"> <div id="pts-tab-wrap" style="position:relative; display:none; align-items:center;">
+  <div id="control-panel" class="collapsed"> <div class="panel-header" id="drawer-panel-header">
+  <button type="button" class="drawer-toggle-btn" id="drawer-toggle-btn" aria-label="展开或收起解析栏" aria-expanded="false" title="展开 / 收起">
+    <!-- 右侧单线箭头：收起朝上 / 展开旋转朝下 -->
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+      <path d="M7.5 14.25L12 9.75l4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <div class="drawer-bar-row">
+    <div class="drawer-header-trigger" id="drawer-header-trigger" aria-hidden="true">
+      <div class="drawer-handle"></div>
+    </div>
+  </div>
+  <div class="tab-container"> <div id="pts-tab-wrap" style="position:relative; display:none; align-items:center;">
   <button class="tab-btn" data-target="pts-list">重要结构</button> <button class="auto-tour-btn" data-mode="pts" style="display:none;">▶ 播放</button> </div>
   <div id="snap-tab-wrap" style="position:relative; display:flex; align-items:center;"> <button class="tab-btn active" data-target="snap-list">童画师解析</button>
   <button class="auto-tour-btn" data-mode="snap">▶ 播放</button> </div> </div> </div> <div class="scroll-area" id="pts-list" style="display:none;"></div>
@@ -175,6 +210,36 @@
   // 【路由】：解析 URL ?lib=，决定本页课程列表（头骨线 / 五官线；换线走全局菜单）
   const urlParams = new URLSearchParams(window.location.search);
   const libType = urlParams.get('lib') || 'anatomy'; // 默认头骨·骨点·肌肉线
+  (function portraitSyncSeoByLib() {
+    const packs = {
+      anatomy: {
+        title: '头骨 · 骨点 · 肌肉｜3D 结构课 - 童画师吴晓 · 手绘工坊',
+        description: '头骨、骨点与肌肉 3D 互动结构课。童画师吴晓手绘工坊为水彩人物与肖像画学习者准备的解剖认识工具，永久免费。',
+        path: 'https://www.wuxiaoart.com/Portrait_c?lib=anatomy'
+      },
+      facial: {
+        title: '五官结构｜3D 结构课 - 童画师吴晓 · 手绘工坊',
+        description: '耳鼻口眼眉等五官 3D 结构课，可旋转观察体表起伏。童画师吴晓手绘工坊免费工具。',
+        path: 'https://www.wuxiaoart.com/Portrait_c?lib=facial'
+      }
+    };
+    const m = packs[libType] || packs.anatomy;
+    try { document.title = m.title; } catch (_eT) {}
+    try {
+      let el = document.querySelector('meta[name="description"]');
+      if (el) el.setAttribute('content', m.description);
+    } catch (_eD) {}
+    try {
+      const link = document.querySelector('link[rel="canonical"]');
+      if (link) link.setAttribute('href', m.path);
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) ogTitle.setAttribute('content', m.title);
+      const ogDesc = document.querySelector('meta[property="og:description"]');
+      if (ogDesc) ogDesc.setAttribute('content', m.description);
+      const ogUrl = document.querySelector('meta[property="og:url"]');
+      if (ogUrl) ogUrl.setAttribute('content', m.path);
+    } catch (_eOg) {}
+  })();
   
   let courseConfig = [];
   let galleryTitleText = '';
@@ -210,19 +275,19 @@
   if (libType === 'anatomy') {
       galleryTitleText = '头骨 · 骨点 · 肌肉';
       courseConfig = [
-          { name: '头骨详解', url: './docs/json/结构_头骨骨点肌肉/01 头骨详解.json' },
-          { name: '骨点详解', url: './docs/json/结构_头骨骨点肌肉/02 骨点详解.json' }, // 请自行修改为真实的 json 路径
-          { name: '肌肉详解', url: './docs/json/结构_头骨骨点肌肉/03 肌肉详解_黄种人女V8.json' }
+          { name: '头骨详解', uid: '01', url: './docs/json/结构_头骨骨点肌肉/01 头骨详解.json' },
+          { name: '骨点详解', uid: '02', url: './docs/json/结构_头骨骨点肌肉/02 骨点详解.json' }, // 请自行修改为真实的 json 路径
+          { name: '肌肉详解', uid: '03', url: './docs/json/结构_头骨骨点肌肉/03 肌肉详解_黄种人女V8.json' }
           
       ];
   } else if (libType === 'facial') {
       galleryTitleText = '五官结构';
       courseConfig = [
-          { name: '耳朵详解', url: './docs/json/结构_五官/01 耳朵详解.json' },
-          { name: '鼻子详解', url: './docs/json/结构_五官/02 鼻子详解.json' },
-          { name: '嘴巴详解', url: './docs/json/结构_五官/03 嘴巴详解.json' },
-          { name: '眼眉详解', url: './docs/json/结构_五官/04 眼眉详解.json' },
-          { name: '五官综合详解', url: './docs/json/结构_五官/05 五官综合详解.json' }
+          { name: '耳朵详解', uid: '01', url: './docs/json/结构_五官/01 耳朵详解.json' },
+          { name: '鼻子详解', uid: '02', url: './docs/json/结构_五官/02 鼻子详解.json' },
+          { name: '嘴巴详解', uid: '03', url: './docs/json/结构_五官/03 嘴巴详解.json' },
+          { name: '眼眉详解', uid: '04', url: './docs/json/结构_五官/04 眼眉详解.json' },
+          { name: '五官综合详解', uid: '05', url: './docs/json/结构_五官/05 五官综合详解.json' }
       ];
   }
 
@@ -347,6 +412,14 @@
       }
   };
 
+  function portraitCourseUidByName(name) {
+      try {
+          for (var i = 0; i < (courseConfig || []).length; i++) {
+              if (courseConfig[i] && courseConfig[i].name === name) return courseConfig[i].uid || '';
+          }
+      } catch (_e) {}
+      return '';
+  }
   window.selectCourse = function(name, url) {
       try {
           if (window.MembershipAccess && window.MembershipPaintHost) {
@@ -354,7 +427,11 @@
                   if (window.MembershipPaintHost.showToast) window.MembershipPaintHost.showToast('涂色中：请点卡片标签改档');
                   return;
               }
-              var rid = window.MembershipAccess.sceneResourceId(libType, { name: name });
+              var sc = { name: name, uid: portraitCourseUidByName(name) };
+              var rids = window.MembershipAccess.sceneResourceIds
+                  ? window.MembershipAccess.sceneResourceIds(libType, sc)
+                  : [window.MembershipAccess.sceneResourceId(libType, sc)].filter(Boolean);
+              var rid = (rids && rids[0]) || null;
               if (rid && !window.MembershipPaintHost.guard(rid, name)) return;
           }
       } catch (_eGate) {}
@@ -373,7 +450,11 @@
               for (var i = 0; i < cards.length; i++) {
                   var el = cards[i];
                   var name = el.getAttribute('data-course-name') || '';
-                  var rid = window.MembershipAccess.sceneResourceId(libType, { name: name });
+                  var sc = { name: name, uid: portraitCourseUidByName(name) };
+                  var rids = window.MembershipAccess.sceneResourceIds
+                      ? window.MembershipAccess.sceneResourceIds(libType, sc)
+                      : [window.MembershipAccess.sceneResourceId(libType, sc)].filter(Boolean);
+                  var rid = (rids && rids[0]) || null;
                   if (!rid) continue;
                   targets.push({ el: el, rid: rid, label: name });
                   window.MembershipPaintHost.markLockedEl(el, rid, name, { place: 'ribbon' });
@@ -977,11 +1058,209 @@
   });
   const k2rgb = (k) => { let t=k/100,r,g,b; if(t<=66){r=255; g=Math.max(0,Math.min(255,99.47*Math.log(t)-161.1)); b=t<=19?0:Math.max(0,Math.min(255,138.5*Math.log(t-10)-305));}else{r=Math.max(0,Math.min(255,329.7*Math.pow(t-60,-0.133)));g=Math.max(0,Math.min(255,288.1*Math.pow(t-60,-0.075)));b=255;} return [r,g,b]; };
   const hexToRgba = (hex, alpha) => { const h = hex || defaultColor; const r = parseInt(h.slice(1, 3), 16) || 212, g = parseInt(h.slice(3, 5), 16) || 175, b = parseInt(h.slice(5, 7), 16) || 55; return `rgba(${r},${g},${b},${alpha})`; };
-  const triggerSyncAnim = () => { let start = Date.now(); let anim = () => { updateSVG(); if(Date.now() - start < 500) requestAnimationFrame(anim); }; anim(); }; window.toggleDrawer = function(e) { if(e) e.stopPropagation();
-  if(window.innerWidth <= 768) { document.getElementById('control-panel').classList.toggle('collapsed');
-  document.getElementById('workbench-viewer').classList.toggle('drawer-open'); document.getElementById('ink-overlay').classList.toggle('drawer-open'); triggerSyncAnim();
-  /* 面板 0.4s 动画结束后再量安全区并改编排 */
-  reframeViewport(420); } };
+  const triggerSyncAnim = () => { let start = Date.now(); let anim = () => { updateSVG(); if(Date.now() - start < 500) requestAnimationFrame(anim); }; anim(); };
+  /* 移动端抽屉：左三角开合；整条顶栏（含课名）上下拖调高；画布安全区跟高 */
+  const DRAWER_H_KEY = 'portrait_drawer_h_v1';
+  const DRAWER_MIN_H = 120;
+  function drawerMaxH() { return Math.floor((window.innerHeight || 600) * 0.88); }
+  function drawerDefaultH() { return Math.round((window.innerHeight || 600) * 0.35); }
+  function loadDrawerH() {
+    try {
+      const v = parseFloat(sessionStorage.getItem(DRAWER_H_KEY));
+      if (isFinite(v) && v >= DRAWER_MIN_H) return Math.min(drawerMaxH(), v);
+    } catch (_e) {}
+    return drawerDefaultH();
+  }
+  function saveDrawerH(h) {
+    try { sessionStorage.setItem(DRAWER_H_KEY, String(Math.round(h))); } catch (_e) {}
+  }
+  function applyDrawerOpenHeight(h) {
+    const panel = document.getElementById('control-panel');
+    if (!panel || window.innerWidth > 768) return;
+    const next = Math.min(drawerMaxH(), Math.max(DRAWER_MIN_H, h || loadDrawerH()));
+    panel.style.height = Math.round(next) + 'px';
+  }
+  function clearDrawerInlineHeightSoon() {
+    const panel = document.getElementById('control-panel');
+    if (!panel) return;
+    setTimeout(function () {
+      if (panel.classList.contains('collapsed')) panel.style.height = '';
+    }, 420);
+  }
+  function syncDrawerToggleAria(open) {
+    const btn = document.getElementById('drawer-toggle-btn');
+    if (!btn) return;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    btn.setAttribute('aria-label', open ? '收起解析栏' : '展开解析栏');
+    btn.title = open ? '收起' : '展开';
+  }
+  function setDrawerOpenState(open) {
+    const panel = document.getElementById('control-panel');
+    if (!panel || window.innerWidth > 768) return;
+    if (open) {
+      applyDrawerOpenHeight(loadDrawerH());
+      panel.classList.remove('collapsed');
+      document.getElementById('workbench-viewer').classList.add('drawer-open');
+      document.getElementById('ink-overlay').classList.add('drawer-open');
+    } else {
+      panel.classList.add('collapsed');
+      document.getElementById('workbench-viewer').classList.remove('drawer-open');
+      document.getElementById('ink-overlay').classList.remove('drawer-open');
+      clearDrawerInlineHeightSoon();
+    }
+    syncDrawerToggleAria(!!open);
+    triggerSyncAnim();
+    reframeViewport(420);
+  }
+  window.toggleDrawer = function(e) {
+    if (e) { try { e.preventDefault(); e.stopPropagation(); } catch (_e) {} }
+    if (window.innerWidth > 768) return;
+    const panel = document.getElementById('control-panel');
+    if (!panel) return;
+    setDrawerOpenState(panel.classList.contains('collapsed'));
+  };
+  (function bindPortraitDrawerChrome() {
+    const panel = document.getElementById('control-panel');
+    const header = document.getElementById('drawer-panel-header');
+    const toggleBtn = document.getElementById('drawer-toggle-btn');
+    if (!panel || !header) return;
+    syncDrawerToggleAria(false);
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('pointerdown', function (e) {
+        e.stopPropagation();
+      }, { passive: true });
+      toggleBtn.addEventListener('click', function (e) {
+        window.toggleDrawer(e);
+      });
+    }
+
+    let mode = null;
+    let startY = 0;
+    let startH = 0;
+    let moved = 0;
+    let ptrId = null;
+    let downTarget = null;
+    let dragRaf = 0;
+
+    function unbindDrag() {
+      try {
+        header.removeEventListener('pointermove', onMove);
+        header.removeEventListener('pointerup', onEnd);
+        header.removeEventListener('pointercancel', onEnd);
+        document.removeEventListener('pointermove', onMove, true);
+        document.removeEventListener('pointerup', onEnd, true);
+        document.removeEventListener('pointercancel', onEnd, true);
+      } catch (_e) {}
+      if (ptrId != null) {
+        try { if (header.releasePointerCapture) header.releasePointerCapture(ptrId); } catch (_e2) {}
+        ptrId = null;
+      }
+    }
+    function layoutWhileDrag() {
+      dragRaf = 0;
+      applyViewerLayout();
+      if (typeof updateSVG === 'function') updateSVG();
+    }
+    function activateTabFromEl(tabBtn) {
+      if (!tabBtn) return;
+      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      tabBtn.classList.add('active');
+      document.querySelectorAll('.scroll-area').forEach(function (el) { el.style.display = 'none'; });
+      const targetId = tabBtn.getAttribute('data-target');
+      const area = targetId && document.getElementById(targetId);
+      if (area) area.style.display = 'block';
+      document.querySelectorAll('.auto-tour-btn').forEach(function (b) { b.style.display = 'none'; });
+      const activeTourBtn = document.querySelector('.auto-tour-btn[data-mode="' + (targetId === 'pts-list' ? 'pts' : 'snap') + '"]');
+      if (activeTourBtn) activeTourBtn.style.display = 'block';
+    }
+    const onMove = function (e) {
+      if (!mode) return;
+      if (ptrId != null && e.pointerId != null && e.pointerId !== ptrId) return;
+      const cy = e.clientY;
+      if (cy == null) return;
+      const dy = Math.abs(cy - startY);
+      if (dy > moved) moved = dy;
+      if (mode === 'collapsed-drag' && startY - cy > 12) {
+        applyDrawerOpenHeight(loadDrawerH());
+        panel.classList.remove('collapsed');
+        document.getElementById('workbench-viewer').classList.add('drawer-open');
+        document.getElementById('ink-overlay').classList.add('drawer-open');
+        syncDrawerToggleAria(true);
+        startH = panel.getBoundingClientRect().height || loadDrawerH();
+        mode = 'resize';
+        panel.classList.add('is-drawer-dragging');
+        triggerSyncAnim();
+      }
+      if (mode === 'resize') {
+        const next = Math.min(drawerMaxH(), Math.max(DRAWER_MIN_H, startH + (startY - cy)));
+        panel.style.height = Math.round(next) + 'px';
+        if (!dragRaf) dragRaf = requestAnimationFrame(layoutWhileDrag);
+      }
+      if (e.cancelable) e.preventDefault();
+    };
+    const onEnd = function (e) {
+      if (!mode) return;
+      if (ptrId != null && e && e.pointerId != null && e.pointerId !== ptrId) return;
+      panel.classList.remove('is-drawer-dragging');
+      if (dragRaf) { cancelAnimationFrame(dragRaf); dragRaf = 0; }
+      const finishedMode = mode;
+      const finishedMoved = moved;
+      const finishedTarget = downTarget;
+      mode = null;
+      moved = 0;
+      downTarget = null;
+      unbindDrag();
+
+      if (finishedMode === 'resize') {
+        const h = panel.getBoundingClientRect().height;
+        if (h <= DRAWER_MIN_H + 8 && finishedMoved > 12) {
+          setDrawerOpenState(false);
+        } else {
+          saveDrawerH(h);
+          applyDrawerOpenHeight(h);
+          reframeViewport(80);
+        }
+        return;
+      }
+      // 收起态轻点顶栏：不替代三角按钮开合（仅上拖可拉开）
+      // 展开态在课名上短按：仍允许切页签（拖动则调高，不切页签）
+      if (finishedMoved < 10 && finishedTarget) {
+        const tabBtn = finishedTarget.closest && finishedTarget.closest('.tab-btn');
+        if (tabBtn) activateTabFromEl(tabBtn);
+        const tourBtn = finishedTarget.closest && finishedTarget.closest('.auto-tour-btn');
+        if (tourBtn) {
+          try { tourBtn.click(); } catch (_eC) {}
+        }
+      }
+    };
+
+    header.addEventListener('pointerdown', function (e) {
+      if (window.innerWidth > 768) return;
+      if (e.button != null && e.button !== 0) return;
+      if (e.target && e.target.closest && e.target.closest('#drawer-toggle-btn')) return;
+      startY = e.clientY;
+      moved = 0;
+      downTarget = e.target;
+      ptrId = e.pointerId;
+      if (panel.classList.contains('collapsed')) {
+        mode = 'collapsed-drag';
+      } else {
+        mode = 'resize';
+        startH = panel.getBoundingClientRect().height || loadDrawerH();
+        panel.classList.add('is-drawer-dragging');
+      }
+      try { header.setPointerCapture(e.pointerId); } catch (_e2) {}
+      // 主听 header（capture 后事件落在此）；document 捕获作兜底
+      header.addEventListener('pointermove', onMove);
+      header.addEventListener('pointerup', onEnd);
+      header.addEventListener('pointercancel', onEnd);
+      document.addEventListener('pointermove', onMove, true);
+      document.addEventListener('pointerup', onEnd, true);
+      document.addEventListener('pointercancel', onEnd, true);
+      e.preventDefault();
+    }, { passive: false });
+  })();
   let _lightCanvas, _lightCtx; function updateLighting() {
   if(!_lightCanvas){ _lightCanvas = document.createElement('canvas'); _lightCanvas.width = 1024; _lightCanvas.height = 512; _lightCtx = _lightCanvas.getContext('2d'); }
   const ctx = _lightCtx; ctx.fillStyle = '#0a0a10'; ctx.fillRect(0, 0, 1024, 512); const iAmb = parseFloat(envSettings.amb) || 0; const iSpot = parseFloat(envSettings.spt) || 0;
@@ -1169,8 +1448,7 @@
   const activeTourBtn = document.querySelector(`.auto-tour-btn[data-mode="${targetId === 'pts-list' ? 'pts' : 'snap'}"]`); if(activeTourBtn) activeTourBtn.style.display = 'block'; if(targetId === 'pts-list' && currentData) {
   currentData.pointsData.forEach(p => p.hidden = false); updateSVG(); }
   if(window.innerWidth <= 768 && document.getElementById('control-panel').classList.contains('collapsed')) {
-  document.getElementById('control-panel').classList.remove('collapsed'); document.getElementById('workbench-viewer').classList.add('drawer-open');
-  document.getElementById('ink-overlay').classList.add('drawer-open'); triggerSyncAnim(); reframeViewport(420); } } }); });
+  setDrawerOpenState(true); } } }); });
   window.addEventListener('resize', () => { reframeViewport(120); });
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => { reframeViewport(120); });

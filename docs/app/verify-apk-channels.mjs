@@ -50,20 +50,36 @@ function findAapt() {
   return null;
 }
 
+/**
+ * aapt 在含中文的仓库路径上常报 Illegal byte sequence。
+ * 先拷到纯 ASCII 临时目录再 dump（Windows 天坑）。
+ */
 function dumpPackage(aapt, apkPath) {
-  const r = spawnSync(aapt, ['dump', 'badging', apkPath], {
-    encoding: 'utf8',
-    maxBuffer: 4 * 1024 * 1024,
-  });
-  if (r.status !== 0) {
-    throw new Error(`aapt dump failed for ${apkPath}: ${r.stderr || r.stdout || r.error}`);
+  const tmpRoot = process.platform === 'win32' ? 'C:\\tmp\\apkchk-verify' : '/tmp/apkchk-verify';
+  fs.mkdirSync(tmpRoot, { recursive: true });
+  const tmpApk = path.join(tmpRoot, `chk-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.apk`);
+  try {
+    fs.copyFileSync(apkPath, tmpApk);
+    const r = spawnSync(aapt, ['dump', 'badging', tmpApk], {
+      encoding: 'utf8',
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    if (r.status !== 0) {
+      throw new Error(`aapt dump failed for ${apkPath}: ${r.stderr || r.stdout || r.error}`);
+    }
+    const out = String(r.stdout || '');
+    const pkg = (out.match(/package: name='([^']+)'/) || [])[1] || '';
+    const label = (out.match(/application-label:'([^']*)'/) || [])[1] || '';
+    const versionName = (out.match(/versionName='([^']*)'/) || [])[1] || '';
+    const versionCode = (out.match(/versionCode='([^']*)'/) || [])[1] || '';
+    return { pkg, label, versionName, versionCode, rawHead: out.split('\n').slice(0, 4).join('\n') };
+  } finally {
+    try {
+      fs.unlinkSync(tmpApk);
+    } catch {
+      /* ignore */
+    }
   }
-  const out = String(r.stdout || '');
-  const pkg = (out.match(/package: name='([^']+)'/) || [])[1] || '';
-  const label = (out.match(/application-label:'([^']*)'/) || [])[1] || '';
-  const versionName = (out.match(/versionName='([^']*)'/) || [])[1] || '';
-  const versionCode = (out.match(/versionCode='([^']*)'/) || [])[1] || '';
-  return { pkg, label, versionName, versionCode, rawHead: out.split('\n').slice(0, 4).join('\n') };
 }
 
 function fail(msg) {

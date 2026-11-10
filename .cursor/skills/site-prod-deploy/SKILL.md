@@ -13,7 +13,7 @@ description: >-
 |--|------|------|
 | Portal | `20b_站点发版_测试环境.bat` | `20_站点发版.bat` |
 | 脚本 | `docs/deploy-staging.bat` | `docs/deploy.bat` |
-| 域名 | `https://test.wuxiaoart.com` | `https://wuxiaoart.com`（www 会跳转） |
+| 域名 | `https://test.wuxiaoart.com` | `https://www.wuxiaoart.com`（无 www 会 301 到 www） |
 | Worker | `soft-voice-f822-staging` | `soft-voice-f822` |
 | 权限 KV | 独立；发测站**禁止**覆盖 `policy_live` | 发正式前从测站同步（见下） |
 

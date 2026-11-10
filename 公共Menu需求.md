@@ -20,8 +20,8 @@
 04.头部造型规律 
     链接到：./solid.html?sandbox=headform   备注：在 Solid 光影沙盒中用真实暗部遮挡观察头部体块与造型规律（数据：docs/json/沙盒_头部造型规律/）。
 
-05.肖像光影沙盒
-    链接到：./solid.html?sandbox=portrait   备注：Solid 肖像光影沙盒（数据：docs/json/沙盒_肖像光影沙盒/）。在逼真光影下观察肖像明暗与体块，帮助提升对肖像的艺术感受。
+05.肖像写生台
+    链接到：./solid.html?sandbox=portrait   备注：Solid 肖像写生台（数据仍：docs/json/沙盒_肖像光影沙盒/）。在逼真光影下观察肖像明暗与体块，帮助提升对肖像的艺术感受。
 
 06.吴晓的作品
     链接到：./Gallery.html    备注：童画师吴晓的作品集在线画廊

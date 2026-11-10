@@ -231,7 +231,22 @@ window.ControlPanel = {
                 </div> 
             </div>`; 
             
-        const container = document.createElement('div'); container.innerHTML = htmlString; document.body.appendChild(container.firstElementChild); 
+        const container = document.createElement('div'); container.innerHTML = htmlString; document.body.appendChild(container.firstElementChild);
+
+        // 仅 iOS 主屏幕快捷方式：抬离 Home 手势带（其它设备保持 bottom:10px）。
+        // 勿在面板上 preventDefault(touchmove)：会把原生 range 拖动一并掐死。
+        (function _iosStandalonePanelLift() {
+            let isIosStandalone = false;
+            try {
+                isIosStandalone = document.documentElement.classList.contains('solid-ios-standalone');
+            } catch (_eCls) { isIosStandalone = false; }
+            if (!isIosStandalone) return;
+            const panel = document.getElementById('main-panel');
+            if (!panel) return;
+            try {
+                panel.style.setProperty('bottom', 'max(10px, calc(env(safe-area-inset-bottom, 0px) + 10px))', 'important');
+            } catch (_eBot) {}
+        })();
 
         // C2：短提示（仅点击「开始渲染」时出现）
         function showRenderToast(text) {

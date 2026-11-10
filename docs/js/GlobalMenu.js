@@ -57,14 +57,14 @@
         { id: '00', text: '首页 · Home', url: '/index', color: '#FCD34D' },
         
         { type: 'category', text: '造型基础' },
-        { id: '01', text: '几何体 · 静物', url: '/Solid?sandbox=geometry', color: '#3B82F6' },
-        { id: '02', text: '几何体 · 静物写生沙盒', url: '/Solid?sandbox=geometrysketch', color: '#60A5FA' },
+        { id: '01', text: '几何体·静物', url: '/Solid?sandbox=geometry', color: '#3B82F6' },
+        { id: '02', text: '静物写生台', url: '/Solid?sandbox=geometrysketch', color: '#60A5FA' },
         
         { type: 'category', text: '肖像' },
         { id: '03', text: '头骨 · 骨点 · 肌肉', url: '/Portrait_c?lib=anatomy', color: '#A855F7' },
         { id: '04', text: '五官', url: '/Portrait_c?lib=facial', color: '#C026D3' },
         { id: '05', text: '头部造型规律', url: '/Solid?sandbox=headform', color: '#D946EF' },
-        { id: '06', text: '肖像光影沙盒', url: '/Solid?sandbox=portrait', color: '#F43F5E' },
+        { id: '06', text: '肖像写生台', url: '/Solid?sandbox=portrait', color: '#F43F5E' },
         { id: '07', text: '吴晓的作品', url: '/Gallery', color: '#EC4899' },
         { id: '08', text: '课程预约', url: '/Course', color: '#FBBF24' },
         { id: '09', text: '会员权益', url: '/member', color: '#E8C547' },

@@ -6,11 +6,21 @@ Disallow: /Backup/
 Disallow: /单体功能OK版本备份/
 Disallow: /自用工具文件_不部署/
 Disallow: /.cursor/
+Disallow: /即将废弃_
 
-# 允许 docs 下说明页与分享图（OG 用 docs/img）；脚本库仍不强调收录
+# 运营 / 会员后台与接口（页面已 noindex，再挡一层）
+Disallow: /member-ops
+Disallow: /api/
+
+# 课表 JSON、加密模型：无搜索价值，省抓取配额（图片仍放行）
+Disallow: /docs/json/
+Disallow: /docs/m/
 Disallow: /docs/js/
+
+# docs 下需要被抓或分享预览的路径
 Allow: /docs/img/
 Allow: /docs/AboutXStudio
+Allow: /docs/app
 
 Sitemap: https://www.wuxiaoart.com/sitemap.xml
 
