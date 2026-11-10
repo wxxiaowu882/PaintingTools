@@ -12,10 +12,25 @@ export async function onRequestGet(context) {
       const scenes = await listSceneNames(context, sandbox);
       const policy = await loadPolicy(context);
       const withLock = scenes.map((s) => {
-        const id = 'scene:' + sandbox + ':name:' + s.name;
-        const require = resourceRequire(policy, id);
+        const uid = s && s.uid != null ? String(s.uid).trim() : '';
+        const name = s && s.name ? String(s.name) : '';
+        const id = uid
+          ? 'scene:' + sandbox + ':uid:' + uid
+          : 'scene:' + sandbox + ':name:' + name;
+        const candidates = [];
+        if (uid) candidates.push('scene:' + sandbox + ':uid:' + uid);
+        if (name) candidates.push('scene:' + sandbox + ':name:' + name);
+        let require = normalizeRequire(policy && policy.defaultRequire);
+        for (let i = 0; i < candidates.length; i++) {
+          const rule = policy.resources && policy.resources[candidates[i]];
+          if (rule && rule.enabled !== false) {
+            require = resourceRequire(policy, candidates[i]);
+            break;
+          }
+        }
         return {
-          name: s.name,
+          name,
+          uid,
           id,
           require,
           // 兼容旧运营台：locked = 需要高级会员

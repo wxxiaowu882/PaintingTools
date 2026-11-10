@@ -1,5 +1,17 @@
 import { loadFilteredCatalogList, loadCatalogThumbsBatch } from '../../membership/policy.js';
 import { accessLevel, jsonResponse, readEntitlementFromRequest } from '../../membership/session.js';
+import { loadAccount, normalizeProductUnlocks } from '../../membership/accounts.js';
+
+async function unlocksForEntitlement(env, ent) {
+  const accountId = ent && ent.accountId;
+  if (!accountId) return [];
+  try {
+    const acct = await loadAccount(env, accountId);
+    return normalizeProductUnlocks(acct && acct.productUnlocks);
+  } catch (_e) {
+    return [];
+  }
+}
 
 /**
  * 课表列表（轻量）：默认不含 items/标注，也不下发 dataURL 缩略图，保证首屏可进。
@@ -11,6 +23,7 @@ export async function onRequestGet(context) {
   const includeThumb = url.searchParams.get('thumbs') === '1';
   const ent = await readEntitlementFromRequest(context.request, context.env);
   const level = accessLevel(ent);
+  const productUnlocks = await unlocksForEntitlement(context.env, ent);
 
   try {
     if (includeThumb) {
@@ -37,7 +50,13 @@ export async function onRequestGet(context) {
       );
     }
 
-    const data = await loadFilteredCatalogList(context, sandbox, level, false);
+    const data = await loadFilteredCatalogList(
+      context,
+      sandbox,
+      level,
+      false,
+      productUnlocks
+    );
     return jsonResponse(
       {
         ok: true,

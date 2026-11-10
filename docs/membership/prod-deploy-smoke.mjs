@@ -2,9 +2,9 @@
 /**
  * 正式发版后冒烟（只读）：首页 / Solid / 会员公开配置 / 防内嵌头。
  * 用法：node docs/membership/prod-deploy-smoke.mjs
- * 环境变量：SMOKE_BASE=https://wuxiaoart.com（默认正式；测站可改 test）
+ * 环境变量：SMOKE_BASE=https://www.wuxiaoart.com（默认正式；测站可改 test）
  */
-const BASE = String(process.env.SMOKE_BASE || 'https://wuxiaoart.com').replace(/\/$/, '');
+const BASE = String(process.env.SMOKE_BASE || 'https://www.wuxiaoart.com').replace(/\/$/, '');
 
 async function head(url) {
   const res = await fetch(url, { method: 'HEAD', redirect: 'follow' });

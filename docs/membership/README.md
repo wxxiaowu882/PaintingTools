@@ -34,7 +34,7 @@
 
 | 地址 | 作用 |
 |------|------|
-| `/member` | 权益说明（PC 宽版）+ 账号 + 兑换 + 水彩课程宣传 |
+| `/member` | 权益说明（PC 宽版）+ 账号 + **权益兑换**（Pro / 写生单品 / 录播课包）+ 水彩课程宣传 |
 | `/Course` | 水彩肖像课程预告（静态；预约未开放） |
 | `/member-ops` | 发码、会员账号查询/重置密码、三档收费设置 |
 
@@ -44,13 +44,13 @@
 
 | API | 作用 |
 |-----|------|
-| `POST /api/membership/redeem` | 验码 → 写 **HttpOnly 签名 Cookie**（`level: member`） |
-| `GET /api/membership/me` | 读会话 + `accessLevel` |
-| `GET /api/membership/catalog?sandbox=` | 按访问档过滤课表 |
-| `GET /api/membership/scene?sandbox=&name=` | 进课全文（不够档返回 locked） |
+| `POST /api/membership/redeem` | 验码 → 按码类型开通（`pro` / `sketch` / `course`）；须登录；写 Cookie（Pro/录播）或写 `productUnlocks`（写生） |
+| `GET /api/membership/me` | 会话 + `accessLevel`；登录后含 **`coursePacks`**、**`productUnlocks`** |
+| `GET /api/membership/catalog?sandbox=` | 按访问档 + 单品解锁过滤课表 |
+| `GET /api/membership/scene?sandbox=&name=` | 进课全文（不够档返回 locked；单品解锁可盖过） |
 | `POST /api/membership/account/register\|login` | 注册/登录（注册默认会员档） |
+| `GET/POST /api/membership/admin/codes` | 发码（kind=pro/sketch/course）、重置、**作废**未兑码；单次最多 100 |
 | `GET/POST /api/membership/admin/accounts` | 运营台查账号 / 重置密码 / **开通学员** / 取消课包 |
-| `GET /api/membership/me` | 会话 + `accessLevel`；登录后含 **`coursePacks`**（已购课包，永久） |
 
 ### 学员开通（运营台）
 

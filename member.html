@@ -200,6 +200,48 @@
       color: var(--accent); text-decoration: none;
     }
     .acct-identity .id-next a:hover { text-decoration: underline; }
+    .my-ents {
+      margin: 14px 0 0; padding: 12px 14px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(232, 197, 71, 0.22);
+      background:
+        linear-gradient(180deg, rgba(232, 197, 71, 0.07), rgba(0, 0, 0, 0.12));
+    }
+    .my-ents[hidden] { display: none !important; }
+    .my-ents .id-kicker {
+      margin: 0 0 10px;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      color: rgba(232, 197, 71, 0.85);
+    }
+    /* 标题与条目错开：条目整体缩进，形成层级 */
+    .my-ents ul {
+      list-style: none;
+      margin: 0;
+      padding: 0 0 0 12px;
+      border-left: 2px solid rgba(232, 197, 71, 0.35);
+    }
+    .my-ents li {
+      display: flex; flex-wrap: wrap; align-items: baseline;
+      justify-content: space-between; gap: 6px 14px;
+      padding: 9px 0 9px 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      font-size: 0.92rem; color: var(--text);
+    }
+    .my-ents li:first-child { border-top: none; padding-top: 2px; }
+    .my-ents .ent-name { font-weight: 560; letter-spacing: 0.01em; }
+    .my-ents .ent-meta {
+      flex: 0 0 auto;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: rgba(232, 197, 71, 0.9);
+      letter-spacing: 0.04em;
+    }
+    .my-ents .ent-meta.is-off { color: var(--muted); font-weight: 400; }
+    .my-ents .ent-empty {
+      color: var(--muted); font-size: 0.86rem;
+      padding: 2px 0 2px 10px; border: none;
+    }
     /* 文字选项卡：绝不要做成黄按钮，避免和「登录」动作撞车 */
     .mode-tabs {
       display: flex; gap: 0; margin: 0 0 14px;
@@ -233,6 +275,22 @@
     .forgot-row button {
       width: auto; margin: 0; padding: 6px 10px; font-size: 0.8rem; font-weight: 500;
     }
+    /* 点「去权益兑换」时兑码框闪几下，引导视线 */
+    @keyframes redeem-code-flash {
+      0%, 100% {
+        border-color: var(--line);
+        box-shadow: none;
+        background: rgba(0, 0, 0, 0.25);
+      }
+      35%, 65% {
+        border-color: rgba(232, 197, 71, 0.95);
+        box-shadow: 0 0 0 3px rgba(232, 197, 71, 0.35);
+        background: rgba(232, 197, 71, 0.12);
+      }
+    }
+    #code.redeem-code-flashing {
+      animation: redeem-code-flash 0.45s ease-in-out 3;
+    }
   </style>
 </head>
 <body>
@@ -245,7 +303,7 @@
       <a href="#course-preview" data-jump="course-preview">水彩课程</a>
       <a href="#how-to-pay" data-jump="how-to-pay">如何开通</a>
       <a href="#account" data-jump="account">账号</a>
-      <a href="#redeem" data-jump="redeem">兑换</a>
+      <a href="#redeem" data-jump="redeem">权益兑换</a>
       <a href="#promo" data-jump="promo">宣传链接</a>
     </nav>
 
@@ -295,7 +353,7 @@
           <li>先在本页注册 / 登录会员账号</li>
           <li>扫「收款码」付款，备注写：高级会员 + 档位（三个月/一年/三年）+ 注册手机号</li>
           <li>再扫「名片码」加微信，或搜微信号：lightouches（复制微信号），等待微信好友通过后，发送付款截图。</li>
-          <li>本站收到您的付款截图，确认到账后 2 小时内发您兑换码，您回到本页「兑换」粘贴即可。</li>
+          <li>本站收到您的付款截图，确认到账后 2 小时内发您兑换码，您回到本页「权益兑换」粘贴即可。</li>
         </ol>
         <div class="pay-qrs">
           <div class="pay-qr primary">
@@ -324,8 +382,12 @@
           <p class="id-main" id="id-bar-main">游客</p>
           <p class="id-sub" id="id-bar-sub">未登录 · 注册后即为会员</p>
           <p class="id-next" id="id-bar-next" hidden>
-            <a href="#redeem" id="id-bar-redeem">已有兑换码？去兑换高级会员</a>
+            <a href="#redeem" id="id-bar-redeem">已有兑换码？去权益兑换</a>
           </p>
+          <div class="my-ents" id="my-entitlements" hidden>
+            <p class="id-kicker">我的权益</p>
+            <ul id="my-ent-list"></ul>
+          </div>
         </div>
         <p class="status" id="status-line" hidden>读取中…</p>
         <p class="status" id="account-line" style="margin-top:0"></p>
@@ -366,12 +428,12 @@
       </section>
 
       <section class="card" id="redeem">
-        <h2>兑换高级会员</h2>
+        <h2>权益兑换</h2>
         <div id="redeem-callout" class="redeem-callout" hidden>
-          请先在左侧完成登录或注册，再兑换。这样权益会挂在你的账号上，换手机也能用。
+          请先登录或注册，再兑换。权益挂在账号上，换手机也能用。
           <a href="#account" id="btn-redeem-goto-acct">去账号区</a>
         </div>
-        <p class="hint" id="redeem-hint">兑换后权益会同步到你已登录的其它设备。</p>
+        <p class="hint" id="redeem-hint">输入兑换码即可开通对应权益（高级会员 / 写生库 / 录播课等）。</p>
         <label for="code">兑换码</label>
         <input id="code" type="text" autocomplete="off" placeholder="10 位兑换码" />
         <button type="button" class="secondary" id="btn-redeem" disabled>兑换</button>
@@ -509,7 +571,7 @@
       if (callout) callout.hidden = logged;
       if (hint) {
         hint.hidden = !logged;
-        hint.textContent = '兑换后权益会同步到你已登录的其它设备。';
+        hint.textContent = '输入兑换码即可开通对应权益（高级会员 / 写生库 / 录播课等）。';
       }
     }
 
@@ -564,8 +626,26 @@
       });
     }
 
+    /** 兑码输入框闪几下（点「去权益兑换」/ 锚点进兑换区） */
+    function flashRedeemCodeInput() {
+      const inp = document.getElementById('code');
+      if (!inp) return;
+      inp.classList.remove('redeem-code-flashing');
+      // 强制重启动画
+      void inp.offsetWidth;
+      inp.classList.add('redeem-code-flashing');
+      const clear = () => inp.classList.remove('redeem-code-flashing');
+      inp.addEventListener('animationend', clear, { once: true });
+      setTimeout(clear, 1600);
+      if (!inp.disabled) {
+        try { inp.focus({ preventScroll: true }); } catch (_e) {
+          try { inp.focus(); } catch (_e2) {}
+        }
+      }
+    }
+
     /** 安卓 WebView 对纯 #锚点常不滚；只 scrollIntoView，不改 history（避免搅乱全局菜单 #menu 栈） */
-    function scrollToJumpId(id) {
+    function scrollToJumpId(id, opts) {
       if (!id) return false;
       const el = document.getElementById(id);
       if (!el || el.hidden) return false;
@@ -573,6 +653,9 @@
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (_e3) {
         try { el.scrollIntoView(true); } catch (_e4) {}
+      }
+      if (id === 'redeem' && !(opts && opts.skipFlash)) {
+        setTimeout(flashRedeemCodeInput, 280);
       }
       return true;
     }
@@ -616,6 +699,82 @@
       syncJumpNav();
     }
 
+    function fmtExpireShort(ms) {
+      if (!ms) return '';
+      try {
+        return new Date(Number(ms)).toLocaleDateString('zh-CN');
+      } catch (_e) {
+        return '';
+      }
+    }
+
+    /** 登录后展示：Pro / 写生库 / 录播课包，一眼扫完 */
+    function renderMyEntitlements() {
+      const box = document.getElementById('my-entitlements');
+      const list = document.getElementById('my-ent-list');
+      if (!box || !list) return;
+      const logged = isLoggedIn();
+      if (!logged) {
+        box.hidden = true;
+        list.innerHTML = '';
+        return;
+      }
+      box.hidden = false;
+      const e = MA.getEntitlement() || {};
+      const level = (MA.getAccessLevel && MA.getAccessLevel()) || 'guest';
+      const rows = [];
+      if (level === 'member') {
+        const until = fmtExpireShort(e.expiresAt);
+        rows.push({
+          name: '高级会员（Pro）',
+          meta: until ? ('有效至 ' + until) : '有效期内'
+        });
+      } else {
+        rows.push({ name: '高级会员（Pro）', meta: '未开通', muted: true });
+      }
+      const unlocks = (MA.getProductUnlocks && MA.getProductUnlocks()) || [];
+      unlocks.forEach((u) => {
+        rows.push({
+          name: (u && u.title) || (u && u.productId) || '写生权益',
+          meta: '永久'
+        });
+      });
+      const packs = (MA.getCoursePacks && MA.getCoursePacks()) || [];
+      packs.forEach((p) => {
+        rows.push({
+          name: (p && p.title) || (p && p.packId) || '录播课包',
+          meta: '永久'
+        });
+      });
+      const hasExtra = unlocks.length > 0 || packs.length > 0 || level === 'member';
+      if (!hasExtra) {
+        list.innerHTML =
+          '<li class="ent-empty">暂无付费权益。可兑换写生库、录播课或高级会员。</li>';
+        return;
+      }
+      list.innerHTML = rows
+        .map((r) => {
+          return (
+            '<li><span class="ent-name">' +
+            escapeHtml(r.name) +
+            '</span><span class="ent-meta' +
+            (r.muted ? ' is-off' : '') +
+            '">' +
+            escapeHtml(r.meta) +
+            '</span></li>'
+          );
+        })
+        .join('');
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
     function renderStatus() {
       const e = MA.getEntitlement();
       const sl = document.getElementById('status-line');
@@ -645,6 +804,7 @@
       renderPromo();
       syncJumpNav();
       if (e && e.accountId) renderIdentityBar(who || '已登录');
+      renderMyEntitlements();
     }
 
     function resolveBackTarget() {
@@ -844,9 +1004,12 @@
       try {
         const u = new URL(location.href);
         const code = u.searchParams.get('code');
-        if (code) document.getElementById('code').value = code;
+        if (code) {
+          document.getElementById('code').value = code;
+          setTimeout(() => scrollToJumpId('redeem'), 80);
+        }
         const hash = (location.hash || '').replace(/^#/, '');
-        if (hash === 'account' || hash === 'redeem' || hash === 'benefits' || hash === 'promo' || hash === 'how-to-pay') {
+        if (!code && (hash === 'account' || hash === 'redeem' || hash === 'benefits' || hash === 'promo' || hash === 'how-to-pay')) {
           setTimeout(() => scrollToJumpId(hash), 80);
         }
       } catch (_e) {}
@@ -918,9 +1081,10 @@
       try {
         const data = await MA.redeem(document.getElementById('code').value);
         msg.className = 'msg ok';
-        msg.textContent = (data && data.tip) || '兑换成功，已开通高级会员';
+        msg.textContent = (data && data.tip) || '兑换成功';
         renderStatus();
-        setTimeout(goReturn, 800);
+        // 已拥有只提示时不必跳转；新开通仍可回跳来源页
+        if (!(data && data.alreadyOwned)) setTimeout(goReturn, 800);
       } catch (e) {
         msg.className = 'msg err';
         msg.textContent = (e && e.message) || '兑换失败';

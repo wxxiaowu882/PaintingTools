@@ -32,6 +32,14 @@
 
 **发测站（`20b` / `deploy-staging.bat`）绝不覆盖测站涂色**：测站以 KV `policy_live` 为准；发测站只上传静态资源与 Worker，**不会** `kv put` 写权限。仓库里的 `access-policy.json` 只是底稿/兜底，不能拿它整表盖掉测站已涂结果。Agent / 人工发测站时禁止对测站执行 policy 覆盖写入。
 
+**场景权限 ID（2026-11 定稿）**：
+
+- 课表显示：模块内短号（`uid`），给人交流用。  
+- 权限键：`scene:{sandbox}:uid:{短号}`（模块 + 短号；跨模块可同号）。  
+- 旧键 `scene:{sandbox}:name:课名` 迁移后可暂留双读；涂色写入走 uid 主键。  
+- 迁移脚本：`node docs/membership/migrate-scene-policy-name-to-uid.mjs`（默认保留旧 name 键）。  
+- 注意：若测站/正式 **KV 的 `policy_live` 为空**，线上实际读的是静态 `access-policy.json`；发测站上传底稿即可生效，不必强行 `kv put`（除非要单独把 live 写进 KV）。
+
 **正式发版前自动预检**：`docs/membership/prod-deploy-preflight.mjs`  
 - 确认正式站已配置两个 Secret（只查「有没有」，不读出口令内容）  
 - 确认探针码（测试假码）已关闭（查运营开关 + 实测兑换会被拒）  
@@ -56,7 +64,7 @@
 
 **要。** 日常验收与发码都走 Cloudflare 上的站：
 
-- **自己练发码 / 验收改动**：先 `20b` 发到**测试站**，再用 `21c` 打开运营台（口令用 `23b` 设的，当前多为 `ops-staging`）。  
+- **自己练发码 / 验收改动**：先 `20b` 发到**测试站**，再用 `21c` 打开运营台（口令以 `23b` / Cloudflare Secret `MEMBERSHIP_ADMIN_PASSWORD` 为准；文档里旧称 `ops-staging` 可能已改）。  
 - **给真实学员发码、改线上收费**：`20` 发正式站 + `23` 设口令，再用 `21b` 打开正式运营台。
 
 不再维护本机 8788 运营台入口。
@@ -68,8 +76,8 @@
 | | 测试站（推荐日常验收） | 正式站 |
 |--|------------------------|--------|
 | 怎么开 | Portal `20b` 发版后 `21c` | Portal `20` 发版后 `21b` |
-| 地址 | `https://test.wuxiaoart.com/...`（国内推荐） | `https://wuxiaoart.com/...` 或 `www` |
-| 运营台密码 | 已设 `ops-staging`（可用 `23b` 改） | 「23」里设的 |
+| 地址 | `https://test.wuxiaoart.com/...`（国内推荐） | `https://www.wuxiaoart.com/...` 或 `www` |
+| 运营台密码 | Cloudflare Secret（Portal `23b` 设置/重置；勿默认沿用旧文档口令） | 「23」里设的 |
 | 发码记录本 | **测试专用本**（不污染正式） | 正式本 |
 | 给学员的码 | 不要用 | 只用正式站发的 |
 
@@ -136,4 +144,4 @@ node docs/js/model-crypto/backup-then-delete-plain-glb.mjs
 
 ## 日常流程（一句话）
 
-学员付款并备注档位 → 打开运营台生成码 → 微信发给对方 → 对方在「会员 · 兑换」输入 → 可用收费内容。
+学员付款并备注档位 → 打开运营台生成码 → 微信发给对方 → 对方在「会员权益」输入 → 可用收费内容。

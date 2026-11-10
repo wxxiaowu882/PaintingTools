@@ -7,7 +7,7 @@
  * 用法：node docs/membership/prod-deploy-preflight.mjs
  * 环境变量：
  *   SKIP_PREFLIGHT=1     跳过
- *   PREFLIGHT_BASE=url   默认 https://wuxiaoart.com
+ *   PREFLIGHT_BASE=url   默认 https://www.wuxiaoart.com
  */
 import { spawnSync } from 'child_process';
 import fs from 'fs';
@@ -18,7 +18,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '../..');
 const PROD_KV = 'e556d7993e374d31bc8d693a6273f337';
 const REQUIRED_SECRETS = ['MEMBERSHIP_SECRET', 'MEMBERSHIP_ADMIN_PASSWORD'];
-const BASE = String(process.env.PREFLIGHT_BASE || 'https://wuxiaoart.com').replace(/\/$/, '');
+const BASE = String(process.env.PREFLIGHT_BASE || 'https://www.wuxiaoart.com').replace(/\/$/, '');
 const MODEL_DIR = path.join(REPO, 'docs/m');
 
 function escapeCmdArg(a) {

@@ -62,6 +62,7 @@ import '../docs/js/membership/MembershipAccess.js';
    */
   function ensureCornerBadge(mountEl, key, text, req, opts) {
     if (!mountEl) return;
+    var owned = !!(opts && opts.owned);
     var sel = '.membership-mod-badge[data-mod-slot="' + key + '"]';
     try {
       document.querySelectorAll(sel).forEach(function (b) {
@@ -93,12 +94,25 @@ import '../docs/js/membership/MembershipAccess.js';
           surface: 'dark',
           compact: true,
           inset: true,
-          floatOut: floatOut
+          floatOut: floatOut,
+          owned: owned
         })
       : 'position:absolute;right:-12px;top:-9px;font-size:8px;padding:1px 4px;border-radius:3px;' +
         'background:rgba(120,94,40,0.5);color:#fffef8;pointer-events:none;';
     badge.textContent = text;
-    badge.title = badgeTitle(text);
+    badge.title = MA.badgeTitleForLabel
+      ? MA.badgeTitleForLabel(text, { owned: owned })
+      : badgeTitle(text);
+  }
+
+  /** 资源需要会员/Pro 时：未开通/已开通都留同一套短标；差别只在 gate.ok 能否进入 */
+  function applyRequireBadge(mountFn, gate, sceneData) {
+    var req = badgeRequire(gate, sceneData);
+    var nreq = MA.normalizeRequire ? MA.normalizeRequire(req) : req;
+    if (nreq !== 'user' && nreq !== 'member') return false;
+    var text = badgeText(gate, sceneData);
+    mountFn(text, req, !!(gate && gate.ok));
+    return true;
   }
 
   function ensureInlineBadge(anchorEl, key, text, req, opts) {
@@ -150,11 +164,13 @@ import '../docs/js/membership/MembershipAccess.js';
           });
           return;
         }
-        var rid = MA.sceneResourceId(MA.currentSandbox(), data);
-        if (rid) {
-          var gate = MA.canAccess(rid);
+        var rids = (MA.sceneResourceIds
+          ? MA.sceneResourceIds(MA.currentSandbox(), data)
+          : [MA.sceneResourceId(MA.currentSandbox(), data)].filter(Boolean));
+        if (rids && rids.length) {
+          var gate = MA.canAccess(rids);
           if (!gate.ok) {
-            if (window.hwLog) window.hwLog('[MembershipGate] 拦截场景 ' + rid);
+            if (window.hwLog) window.hwLog('[MembershipGate] 拦截场景 ' + (rids[0] || ''));
             restoreSceneGridUi();
             MA.promptUpgrade(Object.assign({}, gate, { onDismiss: restoreSceneGridUi }));
             return;
@@ -251,16 +267,15 @@ import '../docs/js/membership/MembershipAccess.js';
 
       var envGate = MA.canAccess(modId('env'));
       setHostLocked(envHost, !envGate.ok);
-      if (!envGate.ok) {
-        var envText = badgeText(envGate);
-        var envReq = badgeRequire(envGate);
+      clearInlineSlots(['env-wall', 'env-ground', 'env-sky']);
+      applyRequireBadge(function (envText, envReq, owned) {
         // 背景墙：挂在「背景墙」文案上，不挡 checkbox
         var wallTitle = null;
         try {
           var wallLab = envHost && envHost.querySelector('label');
           wallTitle = wallLab && wallLab.querySelector('span');
         } catch (_eW) {}
-        ensureCornerBadge(ensureTextHost(wallTitle), 'env-wall', envText, envReq);
+        ensureCornerBadge(ensureTextHost(wallTitle), 'env-wall', envText, envReq, { owned: owned });
         var groundLabel = null;
         try {
           var spans = envHost ? envHost.querySelectorAll('span') : [];
@@ -271,40 +286,34 @@ import '../docs/js/membership/MembershipAccess.js';
             }
           }
         } catch (_eG) {}
-        ensureCornerBadge(ensureTextHost(groundLabel), 'env-ground', envText, envReq);
+        ensureCornerBadge(ensureTextHost(groundLabel), 'env-ground', envText, envReq, { owned: owned });
         var skyLabel = envHost && envHost.querySelector('.slider-label');
-        ensureCornerBadge(ensureTextHost(skyLabel), 'env-sky', envText, envReq);
-      } else {
-        clearInlineSlots(['env-wall', 'env-ground', 'env-sky']);
-      }
+        ensureCornerBadge(ensureTextHost(skyLabel), 'env-sky', envText, envReq, { owned: owned });
+      }, envGate);
 
       var fogGate = MA.canAccess(modId('fog'));
       setHostLocked(fogHost, !fogGate.ok);
-      if (!fogGate.ok) {
-        // 挂在整段标题 label 右上（字尾外侧），不压 checkbox
+      clearInlineSlots(['fog-title']);
+      applyRequireBadge(function (t, r, owned) {
         var fogLabel = fogHost && fogHost.querySelector('label.module-title');
-        ensureCornerBadge(fogLabel, 'fog-title', badgeText(fogGate), badgeRequire(fogGate));
-      } else {
-        clearInlineSlots(['fog-title']);
-      }
+        ensureCornerBadge(fogLabel, 'fog-title', t, r, { owned: owned });
+      }, fogGate);
 
       var dofGate = MA.canAccess(modId('dof'));
       setHostLocked(dofHost, !dofGate.ok);
-      if (!dofGate.ok) {
+      clearInlineSlots(['dof-title']);
+      applyRequireBadge(function (t, r, owned) {
         var dofLabel = dofHost && dofHost.querySelector('label.module-title');
-        ensureCornerBadge(dofLabel, 'dof-title', badgeText(dofGate), badgeRequire(dofGate));
-      } else {
-        clearInlineSlots(['dof-title']);
-      }
+        ensureCornerBadge(dofLabel, 'dof-title', t, r, { owned: owned });
+      }, dofGate);
 
       var postGate = MA.canAccess(modId('posterize'));
       setHostLocked(postHost, !postGate.ok);
-      if (!postGate.ok) {
+      clearInlineSlots(['posterize-title']);
+      applyRequireBadge(function (t, r, owned) {
         var postSpan = postHost && postHost.querySelector('label span');
-        ensureCornerBadge(ensureTextHost(postSpan), 'posterize-title', badgeText(postGate), badgeRequire(postGate));
-      } else {
-        clearInlineSlots(['posterize-title']);
-      }
+        ensureCornerBadge(ensureTextHost(postSpan), 'posterize-title', t, r, { owned: owned });
+      }, postGate);
 
       // 清掉旧 Tab 灰显
       ['env', 'atmos', 'assist', 'light'].forEach(function (tab) {
@@ -350,24 +359,35 @@ import '../docs/js/membership/MembershipAccess.js';
       window.customScenes.forEach(function (sc, idx) {
         var el = byIndex[String(idx)];
         if (!el) return;
-        var rid = MA.sceneResourceId(MA.currentSandbox(), sc);
-        if (!rid) return;
-        var gate = MA.canAccess(rid);
+        var rids = (MA.sceneResourceIds
+          ? MA.sceneResourceIds(MA.currentSandbox(), sc)
+          : [MA.sceneResourceId(MA.currentSandbox(), sc)].filter(Boolean));
+        if (!rids || !rids.length) return;
+        var gate = MA.canAccess(rids);
         var badge = el.querySelector('.membership-badge');
-        if (gate.ok) {
+        var reqSc = badgeRequire(gate, sc);
+        var nreq = MA.normalizeRequire ? MA.normalizeRequire(reqSc) : reqSc;
+        var needBadge = nreq === 'user' || nreq === 'member';
+        if (!needBadge) {
           el.classList.remove('membership-locked');
           if (badge) badge.remove();
           return;
         }
-        el.classList.add('membership-locked');
         var text = badgeText(gate, sc);
-        var reqSc = badgeRequire(gate, sc);
-        // 角内裁切盒 + 斜带，避免圆角处尖角外溢
         try {
           if (el.style.overflow === 'visible') el.style.overflow = '';
         } catch (_eOv2) {}
+        if (gate.ok) {
+          el.classList.remove('membership-locked');
+          if (MA.attachLockRibbon) {
+            MA.attachLockRibbon(el, text, reqSc, { owned: true });
+          }
+          return;
+        }
+        el.classList.add('membership-locked');
+        // 角内裁切盒 + 斜带，避免圆角处尖角外溢
         if (MA.attachLockRibbon) {
-          MA.attachLockRibbon(el, text, reqSc);
+          MA.attachLockRibbon(el, text, reqSc, { owned: false });
         } else if (!badge) {
           badge = document.createElement('span');
           badge.className = 'membership-badge';

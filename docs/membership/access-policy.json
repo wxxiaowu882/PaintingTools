@@ -1,13 +1,23 @@
 {
   "version": 2,
-  "updated": "2026-10-28",
+  "updated": "2026-11-09",
   "notes": "三档：public=游客可见，user=会员（注册）可进，member=Pro。probe=true 仅技术验证，业务清单后定。旧值 free 视为 public。",
   "defaultRequire": "public",
   "resources": {
+    "scene:geometry:uid:924": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】顶光"
+    },
     "scene:geometry:name:【氛围 · 光】顶光": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】顶光"
+    },
+    "scene:geometry:uid:003": {
+      "require": "public",
+      "enabled": true,
+      "label": "【光影基础规律】面转则明暗分，体积现"
     },
     "scene:geometry:name:【光影基础规律】面转则明暗分，体积现": {
       "require": "public",
@@ -38,10 +48,20 @@
       "label": "主光",
       "probe": false
     },
+    "scene:portrait:uid:3": {
+      "require": "user",
+      "enabled": true,
+      "label": "方座短发童"
+    },
     "scene:portrait:name:方座短发童": {
       "require": "user",
       "enabled": true,
       "label": "方座短发童"
+    },
+    "scene:portrait:uid:5": {
+      "require": "member",
+      "enabled": true,
+      "label": "大仲马"
     },
     "scene:portrait:name:大仲马": {
       "require": "member",
@@ -53,925 +73,2275 @@
       "enabled": true,
       "label": "环境光"
     },
+    "scene:geometry:uid:103": {
+      "require": "user",
+      "enabled": true,
+      "label": "球体 【万物观察法  步骤三】"
+    },
     "scene:geometry:name:球体 【万物观察法  步骤三】": {
       "require": "user",
       "enabled": true,
       "label": "球体 【万物观察法  步骤三】"
+    },
+    "scene:geometry:uid:104": {
+      "require": "user",
+      "enabled": true,
+      "label": "球体 【万物观察法 最暗处探讨】"
     },
     "scene:geometry:name:球体 【万物观察法 最暗处探讨】": {
       "require": "user",
       "enabled": true,
       "label": "球体 【万物观察法 最暗处探讨】"
     },
+    "scene:geometry:uid:105": {
+      "require": "user",
+      "enabled": true,
+      "label": "球体 【万物观察法 边缘虚实探讨】"
+    },
     "scene:geometry:name:球体 【万物观察法 边缘虚实探讨】": {
       "require": "user",
       "enabled": true,
       "label": "球体 【万物观察法 边缘虚实探讨】"
+    },
+    "scene:geometry:uid:201": {
+      "require": "member",
+      "enabled": true,
+      "label": "正方体 【万物观察法  步骤一】"
     },
     "scene:geometry:name:正方体 【万物观察法  步骤一】": {
       "require": "member",
       "enabled": true,
       "label": "正方体 【万物观察法  步骤一】"
     },
+    "scene:geometry:uid:202": {
+      "require": "member",
+      "enabled": true,
+      "label": "正方体 【万物观察法  步骤二】"
+    },
     "scene:geometry:name:正方体 【万物观察法  步骤二】": {
       "require": "member",
       "enabled": true,
       "label": "正方体 【万物观察法  步骤二】"
+    },
+    "scene:geometry:uid:203": {
+      "require": "member",
+      "enabled": true,
+      "label": "正方体 【万物观察法  步骤三】"
     },
     "scene:geometry:name:正方体 【万物观察法  步骤三】": {
       "require": "member",
       "enabled": true,
       "label": "正方体 【万物观察法  步骤三】"
     },
+    "scene:geometry:uid:204": {
+      "require": "member",
+      "enabled": true,
+      "label": "正方体 【万物观察法 最深处探讨】"
+    },
     "scene:geometry:name:正方体 【万物观察法 最深处探讨】": {
       "require": "member",
       "enabled": true,
       "label": "正方体 【万物观察法 最深处探讨】"
+    },
+    "scene:geometry:uid:205": {
+      "require": "member",
+      "enabled": true,
+      "label": "正方体 【万物观察法 边缘虚实探讨】"
     },
     "scene:geometry:name:正方体 【万物观察法 边缘虚实探讨】": {
       "require": "member",
       "enabled": true,
       "label": "正方体 【万物观察法 边缘虚实探讨】"
     },
+    "scene:geometry:uid:301": {
+      "require": "member",
+      "enabled": true,
+      "label": "圆柱 【万物观察法  步骤一】"
+    },
     "scene:geometry:name:圆柱 【万物观察法  步骤一】": {
       "require": "member",
       "enabled": true,
       "label": "圆柱 【万物观察法  步骤一】"
+    },
+    "scene:geometry:uid:302": {
+      "require": "member",
+      "enabled": true,
+      "label": "圆柱 【万物观察法  步骤二】"
     },
     "scene:geometry:name:圆柱 【万物观察法  步骤二】": {
       "require": "member",
       "enabled": true,
       "label": "圆柱 【万物观察法  步骤二】"
     },
+    "scene:geometry:uid:303": {
+      "require": "member",
+      "enabled": true,
+      "label": "圆柱 【万物观察法  步骤三】"
+    },
     "scene:geometry:name:圆柱 【万物观察法  步骤三】": {
       "require": "member",
       "enabled": true,
       "label": "圆柱 【万物观察法  步骤三】"
+    },
+    "scene:geometry:uid:304": {
+      "require": "member",
+      "enabled": true,
+      "label": "圆柱 【万物观察法 最深处探讨】"
     },
     "scene:geometry:name:圆柱 【万物观察法 最深处探讨】": {
       "require": "member",
       "enabled": true,
       "label": "圆柱 【万物观察法 最深处探讨】"
     },
+    "scene:geometry:uid:305": {
+      "require": "member",
+      "enabled": true,
+      "label": "圆柱 【万物观察法 边缘虚实探讨】"
+    },
     "scene:geometry:name:圆柱 【万物观察法 边缘虚实探讨】": {
       "require": "member",
       "enabled": true,
       "label": "圆柱 【万物观察法 边缘虚实探讨】"
+    },
+    "scene:geometry:uid:401": {
+      "require": "member",
+      "enabled": true,
+      "label": "圆锥 【万物观察法  步骤一】"
     },
     "scene:geometry:name:圆锥 【万物观察法  步骤一】": {
       "require": "member",
       "enabled": true,
       "label": "圆锥 【万物观察法  步骤一】"
     },
+    "scene:geometry:uid:402": {
+      "require": "member",
+      "enabled": true,
+      "label": "圆锥 【万物观察法  步骤二】"
+    },
     "scene:geometry:name:圆锥 【万物观察法  步骤二】": {
       "require": "member",
       "enabled": true,
       "label": "圆锥 【万物观察法  步骤二】"
+    },
+    "scene:geometry:uid:403": {
+      "require": "member",
+      "enabled": true,
+      "label": "圆锥 【万物观察法  步骤三】"
     },
     "scene:geometry:name:圆锥 【万物观察法  步骤三】": {
       "require": "member",
       "enabled": true,
       "label": "圆锥 【万物观察法  步骤三】"
     },
+    "scene:geometry:uid:404": {
+      "require": "member",
+      "enabled": true,
+      "label": "圆锥 【万物观察法 最深处探讨】"
+    },
     "scene:geometry:name:圆锥 【万物观察法 最深处探讨】": {
       "require": "member",
       "enabled": true,
       "label": "圆锥 【万物观察法 最深处探讨】"
+    },
+    "scene:geometry:uid:405": {
+      "require": "member",
+      "enabled": true,
+      "label": "圆锥 【万物观察法 边缘虚实探讨】"
     },
     "scene:geometry:name:圆锥 【万物观察法 边缘虚实探讨】": {
       "require": "member",
       "enabled": true,
       "label": "圆锥 【万物观察法 边缘虚实探讨】"
     },
+    "scene:geometry:uid:501": {
+      "require": "member",
+      "enabled": true,
+      "label": "棱锥 【万物观察法  步骤一】"
+    },
     "scene:geometry:name:棱锥 【万物观察法  步骤一】": {
       "require": "member",
       "enabled": true,
       "label": "棱锥 【万物观察法  步骤一】"
+    },
+    "scene:geometry:uid:502": {
+      "require": "member",
+      "enabled": true,
+      "label": "棱柱 【万物观察法  步骤二】"
     },
     "scene:geometry:name:棱柱 【万物观察法  步骤二】": {
       "require": "member",
       "enabled": true,
       "label": "棱柱 【万物观察法  步骤二】"
     },
+    "scene:geometry:uid:503": {
+      "require": "member",
+      "enabled": true,
+      "label": "棱柱 【万物观察法  步骤三】"
+    },
     "scene:geometry:name:棱柱 【万物观察法  步骤三】": {
       "require": "member",
       "enabled": true,
       "label": "棱柱 【万物观察法  步骤三】"
+    },
+    "scene:geometry:uid:504": {
+      "require": "member",
+      "enabled": true,
+      "label": "棱柱 【万物观察法 最深处探讨】"
     },
     "scene:geometry:name:棱柱 【万物观察法 最深处探讨】": {
       "require": "member",
       "enabled": true,
       "label": "棱柱 【万物观察法 最深处探讨】"
     },
+    "scene:geometry:uid:505": {
+      "require": "member",
+      "enabled": true,
+      "label": "棱柱 【万物观察法 边缘虚实探讨】"
+    },
     "scene:geometry:name:棱柱 【万物观察法 边缘虚实探讨】": {
       "require": "member",
       "enabled": true,
       "label": "棱柱 【万物观察法 边缘虚实探讨】"
+    },
+    "scene:geometry:uid:601": {
+      "require": "member",
+      "enabled": true,
+      "label": "棱柱 【万物观察法  步骤一】"
     },
     "scene:geometry:name:棱柱 【万物观察法  步骤一】": {
       "require": "member",
       "enabled": true,
       "label": "棱柱 【万物观察法  步骤一】"
     },
+    "scene:geometry:uid:602": {
+      "require": "member",
+      "enabled": true,
+      "label": "棱锥 【万物观察法  步骤二】"
+    },
     "scene:geometry:name:棱锥 【万物观察法  步骤二】": {
       "require": "member",
       "enabled": true,
       "label": "棱锥 【万物观察法  步骤二】"
+    },
+    "scene:geometry:uid:603": {
+      "require": "member",
+      "enabled": true,
+      "label": "棱锥 【万物观察法  步骤三】"
     },
     "scene:geometry:name:棱锥 【万物观察法  步骤三】": {
       "require": "member",
       "enabled": true,
       "label": "棱锥 【万物观察法  步骤三】"
     },
+    "scene:geometry:uid:604": {
+      "require": "member",
+      "enabled": true,
+      "label": "棱锥 【万物观察法 最深处探讨】"
+    },
     "scene:geometry:name:棱锥 【万物观察法 最深处探讨】": {
       "require": "member",
       "enabled": true,
       "label": "棱锥 【万物观察法 最深处探讨】"
+    },
+    "scene:geometry:uid:605": {
+      "require": "member",
+      "enabled": true,
+      "label": "棱锥 【万物观察法 边缘虚实探讨】"
     },
     "scene:geometry:name:棱锥 【万物观察法 边缘虚实探讨】": {
       "require": "member",
       "enabled": true,
       "label": "棱锥 【万物观察法 边缘虚实探讨】"
     },
+    "scene:geometry:uid:701": {
+      "require": "member",
+      "enabled": true,
+      "label": "组合体 【万物观察法】"
+    },
     "scene:geometry:name:组合体 【万物观察法】": {
       "require": "member",
       "enabled": true,
       "label": "组合体 【万物观察法】"
+    },
+    "scene:geometry:uid:102": {
+      "require": "public",
+      "enabled": true,
+      "label": "球体 【万物观察法  步骤二】"
     },
     "scene:geometry:name:球体 【万物观察法  步骤二】": {
       "require": "public",
       "enabled": true,
       "label": "球体 【万物观察法  步骤二】"
     },
+    "scene:geometry:uid:101": {
+      "require": "public",
+      "enabled": true,
+      "label": "球体 【万物观察法  步骤一】"
+    },
     "scene:geometry:name:球体 【万物观察法  步骤一】": {
       "require": "public",
       "enabled": true,
       "label": "球体 【万物观察法  步骤一】"
+    },
+    "scene:geometry:uid:800": {
+      "require": "user",
+      "enabled": true,
+      "label": "【色彩】明暗为骨，色彩为肤"
     },
     "scene:geometry:name:【色彩】明暗为骨，色彩为肤": {
       "require": "user",
       "enabled": true,
       "label": "【色彩】明暗为骨，色彩为肤"
     },
+    "scene:geometry:uid:801": {
+      "require": "user",
+      "enabled": true,
+      "label": "【色彩】同色三性"
+    },
     "scene:geometry:name:【色彩】同色三性": {
       "require": "user",
       "enabled": true,
       "label": "【色彩】同色三性"
+    },
+    "scene:geometry:uid:802": {
+      "require": "member",
+      "enabled": true,
+      "label": "【色彩】六区色律，各从其位"
     },
     "scene:geometry:name:【色彩】六区色律，各从其位": {
       "require": "member",
       "enabled": true,
       "label": "【色彩】六区色律，各从其位"
     },
+    "scene:geometry:uid:803": {
+      "require": "member",
+      "enabled": true,
+      "label": "【色彩】环境色 · 天青而染阴"
+    },
     "scene:geometry:name:【色彩】环境色 · 天青而染阴": {
       "require": "member",
       "enabled": true,
       "label": "【色彩】环境色 · 天青而染阴"
+    },
+    "scene:geometry:uid:804": {
+      "require": "member",
+      "enabled": true,
+      "label": "【色彩】环境色 · 地厚而返色"
     },
     "scene:geometry:name:【色彩】环境色 · 地厚而返色": {
       "require": "member",
       "enabled": true,
       "label": "【色彩】环境色 · 地厚而返色"
     },
+    "scene:geometry:uid:805": {
+      "require": "member",
+      "enabled": true,
+      "label": "【色彩】环境色 · 物邻而色交"
+    },
     "scene:geometry:name:【色彩】环境色 · 物邻而色交": {
       "require": "member",
       "enabled": true,
       "label": "【色彩】环境色 · 物邻而色交"
+    },
+    "scene:geometry:uid:806": {
+      "require": "member",
+      "enabled": true,
+      "label": "【色彩】环境色 · 众色互染 · 众象相摄"
     },
     "scene:geometry:name:【色彩】环境色 · 众色互染 · 众象相摄": {
       "require": "member",
       "enabled": true,
       "label": "【色彩】环境色 · 众色互染 · 众象相摄"
     },
+    "scene:geometry:uid:900": {
+      "require": "public",
+      "enabled": true,
+      "label": "【氛围·气】物载于境，境托于气"
+    },
     "scene:geometry:name:【氛围·气】物载于境，境托于气": {
       "require": "public",
       "enabled": true,
       "label": "【氛围·气】物载于境，境托于气"
+    },
+    "scene:geometry:uid:902": {
+      "require": "user",
+      "enabled": true,
+      "label": "【氛围·气】形，远柔而近利"
     },
     "scene:geometry:name:【氛围·气】形，远柔而近利": {
       "require": "user",
       "enabled": true,
       "label": "【氛围·气】形，远柔而近利"
     },
+    "scene:geometry:uid:903": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围·气】同气归一"
+    },
     "scene:geometry:name:【氛围·气】同气归一": {
       "require": "member",
       "enabled": true,
       "label": "【氛围·气】同气归一"
+    },
+    "scene:geometry:uid:910": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围·光】同光归一"
     },
     "scene:geometry:name:【氛围·光】同光归一": {
       "require": "member",
       "enabled": true,
       "label": "【氛围·光】同光归一"
     },
+    "scene:geometry:uid:911": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】暖光氛围"
+    },
     "scene:geometry:name:【氛围 · 光】暖光氛围": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】暖光氛围"
+    },
+    "scene:geometry:uid:912": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】冷氛围"
     },
     "scene:geometry:name:【氛围 · 光】冷氛围": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】冷氛围"
     },
+    "scene:geometry:uid:913": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】冷暖光平衡氛围"
+    },
     "scene:geometry:name:【氛围 · 光】冷暖光平衡氛围": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】冷暖光平衡氛围"
+    },
+    "scene:geometry:uid:914": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围-光】强光"
     },
     "scene:geometry:name:【氛围-光】强光": {
       "require": "member",
       "enabled": true,
       "label": "【氛围-光】强光"
     },
+    "scene:geometry:uid:915": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】弱光"
+    },
     "scene:geometry:name:【氛围 · 光】弱光": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】弱光"
+    },
+    "scene:geometry:uid:916": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】聚光"
     },
     "scene:geometry:name:【氛围 · 光】聚光": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】聚光"
     },
+    "scene:geometry:uid:917": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】点光"
+    },
     "scene:geometry:name:【氛围 · 光】点光": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】点光"
+    },
+    "scene:geometry:uid:918": {
+      "require": "member",
+      "enabled": true,
+      "label": "氛围 · 光】平行光"
     },
     "scene:geometry:name:氛围 · 光】平行光": {
       "require": "member",
       "enabled": true,
       "label": "氛围 · 光】平行光"
     },
+    "scene:geometry:uid:919": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】面积光"
+    },
     "scene:geometry:name:【氛围 · 光】面积光": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】面积光"
+    },
+    "scene:geometry:uid:920": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】正光"
     },
     "scene:geometry:name:【氛围 · 光】正光": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】正光"
     },
+    "scene:geometry:uid:921": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】前侧光 45°"
+    },
     "scene:geometry:name:【氛围 · 光】前侧光 45°": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】前侧光 45°"
+    },
+    "scene:geometry:uid:922": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】背光"
     },
     "scene:geometry:name:【氛围 · 光】背光": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】背光"
     },
+    "scene:geometry:uid:923": {
+      "require": "member",
+      "enabled": true,
+      "label": "【氛围 · 光】底光"
+    },
     "scene:geometry:name:【氛围 · 光】底光": {
       "require": "member",
       "enabled": true,
       "label": "【氛围 · 光】底光"
+    },
+    "scene:geometry:uid:1004": {
+      "require": "member",
+      "enabled": true,
+      "label": "【构图-例1】④驯冲突"
     },
     "scene:geometry:name:【构图-例1】④驯冲突": {
       "require": "member",
       "enabled": true,
       "label": "【构图-例1】④驯冲突"
     },
+    "scene:geometry:uid:1011": {
+      "require": "member",
+      "enabled": true,
+      "label": "【构图-例2】团结和对峙"
+    },
     "scene:geometry:name:【构图-例2】团结和对峙": {
       "require": "member",
       "enabled": true,
       "label": "【构图-例2】团结和对峙"
+    },
+    "scene:geometry:uid:1021": {
+      "require": "member",
+      "enabled": true,
+      "label": "【构图-案例3】中流砥柱"
     },
     "scene:geometry:name:【构图-案例3】中流砥柱": {
       "require": "member",
       "enabled": true,
       "label": "【构图-案例3】中流砥柱"
     },
+    "scene:geometry:uid:1031": {
+      "require": "member",
+      "enabled": true,
+      "label": "【构图-案例4】松与石"
+    },
     "scene:geometry:name:【构图-案例4】松与石": {
       "require": "member",
       "enabled": true,
       "label": "【构图-案例4】松与石"
+    },
+    "scene:geometry:uid:1041": {
+      "require": "member",
+      "enabled": true,
+      "label": "【构图-案例5】平衡博弈"
     },
     "scene:geometry:name:【构图-案例5】平衡博弈": {
       "require": "member",
       "enabled": true,
       "label": "【构图-案例5】平衡博弈"
     },
+    "scene:geometry:uid:1051": {
+      "require": "member",
+      "enabled": true,
+      "label": "【构图-案例6】高楼"
+    },
     "scene:geometry:name:【构图-案例6】高楼": {
       "require": "member",
       "enabled": true,
       "label": "【构图-案例6】高楼"
+    },
+    "scene:geometry:uid:1061": {
+      "require": "member",
+      "enabled": true,
+      "label": "【构图-例7】和谐共处"
     },
     "scene:geometry:name:【构图-例7】和谐共处": {
       "require": "member",
       "enabled": true,
       "label": "【构图-例7】和谐共处"
     },
+    "scene:geometry:uid:1071": {
+      "require": "member",
+      "enabled": true,
+      "label": "【构图-例8】阁楼上的奖杯"
+    },
     "scene:geometry:name:【构图-例8】阁楼上的奖杯": {
       "require": "member",
       "enabled": true,
       "label": "【构图-例8】阁楼上的奖杯"
+    },
+    "scene:geometry:uid:1081": {
+      "require": "member",
+      "enabled": true,
+      "label": "【构图-例9】阁楼上的另一个奖杯"
     },
     "scene:geometry:name:【构图-例9】阁楼上的另一个奖杯": {
       "require": "member",
       "enabled": true,
       "label": "【构图-例9】阁楼上的另一个奖杯"
     },
+    "scene:geometry:uid:1091": {
+      "require": "member",
+      "enabled": true,
+      "label": "【构图-例10】形断气连"
+    },
     "scene:geometry:name:【构图-例10】形断气连": {
       "require": "member",
       "enabled": true,
       "label": "【构图-例10】形断气连"
+    },
+    "scene:geometry:uid:901": {
+      "require": "user",
+      "enabled": true,
+      "label": "【氛围·气】色，远淡而近实"
     },
     "scene:geometry:name:【氛围·气】色，远淡而近实": {
       "require": "user",
       "enabled": true,
       "label": "【氛围·气】色，远淡而近实"
     },
+    "scene:anatomy:uid:01": {
+      "require": "user",
+      "enabled": true,
+      "label": "头骨详解"
+    },
     "scene:anatomy:name:头骨详解": {
       "require": "user",
       "enabled": true,
       "label": "头骨详解"
+    },
+    "scene:anatomy:uid:02": {
+      "require": "user",
+      "enabled": true,
+      "label": "骨点详解"
     },
     "scene:anatomy:name:骨点详解": {
       "require": "user",
       "enabled": true,
       "label": "骨点详解"
     },
+    "scene:anatomy:uid:03": {
+      "require": "user",
+      "enabled": true,
+      "label": "肌肉详解"
+    },
     "scene:anatomy:name:肌肉详解": {
       "require": "user",
       "enabled": true,
       "label": "肌肉详解"
+    },
+    "scene:facial:uid:03": {
+      "require": "user",
+      "enabled": true,
+      "label": "嘴巴详解"
     },
     "scene:facial:name:嘴巴详解": {
       "require": "user",
       "enabled": true,
       "label": "嘴巴详解"
     },
+    "scene:facial:uid:04": {
+      "require": "user",
+      "enabled": true,
+      "label": "眼眉详解"
+    },
     "scene:facial:name:眼眉详解": {
       "require": "user",
       "enabled": true,
       "label": "眼眉详解"
+    },
+    "scene:facial:uid:05": {
+      "require": "user",
+      "enabled": true,
+      "label": "五官综合详解"
     },
     "scene:facial:name:五官综合详解": {
       "require": "user",
       "enabled": true,
       "label": "五官综合详解"
     },
+    "scene:headform:uid:001": {
+      "require": "public",
+      "enabled": true,
+      "label": "【外轮廓规律】侧前（四分之三）"
+    },
+    "scene:headform:uid:002": {
+      "require": "public",
+      "enabled": true,
+      "label": "【外轮廓规律】侧前（四分之三）"
+    },
+    "scene:headform:uid:003": {
+      "require": "public",
+      "enabled": true,
+      "label": "【外轮廓规律】侧前（四分之三）"
+    },
+    "scene:headform:uid:004": {
+      "require": "public",
+      "enabled": true,
+      "label": "【外轮廓规律】侧前（四分之三）"
+    },
+    "scene:headform:uid:005": {
+      "require": "public",
+      "enabled": true,
+      "label": "【外轮廓规律】侧前（四分之三）"
+    },
+    "scene:headform:uid:006": {
+      "require": "public",
+      "enabled": true,
+      "label": "【外轮廓规律】侧前（四分之三）"
+    },
     "scene:headform:name:【外轮廓规律】侧前（四分之三）": {
       "require": "public",
       "enabled": true,
       "label": "【外轮廓规律】侧前（四分之三）"
+    },
+    "scene:headform:uid:007": {
+      "require": "user",
+      "enabled": true,
+      "label": "【外轮廓规律】正面"
+    },
+    "scene:headform:uid:008": {
+      "require": "user",
+      "enabled": true,
+      "label": "【外轮廓规律】正面"
+    },
+    "scene:headform:uid:009": {
+      "require": "user",
+      "enabled": true,
+      "label": "【外轮廓规律】正面"
+    },
+    "scene:headform:uid:010": {
+      "require": "user",
+      "enabled": true,
+      "label": "【外轮廓规律】正面"
+    },
+    "scene:headform:uid:011": {
+      "require": "user",
+      "enabled": true,
+      "label": "【外轮廓规律】正面"
+    },
+    "scene:headform:uid:012": {
+      "require": "user",
+      "enabled": true,
+      "label": "【外轮廓规律】正面"
     },
     "scene:headform:name:【外轮廓规律】正面": {
       "require": "user",
       "enabled": true,
       "label": "【外轮廓规律】正面"
     },
+    "scene:headform:uid:013": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】大半侧"
+    },
+    "scene:headform:uid:014": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】大半侧"
+    },
+    "scene:headform:uid:015": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】大半侧"
+    },
+    "scene:headform:uid:016": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】大半侧"
+    },
+    "scene:headform:uid:017": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】大半侧"
+    },
+    "scene:headform:uid:018": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】大半侧"
+    },
     "scene:headform:name:【外轮廓规律】大半侧": {
       "require": "member",
       "enabled": true,
       "label": "【外轮廓规律】大半侧"
+    },
+    "scene:headform:uid:019": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】全侧面"
+    },
+    "scene:headform:uid:020": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】全侧面"
+    },
+    "scene:headform:uid:021": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】全侧面"
+    },
+    "scene:headform:uid:022": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】全侧面"
+    },
+    "scene:headform:uid:023": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】全侧面"
+    },
+    "scene:headform:uid:024": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】全侧面"
     },
     "scene:headform:name:【外轮廓规律】全侧面": {
       "require": "member",
       "enabled": true,
       "label": "【外轮廓规律】全侧面"
     },
+    "scene:headform:uid:025": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（见鼻）"
+    },
+    "scene:headform:uid:026": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（见鼻）"
+    },
+    "scene:headform:uid:027": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（见鼻）"
+    },
+    "scene:headform:uid:028": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（见鼻）"
+    },
+    "scene:headform:uid:029": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（见鼻）"
+    },
+    "scene:headform:uid:030": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（见鼻）"
+    },
     "scene:headform:name:【外轮廓规律】侧后（见鼻）": {
       "require": "member",
       "enabled": true,
       "label": "【外轮廓规律】侧后（见鼻）"
+    },
+    "scene:headform:uid:031": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（隐鼻）"
+    },
+    "scene:headform:uid:032": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（隐鼻）"
+    },
+    "scene:headform:uid:033": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（隐鼻）"
+    },
+    "scene:headform:uid:034": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（隐鼻）"
+    },
+    "scene:headform:uid:035": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（隐鼻）"
+    },
+    "scene:headform:uid:036": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】侧后（隐鼻）"
     },
     "scene:headform:name:【外轮廓规律】侧后（隐鼻）": {
       "require": "member",
       "enabled": true,
       "label": "【外轮廓规律】侧后（隐鼻）"
     },
+    "scene:headform:uid:037": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】背面"
+    },
+    "scene:headform:uid:038": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】背面"
+    },
+    "scene:headform:uid:039": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】背面"
+    },
+    "scene:headform:uid:040": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】背面"
+    },
+    "scene:headform:uid:041": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】背面"
+    },
+    "scene:headform:uid:042": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】背面"
+    },
     "scene:headform:name:【外轮廓规律】背面": {
       "require": "member",
       "enabled": true,
       "label": "【外轮廓规律】背面"
+    },
+    "scene:headform:uid:043": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】顶视"
+    },
+    "scene:headform:uid:044": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】顶视"
+    },
+    "scene:headform:uid:045": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】顶视"
+    },
+    "scene:headform:uid:046": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】顶视"
+    },
+    "scene:headform:uid:047": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】顶视"
+    },
+    "scene:headform:uid:048": {
+      "require": "member",
+      "enabled": true,
+      "label": "【外轮廓规律】顶视"
     },
     "scene:headform:name:【外轮廓规律】顶视": {
       "require": "member",
       "enabled": true,
       "label": "【外轮廓规律】顶视"
     },
+    "scene:headform:uid:049": {
+      "require": "user",
+      "enabled": true,
+      "label": "【交界线规律】侧前略高 · 环形明暗（Loop）"
+    },
+    "scene:headform:uid:050": {
+      "require": "user",
+      "enabled": true,
+      "label": "【交界线规律】侧前略高 · 环形明暗（Loop）"
+    },
+    "scene:headform:uid:051": {
+      "require": "user",
+      "enabled": true,
+      "label": "【交界线规律】侧前略高 · 环形明暗（Loop）"
+    },
+    "scene:headform:uid:052": {
+      "require": "user",
+      "enabled": true,
+      "label": "【交界线规律】侧前略高 · 环形明暗（Loop）"
+    },
+    "scene:headform:uid:053": {
+      "require": "user",
+      "enabled": true,
+      "label": "【交界线规律】侧前略高 · 环形明暗（Loop）"
+    },
+    "scene:headform:uid:054": {
+      "require": "user",
+      "enabled": true,
+      "label": "【交界线规律】侧前略高 · 环形明暗（Loop）"
+    },
     "scene:headform:name:【交界线规律】侧前略高 · 环形明暗（Loop）": {
       "require": "user",
       "enabled": true,
       "label": "【交界线规律】侧前略高 · 环形明暗（Loop）"
+    },
+    "scene:headform:uid:055": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】侧前更高 · 伦勃朗三角（Rembrandt）"
+    },
+    "scene:headform:uid:056": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】侧前更高 · 伦勃朗三角（Rembrandt）"
+    },
+    "scene:headform:uid:057": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】侧前更高 · 伦勃朗三角（Rembrandt）"
+    },
+    "scene:headform:uid:058": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】侧前更高 · 伦勃朗三角（Rembrandt）"
+    },
+    "scene:headform:uid:059": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】侧前更高 · 伦勃朗三角（Rembrandt）"
+    },
+    "scene:headform:uid:060": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】侧前更高 · 伦勃朗三角（Rembrandt）"
     },
     "scene:headform:name:【交界线规律】侧前更高 · 伦勃朗三角（Rembrandt）": {
       "require": "member",
       "enabled": true,
       "label": "【交界线规律】侧前更高 · 伦勃朗三角（Rembrandt）"
     },
+    "scene:headform:uid:061": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前略高 · 蝴蝶光（Butterfly）"
+    },
+    "scene:headform:uid:062": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前略高 · 蝴蝶光（Butterfly）"
+    },
+    "scene:headform:uid:063": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前略高 · 蝴蝶光（Butterfly）"
+    },
+    "scene:headform:uid:064": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前略高 · 蝴蝶光（Butterfly）"
+    },
+    "scene:headform:uid:065": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前略高 · 蝴蝶光（Butterfly）"
+    },
+    "scene:headform:uid:066": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前略高 · 蝴蝶光（Butterfly）"
+    },
     "scene:headform:name:【交界线规律】正前略高 · 蝴蝶光（Butterfly）": {
       "require": "member",
       "enabled": true,
       "label": "【交界线规律】正前略高 · 蝴蝶光（Butterfly）"
+    },
+    "scene:headform:uid:067": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正侧 · 阴阳对半（Split）"
+    },
+    "scene:headform:uid:068": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正侧 · 阴阳对半（Split）"
+    },
+    "scene:headform:uid:069": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正侧 · 阴阳对半（Split）"
+    },
+    "scene:headform:uid:070": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正侧 · 阴阳对半（Split）"
+    },
+    "scene:headform:uid:071": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正侧 · 阴阳对半（Split）"
+    },
+    "scene:headform:uid:072": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正侧 · 阴阳对半（Split）"
     },
     "scene:headform:name:【交界线规律】正侧 · 阴阳对半（Split）": {
       "require": "member",
       "enabled": true,
       "label": "【交界线规律】正侧 · 阴阳对半（Split）"
     },
+    "scene:headform:uid:073": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前光 · 头侧交界"
+    },
+    "scene:headform:uid:074": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前光 · 头侧交界"
+    },
+    "scene:headform:uid:075": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前光 · 头侧交界"
+    },
+    "scene:headform:uid:076": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前光 · 头侧交界"
+    },
+    "scene:headform:uid:077": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前光 · 头侧交界"
+    },
+    "scene:headform:uid:078": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】正前光 · 头侧交界"
+    },
     "scene:headform:name:【交界线规律】正前光 · 头侧交界": {
       "require": "member",
       "enabled": true,
       "label": "【交界线规律】正前光 · 头侧交界"
+    },
+    "scene:headform:uid:079": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】顶前光 · 顶前交界"
+    },
+    "scene:headform:uid:080": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】顶前光 · 顶前交界"
+    },
+    "scene:headform:uid:081": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】顶前光 · 顶前交界"
+    },
+    "scene:headform:uid:082": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】顶前光 · 顶前交界"
+    },
+    "scene:headform:uid:083": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】顶前光 · 顶前交界"
+    },
+    "scene:headform:uid:084": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】顶前光 · 顶前交界"
     },
     "scene:headform:name:【交界线规律】顶前光 · 顶前交界": {
       "require": "member",
       "enabled": true,
       "label": "【交界线规律】顶前光 · 顶前交界"
     },
+    "scene:headform:uid:085": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】底前光 · 底前交界"
+    },
+    "scene:headform:uid:086": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】底前光 · 底前交界"
+    },
+    "scene:headform:uid:087": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】底前光 · 底前交界"
+    },
+    "scene:headform:uid:088": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】底前光 · 底前交界"
+    },
+    "scene:headform:uid:089": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】底前光 · 底前交界"
+    },
+    "scene:headform:uid:090": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】底前光 · 底前交界"
+    },
     "scene:headform:name:【交界线规律】底前光 · 底前交界": {
       "require": "member",
       "enabled": true,
       "label": "【交界线规律】底前光 · 底前交界"
+    },
+    "scene:headform:uid:091": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背侧光 · 背侧交界A"
+    },
+    "scene:headform:uid:092": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背侧光 · 背侧交界A"
+    },
+    "scene:headform:uid:093": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背侧光 · 背侧交界A"
+    },
+    "scene:headform:uid:094": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背侧光 · 背侧交界A"
+    },
+    "scene:headform:uid:095": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背侧光 · 背侧交界A"
+    },
+    "scene:headform:uid:096": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背侧光 · 背侧交界A"
     },
     "scene:headform:name:【交界线规律】背侧光 · 背侧交界A": {
       "require": "member",
       "enabled": true,
       "label": "【交界线规律】背侧光 · 背侧交界A"
     },
+    "scene:headform:uid:097": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背面光 · 背侧交界B"
+    },
+    "scene:headform:uid:098": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背面光 · 背侧交界B"
+    },
+    "scene:headform:uid:099": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背面光 · 背侧交界B"
+    },
+    "scene:headform:uid:100": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背面光 · 背侧交界B"
+    },
+    "scene:headform:uid:101": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背面光 · 背侧交界B"
+    },
+    "scene:headform:uid:102": {
+      "require": "member",
+      "enabled": true,
+      "label": "【交界线规律】背面光 · 背侧交界B"
+    },
     "scene:headform:name:【交界线规律】背面光 · 背侧交界B": {
       "require": "member",
       "enabled": true,
       "label": "【交界线规律】背面光 · 背侧交界B"
+    },
+    "scene:portrait:uid:9": {
+      "require": "user",
+      "enabled": true,
+      "label": "赫拉克勒斯"
     },
     "scene:portrait:name:赫拉克勒斯": {
       "require": "user",
       "enabled": true,
       "label": "赫拉克勒斯"
     },
+    "scene:portrait:uid:11": {
+      "require": "member",
+      "enabled": true,
+      "label": "法尔内塞凯撒"
+    },
     "scene:portrait:name:法尔内塞凯撒": {
       "require": "member",
       "enabled": true,
       "label": "法尔内塞凯撒"
+    },
+    "scene:portrait:uid:27": {
+      "require": "member",
+      "enabled": true,
+      "label": "大卫"
     },
     "scene:portrait:name:大卫": {
       "require": "member",
       "enabled": true,
       "label": "大卫"
     },
+    "scene:portrait:uid:28": {
+      "require": "member",
+      "enabled": true,
+      "label": "马赛曲战士"
+    },
     "scene:portrait:name:马赛曲战士": {
       "require": "member",
       "enabled": true,
       "label": "马赛曲战士"
+    },
+    "scene:portrait:uid:30": {
+      "require": "member",
+      "enabled": true,
+      "label": "阿波罗"
     },
     "scene:portrait:name:阿波罗": {
       "require": "member",
       "enabled": true,
       "label": "阿波罗"
     },
+    "scene:portrait:uid:55": {
+      "require": "user",
+      "enabled": true,
+      "label": "赫拉"
+    },
     "scene:portrait:name:赫拉": {
       "require": "user",
       "enabled": true,
       "label": "赫拉"
+    },
+    "scene:portrait:uid:58": {
+      "require": "user",
+      "enabled": true,
+      "label": "密涅瓦"
     },
     "scene:portrait:name:密涅瓦": {
       "require": "user",
       "enabled": true,
       "label": "密涅瓦"
     },
+    "scene:portrait:uid:66": {
+      "require": "user",
+      "enabled": true,
+      "label": "纳芙蒂蒂"
+    },
     "scene:portrait:name:纳芙蒂蒂": {
       "require": "user",
       "enabled": true,
       "label": "纳芙蒂蒂"
+    },
+    "scene:portrait:uid:115": {
+      "require": "user",
+      "enabled": true,
+      "label": "荷马"
     },
     "scene:portrait:name:荷马": {
       "require": "user",
       "enabled": true,
       "label": "荷马"
     },
+    "scene:portrait:uid:119": {
+      "require": "member",
+      "enabled": true,
+      "label": "苏格拉底"
+    },
     "scene:portrait:name:苏格拉底": {
       "require": "member",
       "enabled": true,
       "label": "苏格拉底"
+    },
+    "scene:portrait:uid:132": {
+      "require": "member",
+      "enabled": true,
+      "label": "布鲁特斯"
     },
     "scene:portrait:name:布鲁特斯": {
       "require": "member",
       "enabled": true,
       "label": "布鲁特斯"
     },
+    "scene:portrait:uid:131": {
+      "require": "member",
+      "enabled": true,
+      "label": "伏尔泰"
+    },
     "scene:portrait:name:伏尔泰": {
       "require": "member",
       "enabled": true,
       "label": "伏尔泰"
+    },
+    "scene:portrait:uid:133": {
+      "require": "member",
+      "enabled": true,
+      "label": "阿格里巴"
     },
     "scene:portrait:name:阿格里巴": {
       "require": "member",
       "enabled": true,
       "label": "阿格里巴"
     },
+    "scene:portrait:uid:134": {
+      "require": "member",
+      "enabled": true,
+      "label": "卡拉卡拉"
+    },
     "scene:portrait:name:卡拉卡拉": {
       "require": "member",
       "enabled": true,
       "label": "卡拉卡拉"
+    },
+    "scene:portrait:uid:135": {
+      "require": "member",
+      "enabled": true,
+      "label": "奥古斯都"
     },
     "scene:portrait:name:奥古斯都": {
       "require": "member",
       "enabled": true,
       "label": "奥古斯都"
     },
+    "scene:portrait:uid:136": {
+      "require": "member",
+      "enabled": true,
+      "label": "米开朗基罗"
+    },
     "scene:portrait:name:米开朗基罗": {
       "require": "member",
       "enabled": true,
       "label": "米开朗基罗"
+    },
+    "scene:portrait:uid:137": {
+      "require": "member",
+      "enabled": true,
+      "label": "断臂维纳斯"
     },
     "scene:portrait:name:断臂维纳斯": {
       "require": "member",
       "enabled": true,
       "label": "断臂维纳斯"
     },
+    "scene:portrait:uid:138": {
+      "require": "member",
+      "enabled": true,
+      "label": "安提诺乌斯"
+    },
     "scene:portrait:name:安提诺乌斯": {
       "require": "member",
       "enabled": true,
       "label": "安提诺乌斯"
+    },
+    "scene:portrait:uid:140": {
+      "require": "member",
+      "enabled": true,
+      "label": "贝多芬"
     },
     "scene:portrait:name:贝多芬": {
       "require": "member",
       "enabled": true,
       "label": "贝多芬"
     },
+    "scene:portrait:uid:139": {
+      "require": "user",
+      "enabled": true,
+      "label": "阿波罗头"
+    },
     "scene:portrait:name:阿波罗头": {
       "require": "user",
       "enabled": true,
       "label": "阿波罗头"
+    },
+    "scene:portrait:uid:141": {
+      "require": "member",
+      "enabled": true,
+      "label": "莫里哀"
     },
     "scene:portrait:name:莫里哀": {
       "require": "member",
       "enabled": true,
       "label": "莫里哀"
     },
+    "scene:portrait:uid:142": {
+      "require": "user",
+      "enabled": true,
+      "label": "摩西头"
+    },
     "scene:portrait:name:摩西头": {
       "require": "user",
       "enabled": true,
       "label": "摩西头"
+    },
+    "scene:portrait:uid:6": {
+      "require": "member",
+      "enabled": true,
+      "label": "凯撒"
     },
     "scene:portrait:name:凯撒": {
       "require": "member",
       "enabled": true,
       "label": "凯撒"
     },
+    "scene:portrait:uid:1": {
+      "require": "user",
+      "enabled": true,
+      "label": "桌上男青年"
+    },
     "scene:portrait:name:桌上男青年": {
       "require": "user",
       "enabled": true,
       "label": "桌上男青年"
+    },
+    "scene:portrait:uid:2": {
+      "require": "member",
+      "enabled": true,
+      "label": "鲁迅"
     },
     "scene:portrait:name:鲁迅": {
       "require": "member",
       "enabled": true,
       "label": "鲁迅"
     },
+    "scene:portrait:uid:4": {
+      "require": "member",
+      "enabled": true,
+      "label": "军装男青年"
+    },
     "scene:portrait:name:军装男青年": {
       "require": "member",
       "enabled": true,
       "label": "军装男青年"
+    },
+    "scene:portrait:uid:8": {
+      "require": "user",
+      "enabled": true,
+      "label": "杰昆·菲尼克斯"
     },
     "scene:portrait:name:杰昆·菲尼克斯": {
       "require": "user",
       "enabled": true,
       "label": "杰昆·菲尼克斯"
     },
+    "scene:portrait:uid:7": {
+      "require": "user",
+      "enabled": true,
+      "label": "Nicholson"
+    },
     "scene:portrait:name:Nicholson": {
       "require": "user",
       "enabled": true,
       "label": "Nicholson"
+    },
+    "scene:portrait:uid:10": {
+      "require": "member",
+      "enabled": true,
+      "label": "叶问"
     },
     "scene:portrait:name:叶问": {
       "require": "member",
       "enabled": true,
       "label": "叶问"
     },
+    "scene:portrait:uid:12": {
+      "require": "user",
+      "enabled": true,
+      "label": "麦斯·米科尔森"
+    },
     "scene:portrait:name:麦斯·米科尔森": {
       "require": "user",
       "enabled": true,
       "label": "麦斯·米科尔森"
+    },
+    "scene:portrait:uid:13": {
+      "require": "member",
+      "enabled": true,
+      "label": "阿诺·施瓦辛格"
     },
     "scene:portrait:name:阿诺·施瓦辛格": {
       "require": "member",
       "enabled": true,
       "label": "阿诺·施瓦辛格"
     },
+    "scene:portrait:uid:14": {
+      "require": "user",
+      "enabled": true,
+      "label": "亚伦·保罗"
+    },
     "scene:portrait:name:亚伦·保罗": {
       "require": "user",
       "enabled": true,
       "label": "亚伦·保罗"
+    },
+    "scene:portrait:uid:15": {
+      "require": "public",
+      "enabled": true,
+      "label": "汤姆·赫兰德"
     },
     "scene:portrait:name:汤姆·赫兰德": {
       "require": "public",
       "enabled": true,
       "label": "汤姆·赫兰德"
     },
+    "scene:portrait:uid:16": {
+      "require": "user",
+      "enabled": true,
+      "label": "托尼·斯塔克"
+    },
     "scene:portrait:name:托尼·斯塔克": {
       "require": "user",
       "enabled": true,
       "label": "托尼·斯塔克"
+    },
+    "scene:portrait:uid:18": {
+      "require": "member",
+      "enabled": true,
+      "label": "超人"
     },
     "scene:portrait:name:超人": {
       "require": "member",
       "enabled": true,
       "label": "超人"
     },
+    "scene:portrait:uid:17": {
+      "require": "member",
+      "enabled": true,
+      "label": "克里斯·海姆斯沃斯"
+    },
     "scene:portrait:name:克里斯·海姆斯沃斯": {
       "require": "member",
       "enabled": true,
       "label": "克里斯·海姆斯沃斯"
+    },
+    "scene:portrait:uid:19": {
+      "require": "user",
+      "enabled": true,
+      "label": "杰昆小丑"
     },
     "scene:portrait:name:杰昆小丑": {
       "require": "user",
       "enabled": true,
       "label": "杰昆小丑"
     },
+    "scene:portrait:uid:20": {
+      "require": "user",
+      "enabled": true,
+      "label": "杰克·尼克尔森"
+    },
     "scene:portrait:name:杰克·尼克尔森": {
       "require": "user",
       "enabled": true,
       "label": "杰克·尼克尔森"
+    },
+    "scene:portrait:uid:21": {
+      "require": "public",
+      "enabled": true,
+      "label": "基努·里维斯"
     },
     "scene:portrait:name:基努·里维斯": {
       "require": "public",
       "enabled": true,
       "label": "基努·里维斯"
     },
+    "scene:portrait:uid:22": {
+      "require": "user",
+      "enabled": true,
+      "label": "深眉光头男"
+    },
     "scene:portrait:name:深眉光头男": {
       "require": "user",
       "enabled": true,
       "label": "深眉光头男"
+    },
+    "scene:portrait:uid:23": {
+      "require": "user",
+      "enabled": true,
+      "label": "圆领短发男"
     },
     "scene:portrait:name:圆领短发男": {
       "require": "user",
       "enabled": true,
       "label": "圆领短发男"
     },
+    "scene:portrait:uid:24": {
+      "require": "member",
+      "enabled": true,
+      "label": "亨利·卡维尔"
+    },
     "scene:portrait:name:亨利·卡维尔": {
       "require": "member",
       "enabled": true,
       "label": "亨利·卡维尔"
+    },
+    "scene:portrait:uid:25": {
+      "require": "user",
+      "enabled": true,
+      "label": "布鲁斯·韦恩"
     },
     "scene:portrait:name:布鲁斯·韦恩": {
       "require": "user",
       "enabled": true,
       "label": "布鲁斯·韦恩"
     },
+    "scene:portrait:uid:26": {
+      "require": "user",
+      "enabled": true,
+      "label": "尼根"
+    },
     "scene:portrait:name:尼根": {
       "require": "user",
       "enabled": true,
       "label": "尼根"
+    },
+    "scene:portrait:uid:29": {
+      "require": "user",
+      "enabled": true,
+      "label": "罗伯特·帕丁森"
     },
     "scene:portrait:name:罗伯特·帕丁森": {
       "require": "user",
       "enabled": true,
       "label": "罗伯特·帕丁森"
     },
+    "scene:portrait:uid:31": {
+      "require": "user",
+      "enabled": true,
+      "label": "短发衬衫男"
+    },
     "scene:portrait:name:短发衬衫男": {
       "require": "user",
       "enabled": true,
       "label": "短发衬衫男"
+    },
+    "scene:portrait:uid:32": {
+      "require": "user",
+      "enabled": true,
+      "label": "光头中年男"
     },
     "scene:portrait:name:光头中年男": {
       "require": "user",
       "enabled": true,
       "label": "光头中年男"
     },
+    "scene:portrait:uid:33": {
+      "require": "user",
+      "enabled": true,
+      "label": "卷发古典男"
+    },
     "scene:portrait:name:卷发古典男": {
       "require": "user",
       "enabled": true,
       "label": "卷发古典男"
+    },
+    "scene:portrait:uid:34": {
+      "require": "user",
+      "enabled": true,
+      "label": "抿须中年男"
     },
     "scene:portrait:name:抿须中年男": {
       "require": "user",
       "enabled": true,
       "label": "抿须中年男"
     },
+    "scene:portrait:uid:35": {
+      "require": "user",
+      "enabled": true,
+      "label": "卷发少年"
+    },
     "scene:portrait:name:卷发少年": {
       "require": "user",
       "enabled": true,
       "label": "卷发少年"
+    },
+    "scene:portrait:uid:36": {
+      "require": "user",
+      "enabled": true,
+      "label": "仰望光头"
     },
     "scene:portrait:name:仰望光头": {
       "require": "user",
       "enabled": true,
       "label": "仰望光头"
     },
+    "scene:portrait:uid:37": {
+      "require": "user",
+      "enabled": true,
+      "label": "光头侧脸"
+    },
     "scene:portrait:name:光头侧脸": {
       "require": "user",
       "enabled": true,
       "label": "光头侧脸"
+    },
+    "scene:portrait:uid:38": {
+      "require": "user",
+      "enabled": true,
+      "label": "马可·奥勒留"
     },
     "scene:portrait:name:马可·奥勒留": {
       "require": "user",
       "enabled": true,
       "label": "马可·奥勒留"
     },
+    "scene:portrait:uid:39": {
+      "require": "user",
+      "enabled": true,
+      "label": "石膏白女01"
+    },
     "scene:portrait:name:石膏白女01": {
       "require": "user",
       "enabled": true,
       "label": "石膏白女01"
+    },
+    "scene:portrait:uid:40": {
+      "require": "user",
+      "enabled": true,
+      "label": "石膏白女02"
     },
     "scene:portrait:name:石膏白女02": {
       "require": "user",
       "enabled": true,
       "label": "石膏白女02"
     },
+    "scene:portrait:uid:41": {
+      "require": "user",
+      "enabled": true,
+      "label": "石膏白女03"
+    },
     "scene:portrait:name:石膏白女03": {
       "require": "user",
       "enabled": true,
       "label": "石膏白女03"
+    },
+    "scene:portrait:uid:42": {
+      "require": "user",
+      "enabled": true,
+      "label": "石膏白女04"
     },
     "scene:portrait:name:石膏白女04": {
       "require": "user",
       "enabled": true,
       "label": "石膏白女04"
     },
+    "scene:portrait:uid:43": {
+      "require": "user",
+      "enabled": true,
+      "label": "石膏白女05"
+    },
     "scene:portrait:name:石膏白女05": {
       "require": "user",
       "enabled": true,
       "label": "石膏白女05"
+    },
+    "scene:portrait:uid:44": {
+      "require": "user",
+      "enabled": true,
+      "label": "石膏白女06"
     },
     "scene:portrait:name:石膏白女06": {
       "require": "user",
       "enabled": true,
       "label": "石膏白女06"
     },
+    "scene:portrait:uid:45": {
+      "require": "user",
+      "enabled": true,
+      "label": "盘发吊带女"
+    },
     "scene:portrait:name:盘发吊带女": {
       "require": "user",
       "enabled": true,
       "label": "盘发吊带女"
+    },
+    "scene:portrait:uid:46": {
+      "require": "member",
+      "enabled": true,
+      "label": "辫发礼裙女"
     },
     "scene:portrait:name:辫发礼裙女": {
       "require": "member",
       "enabled": true,
       "label": "辫发礼裙女"
     },
+    "scene:portrait:uid:47": {
+      "require": "member",
+      "enabled": true,
+      "label": "侧面低头女子"
+    },
     "scene:portrait:name:侧面低头女子": {
       "require": "member",
       "enabled": true,
       "label": "侧面低头女子"
+    },
+    "scene:portrait:uid:48": {
+      "require": "member",
+      "enabled": true,
+      "label": "系带背心胸像"
     },
     "scene:portrait:name:系带背心胸像": {
       "require": "member",
       "enabled": true,
       "label": "系带背心胸像"
     },
+    "scene:portrait:uid:49": {
+      "require": "user",
+      "enabled": true,
+      "label": "小丑女"
+    },
     "scene:portrait:name:小丑女": {
       "require": "user",
       "enabled": true,
       "label": "小丑女"
+    },
+    "scene:portrait:uid:50": {
+      "require": "member",
+      "enabled": true,
+      "label": "尤利娅·提图斯"
     },
     "scene:portrait:name:尤利娅·提图斯": {
       "require": "member",
       "enabled": true,
       "label": "尤利娅·提图斯"
     },
+    "scene:portrait:uid:51": {
+      "require": "member",
+      "enabled": true,
+      "label": "伯爵夫人"
+    },
     "scene:portrait:name:伯爵夫人": {
       "require": "member",
       "enabled": true,
       "label": "伯爵夫人"
+    },
+    "scene:portrait:uid:52": {
+      "require": "user",
+      "enabled": true,
+      "label": "闭眼光头女"
     },
     "scene:portrait:name:闭眼光头女": {
       "require": "user",
       "enabled": true,
       "label": "闭眼光头女"
     },
+    "scene:portrait:uid:53": {
+      "require": "member",
+      "enabled": true,
+      "label": "发带礼裙女"
+    },
     "scene:portrait:name:发带礼裙女": {
       "require": "member",
       "enabled": true,
       "label": "发带礼裙女"
+    },
+    "scene:portrait:uid:54": {
+      "require": "user",
+      "enabled": true,
+      "label": "阿马宗"
     },
     "scene:portrait:name:阿马宗": {
       "require": "user",
       "enabled": true,
       "label": "阿马宗"
     },
+    "scene:portrait:uid:56": {
+      "require": "user",
+      "enabled": true,
+      "label": "青年女子胸像"
+    },
     "scene:portrait:name:青年女子胸像": {
       "require": "user",
       "enabled": true,
       "label": "青年女子胸像"
+    },
+    "scene:portrait:uid:57": {
+      "require": "member",
+      "enabled": true,
+      "label": "玛格丽特·勒孔特"
     },
     "scene:portrait:name:玛格丽特·勒孔特": {
       "require": "member",
       "enabled": true,
       "label": "玛格丽特·勒孔特"
     },
+    "scene:portrait:uid:59": {
+      "require": "user",
+      "enabled": true,
+      "label": "高盘发女"
+    },
     "scene:portrait:name:高盘发女": {
       "require": "user",
       "enabled": true,
       "label": "高盘发女"
+    },
+    "scene:portrait:uid:60": {
+      "require": "user",
+      "enabled": true,
+      "label": "女头像"
     },
     "scene:portrait:name:女头像": {
       "require": "user",
       "enabled": true,
       "label": "女头像"
     },
+    "scene:portrait:uid:61": {
+      "require": "user",
+      "enabled": true,
+      "label": "布里斯托尔船首像"
+    },
     "scene:portrait:name:布里斯托尔船首像": {
       "require": "user",
       "enabled": true,
       "label": "布里斯托尔船首像"
+    },
+    "scene:portrait:uid:62": {
+      "require": "user",
+      "enabled": true,
+      "label": "尤利娅·多姆娜"
     },
     "scene:portrait:name:尤利娅·多姆娜": {
       "require": "user",
       "enabled": true,
       "label": "尤利娅·多姆娜"
     },
+    "scene:portrait:uid:63": {
+      "require": "user",
+      "enabled": true,
+      "label": "那不勒斯公主"
+    },
     "scene:portrait:name:那不勒斯公主": {
       "require": "user",
       "enabled": true,
       "label": "那不勒斯公主"
+    },
+    "scene:portrait:uid:64": {
+      "require": "user",
+      "enabled": true,
+      "label": "小安东尼娅"
     },
     "scene:portrait:name:小安东尼娅": {
       "require": "user",
       "enabled": true,
       "label": "小安东尼娅"
     },
+    "scene:portrait:uid:65": {
+      "require": "user",
+      "enabled": true,
+      "label": "普罗塞尔皮娜"
+    },
     "scene:portrait:name:普罗塞尔皮娜": {
       "require": "user",
       "enabled": true,
       "label": "普罗塞尔皮娜"
+    },
+    "scene:portrait:uid:67": {
+      "require": "user",
+      "enabled": true,
+      "label": "艺术家之女"
     },
     "scene:portrait:name:艺术家之女": {
       "require": "user",
       "enabled": true,
       "label": "艺术家之女"
     },
+    "scene:portrait:uid:68": {
+      "require": "member",
+      "enabled": true,
+      "label": "卷发幼女"
+    },
     "scene:portrait:name:卷发幼女": {
       "require": "member",
       "enabled": true,
       "label": "卷发幼女"
+    },
+    "scene:portrait:uid:69": {
+      "require": "member",
+      "enabled": true,
+      "label": "短卷发女"
     },
     "scene:portrait:name:短卷发女": {
       "require": "member",
       "enabled": true,
       "label": "短卷发女"
     },
+    "scene:portrait:uid:71": {
+      "require": "member",
+      "enabled": true,
+      "label": "婴儿头"
+    },
     "scene:portrait:name:婴儿头": {
       "require": "member",
       "enabled": true,
       "label": "婴儿头"
+    },
+    "scene:portrait:uid:73": {
+      "require": "user",
+      "enabled": true,
+      "label": "光头童头"
     },
     "scene:portrait:name:光头童头": {
       "require": "user",
       "enabled": true,
       "label": "光头童头"
     },
+    "scene:portrait:uid:74": {
+      "require": "user",
+      "enabled": true,
+      "label": "男孩头"
+    },
     "scene:portrait:name:男孩头": {
       "require": "user",
       "enabled": true,
       "label": "男孩头"
+    },
+    "scene:portrait:uid:75": {
+      "require": "member",
+      "enabled": true,
+      "label": "卷发男童"
     },
     "scene:portrait:name:卷发男童": {
       "require": "member",
       "enabled": true,
       "label": "卷发男童"
     },
+    "scene:portrait:uid:76": {
+      "require": "member",
+      "enabled": true,
+      "label": "男童分面"
+    },
     "scene:portrait:name:男童分面": {
       "require": "member",
       "enabled": true,
       "label": "男童分面"
+    },
+    "scene:portrait:uid:77": {
+      "require": "user",
+      "enabled": true,
+      "label": "大笑光头女"
     },
     "scene:portrait:name:大笑光头女": {
       "require": "user",
       "enabled": true,
       "label": "大笑光头女"
     },
+    "scene:portrait:uid:78": {
+      "require": "user",
+      "enabled": true,
+      "label": "丸子头女"
+    },
     "scene:portrait:name:丸子头女": {
       "require": "user",
       "enabled": true,
       "label": "丸子头女"
+    },
+    "scene:portrait:uid:79": {
+      "require": "member",
+      "enabled": true,
+      "label": "路易丝·布隆尼亚尔"
     },
     "scene:portrait:name:路易丝·布隆尼亚尔": {
       "require": "member",
       "enabled": true,
       "label": "路易丝·布隆尼亚尔"
     },
+    "scene:portrait:uid:80": {
+      "require": "user",
+      "enabled": true,
+      "label": "女童头"
+    },
     "scene:portrait:name:女童头": {
       "require": "user",
       "enabled": true,
       "label": "女童头"
+    },
+    "scene:portrait:uid:81": {
+      "require": "member",
+      "enabled": true,
+      "label": "女童胸像"
     },
     "scene:portrait:name:女童胸像": {
       "require": "member",
       "enabled": true,
       "label": "女童胸像"
     },
+    "scene:portrait:uid:82": {
+      "require": "user",
+      "enabled": true,
+      "label": "盘发女童"
+    },
     "scene:portrait:name:盘发女童": {
       "require": "user",
       "enabled": true,
       "label": "盘发女童"
+    },
+    "scene:portrait:uid:83": {
+      "require": "user",
+      "enabled": true,
+      "label": "小沉思者"
     },
     "scene:portrait:name:小沉思者": {
       "require": "user",
       "enabled": true,
       "label": "小沉思者"
     },
+    "scene:portrait:uid:84": {
+      "require": "user",
+      "enabled": true,
+      "label": "小皮特"
+    },
     "scene:portrait:name:小皮特": {
       "require": "user",
       "enabled": true,
       "label": "小皮特"
     },
+    "scene:portrait:uid:85": {
+      "require": "user",
+      "enabled": true,
+      "label": "安德鲁·杰克逊"
+    },
     "scene:portrait:name:安德鲁·杰克逊": {
       "require": "user",
       "enabled": true,
       "label": "安德鲁·杰克逊"
+    },
+    "scene:portrait:uid:86": {
+      "require": "member",
+      "enabled": true,
+      "label": "汤姆·李·琼斯"
     },
     "scene:portrait:name:汤姆·李·琼斯": {
       "require": "member",
@@ -983,210 +2353,425 @@
       "enabled": true,
       "label": "男老年胸像"
     },
+    "scene:portrait:uid:88": {
+      "require": "user",
+      "enabled": true,
+      "label": "大笑老妇"
+    },
     "scene:portrait:name:大笑老妇": {
       "require": "user",
       "enabled": true,
       "label": "大笑老妇"
+    },
+    "scene:portrait:uid:89": {
+      "require": "user",
+      "enabled": true,
+      "label": "头巾女老年"
     },
     "scene:portrait:name:头巾女老年": {
       "require": "user",
       "enabled": true,
       "label": "头巾女老年"
     },
+    "scene:portrait:uid:90": {
+      "require": "user",
+      "enabled": true,
+      "label": "短发老妇"
+    },
     "scene:portrait:name:短发老妇": {
       "require": "user",
       "enabled": true,
       "label": "短发老妇"
+    },
+    "scene:portrait:uid:91": {
+      "require": "user",
+      "enabled": true,
+      "label": "深眶光头男"
     },
     "scene:portrait:name:深眶光头男": {
       "require": "user",
       "enabled": true,
       "label": "深眶光头男"
     },
+    "scene:portrait:uid:92": {
+      "require": "user",
+      "enabled": true,
+      "label": "光头写实女"
+    },
     "scene:portrait:name:光头写实女": {
       "require": "user",
       "enabled": true,
       "label": "光头写实女"
+    },
+    "scene:portrait:uid:93": {
+      "require": "member",
+      "enabled": true,
+      "label": "花带白衫童"
     },
     "scene:portrait:name:花带白衫童": {
       "require": "member",
       "enabled": true,
       "label": "花带白衫童"
     },
+    "scene:portrait:uid:94": {
+      "require": "member",
+      "enabled": true,
+      "label": "女青年1"
+    },
     "scene:portrait:name:女青年1": {
       "require": "member",
       "enabled": true,
       "label": "女青年1"
+    },
+    "scene:portrait:uid:95": {
+      "require": "member",
+      "enabled": true,
+      "label": "女青年2"
     },
     "scene:portrait:name:女青年2": {
       "require": "member",
       "enabled": true,
       "label": "女青年2"
     },
+    "scene:portrait:uid:96": {
+      "require": "member",
+      "enabled": true,
+      "label": "女青年3"
+    },
     "scene:portrait:name:女青年3": {
       "require": "member",
       "enabled": true,
       "label": "女青年3"
+    },
+    "scene:portrait:uid:97": {
+      "require": "user",
+      "enabled": true,
+      "label": "长卷齐刘海"
     },
     "scene:portrait:name:长卷齐刘海": {
       "require": "user",
       "enabled": true,
       "label": "长卷齐刘海"
     },
+    "scene:portrait:uid:98": {
+      "require": "member",
+      "enabled": true,
+      "label": "抿发露额女"
+    },
     "scene:portrait:name:抿发露额女": {
       "require": "member",
       "enabled": true,
       "label": "抿发露额女"
+    },
+    "scene:portrait:uid:99": {
+      "require": "user",
+      "enabled": true,
+      "label": "中性光头女"
     },
     "scene:portrait:name:中性光头女": {
       "require": "user",
       "enabled": true,
       "label": "中性光头女"
     },
+    "scene:portrait:uid:100": {
+      "require": "member",
+      "enabled": true,
+      "label": "盘发抹胸女"
+    },
     "scene:portrait:name:盘发抹胸女": {
       "require": "member",
       "enabled": true,
       "label": "盘发抹胸女"
+    },
+    "scene:portrait:uid:101": {
+      "require": "member",
+      "enabled": true,
+      "label": "仰头东方女"
     },
     "scene:portrait:name:仰头东方女": {
       "require": "member",
       "enabled": true,
       "label": "仰头东方女"
     },
+    "scene:portrait:uid:102": {
+      "require": "user",
+      "enabled": true,
+      "label": "网帽蓝领女"
+    },
     "scene:portrait:name:网帽蓝领女": {
       "require": "user",
       "enabled": true,
       "label": "网帽蓝领女"
+    },
+    "scene:portrait:uid:103": {
+      "require": "member",
+      "enabled": true,
+      "label": "杰森·斯坦森"
     },
     "scene:portrait:name:杰森·斯坦森": {
       "require": "member",
       "enabled": true,
       "label": "杰森·斯坦森"
     },
+    "scene:portrait:uid:104": {
+      "require": "member",
+      "enabled": true,
+      "label": "青衫短发男"
+    },
     "scene:portrait:name:青衫短发男": {
       "require": "member",
       "enabled": true,
       "label": "青衫短发男"
+    },
+    "scene:portrait:uid:105": {
+      "require": "user",
+      "enabled": true,
+      "label": "厚发刘海男"
     },
     "scene:portrait:name:厚发刘海男": {
       "require": "user",
       "enabled": true,
       "label": "厚发刘海男"
     },
+    "scene:portrait:uid:106": {
+      "require": "user",
+      "enabled": true,
+      "label": "老年胸像"
+    },
     "scene:portrait:name:老年胸像": {
       "require": "user",
       "enabled": true,
       "label": "老年胸像"
+    },
+    "scene:portrait:uid:107": {
+      "require": "user",
+      "enabled": true,
+      "label": "肩章男童"
     },
     "scene:portrait:name:肩章男童": {
       "require": "user",
       "enabled": true,
       "label": "肩章男童"
     },
+    "scene:portrait:uid:108": {
+      "require": "user",
+      "enabled": true,
+      "label": "靠枕笑男童"
+    },
     "scene:portrait:name:靠枕笑男童": {
       "require": "user",
       "enabled": true,
       "label": "靠枕笑男童"
+    },
+    "scene:portrait:uid:109": {
+      "require": "member",
+      "enabled": true,
+      "label": "微笑女童"
     },
     "scene:portrait:name:微笑女童": {
       "require": "member",
       "enabled": true,
       "label": "微笑女童"
     },
+    "scene:portrait:uid:110": {
+      "require": "member",
+      "enabled": true,
+      "label": "持玫瑰女子"
+    },
     "scene:portrait:name:持玫瑰女子": {
       "require": "member",
       "enabled": true,
       "label": "持玫瑰女子"
+    },
+    "scene:portrait:uid:111": {
+      "require": "user",
+      "enabled": true,
+      "label": "歌德"
     },
     "scene:portrait:name:歌德": {
       "require": "user",
       "enabled": true,
       "label": "歌德"
     },
+    "scene:portrait:uid:112": {
+      "require": "member",
+      "enabled": true,
+      "label": "大胡子男子"
+    },
     "scene:portrait:name:大胡子男子": {
       "require": "member",
       "enabled": true,
       "label": "大胡子男子"
+    },
+    "scene:portrait:uid:113": {
+      "require": "member",
+      "enabled": true,
+      "label": "裹头老农"
     },
     "scene:portrait:name:裹头老农": {
       "require": "member",
       "enabled": true,
       "label": "裹头老农"
     },
+    "scene:portrait:uid:87": {
+      "require": "user",
+      "enabled": true,
+      "label": "塞内卡"
+    },
+    "scene:portrait:uid:114": {
+      "require": "user",
+      "enabled": true,
+      "label": "塞内卡"
+    },
     "scene:portrait:name:塞内卡": {
       "require": "user",
       "enabled": true,
       "label": "塞内卡"
+    },
+    "scene:portrait:uid:116": {
+      "require": "member",
+      "enabled": true,
+      "label": "长须老人"
     },
     "scene:portrait:name:长须老人": {
       "require": "member",
       "enabled": true,
       "label": "长须老人"
     },
+    "scene:portrait:uid:117": {
+      "require": "user",
+      "enabled": true,
+      "label": "方颌老男"
+    },
     "scene:portrait:name:方颌老男": {
       "require": "user",
       "enabled": true,
       "label": "方颌老男"
+    },
+    "scene:portrait:uid:118": {
+      "require": "member",
+      "enabled": true,
+      "label": "光头老者"
     },
     "scene:portrait:name:光头老者": {
       "require": "member",
       "enabled": true,
       "label": "光头老者"
     },
+    "scene:portrait:uid:120": {
+      "require": "member",
+      "enabled": true,
+      "label": "斯诺登"
+    },
     "scene:portrait:name:斯诺登": {
       "require": "member",
       "enabled": true,
       "label": "斯诺登"
+    },
+    "scene:portrait:uid:122": {
+      "require": "member",
+      "enabled": true,
+      "label": "颊痕光头男"
     },
     "scene:portrait:name:颊痕光头男": {
       "require": "member",
       "enabled": true,
       "label": "颊痕光头男"
     },
+    "scene:portrait:uid:121": {
+      "require": "user",
+      "enabled": true,
+      "label": "凯洛·伦"
+    },
     "scene:portrait:name:凯洛·伦": {
       "require": "user",
       "enabled": true,
       "label": "凯洛·伦"
+    },
+    "scene:portrait:uid:123": {
+      "require": "user",
+      "enabled": true,
+      "label": "白须闭目老人"
     },
     "scene:portrait:name:白须闭目老人": {
       "require": "user",
       "enabled": true,
       "label": "白须闭目老人"
     },
+    "scene:portrait:uid:124": {
+      "require": "user",
+      "enabled": true,
+      "label": "戴眼镜中年男"
+    },
     "scene:portrait:name:戴眼镜中年男": {
       "require": "user",
       "enabled": true,
       "label": "戴眼镜中年男"
+    },
+    "scene:portrait:uid:125": {
+      "require": "user",
+      "enabled": true,
+      "label": "眼袋短发男"
     },
     "scene:portrait:name:眼袋短发男": {
       "require": "user",
       "enabled": true,
       "label": "眼袋短发男"
     },
+    "scene:portrait:uid:126": {
+      "require": "user",
+      "enabled": true,
+      "label": "红衣微笑女"
+    },
     "scene:portrait:name:红衣微笑女": {
       "require": "user",
       "enabled": true,
       "label": "红衣微笑女"
+    },
+    "scene:portrait:uid:127": {
+      "require": "user",
+      "enabled": true,
+      "label": "秃顶仰望男"
     },
     "scene:portrait:name:秃顶仰望男": {
       "require": "user",
       "enabled": true,
       "label": "秃顶仰望男"
     },
+    "scene:portrait:uid:128": {
+      "require": "user",
+      "enabled": true,
+      "label": "梳背老者"
+    },
     "scene:portrait:name:梳背老者": {
       "require": "user",
       "enabled": true,
       "label": "梳背老者"
+    },
+    "scene:portrait:uid:129": {
+      "require": "member",
+      "enabled": true,
+      "label": "邦德"
     },
     "scene:portrait:name:邦德": {
       "require": "member",
       "enabled": true,
       "label": "邦德"
     },
+    "scene:portrait:uid:130": {
+      "require": "member",
+      "enabled": true,
+      "label": "平头西方男"
+    },
     "scene:portrait:name:平头西方男": {
       "require": "member",
       "enabled": true,
       "label": "平头西方男"
+    },
+    "scene:portrait:uid:143": {
+      "require": "member",
+      "enabled": true,
+      "label": "婴儿"
     },
     "scene:portrait:name:婴儿": {
       "require": "member",
@@ -1288,305 +2873,606 @@
       "enabled": true,
       "label": "空气透视"
     },
+    "scene:geometrysketch:uid:2000": {
+      "require": "public",
+      "enabled": true,
+      "label": "【几何体写生】球体"
+    },
     "scene:geometrysketch:name:【几何体写生】球体": {
       "require": "public",
       "enabled": true,
       "label": "【几何体写生】球体"
+    },
+    "scene:geometrysketch:uid:2001": {
+      "require": "public",
+      "enabled": true,
+      "label": "【几何体写生】正方体"
     },
     "scene:geometrysketch:name:【几何体写生】正方体": {
       "require": "public",
       "enabled": true,
       "label": "【几何体写生】正方体"
     },
+    "scene:geometrysketch:uid:2002": {
+      "require": "user",
+      "enabled": true,
+      "label": "【几何体写生】圆柱体"
+    },
     "scene:geometrysketch:name:【几何体写生】圆柱体": {
       "require": "user",
       "enabled": true,
       "label": "【几何体写生】圆柱体"
+    },
+    "scene:geometrysketch:uid:2003": {
+      "require": "user",
+      "enabled": true,
+      "label": "【几何体写生】圆锥体"
     },
     "scene:geometrysketch:name:【几何体写生】圆锥体": {
       "require": "user",
       "enabled": true,
       "label": "【几何体写生】圆锥体"
     },
+    "scene:geometrysketch:uid:2004": {
+      "require": "user",
+      "enabled": true,
+      "label": "【几何体写生】四棱锥"
+    },
     "scene:geometrysketch:name:【几何体写生】四棱锥": {
       "require": "user",
       "enabled": true,
       "label": "【几何体写生】四棱锥"
+    },
+    "scene:geometrysketch:uid:2005": {
+      "require": "user",
+      "enabled": true,
+      "label": "【几何体写生】六棱柱"
     },
     "scene:geometrysketch:name:【几何体写生】六棱柱": {
       "require": "user",
       "enabled": true,
       "label": "【几何体写生】六棱柱"
     },
+    "scene:geometrysketch:uid:2006": {
+      "require": "user",
+      "enabled": true,
+      "label": "【几何体写生】穿插体"
+    },
     "scene:geometrysketch:name:【几何体写生】穿插体": {
       "require": "user",
       "enabled": true,
       "label": "【几何体写生】穿插体"
+    },
+    "scene:geometrysketch:uid:2007": {
+      "require": "user",
+      "enabled": true,
+      "label": "【几何体写生】十二面五角体"
     },
     "scene:geometrysketch:name:【几何体写生】十二面五角体": {
       "require": "user",
       "enabled": true,
       "label": "【几何体写生】十二面五角体"
     },
+    "scene:geometrysketch:uid:2100": {
+      "require": "member",
+      "enabled": true,
+      "label": "【几何体写生】组合01"
+    },
     "scene:geometrysketch:name:【几何体写生】组合01": {
       "require": "member",
       "enabled": true,
       "label": "【几何体写生】组合01"
+    },
+    "scene:geometrysketch:uid:2101": {
+      "require": "member",
+      "enabled": true,
+      "label": "【几何体写生】组合02"
     },
     "scene:geometrysketch:name:【几何体写生】组合02": {
       "require": "member",
       "enabled": true,
       "label": "【几何体写生】组合02"
     },
+    "scene:geometrysketch:uid:2102": {
+      "require": "member",
+      "enabled": true,
+      "label": "【几何体写生】组合03"
+    },
     "scene:geometrysketch:name:【几何体写生】组合03": {
       "require": "member",
       "enabled": true,
       "label": "【几何体写生】组合03"
+    },
+    "scene:geometrysketch:uid:2103": {
+      "require": "member",
+      "enabled": true,
+      "label": "【几何体写生】组合04"
     },
     "scene:geometrysketch:name:【几何体写生】组合04": {
       "require": "member",
       "enabled": true,
       "label": "【几何体写生】组合04"
     },
+    "scene:geometrysketch:uid:2104": {
+      "require": "member",
+      "enabled": true,
+      "label": "【几何体写生】组合05"
+    },
     "scene:geometrysketch:name:【几何体写生】组合05": {
       "require": "member",
       "enabled": true,
       "label": "【几何体写生】组合05"
+    },
+    "scene:geometrysketch:uid:2105": {
+      "require": "member",
+      "enabled": true,
+      "label": "【几何体写生】组合06"
     },
     "scene:geometrysketch:name:【几何体写生】组合06": {
       "require": "member",
       "enabled": true,
       "label": "【几何体写生】组合06"
     },
+    "scene:geometrysketch:uid:2106": {
+      "require": "member",
+      "enabled": true,
+      "label": "【几何体写生】组合07"
+    },
     "scene:geometrysketch:name:【几何体写生】组合07": {
       "require": "member",
       "enabled": true,
       "label": "【几何体写生】组合07"
+    },
+    "scene:geometrysketch:uid:2107": {
+      "require": "member",
+      "enabled": true,
+      "label": "【几何体写生】组合08"
     },
     "scene:geometrysketch:name:【几何体写生】组合08": {
       "require": "member",
       "enabled": true,
       "label": "【几何体写生】组合08"
     },
+    "scene:geometrysketch:uid:2108": {
+      "require": "member",
+      "enabled": true,
+      "label": "【几何体写生】组合09"
+    },
     "scene:geometrysketch:name:【几何体写生】组合09": {
       "require": "member",
       "enabled": true,
       "label": "【几何体写生】组合09"
+    },
+    "scene:geometrysketch:uid:2109": {
+      "require": "member",
+      "enabled": true,
+      "label": "【几何体写生】组合10"
     },
     "scene:geometrysketch:name:【几何体写生】组合10": {
       "require": "member",
       "enabled": true,
       "label": "【几何体写生】组合10"
     },
+    "scene:geometrysketch:uid:2200": {
+      "require": "public",
+      "enabled": true,
+      "label": "【静物写生】双耳陶瓷罐"
+    },
     "scene:geometrysketch:name:【静物写生】双耳陶瓷罐": {
       "require": "public",
       "enabled": true,
       "label": "【静物写生】双耳陶瓷罐"
+    },
+    "scene:geometrysketch:uid:2201": {
+      "require": "public",
+      "enabled": true,
+      "label": "【静物写生】残破瓷罐"
     },
     "scene:geometrysketch:name:【静物写生】残破瓷罐": {
       "require": "public",
       "enabled": true,
       "label": "【静物写生】残破瓷罐"
     },
+    "scene:geometrysketch:uid:2202": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】鼓腹陶罐"
+    },
     "scene:geometrysketch:name:【静物写生】鼓腹陶罐": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】鼓腹陶罐"
+    },
+    "scene:geometrysketch:uid:2203": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】陶瓷壶"
     },
     "scene:geometrysketch:name:【静物写生】陶瓷壶": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】陶瓷壶"
     },
+    "scene:geometrysketch:uid:2204": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】陶瓷壶05"
+    },
     "scene:geometrysketch:name:【静物写生】陶瓷壶05": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】陶瓷壶05"
+    },
+    "scene:geometrysketch:uid:2205": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】陶瓷罐与花瓶06"
     },
     "scene:geometrysketch:name:【静物写生】陶瓷罐与花瓶06": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】陶瓷罐与花瓶06"
     },
+    "scene:geometrysketch:uid:2206": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】石青釉陶瓷壶07"
+    },
     "scene:geometrysketch:name:【静物写生】石青釉陶瓷壶07": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】石青釉陶瓷壶07"
+    },
+    "scene:geometrysketch:uid:2207": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】青花瓷花瓶08"
     },
     "scene:geometrysketch:name:【静物写生】青花瓷花瓶08": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】青花瓷花瓶08"
     },
+    "scene:geometrysketch:uid:2208": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】 绿釉莲纹花瓶09"
+    },
     "scene:geometrysketch:name:【静物写生】 绿釉莲纹花瓶09": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】 绿釉莲纹花瓶09"
+    },
+    "scene:geometrysketch:uid:2209": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】红色易拉罐"
     },
     "scene:geometrysketch:name:【静物写生】红色易拉罐": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】红色易拉罐"
     },
+    "scene:geometrysketch:uid:2210": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】 花卉纹装饰罐"
+    },
     "scene:geometrysketch:name:【静物写生】 花卉纹装饰罐": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】 花卉纹装饰罐"
+    },
+    "scene:geometrysketch:uid:2211": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】白罐、可乐与绿釉瓶"
     },
     "scene:geometrysketch:name:【静物写生】白罐、可乐与绿釉瓶": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】白罐、可乐与绿釉瓶"
     },
+    "scene:geometrysketch:uid:2212": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】白壶、蓝罐与红球13"
+    },
     "scene:geometrysketch:name:【静物写生】白壶、蓝罐与红球13": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】白壶、蓝罐与红球13"
+    },
+    "scene:geometrysketch:uid:2213": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】雾气中的土陶14"
     },
     "scene:geometrysketch:name:【静物写生】雾气中的土陶14": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】雾气中的土陶14"
     },
+    "scene:geometrysketch:uid:2214": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】雾中前后"
+    },
     "scene:geometrysketch:name:【静物写生】雾中前后": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】雾中前后"
+    },
+    "scene:geometrysketch:uid:2215": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】面积光与柔雾"
     },
     "scene:geometrysketch:name:【静物写生】面积光与柔雾": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】面积光与柔雾"
     },
+    "scene:geometrysketch:uid:2300": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】水果 · 苹果01"
+    },
     "scene:geometrysketch:name:【静物写生】水果 · 苹果01": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】水果 · 苹果01"
+    },
+    "scene:geometrysketch:uid:2302": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】牛油果02"
     },
     "scene:geometrysketch:name:【静物写生】牛油果02": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】牛油果02"
     },
+    "scene:geometrysketch:uid:2303": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】水果 · 香蕉03"
+    },
     "scene:geometrysketch:name:【静物写生】水果 · 香蕉03": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】水果 · 香蕉03"
+    },
+    "scene:geometrysketch:uid:2304": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】水果 · 石榴04"
     },
     "scene:geometrysketch:name:【静物写生】水果 · 石榴04": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】水果 · 石榴04"
     },
+    "scene:geometrysketch:uid:2305": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】水果 · 菠萝05"
+    },
     "scene:geometrysketch:name:【静物写生】水果 · 菠萝05": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】水果 · 菠萝05"
+    },
+    "scene:geometrysketch:uid:2306": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】水果 · 李子06"
     },
     "scene:geometrysketch:name:【静物写生】水果 · 李子06": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】水果 · 李子06"
     },
+    "scene:geometrysketch:uid:2307": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】水果 · 杨桃07"
+    },
     "scene:geometrysketch:name:【静物写生】水果 · 杨桃07": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】水果 · 杨桃07"
+    },
+    "scene:geometrysketch:uid:2308": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】水果 · 火龙果08"
     },
     "scene:geometrysketch:name:【静物写生】水果 · 火龙果08": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】水果 · 火龙果08"
     },
+    "scene:geometrysketch:uid:2309": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】水果 · 几何体果盘09"
+    },
     "scene:geometrysketch:name:【静物写生】水果 · 几何体果盘09": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】水果 · 几何体果盘09"
+    },
+    "scene:geometrysketch:uid:2310": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】水果 · 果盘10"
     },
     "scene:geometrysketch:name:【静物写生】水果 · 果盘10": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】水果 · 果盘10"
     },
+    "scene:geometrysketch:uid:2311": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】水果 · 果盘与花瓶11"
+    },
     "scene:geometrysketch:name:【静物写生】水果 · 果盘与花瓶11": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】水果 · 果盘与花瓶11"
+    },
+    "scene:geometrysketch:uid:2312": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】水果 · 果篮12"
     },
     "scene:geometrysketch:name:【静物写生】水果 · 果篮12": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】水果 · 果篮12"
     },
+    "scene:geometrysketch:uid:2313": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】水果 · 桌上的水果13"
+    },
     "scene:geometrysketch:name:【静物写生】水果 · 桌上的水果13": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】水果 · 桌上的水果13"
+    },
+    "scene:geometrysketch:uid:2314": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】水果 · 果篮14"
     },
     "scene:geometrysketch:name:【静物写生】水果 · 果篮14": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】水果 · 果篮14"
     },
+    "scene:geometrysketch:uid:2315": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】水果 · 果篮与陶罐15"
+    },
     "scene:geometrysketch:name:【静物写生】水果 · 果篮与陶罐15": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】水果 · 果篮与陶罐15"
+    },
+    "scene:geometrysketch:uid:2401": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】复杂物件 · 战盔01"
     },
     "scene:geometrysketch:name:【静物写生】复杂物件 · 战盔01": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】复杂物件 · 战盔01"
     },
+    "scene:geometrysketch:uid:2402": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】复杂物件 · 阿努比斯像02"
+    },
     "scene:geometrysketch:name:【静物写生】复杂物件 · 阿努比斯像02": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】复杂物件 · 阿努比斯像02"
+    },
+    "scene:geometrysketch:uid:2403": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】复杂物件 · 卡通男孩03"
     },
     "scene:geometrysketch:name:【静物写生】复杂物件 · 卡通男孩03": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】复杂物件 · 卡通男孩03"
     },
+    "scene:geometrysketch:uid:2404": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】复杂物件 · 玩具皮卡04"
+    },
     "scene:geometrysketch:name:【静物写生】复杂物件 · 玩具皮卡04": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】复杂物件 · 玩具皮卡04"
+    },
+    "scene:geometrysketch:uid:2405": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】复杂物件 · 鸥翼门跑车05"
     },
     "scene:geometrysketch:name:【静物写生】复杂物件 · 鸥翼门跑车05": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】复杂物件 · 鸥翼门跑车05"
     },
+    "scene:geometrysketch:uid:2406": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】复杂物件 · 旧拖拉机06"
+    },
     "scene:geometrysketch:name:【静物写生】复杂物件 · 旧拖拉机06": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】复杂物件 · 旧拖拉机06"
+    },
+    "scene:geometrysketch:uid:2407": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】复杂物件 · 陶摊07"
     },
     "scene:geometrysketch:name:【静物写生】复杂物件 · 陶摊07": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】复杂物件 · 陶摊07"
     },
+    "scene:geometrysketch:uid:2408": {
+      "require": "user",
+      "enabled": true,
+      "label": "【静物写生】复杂物件 · 木构小屋08"
+    },
     "scene:geometrysketch:name:【静物写生】复杂物件 · 木构小屋08": {
       "require": "user",
       "enabled": true,
       "label": "【静物写生】复杂物件 · 木构小屋08"
+    },
+    "scene:geometrysketch:uid:2501": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】自然场景 · 雾中小屋01"
     },
     "scene:geometrysketch:name:【静物写生】自然场景 · 雾中小屋01": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】自然场景 · 雾中小屋01"
     },
+    "scene:geometrysketch:uid:2502": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】自然场景 · 农舍小院02"
+    },
     "scene:geometrysketch:name:【静物写生】自然场景 · 农舍小院02": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】自然场景 · 农舍小院02"
+    },
+    "scene:geometrysketch:uid:2503": {
+      "require": "member",
+      "enabled": true,
+      "label": "【静物写生】自然场景 · 樱花小院03"
     },
     "scene:geometrysketch:name:【静物写生】自然场景 · 樱花小院03": {
       "require": "member",
       "enabled": true,
       "label": "【静物写生】自然场景 · 樱花小院03"
     }
-  }
+  },
+  "sceneKeyScheme": "sandbox+uid"
 }

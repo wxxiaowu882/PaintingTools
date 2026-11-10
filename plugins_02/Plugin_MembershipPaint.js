@@ -2,7 +2,8 @@
  * 会员权限「涂色」：运营登录后在 Solid 课表 / 面板模块上点标签轮换档位（游客→会员→高级）。
  * 写入 /api/membership/admin/policy { set }；不改业务课表 JSON。
  * Tab 按钮本身不涂；环境光 / 空气透视 / 景深 / 色阶概括按模块涂。
- * 仅测试/本机环境显示 FAB；生产站永不挂涂色按钮。
+ * 仅测站显示 FAB；本机预览与正式站都不挂涂色按钮。
+ * 2026-11-09：本机隐藏是为了淘宝详情效果截图干净（与 LOCAL_DEV_UNLOCK_ALL 配套；见路线图 §11）。
  */
 import '../docs/js/membership/MembershipAccess.js';
 
@@ -18,7 +19,7 @@ import '../docs/js/membership/MembershipAccess.js';
   function isPaintEnv() {
     try {
       var h = String((location && location.hostname) || '').toLowerCase();
-      if (!h || h === 'localhost' || h === '127.0.0.1') return true;
+      // 本机不显示：本地静态预览无 admin 策略接口；改档请去测站
       if (h === 'test.wuxiaoart.com') return true;
       if (/\.workers\.dev$/i.test(h) && /staging/i.test(h)) return true;
       return false;

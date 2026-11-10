@@ -3,6 +3,8 @@
  * - 权益：以 /api/membership/me（签名 Cookie）为准；localStorage 仅缓存展示
  * - 策略：docs/membership/access-policy.json
  * - 课表：优先 /api/membership/catalog；生产环境禁止回退到未过滤静态全文
+ * - 本机预览：LOCAL_DEV_UNLOCK_ALL 仅在 localhost 把前端门禁当 Pro；测站/正式站永不生效
+ *   （2026-11-09 为淘宝详情效果截图临时打开；非正式产品「免登录」口径，见路线图 §11）
  */
 (function (global) {
   'use strict';
@@ -22,6 +24,13 @@
   var PROMO_REF_KEY = 'pt_promo_ref';
   /** 日活本地标记前缀：pt_dau_v1_{accountId}_{北京日}=1 → 同日不再打 Worker */
   var DAU_KEY_PREFIX = 'pt_dau_v1_';
+  /**
+   * 本机静态预览临时全开（课表可进、控制条不弹升级）。
+   * 用途（2026-11-09）：淘宝新品详情页效果截图，免登录看到会员/Pro 资源。
+   * 仅 isLocalHost() 时生效；改 false 即恢复本机游客门禁观感。
+   * 测站 / 正式站不受此开关影响；勿当作正式「免登录」产品能力发版。
+   */
+  var LOCAL_DEV_UNLOCK_ALL = true;
   var _promoInfo = null;
   var _dauPingInFlight = false;
   var API_DEVICES = '/api/membership/account/devices';
@@ -29,9 +38,64 @@
   var _policy = null;
   var _tiers = null;
   var _entitlement = null;
+  var _productUnlocks = [];
+  var _coursePacks = [];
   var _ready = null;
   var _listeners = [];
   var _serverAuthoritative = false;
+
+  function normalizeProductUnlocks(list) {
+    if (!Array.isArray(list)) return [];
+    var out = [];
+    var seen = {};
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      var productId = String(
+        (item && typeof item === 'object' ? item.productId : item) || ''
+      )
+        .trim()
+        .toLowerCase();
+      if (!productId || seen[productId]) continue;
+      seen[productId] = true;
+      out.push({
+        productId: productId,
+        title: String((item && item.title) || productId).trim().slice(0, 80),
+        grantedAt: Number((item && item.grantedAt) || 0) || 0,
+        source: String((item && item.source) || '').trim().slice(0, 40)
+      });
+    }
+    return out;
+  }
+
+  function unlockCoversResource(resourceId) {
+    var rid = String(resourceId || '');
+    var m = /^scene:([a-z0-9_-]+):/i.exec(rid);
+    if (!m) return false;
+    var want = 'sandbox:' + String(m[1] || '').toLowerCase();
+    var list = _productUnlocks || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].productId === want) return true;
+    }
+    return false;
+  }
+
+  function setProductUnlocks(list) {
+    _productUnlocks = normalizeProductUnlocks(list);
+    return _productUnlocks;
+  }
+
+  function getProductUnlocks() {
+    return (_productUnlocks || []).slice();
+  }
+
+  function setCoursePacks(list) {
+    _coursePacks = Array.isArray(list) ? list.slice() : [];
+    return _coursePacks;
+  }
+
+  function getCoursePacks() {
+    return (_coursePacks || []).slice();
+  }
 
   function nowMs() { return Date.now(); }
 
@@ -42,6 +106,11 @@
     } catch (_e) {
       return false;
     }
+  }
+
+  /** 本机开发全开：必须同时满足开关 + localhost，避免误带到线上 */
+  function isLocalDevUnlockAll() {
+    return !!(LOCAL_DEV_UNLOCK_ALL && isLocalHost());
   }
 
   function getDeviceId() {
@@ -163,6 +232,8 @@
 
   /** guest | user | member */
   function getAccessLevel() {
+    // 本机预览无会员后台：临时按 Pro 放行前端门禁（测站/正式站不会走进这里）
+    if (isLocalDevUnlockAll()) return 'member';
     var e = getEntitlement();
     if (e.level === 'member') return 'member';
     if (e.level === 'user' || e.accountId) return 'user';
@@ -203,7 +274,8 @@
     return dark ? '#fff4c8' : '#7a5c0a';
   }
 
-  function badgeTitleForLabel(text) {
+  /** 悬停文案：开通前后同一套短说明（观感不靠 title 区分身份） */
+  function badgeTitleForLabel(text, _opts) {
     if (text === 'Pro') return 'Pro';
     if (text === '会员') return '会员免费';
     return text || '';
@@ -225,15 +297,13 @@
     );
   }
 
-  /** 按钮叠标：半透明低饱和底 + 白字（类 NEW，不旋转；宁淡勿厚） */
-  function stickerFillCss(require) {
+  /** 按钮叠标：半透明低饱和底 + 白字（类 NEW，不旋转；宁淡勿厚）
+   * 产品口径（2026-11-05）：开通前后同一套观感，不因 owned 换色/换图标 */
+  function stickerFillCss(require, _opts) {
     var isUser = normalizeRequire(require) === 'user';
-    // 会员灰绿 / Pro 暖金；再透一档（约 0.5），避免厚价签感
-    var bg = isUser ? 'rgba(48, 82, 66, 0.5)' : 'rgba(120, 94, 40, 0.5)';
-    var border = isUser ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.4)';
     return {
-      bg: bg,
-      border: border,
+      bg: isUser ? 'rgba(48, 82, 66, 0.5)' : 'rgba(120, 94, 40, 0.5)',
+      border: isUser ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.4)',
       color: '#fffef8'
     };
   }
@@ -259,7 +329,7 @@
       );
     }
     if (place === 'sticker' || place === 'tr') {
-      var fill = stickerFillCss(require);
+      var fill = stickerFillCss(require, opts);
       var size = compact ? '9px' : '10px';
       var pad = compact ? '1px 5px' : '2px 6px';
       // inset：略探出；insetStrict：完全角内（晓阶 app-shell 防裁切）
@@ -279,6 +349,7 @@
         size = '8px';
         pad = '1px 4px';
       }
+      var shadow = '0 1px 2px rgba(0,0,0,0.1)';
       return (
         'position:absolute;right:' + right + ';top:' + top + ';left:auto;bottom:auto;z-index:8;' +
         'font-size:' + size + ';line-height:1.15;font-weight:600;letter-spacing:0.04em;' +
@@ -287,7 +358,7 @@
         'background:' + fill.bg + ' !important;' +
         'color:' + fill.color + ';' +
         '-webkit-text-stroke:0;text-shadow:0 0.5px 1px rgba(0,0,0,0.22);' +
-        'box-shadow:0 1px 2px rgba(0,0,0,0.1);' +
+        'box-shadow:' + shadow + ';' +
         'pointer-events:none;white-space:nowrap;transform:none;'
       );
     }
@@ -314,8 +385,9 @@
     }
   }
 
-  /** Solid / Portrait 课表：角内裁切盒 + 斜角丝带 */
-  function attachLockRibbon(hostEl, text, require) {
+  /** Solid / Portrait 课表：角内裁切盒 + 斜角丝带。
+   * opts.owned=已开通仍留标，但观感与未开通同一套；差别只在能否进入。 */
+  function attachLockRibbon(hostEl, text, require, opts) {
     if (!hostEl) return null;
     var req = normalizeRequire(require);
     var isUser = req === 'user';
@@ -339,6 +411,9 @@
     } else if (badge.parentElement !== hostEl) {
       try { hostEl.appendChild(badge); } catch (_eRe) {}
     }
+    try {
+      badge.classList.remove('membership-badge--owned');
+    } catch (_eCls) {}
     badge.style.cssText =
       'position:absolute;right:0;bottom:0;left:auto;top:auto;z-index:3;' +
       'width:' + box + 'px;height:' + box + 'px;padding:0;margin:0;border:none;border-radius:0;' +
@@ -358,7 +433,7 @@
       'transform:rotate(-45deg);transform-origin:center center;' +
       'pointer-events:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
     strip.textContent = text || '';
-    badge.title = badgeTitleForLabel(text);
+    badge.title = badgeTitleForLabel(text, opts);
     return badge;
   }
 
@@ -578,6 +653,14 @@
         // 服务端为准：覆盖本地（含伪造的 localStorage）
         saveEntitlement(Object.assign({}, data.entitlement, { source: data.entitlement.source || 'server' }));
       }
+      if (data.productUnlocks) setProductUnlocks(data.productUnlocks);
+      else if (!(data.accessLevel === 'user' || data.accessLevel === 'member')) {
+        setProductUnlocks([]);
+      }
+      if (data.coursePacks) setCoursePacks(data.coursePacks);
+      else if (!(data.accessLevel === 'user' || data.accessLevel === 'member')) {
+        setCoursePacks([]);
+      }
       if (data.promoUrl || data.promoCode || data.referral) {
         _promoInfo = {
           promoUrl: data.promoUrl || null,
@@ -600,27 +683,40 @@
     });
   }
 
-  function ruleFor(resourceId) {
+  function asResourceIdList(resourceIdOrIds) {
+    if (Array.isArray(resourceIdOrIds)) {
+      return resourceIdOrIds.filter(function (x) { return !!x; }).map(function (x) { return String(x); });
+    }
+    if (resourceIdOrIds) return [String(resourceIdOrIds)];
+    return [];
+  }
+
+  function ruleFor(resourceIdOrIds) {
     var pol = _policy || { resources: {}, defaultRequire: 'public' };
-    var res = (pol.resources && pol.resources[resourceId]) || null;
-    if (!res || res.enabled === false) {
-      return {
-        require: normalizeRequire(pol.defaultRequire || 'public'),
-        enabled: false,
-        resourceId: resourceId
-      };
+    var ids = asResourceIdList(resourceIdOrIds);
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      var res = (pol.resources && pol.resources[id]) || null;
+      if (res && res.enabled !== false) {
+        return {
+          require: normalizeRequire(res.require || pol.defaultRequire || 'public'),
+          enabled: true,
+          probe: !!res.probe,
+          label: res.label || id,
+          resourceId: id
+        };
+      }
     }
     return {
-      require: normalizeRequire(res.require || pol.defaultRequire || 'public'),
-      enabled: true,
-      probe: !!res.probe,
-      label: res.label || resourceId,
-      resourceId: resourceId
+      require: normalizeRequire(pol.defaultRequire || 'public'),
+      enabled: false,
+      resourceId: ids[0] || null
     };
   }
 
-  function canAccess(resourceId) {
-    var rule = ruleFor(resourceId);
+  function canAccess(resourceIdOrIds) {
+    var ids = asResourceIdList(resourceIdOrIds);
+    var rule = ruleFor(ids);
     var ent = getEntitlement();
     var level = getAccessLevel();
     if (!rule.enabled || normalizeRequire(rule.require) === 'public') {
@@ -628,6 +724,17 @@
     }
     if (meetsRequire(rule.require)) {
       return { ok: true, reason: rule.require, rule: rule, entitlement: ent, accessLevel: level };
+    }
+    for (var i = 0; i < ids.length; i++) {
+      if (unlockCoversResource(ids[i])) {
+        return {
+          ok: true,
+          reason: 'product_unlock',
+          rule: rule,
+          entitlement: ent,
+          accessLevel: level
+        };
+      }
     }
     var need = normalizeRequire(rule.require);
     return {
@@ -640,11 +747,25 @@
     };
   }
 
+  /** 主键：模块 + uid；无 uid 回退 name */
   function sceneResourceId(sandbox, sceneData) {
     var sb = String(sandbox || 'geometry').toLowerCase();
+    var uid = sceneData && sceneData.uid != null ? String(sceneData.uid).trim() : '';
+    if (uid) return 'scene:' + sb + ':uid:' + uid;
     var name = (sceneData && (sceneData.name || sceneData.title)) ? String(sceneData.name || sceneData.title).trim() : '';
     if (!name) return null;
     return 'scene:' + sb + ':name:' + name;
+  }
+
+  /** 双读候选：uid 优先，再 name */
+  function sceneResourceIds(sandbox, sceneData) {
+    var sb = String(sandbox || 'geometry').toLowerCase();
+    var ids = [];
+    var uid = sceneData && sceneData.uid != null ? String(sceneData.uid).trim() : '';
+    var name = (sceneData && (sceneData.name || sceneData.title)) ? String(sceneData.name || sceneData.title).trim() : '';
+    if (uid) ids.push('scene:' + sb + ':uid:' + uid);
+    if (name) ids.push('scene:' + sb + ':name:' + name);
+    return ids;
   }
 
   function tabResourceId(tabName) {
@@ -770,9 +891,9 @@
   function filterScenesClientSide(scenes, sandbox) {
     var list = Array.isArray(scenes) ? scenes : [];
     return list.map(function (sc) {
-      var rid = sceneResourceId(sandbox, sc);
-      if (!rid) return sc;
-      var gate = canAccess(rid);
+      var ids = sceneResourceIds(sandbox, sc);
+      if (!ids.length) return sc;
+      var gate = canAccess(ids);
       if (!gate.ok) {
         return stripScenePayload(sc, gate.needLevel || (gate.rule && gate.rule.require));
       }
@@ -820,8 +941,8 @@
         // 禁止先 strip 再拼卡——旧 strip 会丢掉 uid/age，导致编号没了、「儿童」筛空。
         return arr.map(function (sc) {
           if (!sc || typeof sc !== 'object') return sc;
-          var rid = sceneResourceId(sb, sc);
-          var gate = rid ? canAccess(rid) : { ok: true, needLevel: null, rule: null };
+          var ids = sceneResourceIds(sb, sc);
+          var gate = ids.length ? canAccess(ids) : { ok: true, needLevel: null, rule: null };
           var locked = !gate.ok;
           var needReq = locked
             ? (gate.needLevel || (gate.rule && gate.rule.require) || 'member')
@@ -1040,7 +1161,11 @@
       if (!r.ok || !data || !data.ok) {
         throw new Error((data && data.error) || ('兑换失败 HTTP ' + r.status));
       }
-      saveEntitlement(Object.assign({}, data.entitlement, { source: 'server' }));
+      if (data.entitlement) {
+        saveEntitlement(Object.assign({}, data.entitlement, { source: 'server' }));
+      }
+      if (data.productUnlocks) setProductUnlocks(data.productUnlocks);
+      if (data.coursePacks) setCoursePacks(data.coursePacks);
       return data;
     });
   }
@@ -1107,6 +1232,11 @@
         if (!r.ok || !data || !data.ok) {
           throw new Error((data && data.error) || '无法读取设备列表');
         }
+        // 顺带刷新权益清单（写生/课包），避免只看 /me 缓存旧数据
+        if (data.account) {
+          if (data.account.productUnlocks) setProductUnlocks(data.account.productUnlocks);
+          if (data.account.coursePacks) setCoursePacks(data.account.coursePacks);
+        }
         return data.account;
       });
     });
@@ -1143,6 +1273,8 @@
   }
 
   function clearEntitlement() {
+    setProductUnlocks([]);
+    setCoursePacks([]);
     saveEntitlement({ tierId: 'free', level: 'guest', expiresAt: null, source: 'cleared' });
     return fetch(API_ME, { method: 'DELETE', credentials: 'same-origin' }).catch(function () {
       return null;
@@ -1361,6 +1493,8 @@
     ruleFor: ruleFor,
     getEntitlement: getEntitlement,
     getAccessLevel: getAccessLevel,
+    getProductUnlocks: getProductUnlocks,
+    getCoursePacks: getCoursePacks,
     meetsRequire: meetsRequire,
     normalizeRequire: normalizeRequire,
     badgeLabelForRequire: badgeLabelForRequire,
@@ -1393,6 +1527,7 @@
     sceneUrl: sceneUrl,
     filterScenesClientSide: filterScenesClientSide,
     sceneResourceId: sceneResourceId,
+    sceneResourceIds: sceneResourceIds,
     tabResourceId: tabResourceId,
     modResourceId: modResourceId,
     featureResourceId: featureResourceId,
@@ -1404,6 +1539,7 @@
     memberPageUrl: memberPageUrl,
     promptUpgrade: promptUpgrade,
     isLocalHost: isLocalHost,
+    isLocalDevUnlockAll: isLocalDevUnlockAll,
     isServerAuthoritative: function () { return _serverAuthoritative; },
     STORAGE_KEY: STORAGE_KEY
   };

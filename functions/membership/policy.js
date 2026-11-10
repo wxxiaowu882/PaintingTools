@@ -1,6 +1,7 @@
 /** 读取 access-policy 并过滤课表（不改磁盘权威 JSON） */
 
 import { accessLevel, meetsRequire, normalizeRequire } from './session.js';
+import { unlockCoversResource } from './product-unlocks.js';
 
 const POLICY_ASSET = '/docs/membership/access-policy.json';
 
@@ -128,13 +129,36 @@ export async function listSceneNames(context, sandbox) {
   const path = catalogAssetPath(sandbox);
   const raw = await fetchAssetJson(context, path);
   const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  return list.map((s) => ({ name: s && s.name ? String(s.name) : '' })).filter((x) => x.name);
+  return list
+    .map((s) => ({
+      name: s && s.name ? String(s.name) : '',
+      uid: s && s.uid != null ? String(s.uid).trim() : ''
+    }))
+    .filter((x) => x.name || x.uid);
 }
 
+/**
+ * 权限 ID 主键：模块 + 短号（uid）。
+ * 无 uid 时回退 name（解剖/五官等旧课）。
+ */
 export function sceneResourceId(sandbox, scene) {
+  const sb = String(sandbox || 'geometry').toLowerCase();
+  const uid = scene && scene.uid != null ? String(scene.uid).trim() : '';
+  if (uid) return 'scene:' + sb + ':uid:' + uid;
   const name = scene && (scene.name || scene.title) ? String(scene.name || scene.title).trim() : '';
   if (!name) return null;
-  return 'scene:' + String(sandbox || 'geometry').toLowerCase() + ':name:' + name;
+  return 'scene:' + sb + ':name:' + name;
+}
+
+/** 查询候选：uid 优先，再 name（迁移双读 / 旧客户端） */
+export function sceneResourceIds(sandbox, scene) {
+  const sb = String(sandbox || 'geometry').toLowerCase();
+  const ids = [];
+  const uid = scene && scene.uid != null ? String(scene.uid).trim() : '';
+  const name = scene && (scene.name || scene.title) ? String(scene.name || scene.title).trim() : '';
+  if (uid) ids.push('scene:' + sb + ':uid:' + uid);
+  if (name) ids.push('scene:' + sb + ':name:' + name);
+  return ids;
 }
 
 /** 资源所需档：public | user | member；无规则时用 defaultRequire */
@@ -145,6 +169,19 @@ export function resourceRequire(policy, resourceId) {
     return normalizeRequire(policy.defaultRequire);
   }
   return normalizeRequire(rule.require != null ? rule.require : policy.defaultRequire);
+}
+
+/** 多候选：命中第一条 enabled 规则；皆无则 defaultRequire */
+export function resourceRequireAny(policy, resourceIds) {
+  const ids = Array.isArray(resourceIds) ? resourceIds.filter(Boolean) : resourceIds ? [resourceIds] : [];
+  if (!policy) return normalizeRequire('public');
+  for (let i = 0; i < ids.length; i++) {
+    const rule = policy.resources && policy.resources[ids[i]];
+    if (rule && rule.enabled !== false) {
+      return normalizeRequire(rule.require != null ? rule.require : policy.defaultRequire);
+    }
+  }
+  return normalizeRequire(policy.defaultRequire);
 }
 
 /** @deprecated 兼容旧调用：是否要求高级会员 */
@@ -238,15 +275,21 @@ export function toCatalogListCard(scene, locked, includeThumb, requireLevel) {
   return out;
 }
 
-/** userLevel：guest|user|member，或传入 entitlement 对象 */
-export function filterCatalog(scenes, sandbox, policy, userLevel) {
+function resourceUnlocked(level, req, resourceId, productUnlocks) {
+  if (meetsRequire(level, req)) return true;
+  return unlockCoversResource(productUnlocks, resourceId);
+}
+
+/** userLevel：guest|user|member，或传入 entitlement 对象；productUnlocks 可盖过 scene:{sandbox}:* */
+export function filterCatalog(scenes, sandbox, policy, userLevel, productUnlocks) {
   const list = Array.isArray(scenes) ? scenes : scenes ? [scenes] : [];
   const level = typeof userLevel === 'string' ? userLevel : accessLevel(userLevel);
   return list.map((scene) => {
     if (!scene || typeof scene !== 'object') return scene;
-    const rid = sceneResourceId(sandbox, scene);
-    const req = rid ? resourceRequire(policy, rid) : normalizeRequire(policy && policy.defaultRequire);
-    if (!meetsRequire(level, req)) return stripScenePayload(scene, req);
+    const ids = sceneResourceIds(sandbox, scene);
+    const rid = ids[0] || sceneResourceId(sandbox, scene);
+    const req = ids.length ? resourceRequireAny(policy, ids) : normalizeRequire(policy && policy.defaultRequire);
+    if (!resourceUnlocked(level, req, rid, productUnlocks)) return stripScenePayload(scene, req);
     const copy = Object.assign({}, scene);
     delete copy.__membershipLocked;
     delete copy.__require;
@@ -255,30 +298,31 @@ export function filterCatalog(scenes, sandbox, policy, userLevel) {
 }
 
 /** 列表专用：全员只返回轻量卡（不够档带 locked + require），体积远小于全文课表 */
-export function filterCatalogList(scenes, sandbox, policy, userLevel, includeThumb) {
+export function filterCatalogList(scenes, sandbox, policy, userLevel, includeThumb, productUnlocks) {
   const list = Array.isArray(scenes) ? scenes : scenes ? [scenes] : [];
   const level = typeof userLevel === 'string' ? userLevel : accessLevel(userLevel);
   return list.map((scene) => {
     if (!scene || typeof scene !== 'object') return scene;
-    const rid = sceneResourceId(sandbox, scene);
-    const req = rid ? resourceRequire(policy, rid) : normalizeRequire(policy && policy.defaultRequire);
-    const locked = !meetsRequire(level, req);
+    const ids = sceneResourceIds(sandbox, scene);
+    const rid = ids[0] || sceneResourceId(sandbox, scene);
+    const req = ids.length ? resourceRequireAny(policy, ids) : normalizeRequire(policy && policy.defaultRequire);
+    const locked = !resourceUnlocked(level, req, rid, productUnlocks);
     return toCatalogListCard(scene, locked, !!includeThumb, req);
   });
 }
 
-export async function loadFilteredCatalog(context, sandbox, userLevel) {
+export async function loadFilteredCatalog(context, sandbox, userLevel, productUnlocks) {
   const path = catalogAssetPath(sandbox);
   const policy = await loadPolicy(context);
   const raw = await fetchAssetJson(context, path);
-  return filterCatalog(raw, sandbox, policy, userLevel);
+  return filterCatalog(raw, sandbox, policy, userLevel, productUnlocks);
 }
 
-export async function loadFilteredCatalogList(context, sandbox, userLevel, includeThumb) {
+export async function loadFilteredCatalogList(context, sandbox, userLevel, includeThumb, productUnlocks) {
   const path = catalogAssetPath(sandbox);
   const policy = await loadPolicy(context);
   const raw = await fetchAssetJson(context, path);
-  return filterCatalogList(raw, sandbox, policy, userLevel, includeThumb);
+  return filterCatalogList(raw, sandbox, policy, userLevel, includeThumb, productUnlocks);
 }
 
 /**
@@ -340,9 +384,11 @@ export async function loadFilteredSceneByName(context, sandbox, userLevel, scene
   if (!hit && want) hit = list.find((s) => s && String(s.name || '').trim() === want) || null;
   if (!hit) return { ok: false, error: '场景不存在' };
   const level = typeof userLevel === 'string' ? userLevel : accessLevel(userLevel);
-  const rid = sceneResourceId(sandbox, hit);
-  const req = rid ? resourceRequire(policy, rid) : normalizeRequire(policy.defaultRequire);
-  if (!meetsRequire(level, req)) {
+  const ids = sceneResourceIds(sandbox, hit);
+  const rid = ids[0] || sceneResourceId(sandbox, hit);
+  const req = ids.length ? resourceRequireAny(policy, ids) : normalizeRequire(policy.defaultRequire);
+  const unlocks = o.productUnlocks;
+  if (!resourceUnlocked(level, req, rid, unlocks)) {
     return { ok: true, locked: true, require: req, scene: stripScenePayload(hit, req) };
   }
   const copy = Object.assign({}, hit);

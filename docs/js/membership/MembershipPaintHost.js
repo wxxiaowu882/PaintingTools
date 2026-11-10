@@ -1,18 +1,19 @@
 /**
  * 跨页权限涂色宿主（Portrait_c / GR / XStudio / ARSketch）。
  * 依赖先加载 MembershipAccess.js。Solid 仍用 Plugin_MembershipPaint。
- * 仅测试/本机环境显示「权限涂色」；生产站永不挂 FAB。
+ * 仅测站显示「权限涂色」；本机预览与正式站永不挂 FAB。
+ * 2026-11-09：本机隐藏为淘宝详情效果截图（与 LOCAL_DEV_UNLOCK_ALL 配套；见路线图 §11）。
  */
 (function (global) {
   'use strict';
   var MA = global.MembershipAccess;
   if (!MA) return;
 
-  /** 测站 / 本机才允许运营涂色 UI；www 正式站绝不出现 */
+  /** 仅测站允许运营涂色 UI；本机 / www 正式站绝不出现 */
   function isPaintEnv() {
     try {
       var h = String((global.location && location.hostname) || '').toLowerCase();
-      if (!h || h === 'localhost' || h === '127.0.0.1') return true;
+      // 本机不显示：截图干净 + 无运营后台
       if (h === 'test.wuxiaoart.com') return true;
       if (/\.workers\.dev$/i.test(h) && /staging/i.test(h)) return true;
       return false;
@@ -278,7 +279,17 @@
     var gate = MA.canAccess(rid);
     var pageBadge = el.querySelector && el.querySelector('.membership-page-badge');
     var ribbon = el.querySelector && el.querySelector('.membership-badge');
-    if (gate.ok) {
+    var rule = MA.ruleFor ? MA.ruleFor(rid) : null;
+    var need =
+      (gate && gate.needLevel) ||
+      (gate && gate.rule && gate.rule.require) ||
+      (rule && rule.require) ||
+      'member';
+    var nreq = MA.normalizeRequire ? MA.normalizeRequire(need) : need;
+    var needBadge = nreq === 'user' || nreq === 'member';
+    var owned = !!(gate && gate.ok);
+
+    if (!needBadge) {
       el.classList.remove('membership-locked');
       el.style.opacity = '';
       if (pageBadge) pageBadge.remove();
@@ -286,22 +297,30 @@
       clearCornerPad(el);
       return;
     }
-    el.classList.add('membership-locked');
-    el.style.opacity = '';
-    var need = gate.needLevel || (gate.rule && gate.rule.require) || 'member';
+
+    if (owned) {
+      el.classList.remove('membership-locked');
+      el.style.opacity = '';
+    } else {
+      el.classList.add('membership-locked');
+      el.style.opacity = '';
+    }
+
     var text = MA.badgeLabelForRequire
       ? (MA.badgeLabelForRequire(need) || '会员')
       : '会员';
     var place = (opts && opts.place) || 'tr';
-    var title = MA.badgeTitleForLabel ? MA.badgeTitleForLabel(text) : (text === 'Pro' ? 'Pro' : '会员免费');
+    var title = MA.badgeTitleForLabel
+      ? MA.badgeTitleForLabel(text, { owned: owned })
+      : (text === 'Pro' ? 'Pro' : '会员免费');
 
-    // Portrait / 课表：与 Solid 同款角内斜带
+    // Portrait / 课表：与 Solid 同款角内斜带（开通后仍留标）
     if (place === 'ribbon' && MA.attachLockRibbon) {
       if (pageBadge) pageBadge.remove();
       try {
         if (el.style.overflow === 'visible') el.style.overflow = '';
       } catch (_eOv) {}
-      MA.attachLockRibbon(el, text, need);
+      MA.attachLockRibbon(el, text, need, { owned: owned });
       return;
     }
 
@@ -329,7 +348,10 @@
     if (useInline) {
       clearCornerPad(mount);
       if (MA.outlineBadgeCss) {
-        pageBadge.style.cssText = MA.outlineBadgeCss(need, 'inline', { surface: surface });
+        pageBadge.style.cssText = MA.outlineBadgeCss(need, 'inline', {
+          surface: surface,
+          owned: owned
+        });
       } else {
         pageBadge.style.cssText =
           'display:inline;margin-left:4px;font-size:9px;font-weight:600;background:transparent;border:none;' +
@@ -388,7 +410,8 @@
           compact: compact,
           inset: !floatOut,
           insetStrict: insetStrict,
-          floatOut: floatOut
+          floatOut: floatOut,
+          owned: owned
         });
       } else {
         pageBadge.style.cssText =
@@ -401,7 +424,10 @@
         if (getComputedStyle(mount).position === 'static') mount.style.position = 'relative';
       } catch (_e2) {}
       if (MA.outlineBadgeCss) {
-        pageBadge.style.cssText = MA.outlineBadgeCss(need, 'br', { surface: surface });
+        pageBadge.style.cssText = MA.outlineBadgeCss(need, 'br', {
+          surface: surface,
+          owned: owned
+        });
       }
     }
     pageBadge.textContent = text;

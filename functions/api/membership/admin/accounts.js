@@ -44,11 +44,14 @@ export async function onRequestGet(context) {
   }
   const cursor = url.searchParams.get('cursor') || '';
   const limitRaw = url.searchParams.get('limit');
-  const limit = limitRaw != null && limitRaw !== '' ? parseInt(limitRaw, 10) : undefined;
+  const limitParsed =
+    limitRaw != null && limitRaw !== '' ? parseInt(limitRaw, 10) : 20;
+  const limit = Number.isFinite(limitParsed) && limitParsed > 0 ? limitParsed : 20;
+  // 始终单页：避免运营台一次拉满上千账号（KV 读 + list 翻页）
   const result = await adminListAccounts(context.env, {
     cursor: cursor || undefined,
     limit,
-    singlePage: !!cursor
+    singlePage: true
   });
   if (!result.ok) return jsonResponse(result, 503);
   const accounts = [];
@@ -59,6 +62,7 @@ export async function onRequestGet(context) {
     ok: true,
     accounts,
     cursor: result.cursor || null,
+    listComplete: !result.cursor,
     truncated: !!result.truncated
   });
 }

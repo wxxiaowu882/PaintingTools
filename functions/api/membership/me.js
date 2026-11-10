@@ -4,7 +4,11 @@ import {
   jsonResponse,
   accessLevel
 } from '../../membership/session.js';
-import { loadAccount, normalizeCoursePacks } from '../../membership/accounts.js';
+import {
+  loadAccount,
+  normalizeCoursePacks,
+  normalizeProductUnlocks
+} from '../../membership/accounts.js';
 import { ensurePromoCode, referralSummaryForAdmin } from '../../membership/referral.js';
 import { loadOpsSettings } from '../../membership/ops-settings.js';
 
@@ -19,6 +23,7 @@ export async function onRequestGet(context) {
       const acct = await loadAccount(context.env, accountId);
       if (acct) {
         out.coursePacks = normalizeCoursePacks(acct.coursePacks);
+        out.productUnlocks = normalizeProductUnlocks(acct.productUnlocks);
       }
       const settings = await loadOpsSettings(context.env);
       out.referral = {

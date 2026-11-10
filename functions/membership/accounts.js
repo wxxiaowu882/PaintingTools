@@ -5,6 +5,13 @@
  */
 import { getSecret } from './session.js';
 import { beijingDayKey, bumpDailyStats } from './daily-stats.js';
+import {
+  normalizeProductUnlocks,
+  accountHasProductUnlock,
+  SKETCH_PRODUCTS
+} from './product-unlocks.js';
+
+export { normalizeProductUnlocks, accountHasProductUnlock };
 
 const MAX_DEVICES = 3;
 /** 同时在线会话上限（与设备白名单分开；第 3 处登录踢最老会话，不删白名单） */
@@ -104,6 +111,7 @@ export function ensureAccountFields(acct) {
   if (acct.referralRewardMonthKey == null) acct.referralRewardMonthKey = null;
   if (acct.referralRewardTotal == null) acct.referralRewardTotal = 0;
   if (!Array.isArray(acct.coursePacks)) acct.coursePacks = [];
+  if (!Array.isArray(acct.productUnlocks)) acct.productUnlocks = [];
   if (!Array.isArray(acct.activeSessions)) acct.activeSessions = [];
   return acct;
 }
@@ -179,6 +187,7 @@ function publicAccount(acct) {
     lastActiveAt: accountLastActiveAt(acct),
     entitlement: acct.entitlement || null,
     coursePacks: normalizeCoursePacks(acct.coursePacks),
+    productUnlocks: normalizeProductUnlocks(acct.productUnlocks),
     promoCode: acct.promoCode || null,
     referredByAccountId: acct.referredByAccountId || null,
     devices: (acct.devices || []).map((d) => ({
@@ -394,30 +403,152 @@ export async function noteDailyActive(env, accountId, opts) {
   return { ok: true, counted: true, account: publicAccount(acct) };
 }
 
+async function touchDeviceIfNeeded(acct, deviceId) {
+  if (!deviceId || deviceAllowed(acct, deviceId)) return { ok: true, account: acct };
+  return touchDevice(acct, deviceId, '');
+}
+
+async function bumpRedeemStatOnce(env, acct) {
+  const day = beijingDayKey();
+  if (acct.statsRedeemDay === day) return { bumped: false };
+  acct.statsRedeemDay = day;
+  try {
+    await bumpDailyStats(env, { redeem: 1 });
+  } catch (_eStat) {}
+  return { bumped: true };
+}
+
+/**
+ * 内存写入课包，并按需覆盖重算三年 Pro。
+ * recalculatePro=true：与人工开通一致（即使已有课包也重算）。
+ * recalculatePro=false：已拥有则只提示，不改 Pro。
+ */
+export function applyCoursePackAndMaybePro(acct, opts) {
+  ensureAccountFields(acct);
+  const packId = String((opts && opts.packId) || '').trim();
+  const packTitle = String((opts && opts.packTitle) || '').trim().slice(0, 80);
+  const source = String((opts && opts.source) || 'admin_grant').trim().slice(0, 40);
+  const recalculatePro = !!(opts && opts.recalculatePro);
+  if (!packId) return { ok: false, error: '请选择课包' };
+
+  const now = Date.now();
+  const packs = normalizeCoursePacks(acct.coursePacks);
+  const alreadyHadPack = packs.some((p) => p.packId === packId);
+  if (!alreadyHadPack) {
+    packs.push({
+      packId,
+      title: packTitle,
+      grantedAt: now,
+      source
+    });
+  }
+  acct.coursePacks = packs;
+
+  if (recalculatePro) {
+    const prev = acct.entitlement || {};
+    acct.entitlement = {
+      tierId: 'member_3y',
+      level: 'member',
+      expiresAt: now + COURSE_PRO_DAYS * 86400000,
+      source: source === 'course_redeem' ? 'course_redeem' : 'course_purchase',
+      redeemedAt: now,
+      jti: prev.jti || null,
+      redeemCode: (opts && opts.redeemCode) || prev.redeemCode || null,
+      lastCoursePackId: packId
+    };
+  }
+  return { ok: true, alreadyHadPack, granted: !alreadyHadPack };
+}
+
 /** 把兑换权益写入账号（取更长有效期 / 更高档简单合并：直接覆盖为新 grant） */
 export async function applyEntitlementToAccount(env, accountId, entitlement, deviceId) {
   let acct = await loadAccount(env, accountId);
   if (!acct) return { ok: false, error: '账号不存在' };
-  if (deviceId && !deviceAllowed(acct, deviceId)) {
-    const touched = touchDevice(acct, deviceId, '');
-    if (!touched.ok) return touched;
-    acct = touched.account;
-  }
+  const touched = await touchDeviceIfNeeded(acct, deviceId);
+  if (!touched.ok) return touched;
+  acct = touched.account;
   acct.entitlement = Object.assign({}, entitlement);
-  const day = beijingDayKey();
-  let redeemBump = 0;
-  if (acct.statsRedeemDay !== day) {
-    acct.statsRedeemDay = day;
-    redeemBump = 1;
-  }
+  await bumpRedeemStatOnce(env, acct);
   const saved = await saveAccount(env, acct);
   if (!saved.ok) return saved;
-  if (redeemBump) {
-    try {
-      await bumpDailyStats(env, { redeem: 1 });
-    } catch (_eStat) {}
-  }
   return { ok: true, account: publicAccount(acct) };
+}
+
+/**
+ * 权益兑换 · 录播课包：未拥有 → 加包 + 三年 Pro 重算；已拥有 → 只提示，不重算。
+ */
+export async function applyCourseRedeemToAccount(env, accountId, opts) {
+  let acct = await loadAccount(env, accountId);
+  if (!acct) return { ok: false, error: '账号不存在' };
+  const deviceId = opts && opts.deviceId;
+  const touched = await touchDeviceIfNeeded(acct, deviceId);
+  if (!touched.ok) return touched;
+  acct = touched.account;
+
+  const packId = String((opts && opts.packId) || '').trim();
+  const packTitle = String((opts && opts.packTitle) || '').trim().slice(0, 80);
+  if (!packId) return { ok: false, error: '兑换码缺少课包' };
+
+  const alreadyHadPack = accountHasCoursePack(acct, packId);
+  const applied = applyCoursePackAndMaybePro(acct, {
+    packId,
+    packTitle,
+    source: 'course_redeem',
+    recalculatePro: !alreadyHadPack,
+    redeemCode: opts && opts.redeemCode
+  });
+  if (!applied.ok) return applied;
+
+  await bumpRedeemStatOnce(env, acct);
+  const saved = await saveAccount(env, ensureAccountFields(acct));
+  if (!saved.ok) return saved;
+  return {
+    ok: true,
+    alreadyOwned: !!alreadyHadPack,
+    account: publicAccount(acct)
+  };
+}
+
+/**
+ * 权益兑换 · 写生单品永久解锁（盖过该沙盒锁课；≠ 整站 Pro）。
+ */
+export async function applyProductUnlockToAccount(env, accountId, opts) {
+  let acct = await loadAccount(env, accountId);
+  if (!acct) return { ok: false, error: '账号不存在' };
+  const deviceId = opts && opts.deviceId;
+  const touched = await touchDeviceIfNeeded(acct, deviceId);
+  if (!touched.ok) return touched;
+  acct = touched.account;
+  ensureAccountFields(acct);
+
+  const productId = String((opts && opts.productId) || '')
+    .trim()
+    .toLowerCase();
+  const known = SKETCH_PRODUCTS[productId];
+  if (!known) return { ok: false, error: '兑换码单品类型无效' };
+
+  const alreadyOwned = accountHasProductUnlock(acct, productId);
+  if (!alreadyOwned) {
+    const list = normalizeProductUnlocks(acct.productUnlocks);
+    list.push({
+      productId,
+      title: String((opts && opts.productName) || known.title).trim().slice(0, 80),
+      grantedAt: Date.now(),
+      source: 'product_redeem'
+    });
+    acct.productUnlocks = list;
+  }
+
+  await bumpRedeemStatOnce(env, acct);
+  const saved = await saveAccount(env, ensureAccountFields(acct));
+  if (!saved.ok) return saved;
+  return {
+    ok: true,
+    alreadyOwned,
+    productId,
+    productTitle: known.title,
+    account: publicAccount(acct)
+  };
 }
 
 export async function removeDevice(env, accountId, deviceId) {
@@ -642,37 +773,20 @@ export async function adminGrantCourseStudent(env, opts) {
   }
 
   ensureAccountFields(acct);
-  const now = Date.now();
-  const packs = normalizeCoursePacks(acct.coursePacks);
-  const alreadyHadPack = packs.some((p) => p.packId === packId);
-  if (!alreadyHadPack) {
-    packs.push({
-      packId,
-      title: packTitle,
-      grantedAt: now,
-      source: 'admin_grant'
-    });
-  }
-  acct.coursePacks = packs;
-
-  const prev = acct.entitlement || {};
-  acct.entitlement = {
-    tierId: 'member_3y',
-    level: 'member',
-    expiresAt: now + COURSE_PRO_DAYS * 86400000,
-    source: 'course_purchase',
-    redeemedAt: now,
-    jti: prev.jti || null,
-    redeemCode: prev.redeemCode || null,
-    lastCoursePackId: packId
-  };
+  const applied = applyCoursePackAndMaybePro(acct, {
+    packId,
+    packTitle,
+    source: 'admin_grant',
+    recalculatePro: true
+  });
+  if (!applied.ok) return applied;
 
   const saved = await saveAccount(env, ensureAccountFields(acct));
   if (!saved.ok) return saved;
   return {
     ok: true,
     created,
-    alreadyHadPack,
+    alreadyHadPack: !!applied.alreadyHadPack,
     initialPassword,
     account: publicAccount(acct)
   };

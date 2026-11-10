@@ -37,17 +37,63 @@
     .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
     label { font-size: 0.92rem; color: var(--muted); }
     input, select, textarea {
-      font: inherit; padding: 8px 10px; border: 1px solid var(--line);
+      font: inherit; padding: 8px 10px; border: 1px solid #cfc8bc;
       border-radius: 8px; background: #fff; color: var(--ink);
+      box-shadow: inset 0 1px 2px rgba(28, 25, 21, 0.05);
     }
     input[type="number"] { width: 88px; }
     textarea { width: 100%; min-height: 110px; }
     button {
       font: inherit; border: none; border-radius: 8px; padding: 9px 14px;
-      background: var(--btn); color: #fff; cursor: pointer;
+      background: var(--btn); color: #fff; cursor: pointer; font-weight: 600;
+      box-shadow: 0 1px 0 rgba(28, 25, 21, 0.08);
     }
-    button.secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+    /* 次要按钮：浅底色，勿做成「白底描边」以免和输入框撞脸 */
+    button.secondary {
+      background: #e7eef6; color: var(--accent); border: 1px solid #b7c8dc;
+      box-shadow: none;
+    }
+    button.danger {
+      background: #f3e4e4; color: var(--bad); border: 1px solid #e0b6b6;
+      box-shadow: none; font-weight: 600;
+    }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .pager-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      margin-top: 10px;
+    }
+    .pager-row .pager-meta { color: var(--muted, #6b645a); font-size: 13px; flex: 1; min-width: 120px; }
+    /* 账号详情操作条：输入与按钮并排，省纵向空间 */
+    .acct-ops {
+      margin-top: 12px;
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #faf7f1;
+    }
+    .ops-tool-row {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;
+    }
+    .ops-tool-row .ops-field {
+      display: flex; flex-direction: column; gap: 4px;
+      margin: 0; font-size: 0.82rem; color: var(--muted); font-weight: 500;
+      min-width: 0;
+    }
+    .ops-tool-row .ops-field.grow { flex: 1 1 12em; }
+    .ops-tool-row .ops-field.shrink { flex: 0 0 auto; }
+    .ops-tool-row .ops-field input {
+      width: 100%; margin: 0; min-height: 38px;
+    }
+    .ops-tool-row .ops-field.shrink input[type="number"] {
+      width: 72px; max-width: 72px;
+    }
+    .ops-tool-row > button {
+      flex: 0 0 auto;
+      min-height: 38px;
+      padding: 8px 12px;
+      white-space: nowrap;
+    }
     .pill {
       display: inline-block; font-size: 0.8rem; padding: 2px 8px;
       border-radius: 999px; border: 1px solid var(--line);
@@ -136,6 +182,81 @@
     }
     .ops-device-row > span { flex: 1 1 12em; min-width: 0; word-break: break-word; }
     .ops-device-row button { padding: 4px 8px; flex: 0 0 auto; }
+    /* 账号权益面板：分组清晰、对账一眼扫完 */
+    .ents-panel {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f7f5f1;
+      overflow: hidden;
+    }
+    .ents-panel-hd {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+      padding: 10px 12px;
+      background: #efece6;
+      border-bottom: 1px solid var(--line);
+    }
+    .ents-panel-hd .ents-title {
+      margin: 0; font-size: 0.95rem; font-weight: 650; color: var(--ink);
+      letter-spacing: 0.02em;
+    }
+    .ents-panel-hd .ents-hint {
+      margin: 0; font-size: 0.78rem; color: var(--muted);
+    }
+    .ents-group {
+      padding: 10px 12px 12px;
+      border-top: 1px solid rgba(0,0,0,0.06);
+    }
+    .ents-group:first-of-type { border-top: none; }
+    .ents-group-hd {
+      display: flex; align-items: center; gap: 8px;
+      margin: 0 0 8px;
+    }
+    .ents-group-hd .g-name {
+      font-size: 0.82rem; font-weight: 650; color: var(--ink);
+    }
+    .ents-pill {
+      display: inline-block; padding: 1px 7px; border-radius: 999px;
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em;
+      border: 1px solid transparent;
+    }
+    .ents-pill.time {
+      color: #1f4b7a; background: #e8f0fa; border-color: #c9daf0;
+    }
+    .ents-pill.forever {
+      color: #3d5a3a; background: #e8f2e9; border-color: #c9dfcc;
+    }
+    .ents-pill.off {
+      color: #6a6560; background: #eceae6; border-color: #ddd8d0;
+    }
+    .ents-item {
+      display: flex; flex-wrap: wrap; align-items: flex-start;
+      justify-content: space-between; gap: 8px 12px;
+      margin: 0 0 0 2px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid #e6e2da;
+    }
+    .ents-item + .ents-item { margin-top: 6px; }
+    .ents-item .ei-main { min-width: 0; flex: 1 1 12em; }
+    .ents-item .ei-title {
+      display: block; font-size: 0.92rem; font-weight: 600; color: var(--ink);
+      line-height: 1.35;
+    }
+    .ents-item .ei-sub {
+      display: block; margin-top: 3px;
+      font-size: 0.78rem; color: var(--muted); line-height: 1.4;
+      word-break: break-all;
+    }
+    .ents-item .ei-actions { flex: 0 0 auto; }
+    .ents-item .ei-actions button { padding: 4px 10px; margin: 0; }
+    .ents-empty {
+      margin: 0 0 0 2px; padding: 8px 10px;
+      font-size: 0.86rem; color: var(--muted);
+      border-radius: 8px; background: rgba(255,255,255,0.55);
+      border: 1px dashed #ddd8d0;
+    }
     .stats-chart-wrap {
       width: 100%; max-width: 100%; overflow: hidden;
       border: 1px solid var(--line); border-radius: 8px; background: #fff;
@@ -228,12 +349,13 @@
         gap: 8px;
         align-items: stretch;
       }
-      .row > label {
+      /* 通用表单行仍可纵向；账号操作条 .ops-tool-row 单独并排省高度 */
+      .row > label:not(.ops-field) {
         flex: 1 1 100%;
         display: block;
       }
-      .row > label > input,
-      .row > label > select,
+      .row > label:not(.ops-field) > input,
+      .row > label:not(.ops-field) > select,
       .row > input:not([type="checkbox"]),
       .row > select {
         width: 100%;
@@ -242,23 +364,39 @@
         display: block;
         margin-top: 4px;
       }
-      /* 表单主按钮拉满宽；表格/设备行内按钮保持紧凑，避免行高被撑爆 */
       .card > .row > button,
       .probe-actions button,
-      #acct-actions > .row > button,
       #sec-login .row > button {
         width: 100%;
         max-width: 100%;
         min-height: 44px;
       }
       button { min-height: 40px; padding: 9px 12px; max-width: 100%; }
-      #acct-actions .row,
       #acct-result {
         max-width: 100%;
         min-width: 0;
       }
-      #acct-actions .row { margin: 6px 0; }
       #acct-result .tip { margin: 2px 0; line-height: 1.4; }
+      .acct-ops { padding: 8px 10px; gap: 8px; }
+      .ops-tool-row {
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 6px;
+      }
+      .ops-tool-row .ops-field.grow { flex: 1 1 calc(100% - 7.5em); min-width: 8em; }
+      .ops-tool-row .ops-field.shrink { flex: 0 0 auto; }
+      .ops-tool-row > button {
+        width: auto !important;
+        max-width: none !important;
+        min-height: 38px !important;
+        padding: 7px 10px !important;
+        flex: 0 0 auto;
+      }
+      .ops-tool-row .ops-field input {
+        min-height: 38px;
+        font-size: 16px;
+        padding: 8px 10px;
+      }
       .ops-cell-actions button,
       .ops-device-row button,
       .table-scroll button,
@@ -313,7 +451,6 @@
       .ent-banner { padding: 8px 10px; margin-bottom: 6px; }
       .ent-banner .ent-main { font-size: 1rem; word-break: break-word; }
       .ent-banner .ent-sub { margin-top: 2px; }
-      #acct-actions .row { margin-top: 8px !important; }
       .price-item {
         flex-direction: column;
         align-items: stretch;
@@ -336,8 +473,6 @@
         justify-self: stretch;
         min-height: 44px;
       }
-      #acct-note,
-      #acct-new-pwd { max-width: none !important; width: 100%; }
       .guide-ol { padding-left: 1.15em; font-size: 0.9rem; }
     }
   </style>
@@ -505,39 +640,76 @@
 
       <div class="tab-panel active" data-panel="codes">
         <section class="card">
-          <h2>学员付完钱 → 发兑换码</h2>
-          <p class="tip">生成 <strong>10 位短码</strong>，复制话术发微信。<strong>强烈建议写备注</strong>（付款备注里的手机号 / 微信名），方便以后对账。</p>
+          <h2>发权益兑换码</h2>
+          <p class="tip">生成 <strong>10 位短码</strong>（Pro / 写生库 / 录播课包）。可批量导出给淘宝自动发货。<strong>强烈建议写备注</strong>，方便对账。</p>
           <div class="row">
-            <label>档位
-              <select id="code-tier">
-                <option value="member_3m">高级会员 · 三个月（¥39）</option>
-                <option value="member_1y">高级会员 · 一年（¥99）</option>
-                <option value="member_3y">高级会员 · 三年（¥199）</option>
+            <label style="flex:1.4;min-width:220px">开通哪一项（一个列表全看得见）
+              <select id="code-offer" style="width:100%">
+                <optgroup label="高级会员（按时长）">
+                  <option value="pro|member_3m">高级会员 · 三个月（¥39）</option>
+                  <option value="pro|member_1y">高级会员 · 一年（¥99）</option>
+                  <option value="pro|member_3y">高级会员 · 三年（¥199）</option>
+                </optgroup>
+                <optgroup label="写生台（永久单品）">
+                  <option value="sketch|sandbox:geometrysketch">静物写生台（永久）</option>
+                  <option value="sketch|sandbox:portrait">肖像写生台（永久）</option>
+                </optgroup>
+                <optgroup label="录播课包（永久 + 三年 Pro）" id="code-offer-course-group">
+                  <option value="course|watercolor-portrait-demo">水彩肖像画课程（demo）</option>
+                </optgroup>
               </select>
             </label>
-            <label>数量 <input id="code-count" type="number" min="1" max="20" value="1"></label>
+            <label>数量 <input id="code-count" type="number" min="1" max="100" value="1"></label>
             <label>码几天内有效 <input id="code-days" type="number" min="1" max="365" value="30"></label>
           </div>
           <div class="row">
             <label style="flex:1;min-width:200px">备注（强烈建议，仅你自己看）
-              <input id="code-note" type="text" maxlength="80" placeholder="例：付款备注手机号 138**** · 微信名小明 · 一年档" style="width:100%">
+              <input id="code-note" type="text" maxlength="80" placeholder="例：淘宝订单号 / 手机号 / 微信名" style="width:100%">
             </label>
             <button type="button" id="btn-gen">生成兑换码</button>
           </div>
-          <p class="tip" id="code-note-hint">没写备注也能发码，但对账会很难找。学员付款备注格式：高级会员 + 档位 + 注册手机号。</p>
+          <p class="tip" id="code-note-hint">没写备注也能发码，但对账会很难找。学员在会员页「权益兑换」粘贴即可。</p>
           <textarea id="code-out" readonly placeholder="生成后显示可复制给学员的话术"></textarea>
           <div class="row">
             <button type="button" class="secondary" id="btn-copy-code">复制整段话术</button>
-            <button type="button" class="secondary" id="btn-copy-codes-only">只复制短码</button>
+            <button type="button" class="secondary" id="btn-copy-codes-only">只复制短码（淘宝发货）</button>
             <button type="button" class="secondary" id="btn-open-redeem-filled">打开兑换页（已填码）</button>
           </div>
           <p class="msg" id="code-msg"></p>
         </section>
         <section class="card">
           <h2>发码记录（谁开通过）</h2>
-          <p class="tip">生成时间、档位、是否已兑、兑到哪台手机。建议发码时写备注。</p>
-          <div class="row">
-            <button type="button" class="secondary" id="btn-refresh-ledger">刷新列表</button>
+          <p class="tip">列表<strong>每页 20 条</strong>。检索：空着的条件不参与过滤（更省）；只填兑换码时只查一条。有条件时后台按需扫描凑页，勿一次把全部码拉到浏览器。</p>
+          <div class="row" id="ledger-search" style="align-items:flex-end">
+            <label style="flex:0.9;min-width:110px">兑换码
+              <input id="ledger-q-code" type="text" maxlength="16" placeholder="精确短码" autocomplete="off" style="width:100%">
+            </label>
+            <label style="flex:1;min-width:120px">兑到手机
+              <input id="ledger-q-phone" type="text" inputmode="tel" maxlength="11" placeholder="片段" autocomplete="off" style="width:100%">
+            </label>
+            <label style="flex:1.1;min-width:120px">备注含
+              <input id="ledger-q-note" type="text" maxlength="40" placeholder="关键字" autocomplete="off" style="width:100%">
+            </label>
+            <label>状态
+              <select id="ledger-q-status">
+                <option value="all">全部</option>
+                <option value="pending">待兑换</option>
+                <option value="redeemed">已兑换</option>
+                <option value="disabled">已作废</option>
+                <option value="expired">过期未兑</option>
+              </select>
+            </label>
+            <label>类型
+              <select id="ledger-q-kind">
+                <option value="all">全部</option>
+                <option value="pro">Pro</option>
+                <option value="sketch">写生</option>
+                <option value="course">录播</option>
+              </select>
+            </label>
+            <button type="button" id="btn-ledger-search">查询</button>
+            <button type="button" class="secondary" id="btn-ledger-clear">清空</button>
+            <button type="button" class="secondary" id="btn-refresh-ledger">刷新本页</button>
           </div>
           <div class="table-scroll">
             <table>
@@ -556,6 +728,11 @@
                 <tr><td colspan="7" class="tip">登录后自动加载…</td></tr>
               </tbody>
             </table>
+          </div>
+          <div class="pager-row" id="ledger-pager">
+            <button type="button" class="secondary" id="btn-ledger-prev" disabled>上一页</button>
+            <button type="button" class="secondary" id="btn-ledger-next" disabled>下一页</button>
+            <span class="pager-meta" id="ledger-pager-meta"></span>
           </div>
           <p class="msg" id="ledger-msg"></p>
         </section>
@@ -589,10 +766,10 @@
         </section>
         <section class="card">
           <h2>会员账号</h2>
-          <p class="tip">列表一次拉取后本地筛选（少打接口）。点行看权益/兑码/课包；可延期、取消高级、踢设备、复制回复话术。</p>
+          <p class="tip">列表<strong>每页 20 条</strong>；上方筛选只作用于<strong>当前页</strong>。找人请用「精确查询」。点行看<strong>账号权益</strong>（Pro / 写生台 / 录播课包）；可延期、取消高级、取消课包、踢设备、复制回复话术。</p>
           <div class="row">
             <label style="flex:1;min-width:160px">手机号
-              <input id="acct-phone" type="text" inputmode="tel" placeholder="片段过滤" style="width:100%">
+              <input id="acct-phone" type="text" inputmode="tel" placeholder="片段过滤（当前页）/ 精确查全号" style="width:100%">
             </label>
             <label>状态
               <select id="acct-filter-status">
@@ -626,29 +803,34 @@
                   <tbody id="acct-tbody"></tbody>
                 </table>
               </div>
+              <div class="pager-row" id="acct-pager">
+                <button type="button" class="secondary" id="btn-acct-prev" disabled>上一页</button>
+                <button type="button" class="secondary" id="btn-acct-next" disabled>下一页</button>
+                <span class="pager-meta" id="acct-pager-meta"></span>
+              </div>
             </div>
             <div>
               <div id="acct-result" class="tip">从左侧点选账号查看详情。</div>
-          <div id="acct-actions" class="hidden" style="margin-top:12px">
-            <label>微信备注
-              <input id="acct-note" type="text" maxlength="40" style="width:100%;max-width:320px">
-            </label>
-            <div class="row" style="margin-top:8px">
-              <button type="button" class="secondary" id="btn-acct-note">保存备注</button>
-                  <button type="button" class="secondary" id="btn-acct-copy-script">复制回复话术</button>
+          <div id="acct-actions" class="acct-ops hidden">
+            <div class="ops-tool-row">
+              <label class="ops-field grow">微信备注
+                <input id="acct-note" type="text" maxlength="40" placeholder="内部备注">
+              </label>
+              <button type="button" class="secondary" id="btn-acct-note">保存</button>
+              <button type="button" class="secondary" id="btn-acct-copy-script">复制话术</button>
             </div>
-                <div class="row" style="margin-top:10px;align-items:flex-end">
-                  <label>延期（天）
-                    <input id="acct-extend-days" type="number" min="1" max="3660" value="30" style="width:88px">
-                  </label>
-                  <button type="button" class="secondary" id="btn-acct-extend">延期高级</button>
-                  <button type="button" class="secondary" id="btn-acct-revoke">取消高级</button>
-                </div>
-                <div id="acct-devices" class="tip" style="margin-top:10px"></div>
-            <label style="display:block;margin-top:12px">新密码（至少 6 位）
-              <input id="acct-new-pwd" type="text" autocomplete="off" style="width:100%;max-width:320px" placeholder="重置后请私下告知用户">
-            </label>
-            <div class="row" style="margin-top:8px">
+            <div class="ops-tool-row">
+              <label class="ops-field shrink">延期（天）
+                <input id="acct-extend-days" type="number" min="1" max="3660" value="30">
+              </label>
+              <button type="button" class="secondary" id="btn-acct-extend">延期高级</button>
+              <button type="button" class="danger" id="btn-acct-revoke">取消高级</button>
+            </div>
+            <div id="acct-devices" class="tip" style="margin:2px 0 0"></div>
+            <div class="ops-tool-row">
+              <label class="ops-field grow">新密码（≥6 位）
+                <input id="acct-new-pwd" type="text" autocomplete="off" placeholder="重置后私下告知用户">
+              </label>
               <button type="button" id="btn-acct-reset">重置密码</button>
             </div>
           </div>
@@ -719,7 +901,7 @@
             <h3>操作步骤</h3>
             <ol class="guide-ol">
               <li>先在本运营台登录（测站或正式站对应口令）。</li>
-              <li>打开 <a href="/Solid?sandbox=geometry" target="_blank" rel="noopener">Solid</a>（几何 / 写生沙盒 / 肖像 / 头部造型规律均可；写生：<code>?sandbox=geometrysketch</code>）。</li>
+              <li>打开 <a href="/Solid?sandbox=geometry" target="_blank" rel="noopener">Solid</a>（几何 / 静物写生台 / 肖像写生台 / 头部造型规律均可；写生：<code>?sandbox=geometrysketch</code>）。</li>
               <li>点右下角「权限涂色」，再点课表卡片角标或底部面板标签。</li>
               <li>每点一次轮换：<strong>游客 → 会员 → 高级</strong>；改完自动保存到当前站点策略。</li>
             </ol>
@@ -784,6 +966,16 @@
     let canSaveOnline = false;
     let lastCodes = [];
     let acctCache = [];
+    const PAGE_SIZE = 20;
+    let ledgerPage = 0;
+    let ledgerCursorStack = [''];
+    let ledgerNextCursor = null;
+    let ledgerLoading = false;
+    let ledgerFilters = {};
+    let acctPage = 0;
+    let acctCursorStack = [''];
+    let acctNextCursor = null;
+    let acctLoading = false;
     let lastAcctPhone = '';
     let selectedAcctPhone = '';
     let selectedAcct = null;
@@ -804,7 +996,7 @@
         try {
           if (typeof loadCoursePackOptions === 'function') loadCoursePackOptions();
           if (typeof loadAcctList === 'function') {
-            if (!acctCache || !acctCache.length) loadAcctList();
+            if (!acctCache || !acctCache.length) loadAcctList({ reset: true });
             else renderAcctTable(acctCache);
           }
         } catch (_eAcct) {}
@@ -918,18 +1110,24 @@
       }
       tb.innerHTML = '';
       codes.forEach((c) => {
-        const status = c.redeemedAt
-          ? '<span class="pill ok">已兑换 ' + fmtTime(c.redeemedAt) + '</span>'
-          : (c.codeExpiresAt && c.codeExpiresAt < Date.now()
-            ? '<span class="pill bad">已过期未兑</span>'
-            : '<span class="pill warn">待兑换</span>');
+        const status = c.disabled
+          ? '<span class="pill bad">已作废</span>'
+          : (c.redeemedAt
+            ? '<span class="pill ok">已兑换 ' + fmtTime(c.redeemedAt) + '</span>'
+            : (c.codeExpiresAt && c.codeExpiresAt < Date.now()
+              ? '<span class="pill bad">已过期未兑</span>'
+              : '<span class="pill warn">待兑换</span>'));
         const who = c.redeemedByPhone
           ? ('<button type="button" class="secondary btn-goto-phone" data-phone="' + escapeHtml(c.redeemedByPhone) + '" style="padding:4px 8px">' + escapeHtml(c.redeemedByPhone) + '</button>')
           : (c.redeemedAt ? '<span class="tip">旧数据无绑定</span>' : '—');
+        const kind = String(c.kind || 'pro');
+        const kindTag = kind === 'sketch' ? '写生' : (kind === 'course' ? '录播' : 'Pro');
+        const label = c.tierName || c.productName || c.packTitle || c.tierId || c.productId || c.packId || '—';
+        const canVoid = !c.redeemedAt && !c.disabled;
         const tr = document.createElement('tr');
         tr.innerHTML =
           '<td><code>' + escapeHtml(c.code) + '</code></td>' +
-          '<td>' + escapeHtml(c.tierName || c.tierId) + '</td>' +
+          '<td><span class="pill">' + escapeHtml(kindTag) + '</span> ' + escapeHtml(label) + '</td>' +
           '<td>' + fmtTime(c.createdAt) + '</td>' +
           '<td>' + status + '</td>' +
           '<td>' + who + '</td>' +
@@ -937,6 +1135,9 @@
           '<td class="ops-cell-actions">' +
             '<button type="button" class="secondary btn-copy-one" data-code="' + escapeHtml(c.code) + '">复制</button>' +
             '<button type="button" class="secondary btn-reset-code" data-code="' + escapeHtml(c.code) + '">重置可再兑</button>' +
+            (canVoid
+              ? '<button type="button" class="secondary btn-disable-code" data-code="' + escapeHtml(c.code) + '">作废</button>'
+              : '') +
             '<button type="button" class="secondary btn-open-one" data-code="' + escapeHtml(c.code) + '">去兑换</button>' +
           '</td>';
         tb.appendChild(tr);
@@ -947,13 +1148,8 @@
           switchTab('accounts');
           $('acct-phone').value = phone;
           $('acct-filter-status').value = 'all';
-          loadAcctList().then(() => {
-            const hit = (acctCache || []).find((x) => x.phone === phone);
-            if (hit) showAcct(hit);
-            else {
-              $('btn-acct-lookup').click();
-            }
-          });
+          // 翻页后当前页未必有此人，直接精确查询
+          $('btn-acct-lookup').click();
         };
       });
       tb.querySelectorAll('.btn-copy-one').forEach((btn) => {
@@ -989,21 +1185,121 @@
           }
           $('ledger-msg').className = 'msg ok';
           $('ledger-msg').textContent = '已重置 ' + code + '，可再兑换';
-          await loadLedger();
+          await loadLedger({ keepMsg: true });
+        };
+      });
+      tb.querySelectorAll('.btn-disable-code').forEach((btn) => {
+        btn.onclick = async () => {
+          const code = btn.getAttribute('data-code');
+          if (!confirm('作废兑换码 ' + code + '？\n未兑过的码将无法再兑。')) return;
+          const { res, data } = await api('/api/membership/admin/codes', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'disable', code: code })
+          });
+          if (!res.ok) {
+            $('ledger-msg').className = 'msg err';
+            $('ledger-msg').textContent = (data && data.error) || '作废失败';
+            return;
+          }
+          $('ledger-msg').className = 'msg ok';
+          $('ledger-msg').textContent = '已作废 ' + code;
+          await loadLedger({ keepMsg: true });
         };
       });
     }
 
-    async function loadLedger() {
-      const { res, data } = await api('/api/membership/admin/codes?limit=50');
-      if (!res.ok) {
-        $('ledger-msg').className = 'msg err';
-        $('ledger-msg').textContent = (data && data.error) || '加载发码记录失败';
-        $('ledger-tbody').innerHTML = '<tr><td colspan="6" class="tip">加载失败</td></tr>';
-        return;
+    function readLedgerFiltersFromForm() {
+      const code = ($('ledger-q-code') && $('ledger-q-code').value || '').trim();
+      const phone = ($('ledger-q-phone') && $('ledger-q-phone').value || '').trim();
+      const note = ($('ledger-q-note') && $('ledger-q-note').value || '').trim();
+      const status = ($('ledger-q-status') && $('ledger-q-status').value) || 'all';
+      const kind = ($('ledger-q-kind') && $('ledger-q-kind').value) || 'all';
+      const f = {};
+      // 空字段不传，后台也不按该关键字过滤
+      if (code) f.code = code;
+      if (phone) f.phone = phone;
+      if (note) f.note = note;
+      if (status && status !== 'all') f.status = status;
+      if (kind && kind !== 'all') f.kind = kind;
+      return f;
+    }
+
+    function ledgerFilterQuery(f) {
+      const parts = [];
+      if (f.code) parts.push('code=' + encodeURIComponent(f.code));
+      if (f.phone) parts.push('phone=' + encodeURIComponent(f.phone));
+      if (f.note) parts.push('note=' + encodeURIComponent(f.note));
+      if (f.status) parts.push('status=' + encodeURIComponent(f.status));
+      if (f.kind) parts.push('kind=' + encodeURIComponent(f.kind));
+      return parts.length ? ('&' + parts.join('&')) : '';
+    }
+
+    function ledgerFilterLabel(f) {
+      const bits = [];
+      if (f.code) bits.push('码=' + f.code);
+      if (f.phone) bits.push('手机含' + f.phone);
+      if (f.note) bits.push('备注含「' + f.note + '」');
+      if (f.status) bits.push('状态=' + f.status);
+      if (f.kind) bits.push('类型=' + f.kind);
+      return bits.length ? bits.join(' · ') : '无过滤（浏览）';
+    }
+
+    function updateLedgerPager(count) {
+      const prev = $('btn-ledger-prev');
+      const next = $('btn-ledger-next');
+      const meta = $('ledger-pager-meta');
+      if (prev) prev.disabled = ledgerLoading || ledgerPage <= 0;
+      if (next) next.disabled = ledgerLoading || !ledgerNextCursor;
+      if (meta) {
+        meta.textContent =
+          '第 ' + (ledgerPage + 1) + ' 页 · 本页 ' + String(count || 0) + ' 条 · ' +
+          ledgerFilterLabel(ledgerFilters) +
+          (ledgerNextCursor ? ' · 还有下一页' : ' · 已到末页');
       }
-      $('ledger-msg').textContent = '';
-      renderLedger(data.codes || []);
+    }
+
+    async function loadLedger(opts) {
+      const o = opts && typeof opts === 'object' ? opts : {};
+      if (o.reset) {
+        ledgerPage = 0;
+        ledgerCursorStack = [''];
+        ledgerNextCursor = null;
+      }
+      if (o.filters) ledgerFilters = o.filters;
+      if (ledgerLoading) return;
+      ledgerLoading = true;
+      updateLedgerPager(0);
+      const cursor = ledgerCursorStack[ledgerPage] || '';
+      let qs = 'limit=' + PAGE_SIZE + ledgerFilterQuery(ledgerFilters || {});
+      if (cursor) qs += '&cursor=' + encodeURIComponent(cursor);
+      let pageCount = 0;
+      try {
+        const { res, data } = await api('/api/membership/admin/codes?' + qs);
+        if (!res.ok) {
+          $('ledger-msg').className = 'msg err';
+          $('ledger-msg').textContent = (data && data.error) || '加载发码记录失败';
+          $('ledger-tbody').innerHTML = '<tr><td colspan="7" class="tip">加载失败</td></tr>';
+          ledgerNextCursor = null;
+          return;
+        }
+        if (!o.keepMsg) {
+          $('ledger-msg').textContent = '';
+          $('ledger-msg').className = 'msg';
+        }
+        const codes = data.codes || [];
+        pageCount = codes.length;
+        ledgerNextCursor = data.listComplete ? null : (data.cursor || null);
+        if (!codes.length && Object.keys(ledgerFilters || {}).length) {
+          $('ledger-msg').className = 'msg';
+          $('ledger-msg').textContent = ledgerNextCursor
+            ? '本段未命中，可点「下一页」继续往后扫'
+            : '没有符合条件的发码记录';
+        }
+        renderLedger(codes);
+      } finally {
+        ledgerLoading = false;
+        updateLedgerPager(pageCount);
+      }
     }
 
     function normalizeReq(r) {
@@ -1080,7 +1376,7 @@
       next.resources = next.resources || {};
       document.querySelectorAll('#scene-tbody select[data-scene-id]').forEach((sel) => {
         const id = decodeURIComponent(sel.getAttribute('data-scene-id'));
-        const name = id.replace(/^scene:[^:]+:name:/, '');
+        const labelFromId = id.replace(/^scene:[^:]+:(?:uid|name):/, '');
         const req = normalizeReq(sel.value);
         if (req === 'public') {
           if (next.resources[id]) {
@@ -1089,7 +1385,7 @@
           }
         } else {
           next.resources[id] = Object.assign({}, next.resources[id] || {}, {
-            require: req, enabled: true, label: name
+            require: req, enabled: true, label: labelFromId
           });
         }
       });
@@ -1204,7 +1500,7 @@
       if ($('ui-tbody') && !$('ui-tbody').hidden) renderUiTabs();
       renderTiers();
       if (data.backupHistory) renderBackupHistory(data.backupHistory);
-      await loadLedger();
+      await loadLedger({ reset: true });
       return true;
     }
 
@@ -1277,25 +1573,76 @@
       $('sec-login').classList.remove('hidden');
     };
 
+    function parseCodeOffer(raw) {
+      const s = String(raw || '').trim();
+      const bar = s.indexOf('|');
+      if (bar < 0) return { kind: 'pro', tierId: s || 'member_3m' };
+      const kind = s.slice(0, bar);
+      const rest = s.slice(bar + 1);
+      if (kind === 'sketch') return { kind: 'sketch', productId: rest };
+      if (kind === 'course') return { kind: 'course', packId: rest };
+      return { kind: 'pro', tierId: rest || 'member_3m' };
+    }
+
+    async function loadCoursePackOptions() {
+      const group = $('code-offer-course-group');
+      if (!group) return;
+      try {
+        const res = await fetch('/docs/course/packs.json', { cache: 'no-cache' });
+        if (!res.ok) return;
+        const doc = await res.json();
+        const packs = (doc && doc.packs) || [];
+        if (!packs.length) return;
+        group.innerHTML = '';
+        packs.forEach((p) => {
+          const opt = document.createElement('option');
+          opt.value = 'course|' + p.packId;
+          opt.textContent =
+            (p.title || p.packId) +
+            (p.status === 'demo' ? '（demo）' : '') +
+            ' · 永久+三年Pro';
+          group.appendChild(opt);
+        });
+      } catch (_e) {}
+    }
+
+    loadCoursePackOptions();
+
     $('btn-gen').onclick = async () => {
       const noteVal = (($('code-note') && $('code-note').value) || '').trim();
       if (!noteVal) {
-        const go = confirm('还没写备注（手机号/微信名）。没有备注以后对账会很难。\n\n仍要继续生成吗？');
+        const go = confirm('还没写备注（手机号/微信名/订单号）。没有备注以后对账会很难。\n\n仍要继续生成吗？');
         if (!go) {
           if ($('code-note')) $('code-note').focus();
           setMsg($('code-msg'), '已取消。建议先填备注再生成。', false);
           return;
         }
       }
+      const offerEl = $('code-offer');
+      const parsed = parseCodeOffer(offerEl && offerEl.value);
+      const offerLabel =
+        (offerEl &&
+          offerEl.options[offerEl.selectedIndex] &&
+          offerEl.options[offerEl.selectedIndex].text) ||
+        '';
+      const payload = {
+        kind: parsed.kind,
+        count: Number($('code-count').value || 1),
+        codeDays: Number($('code-days').value || 30),
+        note: noteVal
+      };
+      if (parsed.kind === 'sketch') {
+        payload.productId = parsed.productId;
+      } else if (parsed.kind === 'course') {
+        payload.packId = parsed.packId;
+        payload.packTitle = offerLabel.replace(/\s*·\s*永久\+三年Pro\s*$/, '').trim() || parsed.packId;
+      } else {
+        payload.tierId = parsed.tierId;
+      }
       setMsg($('code-msg'), '生成中…', true);
       const { res, data } = await api('/api/membership/admin/codes', {
         method: 'POST',
-        body: JSON.stringify({
-          tierId: $('code-tier').value,
-          count: Number($('code-count').value || 1),
-          codeDays: Number($('code-days').value || 30),
-          note: noteVal
-        })
+        body: JSON.stringify(payload)
       });
       if (!res.ok) {
         setMsg($('code-msg'), (data && data.error) || '生成失败', false);
@@ -1303,11 +1650,55 @@
       }
       lastCodes = data.codes || [];
       $('code-out').value = data.copyText || lastCodes.join('\n');
-      setMsg($('code-msg'), '已生成 ' + lastCodes.length + ' 个短码（各 10 位）', true);
-      await loadLedger();
+      setMsg(
+        $('code-msg'),
+        '已生成 ' + lastCodes.length + ' 个短码（' + (data.label || offerLabel || parsed.kind) + '）',
+        true
+      );
+      await loadLedger({ reset: true });
     };
 
     $('btn-refresh-ledger').onclick = () => loadLedger();
+    if ($('btn-ledger-search')) {
+      $('btn-ledger-search').onclick = () => {
+        loadLedger({ reset: true, filters: readLedgerFiltersFromForm() });
+      };
+    }
+    if ($('btn-ledger-clear')) {
+      $('btn-ledger-clear').onclick = () => {
+        if ($('ledger-q-code')) $('ledger-q-code').value = '';
+        if ($('ledger-q-phone')) $('ledger-q-phone').value = '';
+        if ($('ledger-q-note')) $('ledger-q-note').value = '';
+        if ($('ledger-q-status')) $('ledger-q-status').value = 'all';
+        if ($('ledger-q-kind')) $('ledger-q-kind').value = 'all';
+        loadLedger({ reset: true, filters: {} });
+      };
+    }
+    ['ledger-q-code', 'ledger-q-phone', 'ledger-q-note'].forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          if ($('btn-ledger-search')) $('btn-ledger-search').click();
+        }
+      });
+    });
+    if ($('btn-ledger-prev')) {
+      $('btn-ledger-prev').onclick = () => {
+        if (ledgerPage <= 0 || ledgerLoading) return;
+        ledgerPage -= 1;
+        loadLedger();
+      };
+    }
+    if ($('btn-ledger-next')) {
+      $('btn-ledger-next').onclick = () => {
+        if (!ledgerNextCursor || ledgerLoading) return;
+        ledgerPage += 1;
+        ledgerCursorStack[ledgerPage] = ledgerNextCursor;
+        loadLedger();
+      };
+    }
 
     $('btn-copy-code').onclick = async () => {
       try {
@@ -1471,11 +1862,20 @@
         '到期时间：' + exp
       ];
       if (code) lines.push('关联兑换码：' + code);
+      const unlocks = account.productUnlocks || [];
+      if (unlocks.length) {
+        lines.push(
+          '写生权益：' +
+            unlocks.map((u) => u.title || u.productId).join('、') +
+            '（永久）'
+        );
+      }
       const packs = account.coursePacks || [];
       if (packs.length) {
         lines.push(
           '已购课包：' +
-            packs.map((p) => p.title || p.packId).join('、')
+            packs.map((p) => p.title || p.packId).join('、') +
+            '（永久）'
         );
       }
       if (account.wechatNote) lines.push('（内部备注：' + account.wechatNote + '）');
@@ -1527,7 +1927,7 @@
         '<div class="tip">备注：' + escapeHtml(account.wechatNote || '—') + '</div>' +
         '<div class="tip">来源：' + escapeHtml(sourceLabel(ent.source)) +
           (ent.redeemedAt ? (' · 兑码时间 ' + fmtTime(ent.redeemedAt)) : '') + '</div>' +
-        formatCoursePacksHtml(account) +
+        formatAccountEntitlementsPanel(account) +
         formatReferralTip(account);
       $('acct-note').value = account.wechatNote || '';
       const devices = account.devices || [];
@@ -1554,22 +1954,107 @@
       renderAcctTable(acctCache);
     }
 
-    function formatCoursePacksHtml(account) {
+    function formatAccountEntitlementsPanel(account) {
+      const ent = (account && account.entitlement) || {};
+      const isPro = account && account.accessLevel === 'member';
+      const unlocks = (account && account.productUnlocks) || [];
       const packs = (account && account.coursePacks) || [];
-      if (!packs.length) {
-        return '<div class="tip" style="margin-top:6px">课包：无（购课开通后显示于此；永久可看，与 Pro 到期无关）</div>';
+
+      let proBody;
+      if (!isPro) {
+        proBody = '<div class="ents-empty">未开通</div>';
+      } else {
+        const left = daysLeft(account);
+        let leftTxt = '';
+        if (left != null) {
+          if (left < 0) leftTxt = '已过期';
+          else leftTxt = '剩余 ' + left + ' 天';
+        }
+        const subParts = [
+          '到期 ' + expireLabel(account),
+          leftTxt,
+          '开通 ' + (ent.redeemedAt ? fmtTime(ent.redeemedAt) : '—')
+        ].filter(Boolean);
+        proBody =
+          '<div class="ents-item"><div class="ei-main">' +
+          '<span class="ei-title">' +
+          escapeHtml(tierLabel(ent.tierId)) +
+          '</span>' +
+          '<span class="ei-sub">' +
+          escapeHtml(subParts.join(' · ')) +
+          '</span></div></div>';
       }
-      const rows = packs.map((p) => {
-        const when = p.grantedAt ? fmtTime(p.grantedAt) : '—';
-        const title = p.title || p.packId;
-        return '<div class="ops-device-row">' +
-          '<span>' + escapeHtml(title) +
-          ' <code>' + escapeHtml(p.packId) + '</code>' +
-          ' · ' + escapeHtml(when) + '</span>' +
-          '<button type="button" class="secondary btn-revoke-pack" data-pack="' +
-          escapeHtml(p.packId) + '">取消课包</button></div>';
-      }).join('');
-      return '<div class="tip" style="margin-top:6px">课包（永久）：</div>' + rows;
+
+      let sketchBody;
+      if (!unlocks.length) {
+        sketchBody = '<div class="ents-empty">无</div>';
+      } else {
+        sketchBody = unlocks
+          .map((u) => {
+            const when = u.grantedAt ? fmtTime(u.grantedAt) : '—';
+            return (
+              '<div class="ents-item"><div class="ei-main">' +
+              '<span class="ei-title">' +
+              escapeHtml(u.title || u.productId || '写生权益') +
+              '</span>' +
+              '<span class="ei-sub">' +
+              escapeHtml((u.productId || '') + (u.productId ? ' · ' : '') + '开通 ' + when) +
+              '</span></div></div>'
+            );
+          })
+          .join('');
+      }
+
+      let courseBody;
+      if (!packs.length) {
+        courseBody = '<div class="ents-empty">无</div>';
+      } else {
+        courseBody = packs
+          .map((p) => {
+            const when = p.grantedAt ? fmtTime(p.grantedAt) : '—';
+            return (
+              '<div class="ents-item"><div class="ei-main">' +
+              '<span class="ei-title">' +
+              escapeHtml(p.title || p.packId || '录播课') +
+              '</span>' +
+              '<span class="ei-sub">' +
+              escapeHtml((p.packId || '') + (p.packId ? ' · ' : '') + '开通 ' + when) +
+              '</span></div>' +
+              '<div class="ei-actions">' +
+              '<button type="button" class="secondary btn-revoke-pack" data-pack="' +
+              escapeHtml(p.packId) +
+              '">取消课包</button></div></div>'
+            );
+          })
+          .join('');
+      }
+
+      return (
+        '<div class="ents-panel">' +
+        '<div class="ents-panel-hd">' +
+        '<p class="ents-title">账号权益</p>' +
+        '<p class="ents-hint">对账用 · 与顶栏身份对照</p>' +
+        '</div>' +
+        '<div class="ents-group">' +
+        '<div class="ents-group-hd"><span class="g-name">高级会员 Pro</span>' +
+        (isPro
+          ? '<span class="ents-pill time">按时长</span>'
+          : '<span class="ents-pill off">未开通</span>') +
+        '</div>' +
+        proBody +
+        '</div>' +
+        '<div class="ents-group">' +
+        '<div class="ents-group-hd"><span class="g-name">写生台</span>' +
+        '<span class="ents-pill forever">永久</span></div>' +
+        sketchBody +
+        '</div>' +
+        '<div class="ents-group">' +
+        '<div class="ents-group-hd"><span class="g-name">录播课包</span>' +
+        '<span class="ents-pill forever">永久</span></div>' +
+        courseBody +
+        '</div>' +
+        '</div>'
+      );
     }
 
     function filterAcctRows(list) {
@@ -1591,6 +2076,19 @@
       });
     }
 
+    function updateAcctPager(count) {
+      const prev = $('btn-acct-prev');
+      const next = $('btn-acct-next');
+      const meta = $('acct-pager-meta');
+      if (prev) prev.disabled = acctLoading || acctPage <= 0;
+      if (next) next.disabled = acctLoading || !acctNextCursor;
+      if (meta) {
+        meta.textContent =
+          '第 ' + (acctPage + 1) + ' 页 · 本页 ' + String(count || 0) + ' 条' +
+          (acctNextCursor ? ' · 还有下一页' : ' · 已到末页');
+      }
+    }
+
     function renderAcctTable(list) {
       const tbody = $('acct-tbody');
       const meta = $('acct-list-meta');
@@ -1598,8 +2096,10 @@
       const st = ($('acct-filter-status') && $('acct-filter-status').value) || 'all';
       const q = ($('acct-phone').value || '').trim();
       const filtered = !!(q || st !== 'all');
-      meta.textContent = '共 ' + String((list || []).length) + ' 个账号' +
-        (filtered ? '（筛选后 ' + rows.length + '）' : '');
+      meta.textContent = '本页 ' + String((list || []).length) + ' 个账号' +
+        (filtered ? '（筛选后 ' + rows.length + '）' : '') +
+        ' · 筛选仅当前页';
+      updateAcctPager((list || []).length);
       if (!rows.length) {
         tbody.innerHTML = '<tr><td colspan="8" class="tip">暂无账号</td></tr>';
         return;
@@ -1626,21 +2126,44 @@
       });
     }
 
-    async function loadAcctList() {
-      setMsg($('acct-msg'), '加载账号列表…', true);
-      const { res, data } = await api('/api/membership/admin/accounts');
-      if (!res.ok) {
-        setMsg($('acct-msg'), (data && data.error) || '列表加载失败', false);
-        acctCache = [];
-        renderAcctTable([]);
-        return;
+    async function loadAcctList(opts) {
+      const o = opts && typeof opts === 'object' ? opts : {};
+      if (o.reset) {
+        acctPage = 0;
+        acctCursorStack = [''];
+        acctNextCursor = null;
       }
-      acctCache = Array.isArray(data.accounts) ? data.accounts : [];
-      setMsg($('acct-msg'), data.truncated ? '列表已截断（账号很多时只显示前一批）' : '', true);
-      renderAcctTable(acctCache);
-      if (selectedAcctPhone) {
-        const hit = acctCache.find((x) => x.phone === selectedAcctPhone);
-        if (hit) showAcct(hit);
+      if (acctLoading) return;
+      acctLoading = true;
+      updateAcctPager(0);
+      setMsg($('acct-msg'), '加载账号列表…', true);
+      const cursor = acctCursorStack[acctPage] || '';
+      let qs = 'limit=' + PAGE_SIZE;
+      if (cursor) qs += '&cursor=' + encodeURIComponent(cursor);
+      try {
+        const { res, data } = await api('/api/membership/admin/accounts?' + qs);
+        if (!res.ok) {
+          setMsg($('acct-msg'), (data && data.error) || '列表加载失败', false);
+          acctCache = [];
+          acctNextCursor = null;
+          renderAcctTable([]);
+          return;
+        }
+        acctCache = Array.isArray(data.accounts) ? data.accounts : [];
+        acctNextCursor = data.listComplete ? null : (data.cursor || null);
+        setMsg(
+          $('acct-msg'),
+          data.truncated ? '本页已达上限；请用翻页或精确查询' : '',
+          true
+        );
+        renderAcctTable(acctCache);
+        if (selectedAcctPhone) {
+          const hit = acctCache.find((x) => x.phone === selectedAcctPhone);
+          if (hit) showAcct(hit);
+        }
+      } finally {
+        acctLoading = false;
+        updateAcctPager((acctCache || []).length);
       }
     }
 
@@ -1673,7 +2196,22 @@
     if ($('acct-filter-status')) {
       $('acct-filter-status').addEventListener('change', () => { renderAcctTable(acctCache); });
     }
-    $('btn-acct-reload').onclick = () => { loadAcctList(); };
+    $('btn-acct-reload').onclick = () => { loadAcctList({ reset: true }); };
+    if ($('btn-acct-prev')) {
+      $('btn-acct-prev').onclick = () => {
+        if (acctPage <= 0 || acctLoading) return;
+        acctPage -= 1;
+        loadAcctList();
+      };
+    }
+    if ($('btn-acct-next')) {
+      $('btn-acct-next').onclick = () => {
+        if (!acctNextCursor || acctLoading) return;
+        acctPage += 1;
+        acctCursorStack[acctPage] = acctNextCursor;
+        loadAcctList();
+      };
+    }
 
     $('btn-acct-lookup').onclick = async () => {
       const phone = ($('acct-phone').value || '').trim();
@@ -1863,7 +2401,7 @@
         }
         if (resultBox) resultBox.innerHTML = html;
         $('grant-pwd').value = '';
-        try { await loadAcctList(); } catch (_e) {}
+        try { await loadAcctList({ reset: true }); } catch (_e) {}
       };
     }
 
